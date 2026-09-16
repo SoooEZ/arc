@@ -16,6 +16,10 @@ test("library, graph preview, reference navigation, and published API execution"
     page.getByRole("heading", { name: "Order pricing", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(7);
+  await expect(page.locator(".react-flow__minimap-node")).toHaveCount(7);
+  await expect(
+    page.getByRole("button", { name: "Save draft", exact: true }),
+  ).toBeDisabled();
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("120");

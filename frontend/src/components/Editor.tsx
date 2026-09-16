@@ -86,6 +86,9 @@ function EditorContent({
     initial.draft.nodes.find((n) => n.type === "CONDITION")?.id || "input",
   );
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  const [measurements, setMeasurements] = useState<
+    Record<string, { width: number; height: number }>
+  >({});
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [testOpen, setTestOpen] = useState(false);
@@ -144,6 +147,7 @@ function EditorContent({
         id: n.id,
         type: "arc",
         position: n.position || { x: 0, y: 0 },
+        measured: measurements[n.id],
         selected: n.id === selected,
         data: {
           model: n,
@@ -151,7 +155,7 @@ function EditorContent({
           inputCount: rule.draft.inputs.length,
         },
       })),
-    [rule.draft, selected, visited],
+    [rule.draft, selected, visited, measurements],
   );
   const edges = useMemo(
     () =>
@@ -194,6 +198,28 @@ function EditorContent({
   );
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
+      const resized = changes.filter(
+        (c) => c.type === "dimensions" && c.dimensions,
+      );
+      if (resized.length) {
+        // React Flow's minimap reads measured user nodes. Keep these UI-only
+        // measurements without changing the portable graph or dirtying a draft.
+        setMeasurements((current) => {
+          const next = { ...current };
+          let changed = false;
+          for (const c of resized)
+            if (c.type === "dimensions" && c.dimensions) {
+              if (
+                next[c.id]?.width !== c.dimensions.width ||
+                next[c.id]?.height !== c.dimensions.height
+              ) {
+                next[c.id] = c.dimensions;
+                changed = true;
+              }
+            }
+          return changed ? next : current;
+        });
+      }
       const moved = changes.filter((c) => c.type === "position" && c.position);
       if (!moved.length) return;
       changeDefinition((d) => ({
