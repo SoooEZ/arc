@@ -1,0 +1,291 @@
+openapi: 3.0.3
+info:
+  title: ARC — Rules & Calculations
+  version: 0.1.0
+  description: Unauthenticated authoring and execution API. Published graphs and their pinned dependencies are immutable.
+servers:
+  - url: http://localhost:8080/api
+  - url: http://localhost:3080/api
+paths:
+  /rules:
+    get:
+      operationId: listRules
+      responses:
+        '200':
+          description: Rules with current drafts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Rule'}
+    post:
+      operationId: createRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, name, kind]
+              properties:
+                id: {type: string, pattern: '^[a-z][a-z0-9-]{0,79}$'}
+                name: {type: string, minLength: 1, maxLength: 160}
+                description: {type: string, maxLength: 2000}
+                kind: {type: string, enum: [DECISION_TREE, FORMULA, RULE]}
+                definition: {$ref: '#/components/schemas/Definition'}
+      responses:
+        '201':
+          description: Created rule (definition defaults to a template)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Rule'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}:
+    parameters: [{$ref: '#/components/parameters/RuleId'}]
+    get:
+      operationId: getRule
+      responses:
+        '200':
+          description: Rule and draft
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Rule'}
+        default: {$ref: '#/components/responses/Error'}
+    put:
+      operationId: saveDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, revision, definition]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 160}
+                description: {type: string, maxLength: 2000}
+                revision: {type: integer, minimum: 1}
+                definition: {$ref: '#/components/schemas/Definition'}
+      responses:
+        '200':
+          description: Saved rule with incremented revision
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Rule'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/publish:
+    parameters: [{$ref: '#/components/parameters/RuleId'}]
+    post:
+      operationId: publishRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision]
+              properties:
+                revision: {type: integer, minimum: 1}
+      responses:
+        '200':
+          description: Rule with incremented revision and publishedVersion
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Rule'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/execute:
+    parameters: [{$ref: '#/components/parameters/RuleId'}]
+    post:
+      operationId: executeRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inputs]
+              properties:
+                inputs: {type: object, additionalProperties: true}
+                version: {type: integer, minimum: 1, description: Omit for latest published version}
+            example:
+              inputs: {orderTotal: 150, customerTier: premium}
+              version: 1
+      responses:
+        '200': {$ref: '#/components/responses/Execution'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/versions:
+    parameters: [{$ref: '#/components/parameters/RuleId'}]
+    get:
+      operationId: listVersions
+      responses:
+        '200':
+          description: Versions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Version'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/versions/{version}:
+    parameters:
+      - {$ref: '#/components/parameters/RuleId'}
+      - name: version
+        in: path
+        required: true
+        schema: {type: integer, minimum: 1}
+    get:
+      operationId: getVersion
+      responses:
+        '200':
+          description: Immutable graph snapshot
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Version'}
+        default: {$ref: '#/components/responses/Error'}
+  /validate:
+    post:
+      operationId: validateGraph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Definition'}
+      responses:
+        '200':
+          description: Graph is structurally valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: {type: boolean, enum: [true]}
+        default: {$ref: '#/components/responses/Error'}
+  /preview:
+    post:
+      operationId: previewGraph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [definition, inputs]
+              properties:
+                definition: {$ref: '#/components/schemas/Definition'}
+                inputs: {type: object, additionalProperties: true}
+      responses:
+        '200': {$ref: '#/components/responses/Execution'}
+        default: {$ref: '#/components/responses/Error'}
+components:
+  parameters:
+    RuleId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string}
+  responses:
+    Error:
+      description: 400 malformed request; 404 missing resource; 409 revision conflict, duplicate ID, or unpublished rule; 413 oversized request; 422 invalid graph/input/calculation; 500 server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: {type: integer}
+              message: {type: string}
+              issues: {type: array, items: {type: string}}
+    Execution:
+      description: Scalar result and complete execution trace
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ruleId: {type: string}
+              version: {type: integer, nullable: true}
+              result: {nullable: true, description: Number, string, boolean, or null}
+              durationMicros: {type: integer, format: int64}
+              trace:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    ruleId: {type: string}
+                    version: {type: integer, nullable: true}
+                    nodeId: {type: string}
+                    label: {type: string}
+                    type: {type: string}
+                    value: {nullable: true}
+                    branch: {type: string, nullable: true, enum: [next, 'true', 'false', null]}
+                    depth: {type: integer}
+  schemas:
+    Rule:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        description: {type: string}
+        kind: {type: string, enum: [DECISION_TREE, FORMULA, RULE]}
+        draft: {$ref: '#/components/schemas/Definition'}
+        revision: {type: integer}
+        publishedVersion: {type: integer, nullable: true}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    Version:
+      type: object
+      properties:
+        ruleId: {type: string}
+        version: {type: integer}
+        definition: {$ref: '#/components/schemas/Definition'}
+        publishedAt: {type: string, format: date-time}
+    Definition:
+      type: object
+      required: [schemaVersion, inputs, nodes, edges]
+      properties:
+        schemaVersion: {type: integer, enum: [1]}
+        inputs:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            required: [name, type, required]
+            properties:
+              name: {type: string, pattern: '^[A-Za-z_][A-Za-z_0-9]{0,63}$'}
+              type: {type: string, enum: [NUMBER, STRING, BOOLEAN]}
+              required: {type: boolean}
+              defaultValue: {nullable: true}
+        nodes:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [id, type, label]
+            properties:
+              id: {type: string, pattern: '^[A-Za-z0-9_-]{1,80}$'}
+              type: {type: string, enum: [INPUT, FORMULA, CONDITION, REFERENCE, OUTPUT]}
+              label: {type: string, minLength: 1, maxLength: 160}
+              position:
+                type: object
+                properties:
+                  x: {type: number}
+                  y: {type: number}
+              expression: {type: string, maxLength: 2000, nullable: true}
+              output: {type: string, nullable: true}
+              ruleId: {type: string, nullable: true}
+              version: {type: integer, minimum: 1, nullable: true}
+              bindings:
+                type: object
+                nullable: true
+                maxProperties: 50
+                additionalProperties: {type: string, maxLength: 2000}
+        edges:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [id, source, target, sourceHandle]
+            properties:
+              id: {type: string, maxLength: 100}
+              source: {type: string}
+              target: {type: string}
+              sourceHandle: {type: string, enum: [next, 'true', 'false']}

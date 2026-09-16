@@ -1,0 +1,13 @@
+.DS_Store
+.env
+!.env.example
+node_modules/
+dist/
+target/
+.idea/
+*.iml
+playwright-report/
+test-results/
+.local/
+*.log
+*.tsbuildinfo

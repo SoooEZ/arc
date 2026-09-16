@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: arc
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/arc}
+    username: ${DB_USER:arc}
+    password: ${DB_PASSWORD:arc-local-development}
+  jackson:
+    deserialization:
+      use-big-decimal-for-floats: true
+server:
+  port: 8080
+  error:
+    include-message: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
