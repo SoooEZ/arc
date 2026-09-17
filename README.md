@@ -4,164 +4,7 @@
 
 The first release implements **R & C**: build formulas, conditions, and decision trees; publish stable versions; execute them from any application with typed inputs and a complete execution trace.
 
-Choose [Java or Rails](#choose-java-or-rails), then use Docker Compose or the native development commands below. Run the setup commands from the repository root unless a step says otherwise.
-
-## Choose Java or Rails
-
-ARC has two independent backends with the same React frontend, HTTP API, and PostgreSQL data format:
-
-| Backend | API and persistence | Calculation / Studio engine | Start with Compose |
-| --- | --- | --- | --- |
-| Java (default) | Spring Boot + JDBC | Java + Apache POI | `docker compose up -d --build --wait` |
-| Rails | Rails 8.1 API + Active Record | Ruby, with no Java dependency | `docker compose -f compose.yaml -f compose.rails.yaml up -d --build --wait` |
-
-**Rails runs entirely without Java, Maven, Spring Boot, or a separate calculation service.** Its Ruby engine handles decimal expressions, all 192 enabled functions, graph validation/execution, fan-out and joins, reusable rules, ARC Script, diagnostics, HTTP sources and lookup tables. The Rails Docker image contains no JVM or JAR files. The frontend uses the same API whichever backend is selected.
-
-Both backends use the SQL files in `database/migrations`, the same migration history, and the same published definitions. Java runs Flyway; Rails applies the SQL using a Ruby migration runner that preserves Flyway-compatible checksums. Features must be implemented in **both** engines; shared contract tests and CI check for differences. Code does not automatically translate between Java and Ruby. See [compatibility guidance](contracts/README.md), including numerical tolerances and supported Excel behavior.
-
-### Start or switch with Docker Compose
-
-Install Docker and Compose as described below. From the repository root, create `.env` once if it does not already exist:
-
-```sh
-cp .env.example .env
-```
-
-Choose one backend for the `api` service. Keep the project name and database credentials unchanged when switching an existing workspace:
-
-```sh
-# Run Rails, or switch an existing Java workspace to Rails
-docker compose -f compose.yaml -f compose.rails.yaml up -d --build --wait
-
-# Inspect the Rails stack and follow its logs
-docker compose -f compose.yaml -f compose.rails.yaml ps
-docker compose -f compose.yaml -f compose.rails.yaml logs -f api
-
-# Switch the same workspace back to Java
-docker compose up -d --build --wait
-```
-
-The API container is recreated for the selected backend; the database volume is preserved. Switching retains drafts, published versions, and data sources. The frontend remains at **http://localhost:3080**, and API callers keep using **http://localhost:8080/api**. Run one backend per workspace; do not execute the switch commands concurrently.
-
-```sh
-# Stop Rails while keeping its database
-docker compose -f compose.yaml -f compose.rails.yaml down
-
-# Optional: create a separate Rails workspace with new containers, data and ports
-COMPOSE_PROJECT_NAME=arc-rails ARC_WEB_PORT=3081 ARC_API_PORT=8081 \
-  docker compose -f compose.yaml -f compose.rails.yaml up -d --build --wait
-```
-
-Keep using that project name and port overrides to manage the separate workspace. Do not use `down -v` when switching backends: it deletes the database.
-
-### Run Rails without Docker
-
-The following macOS/Homebrew setup includes PostgreSQL creation, table initialization, backend startup and frontend startup. Java and Maven are not needed. Use Ruby **3.3.x**, PostgreSQL **17**, and Node.js **24**. The repository pins Ruby **3.3.11** for asdf and CI; another supported Ruby 3.3 patch from Homebrew is also suitable.
-
-Install prerequisites and obtain the repository if needed:
-
-```sh
-brew install ruby@3.3 libpq libyaml postgresql@17 node@24
-export PATH="$(brew --prefix ruby@3.3)/bin:$(brew --prefix libpq)/bin:$(brew --prefix postgresql@17)/bin:$(brew --prefix node@24)/bin:$PATH"
-
-ruby -v        # Ruby 3.3.x
-bundle -v
-psql --version # PostgreSQL 17.x
-node -v        # Node 24.x
-
-# Skip cloning if you already have this checkout
-git clone https://github.com/SoooEZ/arc.git
-cd arc
-```
-
-Start PostgreSQL and create the role/database **once**. Skip `createuser` and `createdb` when reusing a database initialized by Java; retain its existing password.
-
-```sh
-brew services start postgresql@17
-pg_isready -h localhost -p 5432
-
-# Continue after pg_isready reports "accepting connections".
-# Choose a password when prompted.
-createuser --pwprompt arc
-createdb --owner=arc arc
-
-# Verify login and permission to create the application's tables
-psql -h localhost -p 5432 -U arc -d arc -W \
-  -c "SELECT current_database(), current_user, has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_tables;"
-```
-
-Homebrew initializes the cluster; no separate `initdb` is needed. These commands assume the normal Homebrew administrator role for your OS user. For another PostgreSQL installation, use its administrator account to create the role/database. Expected verification is database `arc`, user `arc`, and `can_create_tables = t`.
-
-In **terminal A**, from the ARC repository root:
-
-```sh
-cd backend-rails
-bundle config set --local path vendor/bundle
-bundle install
-
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=arc
-export DB_USER=arc
-export DB_PASSWORD='replace-with-the-password-you-created'
-
-# Creates all tables, migration history and initial examples when needed.
-# Safe to repeat, including on a database previously used by Java.
-bundle exec rails arc:prepare
-
-# Start Rails/Puma on port 8080; leave this terminal open.
-bundle exec puma -C config/puma.rb
-```
-
-Stop any other API listening on port 8080 first. Native Rails does **not** load the root `.env` automatically; export these variables in its terminal. `arc:prepare` runs SQL using Ruby and creates `rules`, `rule_versions`, `data_sources`, `data_source_versions`, and `flyway_schema_history`. It seeds the country-tax lookup and three sample rules when needed. No manual `CREATE TABLE`, SQL import, `rails db:migrate`, or Java process is required. Existing rules are preserved.
-
-In **terminal B**, verify the API and database:
-
-```sh
-curl -fsS http://localhost:8080/actuator/health
-curl -sS http://localhost:8080/api/rules/order-pricing/execute \
-  -H 'Content-Type: application/json' \
-  -d '{"inputs":{"orderTotal":150,"customerTier":"premium"}}'
-
-psql -h localhost -p 5432 -U arc -d arc -W -c '\dt public.*'
-psql -h localhost -p 5432 -U arc -d arc -W \
-  -c 'SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank;'
-psql -h localhost -p 5432 -U arc -d arc -W \
-  -c 'SELECT id, published_version FROM rules ORDER BY id;'
-```
-
-Expected health is `{"status":"UP"}`, both migrations show `success = t`, and an unmodified order-pricing example returns `120`. See [table verification](#4-verify-tables-and-initial-data) for further checks.
-
-In **terminal C**, from the repository root, start the frontend:
-
-```sh
-export PATH="$(brew --prefix node@24)/bin:$PATH"
-cd frontend
-npm ci
-npm run dev
-```
-
-Open **http://localhost:3080**. Vite proxies `/api` to port 8080. Press **Ctrl+C** in the respective terminals to stop Puma and Vite. PostgreSQL can remain running; `brew services stop postgresql@17` stops it while preserving its data. To restart, restore the PATH and database variables, run `arc:prepare`, then start Puma and Vite. After pulling changes, run `bundle install` for updated gems and `arc:prepare` before startup; use `npm ci` if the frontend lockfile changed. The initial gem/npm installation needs internet access.
-
-To switch a native workspace to Java, stop Puma and follow [the Java backend step](#3-start-the-java-backend-tables-are-created-here) with the same PostgreSQL database. Only that choice requires Java and Maven.
-
-Optional Rails settings:
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PORT` | `8080` | Native Puma port; Compose uses internal port 8080 |
-| `RAILS_MAX_THREADS` | `5` | Puma request threads and database pool size |
-| `ARC_CONTRACTS_PATH` | Repository `contracts/` | Shared catalogs and sample definitions; set automatically in the image |
-| `ARC_MIGRATIONS_PATH` | Repository `database/migrations/` | Canonical SQL directory; set automatically in the image |
-
-HTTP allowlists and `ARC_SECRET_*` aliases work the same as on Java; export them in the Rails terminal as described in [the source guide](docs/studio.md). The public API remains unauthenticated for this phase.
-
-Troubleshooting:
-
-- **Old Ruby selected:** check `which ruby`, `ruby -v`, and `bundle -v` in the same terminal. Put the selected Ruby's bin directory or version-manager shims first in `PATH`.
-- **`pg` cannot build:** install `libpq`, put its `bin` directory in `PATH`, and rerun `bundle install`. For `psych` build failures, check `libyaml` and the selected Ruby installation.
-- **Database/table errors:** verify all five `DB_*` values and run `bundle exec rails arc:prepare` with those exact values. Rails uses `DB_HOST`/`DB_PORT`/`DB_NAME`; native Java uses a JDBC `DB_URL` instead.
-- **Migration checksum mismatch:** restore the original already-applied SQL file. Add schema changes as a new migration; do not clear the history or rerun old SQL manually.
+Choose [Docker Compose](#run-with-docker-compose) to run the whole stack in containers, or [local development without Docker](#run-without-docker-local-development) to run PostgreSQL, Java, and React directly. Run the setup commands from the repository root unless a step says otherwise.
 
 ## Run with Docker Compose
 
@@ -199,7 +42,7 @@ Normal shutdown preserves saved rules and published versions. `docker compose do
 
 ## Run without Docker (local development)
 
-Prerequisites: **Java 21**, **Maven 3.9+**, **Node.js 24+** with npm, and **PostgreSQL 17**. Docker and Nginx are not required. For Rails, also follow [the Rails native setup](#run-rails-without-docker). The steps below cover a fresh local setup on **macOS with [Homebrew](https://brew.sh/)**. On other systems, install the same tools using your platform's package manager and substitute your local JDK path and PostgreSQL administrator account.
+Prerequisites: **Java 21**, **Maven 3.9+**, **Node.js 24+** with npm, and **PostgreSQL 17**. Docker and Nginx are not required. The steps below cover a fresh local setup on **macOS with [Homebrew](https://brew.sh/)**. On other systems, install the same tools using your platform's package manager and substitute your local JDK path and PostgreSQL administrator account.
 
 You create the PostgreSQL role and database once. **ARC creates its tables automatically when the backend starts**; there is no separate manual `CREATE TABLE` or SQL import step.
 
@@ -275,15 +118,15 @@ mvn spring-boot:run
 
 Keep this terminal running. The API listens on port **8080**. The root `.env` file is read by Docker Compose; it is **not automatically loaded** by `mvn spring-boot:run`. Export the `DB_*` variables in the backend's terminal as shown above. If you configure HTTP data sources, also export any needed `ARC_HTTP_ALLOWED_HOSTS` / `ARC_HTTP_PRIVATE_HOSTS` settings there; see [the studio guide](docs/studio.md).
 
-Maven downloads Java dependencies, compiles the backend, and starts Spring Boot. Its [Flyway integration](https://docs.spring.io/spring-boot/3.5/how-to/data-initialization.html#howto.data-initialization.migration-tool.flyway) runs the versioned SQL files in `database/migrations` automatically. Both native startup and Docker Compose use this same initialization process:
+Maven downloads Java dependencies, compiles the backend, and starts Spring Boot. Its [Flyway integration](https://docs.spring.io/spring-boot/3.5/how-to/data-initialization.html#howto.data-initialization.migration-tool.flyway) runs the versioned SQL files in `backend/src/main/resources/db/migration` automatically. Both native startup and Docker Compose use this same initialization process:
 
 | Created automatically | Purpose | Initialization source |
 | --- | --- | --- |
-| `rules` | Rule metadata and the editable draft graph | [V1__rules.sql](database/migrations/V1__rules.sql) |
-| `rule_versions` | Immutable published rule versions | [V1__rules.sql](database/migrations/V1__rules.sql) |
-| `data_sources` | Data-source metadata | [V2__data_sources.sql](database/migrations/V2__data_sources.sql) |
-| `data_source_versions` | Versioned HTTP or lookup-table configurations | [V2__data_sources.sql](database/migrations/V2__data_sources.sql) |
-| `flyway_schema_history` | Applied migration versions and checksums | Flyway on Java; compatible Ruby runner on Rails |
+| `rules` | Rule metadata and the editable draft graph | [V1__rules.sql](backend/src/main/resources/db/migration/V1__rules.sql) |
+| `rule_versions` | Immutable published rule versions | [V1__rules.sql](backend/src/main/resources/db/migration/V1__rules.sql) |
+| `data_sources` | Data-source metadata | [V2__data_sources.sql](backend/src/main/resources/db/migration/V2__data_sources.sql) |
+| `data_source_versions` | Versioned HTTP or lookup-table configurations | [V2__data_sources.sql](backend/src/main/resources/db/migration/V2__data_sources.sql) |
+| `flyway_schema_history` | Applied migration versions and checksums | Managed by Flyway |
 
 `V2` also inserts the `country-tax` lookup example. After migrations, [Samples.java](backend/src/main/java/dev/arc/store/Samples.java) creates and publishes `apply-discount`, `order-pricing`, and `free-shipping` **only if the `rules` table is empty**. Restarting an initialized workspace preserves existing rules. Later application updates apply new migration versions once; already applied migration files should not be edited or executed manually.
 
@@ -403,7 +246,7 @@ The result is `120`, alongside the executed version, timing, and each visited no
 ## Technology
 
 - **Frontend:** React 19, TypeScript, [MUI](https://mui.com/material-ui/), [React Flow](https://reactflow.dev/), [ELK](https://github.com/kieler/elkjs), Vite. Fonts are bundled locally.
-- **Backends:** Java 21 / [Spring Boot 3.5](https://docs.spring.io/spring-boot/3.5/) with JDBC, or Ruby 3.3 / [Rails 8.1 API](https://guides.rubyonrails.org/api_app.html) with Active Record and Puma. Each backend has its own calculation engine; both use the shared SQL schema and compatible migration history.
+- **Backend:** Java 21, [Spring Boot 3.5](https://docs.spring.io/spring-boot/3.5/), JDBC, Flyway.
 - **Storage:** PostgreSQL 17 with JSONB graph documents and immutable version rows.
 - **Execution:** a restricted expression parser using `BigDecimal`/DECIMAL128. No JavaScript evaluation, JVM reflection, SQL expressions, or arbitrary code execution.
 - **Infrastructure:** Docker Compose with health checks, isolated persistent storage, and an Nginx frontend/API proxy.
@@ -434,21 +277,6 @@ The evaluator starts at Input and executes active nodes in a deterministic depen
 - [OpenAPI specification](docs/openapi.yaml)
 
 ## Development and verification
-
-Both backend implementations are checked in CI. For an already running backend:
-
-```sh
-python3 scripts/contract.py http://localhost:8080
-# Compare two isolated deployments:
-python3 scripts/contract.py http://localhost:18080 http://localhost:18081
-# Compare the enabled function catalog and calculation examples:
-python3 scripts/function_contract.py http://localhost:18080 http://localhost:18081
-# From the root: creates and removes a fresh temporary Docker stack on 18082/13082
-python3 scripts/switch_backend_test.py
-```
-
-The switching test checks Rails → Java → Rails → Java against one database, including migrations, stored drafts and immutable versions. Override `ARC_SWITCH_API_PORT` and `ARC_SWITCH_WEB_PORT` if those test ports are occupied. Contract and smoke tests create fixtures; run them on disposable test workspaces. See [contracts/README.md](contracts/README.md) for the rules for keeping both APIs compatible.
-
 
 Use Java 21, Maven 3.9+, and Node.js 24+ for the checks below. Browser and live API tests also require a running ARC stack, started with either method above. Start these commands from the repository root.
 
@@ -486,14 +314,7 @@ COMPOSE_PROJECT_NAME=arc-test ARC_WEB_PORT=3081 ARC_API_PORT=8081 docker compose
 
 The final command deletes only that test project's containers and database volume. Normal `docker compose down` preserves the development database.
 
-For the independent Rails runtime and HTTP-source tests, no Java or database is needed:
-
-```sh
-cd backend-rails
-bundle exec ruby test/run.rb
-```
-
-[Shared API/function checks](contracts/README.md) compare disposable Java and Rails deployments. GitHub Actions tests both engines, builds the frontend, compares APIs and all enabled functions, verifies Rails → Java → Rails → Java database switching, and runs Chromium workflows on both backends. It also checks that the Rails image contains no Java executable or JAR files.
+GitHub Actions runs the Java tests, frontend build, real PostgreSQL API checks, and Chromium end-to-end tests.
 
 ## Next phases
 

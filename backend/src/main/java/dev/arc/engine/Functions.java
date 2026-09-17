@@ -412,7 +412,7 @@ public final class Functions {
               CATEGORIES.getOrDefault(name, "Workbook & other"),
               name + "(" + args + (m != null && m.getMaxParams() > count ? ", ..." : "") + ")",
               supported
-                  ? "Excel-compatible calculation. Accepts "
+                  ? "Excel-compatible calculation via Apache POI. Accepts "
                       + m.getMinParams()
                       + "–"
                       + m.getMaxParams()
@@ -421,7 +421,7 @@ public final class Functions {
                       + " the ARC adapter.",
               snippet,
               supported,
-              "Excel"));
+              "Excel / Apache POI"));
     }
     HELP.forEach(
         (n, h) -> {
@@ -615,19 +615,9 @@ public final class Functions {
                       * Expressions.number(args.get(1)).doubleValue()
                   > 2000)) throw ArcException.invalid("REPT result exceeds string limit");
       var m = FunctionMetadataRegistry.getFunctionByName(name);
-      var values = args.stream().map(Functions::value).toArray(ValueEval[]::new);
-      // POI's QR inverse can emit enormous finite values for exactly singular
-      // matrices. Reject them consistently with the independent Ruby engine.
-      if (name.equals("MINVERSE")) {
-        var determinant = FunctionEval.getBasicFunction(
-                FunctionMetadataRegistry.getFunctionByName("MDETERM").getIndex())
-            .evaluate(values, 0, 0);
-        if (determinant instanceof NumberEval n && n.getNumberValue() == 0)
-          throw ArcException.invalid("MINVERSE: #NUM!");
-      }
       ValueEval result =
           FunctionEval.getBasicFunction(m.getIndex())
-              .evaluate(values, 0, 0);
+              .evaluate(args.stream().map(Functions::value).toArray(ValueEval[]::new), 0, 0);
       return converted(result, name);
     } catch (ArcException e) {
       throw e;
