@@ -102,3 +102,21 @@ Identifiers use letters, digits, and underscores, start with a letter or undersc
 - Nginx caps request bodies at 1 MiB; Java also caps API request bodies independently.
 
 The service has no JWT requirement yet. Both reads and writes are intentionally open, and CORS allows any origin. Versioning and a restricted expression language are foundations for predictable execution; they do not substitute for the future production authentication, authorization, quota, and operational work.
+
+## Code and graph share a definition
+
+ARC Script is a declarative text representation of the existing JSON graph, not JavaScript, Ruby, or host code. `/api/studio/build` parses it into `Definition`; `/api/studio/render` converts a definition back into canonical text. Stable node IDs, edge IDs, positions, input schemas, source bindings, pinned references, and comment text are retained. Comments are normalized to a header. A syntax error returns line/column diagnostics and no partial graph. Build accepts structurally sound work in progress; full path/scope/reference validation runs before publishing and execution.
+
+The standalone Code studio uses a locally bundled Monaco editor, completion and hover providers generated from `/api/functions`, module snippets, rule insertion, and a node outline. Both views operate on the same in-memory draft and use the existing optimistic revision lock. Code is compiled before saving, publishing, testing, or switching to the canvas; canvas edits regenerate code. Publication still creates immutable graph snapshots.
+
+## Connected inputs
+
+`data_sources` identifies a provider. `data_source_versions` stores immutable JSON configurations. Every sourced input pins a source ID and version. Providers currently support local lookup tables and HTTP GET endpoints returning JSON. Source arguments are expressions over declared rule inputs, with dependency-cycle validation and recursive resolution independent of declaration order. Caller-supplied values always win, including an explicit null (which then obeys the input's required/type contract). Omitted inputs invoke their source; defaults are used on failure only with an explicit `DEFAULT` policy. JSON Pointer selects the response field before strict type validation. Execution reports source reads and fallback status without secrets.
+
+HTTP requests use encoded query parameters, a per-request deadline, 1 MiB response limit, and no redirect/retry/proxy behavior. DNS is checked when the socket resolves, preventing a validate-then-resolve gap. Private/reserved addresses are blocked unless the exact hostname is configured in `ARC_HTTP_PRIVATE_HOSTS`. `ARC_HTTP_ALLOWED_HOSTS` optionally restricts all destinations. Secret headers contain aliases only; the server reads `ARC_SECRET_<ALIAS>`. Secrets require an explicitly allowlisted destination. Operator environment changes are outside source versioning. External values are live and can change even when configuration is pinned.
+
+## Extended expressions
+
+The expression engine keeps decimal arithmetic for core math. Apache POI supplies context-free Excel calculations; these use Excel floating-point semantics. A shared capability registry exposes callable functions and reference-only functions separately. This is an Excel/Dentaku-inspired calculation dialect, not a workbook engine or a drop-in Dentaku implementation. No cell references, workbook formulas, macros, arbitrary Ruby, or host-language calls are evaluated. Functions requiring workbook context or a missing adapter are shown as reference-only.
+
+Arrays and objects are input types. Arrays can be used as Excel ranges. `MAP`, `FILTER`, `ALL`, `ANY`, and `REDUCE` use explicitly scoped local identifiers. `PLUCK` and `GET` accept quoted dot paths. Object property access is available inside ordinary expressions (`customer.country`, `item.price`). Expressions remain bounded by source length, token/depth limits, numeric/string limits, collection size/depth limits, and an iteration budget.

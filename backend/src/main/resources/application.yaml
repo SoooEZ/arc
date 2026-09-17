@@ -20,3 +20,8 @@ management:
   endpoint:
     health:
       show-details: never
+
+arc:
+  http:
+    allowed-hosts: ${ARC_HTTP_ALLOWED_HOSTS:}
+    private-hosts: ${ARC_HTTP_PRIVATE_HOSTS:}

@@ -84,3 +84,7 @@ The UI saves any changed draft before publishing. API clients should save explic
 | `500` | Unexpected internal error (details are logged, not exposed) |
 
 The current release has no deletion API, batch endpoint, run-history storage, or authentication. Rules and published versions persist; execution traces are returned to the caller rather than stored.
+
+## Code studio and external parameters
+
+See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults.

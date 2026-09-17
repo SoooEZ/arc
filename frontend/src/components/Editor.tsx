@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Button,
@@ -41,6 +49,7 @@ import {
 import { api, errorMessage } from "../api";
 import type {
   Definition,
+  Diagnostic,
   Execution,
   NodeType,
   Rule,
@@ -53,8 +62,10 @@ import { KindIcon, NodeIcon } from "./Icons";
 import Inspector from "./Inspector";
 import TestPanel from "./TestPanel";
 
+const CodeStudio = lazy(() => import("./CodeStudio"));
 const nodeTypes = { arc: GraphNode };
 interface Props {
+  mode: "code" | "graph";
   rule: Rule;
   rules: Rule[];
   requestedVersion: number | null;
@@ -72,6 +83,7 @@ export default function Editor(props: Props) {
   );
 }
 function EditorContent({
+  mode,
   rule: initial,
   rules,
   requestedVersion,
@@ -81,6 +93,20 @@ function EditorContent({
   notify,
 }: Props) {
   const [rule, setRule] = useState(initial);
+  const [invalidJson, setInvalidJson] = useState<Record<string, boolean>>({});
+  const hasInvalidJson = Object.values(invalidJson).some(Boolean);
+  const onInvalidJson = useCallback(
+    (key: string, invalid: boolean) =>
+      setInvalidJson((old) =>
+        old[key] === invalid ? old : { ...old, [key]: invalid },
+      ),
+    [],
+  );
+  const [source, setSource] = useState<string | null>(null);
+  const sourceValue = useRef(source);
+  sourceValue.current = source;
+  const [sourceDirty, setSourceDirty] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [baseline, setBaseline] = useState(snapshot(initial));
   const [selected, setSelected] = useState(
     initial.draft.nodes.find((n) => n.type === "CONDITION")?.id || "input",
@@ -100,7 +126,8 @@ function EditorContent({
   const [versionLoading, setVersionLoading] = useState(!!requestedVersion);
   const flow = useReactFlow<FlowNode>();
   const readOnly = !!requestedVersion;
-  const dirty = !readOnly && snapshot(rule) !== baseline;
+  const dirty =
+    !readOnly && (hasInvalidJson || sourceDirty || snapshot(rule) !== baseline);
   useEffect(() => {
     onDirty(dirty);
   }, [dirty, onDirty]);
@@ -126,6 +153,8 @@ function EditorContent({
     (fn: (d: Definition) => Definition) => {
       if (readOnly) return;
       setRule((r) => ({ ...r, draft: fn(r.draft) }));
+      setSource(null);
+      setDiagnostics([]);
       setTrace(null);
       setError("");
     },
@@ -264,28 +293,101 @@ function EditorContent({
       ],
     }));
   };
-  const save = async () => {
-    const saved = await api.save(rule);
+  const buildCode = async (): Promise<Definition> => {
+    if (hasInvalidJson)
+      throw new Error(
+        "Fix the invalid JSON default before saving or changing views",
+      );
+    if (!sourceDirty || source === null || readOnly) return rule.draft;
+    const result = await api.build(source);
+    setDiagnostics(result.diagnostics);
+    if (!result.definition)
+      throw new Error(
+        result.diagnostics[0]?.message || "Code could not be built",
+      );
+    setRule((r) => ({ ...r, draft: result.definition! }));
+    setSource(result.source);
+    setSourceDirty(false);
+    setTrace(null);
+    return result.definition;
+  };
+  const build = async () => {
+    setBusy("build");
+    setError("");
+    try {
+      const draft = await buildCode();
+      await api.validate(draft);
+      notify("Code built. Graph is valid.");
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy("");
+    }
+  };
+  useEffect(() => {
+    if (mode !== "code" || source !== null || versionLoading) return;
+    let active = true;
+    api
+      .render(rule.draft)
+      .then((r) => {
+        if (active) setSource(r.source);
+      })
+      .catch((e) => {
+        if (active) setError(errorMessage(e));
+      });
+    return () => {
+      active = false;
+    };
+  }, [mode, source, rule.draft, versionLoading]);
+  useEffect(() => {
+    if (mode === "graph" && sourceDirty) {
+      void buildCode().catch((e) => {
+        setError(errorMessage(e));
+        navigate(`/studio/${rule.id}`);
+      });
+    }
+  }, [mode]); // A sidebar view switch also compiles before displaying the canvas.
+  const switchView = async () => {
+    if (busy) return;
+    setBusy("switch");
+    try {
+      if (hasInvalidJson)
+        throw new Error("Fix the invalid JSON default before changing views");
+      if (mode === "code") await buildCode();
+      navigate(
+        `/${mode === "code" ? "rules" : "studio"}/${rule.id}${requestedVersion ? `?version=${requestedVersion}` : ""}`,
+      );
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy("");
+    }
+  };
+  const save = async (candidate: Rule) => {
+    const saved = await api.save(candidate);
     setRule(saved);
     setBaseline(snapshot(saved));
     onSaved(saved);
     return saved;
   };
   const action = async (type: string) => {
+    if (busy) return;
     setBusy(type);
     setError("");
     try {
+      const candidate = { ...rule, draft: await buildCode() };
       if (type === "save") {
-        await save();
+        await save(candidate);
         notify("Draft saved");
       }
       if (type === "validate") {
-        await api.validate(rule.draft);
+        await api.validate(candidate.draft);
         notify("Graph is valid. All paths lead to a result.");
       }
       if (type === "publish") {
-        await api.validate(rule.draft);
-        const saved = dirty ? await save() : rule;
+        await api.validate(candidate.draft);
+        const saved =
+          snapshot(candidate) !== baseline ? await save(candidate) : candidate;
         const published = await api.publish(saved.id, saved.revision);
         setRule(published);
         setBaseline(snapshot(published));
@@ -430,6 +532,15 @@ function EditorContent({
           </div>
         </div>
         <div className="editor-actions">
+          <Button
+            startIcon={
+              mode === "code" ? <GitBranch size={15} /> : <Code2 size={15} />
+            }
+            onClick={() => void switchView()}
+            disabled={!!busy}
+          >
+            {mode === "code" ? "Graph view" : "Code editor"}
+          </Button>
           <Tooltip title="Version history">
             <IconButton aria-label="Version history" onClick={showHistory}>
               <Clock3 size={18} />
@@ -438,7 +549,15 @@ function EditorContent({
           <Button
             startIcon={<Play size={15} />}
             variant="outlined"
-            onClick={() => setTestOpen((v) => !v)}
+            disabled={!!busy}
+            onClick={async () => {
+              try {
+                await buildCode();
+                setTestOpen((v) => !v);
+              } catch (e) {
+                setError(errorMessage(e));
+              }
+            }}
           >
             {testOpen ? "Hide test" : "Test rule"}
           </Button>
@@ -507,204 +626,257 @@ function EditorContent({
           </IconButton>
         </div>
       )}
-      <div className="editor-body">
-        <div className="graph-workspace">
-          <div className="graph-toolbar">
-            <div className="graph-view-label">
-              <GitBranch size={16} />
-              <strong>Decision canvas</strong>
-              <span>{rule.draft.nodes.length} nodes</span>
-            </div>
-            <div className="graph-tools">
-              <Tooltip title="Node outline">
-                <IconButton
-                  aria-label="Node outline"
-                  onClick={() => setOutline((o) => !o)}
-                  color={outline ? "primary" : "default"}
-                >
-                  <ListTree size={17} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Arrange graph">
-                <span>
-                  <IconButton
-                    aria-label="Arrange graph"
-                    disabled={readOnly}
-                    onClick={layout}
-                  >
-                    <LayoutGrid size={16} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Export definition">
-                <IconButton aria-label="Export definition" onClick={exportJson}>
-                  <Download size={16} />
-                </IconButton>
-              </Tooltip>
-              <Button
-                size="small"
-                startIcon={<CheckCheck size={15} />}
-                onClick={() => action("validate")}
-                disabled={!!busy}
-              >
-                Validate
-              </Button>
-              {!readOnly && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<Plus size={15} />}
-                  endIcon={<ChevronDown size={13} />}
-                  onClick={(e) => setAddAnchor(e.currentTarget)}
-                >
-                  Add node
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="flow-container">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onNodeClick={(_, n) => {
-                setSelected(n.id);
-                setSelectedEdge(null);
-              }}
-              onPaneClick={() => setSelectedEdge(null)}
-              onEdgeClick={(_, e) => setSelectedEdge(e.id)}
-              onConnect={connect}
-              nodesDraggable={!readOnly}
-              nodesConnectable={!readOnly}
-              edgesReconnectable={false}
-              deleteKeyCode={null}
-              fitView
-              fitViewOptions={{ padding: 0.18 }}
-              minZoom={0.25}
-              maxZoom={1.5}
-              proOptions={{ hideAttribution: true }}
-            >
-              <Background
-                variant={BackgroundVariant.Dots}
-                gap={20}
-                size={1}
-                color="#cad5cf"
+      {mode === "code" || sourceDirty ? (
+        <>
+          <Suspense
+            fallback={
+              <div className="center-state">
+                <CircularProgress size={24} />
+                <p>Loading code editor…</p>
+              </div>
+            }
+          >
+            {source !== null ? (
+              <CodeStudio
+                rule={rule}
+                rules={rules}
+                definition={rule.draft}
+                source={source}
+                onChange={(value) => {
+                  if (value === sourceValue.current) return;
+                  sourceValue.current = value;
+                  setSource(value);
+                  setSourceDirty(true);
+                  setDiagnostics([]);
+                }}
+                diagnostics={diagnostics}
+                readOnly={readOnly || !!busy}
+                pending={sourceDirty}
+                onBuild={build}
+                onGraph={() => void switchView()}
+                onSave={() => void action("save")}
               />
-              <Controls showInteractive={false} />
-              <MiniMap
-                nodeColor={(n) =>
-                  visited.has(n.id)
-                    ? "#8ebda8"
-                    : n.data?.model &&
-                        (n.data.model as RuleNode).type === "CONDITION"
-                      ? "#e8d8b2"
-                      : "#d4dfd8"
-                }
-                maskColor="rgba(245,248,246,.7)"
-                pannable
-                zoomable
-              />
-            </ReactFlow>
-            {outline && (
-              <div className="node-outline">
-                <div>
-                  <strong>Node outline</strong>
-                  <IconButton
-                    size="small"
-                    aria-label="Close outline"
-                    onClick={() => setOutline(false)}
-                  >
-                    <X size={14} />
-                  </IconButton>
-                </div>
-                {rule.draft.nodes.map((n, i) => (
-                  <button
-                    key={n.id}
-                    className={selected === n.id ? "selected" : ""}
-                    onClick={() => focusNode(n.id)}
-                  >
-                    <small>{String(i + 1).padStart(2, "0")}</small>
-                    <NodeIcon type={n.type} size={14} />
-                    <span>{n.label}</span>
-                  </button>
-                ))}
+            ) : (
+              <div className="center-state">
+                <CircularProgress size={24} />
               </div>
             )}
-            {selectedEdge && !readOnly && (
-              <div className="edge-delete">
-                <Button
-                  size="small"
-                  color="error"
-                  startIcon={<Trash2 size={14} />}
-                  onClick={() => {
-                    changeDefinition((d) => ({
-                      ...d,
-                      edges: d.edges.filter((e) => e.id !== selectedEdge),
-                    }));
-                    setSelectedEdge(null);
-                  }}
-                >
-                  Delete connection
-                </Button>
-              </div>
-            )}
-            <div className="canvas-hint">
-              {trace ? (
-                <>
-                  <span className="status-dot published" />
-                  Execution path highlighted
-                </>
-              ) : (
-                <>
-                  <span className="keyboard-key">⌘</span>Scroll to zoom
-                  <span className="tiny-divider" />
-                  Drag handles to connect
-                </>
-              )}
-            </div>
-          </div>
-          {testOpen && (
+          </Suspense>
+          {testOpen && !sourceDirty && (
             <TestPanel
               definition={rule.draft}
               ruleId={rule.id}
               publishedVersion={requestedVersion || rule.publishedVersion}
               onResult={setTrace}
-              onNode={focusNode}
+              onNode={() => void switchView()}
               onClose={() => setTestOpen(false)}
             />
           )}
-          <div className="editor-status">
-            <span>
-              <span className="status-dot published" />
-              ARC engine
-            </span>
-            <span>
-              {rule.draft.inputs.length} inputs
-              <span className="tiny-divider" />
-              {rule.draft.edges.length} connections
-              <span className="tiny-divider" />
-              <Code2 size={12} />
-              Schema v{rule.draft.schemaVersion}
-            </span>
+        </>
+      ) : (
+        <div className="editor-body">
+          <div className="graph-workspace">
+            <div className="graph-toolbar">
+              <div className="graph-view-label">
+                <GitBranch size={16} />
+                <strong>Decision canvas</strong>
+                <span>{rule.draft.nodes.length} nodes</span>
+              </div>
+              <div className="graph-tools">
+                <Tooltip title="Node outline">
+                  <IconButton
+                    aria-label="Node outline"
+                    onClick={() => setOutline((o) => !o)}
+                    color={outline ? "primary" : "default"}
+                  >
+                    <ListTree size={17} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Arrange graph">
+                  <span>
+                    <IconButton
+                      aria-label="Arrange graph"
+                      disabled={readOnly}
+                      onClick={layout}
+                    >
+                      <LayoutGrid size={16} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Export definition">
+                  <IconButton
+                    aria-label="Export definition"
+                    onClick={exportJson}
+                  >
+                    <Download size={16} />
+                  </IconButton>
+                </Tooltip>
+                <Button
+                  size="small"
+                  startIcon={<CheckCheck size={15} />}
+                  onClick={() => action("validate")}
+                  disabled={!!busy}
+                >
+                  Validate
+                </Button>
+                {!readOnly && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Plus size={15} />}
+                    endIcon={<ChevronDown size={13} />}
+                    onClick={(e) => setAddAnchor(e.currentTarget)}
+                  >
+                    Add node
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="flow-container">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                nodeTypes={nodeTypes}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onNodeClick={(_, n) => {
+                  setSelected(n.id);
+                  setSelectedEdge(null);
+                }}
+                onPaneClick={() => setSelectedEdge(null)}
+                onEdgeClick={(_, e) => setSelectedEdge(e.id)}
+                onConnect={connect}
+                nodesDraggable={!readOnly}
+                nodesConnectable={!readOnly}
+                edgesReconnectable={false}
+                deleteKeyCode={null}
+                fitView
+                fitViewOptions={{ padding: 0.18 }}
+                minZoom={0.25}
+                maxZoom={1.5}
+                proOptions={{ hideAttribution: true }}
+              >
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={20}
+                  size={1}
+                  color="#cad5cf"
+                />
+                <Controls showInteractive={false} />
+                <MiniMap
+                  nodeColor={(n) =>
+                    visited.has(n.id)
+                      ? "#8ebda8"
+                      : n.data?.model &&
+                          (n.data.model as RuleNode).type === "CONDITION"
+                        ? "#e8d8b2"
+                        : "#d4dfd8"
+                  }
+                  maskColor="rgba(245,248,246,.7)"
+                  pannable
+                  zoomable
+                />
+              </ReactFlow>
+              {outline && (
+                <div className="node-outline">
+                  <div>
+                    <strong>Node outline</strong>
+                    <IconButton
+                      size="small"
+                      aria-label="Close outline"
+                      onClick={() => setOutline(false)}
+                    >
+                      <X size={14} />
+                    </IconButton>
+                  </div>
+                  {rule.draft.nodes.map((n, i) => (
+                    <button
+                      key={n.id}
+                      className={selected === n.id ? "selected" : ""}
+                      onClick={() => focusNode(n.id)}
+                    >
+                      <small>{String(i + 1).padStart(2, "0")}</small>
+                      <NodeIcon type={n.type} size={14} />
+                      <span>{n.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedEdge && !readOnly && (
+                <div className="edge-delete">
+                  <Button
+                    size="small"
+                    color="error"
+                    startIcon={<Trash2 size={14} />}
+                    onClick={() => {
+                      changeDefinition((d) => ({
+                        ...d,
+                        edges: d.edges.filter((e) => e.id !== selectedEdge),
+                      }));
+                      setSelectedEdge(null);
+                    }}
+                  >
+                    Delete connection
+                  </Button>
+                </div>
+              )}
+              <div className="canvas-hint">
+                {trace ? (
+                  <>
+                    <span className="status-dot published" />
+                    Execution path highlighted
+                  </>
+                ) : (
+                  <>
+                    <span className="keyboard-key">⌘</span>Scroll to zoom
+                    <span className="tiny-divider" />
+                    Drag handles to connect
+                  </>
+                )}
+              </div>
+            </div>
+            {testOpen && (
+              <TestPanel
+                definition={rule.draft}
+                ruleId={rule.id}
+                publishedVersion={requestedVersion || rule.publishedVersion}
+                onResult={setTrace}
+                onNode={focusNode}
+                onClose={() => setTestOpen(false)}
+              />
+            )}
+            <div className="editor-status">
+              <span>
+                <span className="status-dot published" />
+                ARC engine
+              </span>
+              <span>
+                {rule.draft.inputs.length} inputs
+                <span className="tiny-divider" />
+                {rule.draft.edges.length} connections
+                <span className="tiny-divider" />
+                <Code2 size={12} />
+                Schema v{rule.draft.schemaVersion}
+              </span>
+            </div>
           </div>
+          <Inspector
+            rule={rule}
+            node={
+              rule.draft.nodes.find((n) => n.id === selected) ||
+              rule.draft.nodes[0]
+            }
+            rules={rules}
+            readOnly={readOnly}
+            onNodeChange={patchNode}
+            onDelete={removeNode}
+            onDefinitionChange={changeDefinition}
+            onMetadata={(patch) => setRule((r) => ({ ...r, ...patch }))}
+            navigate={navigate}
+            onInvalidJson={onInvalidJson}
+          />
         </div>
-        <Inspector
-          rule={rule}
-          node={
-            rule.draft.nodes.find((n) => n.id === selected) ||
-            rule.draft.nodes[0]
-          }
-          rules={rules}
-          readOnly={readOnly}
-          onNodeChange={patchNode}
-          onDelete={removeNode}
-          onDefinitionChange={changeDefinition}
-          onMetadata={(patch) => setRule((r) => ({ ...r, ...patch }))}
-          navigate={navigate}
-        />
-      </div>
+      )}
       <Menu
         anchorEl={addAnchor}
         open={!!addAnchor}

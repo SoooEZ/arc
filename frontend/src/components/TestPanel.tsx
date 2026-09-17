@@ -15,19 +15,23 @@ import { NodeIcon } from "./Icons";
 export function sampleInputs(definition: Definition): Record<string, unknown> {
   return Object.fromEntries(
     definition.inputs
-      .filter((p) => p.required || p.defaultValue != null)
+      .filter((p) => !p.source && (p.required || p.defaultValue != null))
       .map((p) => [
         p.name,
         p.defaultValue ??
-          (p.type === "NUMBER"
-            ? p.name === "rate"
-              ? 0.1
-              : 150
-            : p.type === "BOOLEAN"
-              ? true
-              : p.name === "customerTier"
-                ? "premium"
-                : "example"),
+          (p.type === "ARRAY"
+            ? []
+            : p.type === "OBJECT"
+              ? {}
+              : p.type === "NUMBER"
+                ? p.name === "rate"
+                  ? 0.1
+                  : 150
+                : p.type === "BOOLEAN"
+                  ? true
+                  : p.name === "customerTier"
+                    ? "premium"
+                    : "example"),
       ]),
   );
 }
@@ -181,6 +185,21 @@ export default function TestPanel({
                   {(result.durationMicros / 1000).toFixed(2)} ms
                 </small>
               </div>
+              {!!result.sources?.length && (
+                <div className="source-reads">
+                  {result.sources.map((s, i) => (
+                    <div key={i}>
+                      <span>
+                        {s.input} ← {s.sourceId} v{s.version}
+                      </span>
+                      <strong>
+                        {s.status === "DEFAULT" ? "Default used" : "Fetched"}
+                      </strong>
+                      <small>{(s.durationMicros / 1000).toFixed(1)} ms</small>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="trace-label">
                 EXECUTION TRACE <span>{result.trace.length} steps</span>
               </div>

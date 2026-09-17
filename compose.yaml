@@ -17,6 +17,8 @@ services:
   api:
     build: ./backend
     environment:
+      ARC_HTTP_ALLOWED_HOSTS: ${ARC_HTTP_ALLOWED_HOSTS:-}
+      ARC_HTTP_PRIVATE_HOSTS: ${ARC_HTTP_PRIVATE_HOSTS:-}
       DB_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-arc}
       DB_USER: ${POSTGRES_USER:-arc}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-arc-local-development}

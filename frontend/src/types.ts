@@ -1,12 +1,13 @@
 export type Kind = "DECISION_TREE" | "FORMULA" | "RULE";
 export type NodeType =
   "INPUT" | "FORMULA" | "CONDITION" | "REFERENCE" | "OUTPUT";
-export type InputType = "NUMBER" | "STRING" | "BOOLEAN";
+export type InputType = "NUMBER" | "STRING" | "BOOLEAN" | "ARRAY" | "OBJECT";
 export interface Input {
   name: string;
   type: InputType;
   required: boolean;
   defaultValue: unknown;
+  source?: SourceBinding | null;
 }
 export interface RuleNode {
   id: string;
@@ -27,6 +28,7 @@ export interface RuleEdge {
 }
 export interface Definition {
   schemaVersion: number;
+  notes?: string[] | null;
   inputs: Input[];
   nodes: RuleNode[];
   edges: RuleEdge[];
@@ -64,6 +66,13 @@ export interface Execution {
   result: unknown;
   trace: Step[];
   durationMicros: number;
+  sources?: {
+    input: string;
+    sourceId: string;
+    version: number;
+    status: string;
+    durationMicros: number;
+  }[];
 }
 export const kindLabel: Record<Kind, string> = {
   DECISION_TREE: "Decision tree",
@@ -77,3 +86,44 @@ export const nodeLabel: Record<NodeType, string> = {
   REFERENCE: "Reuse rule",
   OUTPUT: "Output",
 };
+
+export interface SourceBinding {
+  id: string;
+  version: number;
+  bindings: Record<string, string>;
+  pointer: string;
+  onError: "FAIL" | "DEFAULT";
+}
+export interface SourceConfig {
+  kind: "HTTP" | "LOOKUP";
+  url?: string;
+  parameters: Input[];
+  entries?: Record<string, unknown>;
+  secretHeaders?: Record<string, string>;
+  timeoutMs: number;
+}
+export interface DataSource {
+  id: string;
+  name: string;
+  version: number;
+  definition: SourceConfig;
+}
+export interface FunctionEntry {
+  name: string;
+  category: string;
+  signature: string;
+  description: string;
+  snippet: string;
+  supported: boolean;
+  origin: string;
+}
+export interface Diagnostic {
+  message: string;
+  line: number;
+  column: number;
+}
+export interface Build {
+  definition: Definition | null;
+  source: string;
+  diagnostics: Diagnostic[];
+}

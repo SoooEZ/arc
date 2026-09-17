@@ -34,7 +34,9 @@ jobs:
       - name: Start fresh Compose stack
         run: docker compose up -d --build --wait --wait-timeout 180
       - name: API integration tests
-        run: python3 scripts/smoke.py
+        run: |
+          python3 scripts/smoke.py
+          python3 scripts/studio_smoke.py
       - name: Install Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium

@@ -31,6 +31,7 @@ import { ArcMark, KindIcon } from "./components/Icons";
 import Library from "./components/Library";
 import Editor from "./components/Editor";
 import ApiPage from "./components/ApiPage";
+import SourcesPage from "./components/SourcesPage";
 
 const initialRoute = () => window.location.hash.slice(1) || "/library";
 export default function App() {
@@ -64,8 +65,14 @@ export default function App() {
     const changed = () => {
       const next = initialRoute();
       if (next === route) return;
+      const sameRule =
+        /^(\/rules\/|\/studio\/)/.test(route) &&
+        /^(\/rules\/|\/studio\/)/.test(next) &&
+        route.replace(/^\/(rules|studio)\//, "") ===
+          next.replace(/^\/(rules|studio)\//, "");
       if (
         dirty &&
+        !sameRule &&
         !window.confirm(
           "You have unsaved changes. Leave this rule and discard them?",
         )
@@ -73,7 +80,7 @@ export default function App() {
         window.history.replaceState(null, "", `#${route}`);
         return;
       }
-      setDirty(false);
+      if (!sameRule) setDirty(false);
       setRoute(next);
     };
     window.addEventListener("hashchange", changed);
@@ -116,9 +123,10 @@ export default function App() {
       setCreating(false);
     }
   };
-  const selectedId = route.startsWith("/rules/")
-    ? route.split("/")[2]?.split("?")[0]
-    : null;
+  const selectedId =
+    route.startsWith("/rules/") || route.startsWith("/studio/")
+      ? route.split("/")[2]?.split("?")[0]
+      : null;
   const selected = rules.find((r) => r.id === selectedId);
   const requestedVersion =
     Number(new URLSearchParams(route.split("?")[1]).get("version")) || null;
@@ -143,7 +151,11 @@ export default function App() {
         <div className="nav-section-label">WORKSPACE</div>
         <nav className="main-nav">
           <button
-            className={route === "/library" || selectedId ? "active" : ""}
+            className={
+              route === "/library" || route.startsWith("/rules/")
+                ? "active"
+                : ""
+            }
             onClick={() => navigate("/library")}
           >
             <Layers3 size={18} />
@@ -163,6 +175,24 @@ export default function App() {
             <BookOpen size={18} />
             API reference
             <ArrowUpRight size={14} className="nav-tail" />
+          </button>
+          <button
+            className={route.startsWith("/studio/") ? "active" : ""}
+            onClick={() =>
+              rules.length
+                ? navigate(`/studio/${selectedId || rules[0].id}`)
+                : newRule()
+            }
+          >
+            <Terminal size={18} />
+            Code studio
+          </button>
+          <button
+            className={route === "/sources" ? "active" : ""}
+            onClick={() => navigate("/sources")}
+          >
+            <Workflow size={18} />
+            Data sources
           </button>
         </nav>
         <div className="nav-section-label rules-label">
@@ -211,7 +241,7 @@ export default function App() {
           <div className="environment">
             <span className="status-dot published" />
             <span>Development</span>
-            <span>v0.1</span>
+            <span>v0.2</span>
           </div>
         </div>
       </aside>
@@ -225,7 +255,11 @@ export default function App() {
                 ? "API playground"
                 : route === "/docs"
                   ? "API reference"
-                  : "Rule library"}
+                  : route === "/sources"
+                    ? "Data sources"
+                    : route.startsWith("/studio/")
+                      ? "Code studio"
+                      : "Rule library"}
             </button>
             {selected && (
               <>
@@ -258,6 +292,7 @@ export default function App() {
             key={`${selected.id}:${requestedVersion}`}
             rule={selected}
             rules={rules}
+            mode={route.startsWith("/studio/") ? "code" : "graph"}
             requestedVersion={requestedVersion}
             onSaved={upsert}
             onDirty={setDirty}
@@ -271,6 +306,8 @@ export default function App() {
               Back to library
             </Button>
           </div>
+        ) : route === "/sources" ? (
+          <SourcesPage onDirty={setDirty} notify={setNotice} />
         ) : route === "/playground" || route === "/docs" ? (
           <ApiPage
             mode={route === "/docs" ? "docs" : "playground"}

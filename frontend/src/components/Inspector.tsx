@@ -23,6 +23,8 @@ import { api, errorMessage } from "../api";
 import type { Definition, InputType, Rule, RuleNode, Version } from "../types";
 import { nodeLabel } from "../types";
 import { NodeIcon } from "./Icons";
+import SourceBindingEditor from "./SourceBindingEditor";
+import JsonField from "./JsonField";
 
 interface Props {
   rule: Rule;
@@ -34,6 +36,7 @@ interface Props {
   onDefinitionChange: (fn: (d: Definition) => Definition) => void;
   onMetadata: (patch: Partial<Rule>) => void;
   navigate: (path: string) => void;
+  onInvalidJson: (key: string, invalid: boolean) => void;
 }
 export default function Inspector({
   rule,
@@ -45,6 +48,7 @@ export default function Inspector({
   onDefinitionChange,
   onMetadata,
   navigate,
+  onInvalidJson,
 }: Props) {
   const [tab, setTab] = useState(0);
   const [refVersions, setRefVersions] = useState<Version[]>([]);
@@ -255,13 +259,31 @@ export default function Inspector({
                       }
                       disabled={readOnly}
                     >
-                      {["NUMBER", "STRING", "BOOLEAN"].map((type) => (
-                        <MenuItem key={type} value={type}>
-                          {type.toLowerCase()}
-                        </MenuItem>
-                      ))}
+                      {["NUMBER", "STRING", "BOOLEAN", "ARRAY", "OBJECT"].map(
+                        (type) => (
+                          <MenuItem key={type} value={type}>
+                            {type.toLowerCase()}
+                          </MenuItem>
+                        ),
+                      )}
                     </TextField>
-                    {input.type === "BOOLEAN" ? (
+                    {input.type === "ARRAY" || input.type === "OBJECT" ? (
+                      <JsonField
+                        label="Default JSON (optional)"
+                        onValidity={(valid) => onInvalidJson(String(i), !valid)}
+                        rows={2}
+                        value={input.defaultValue}
+                        disabled={readOnly}
+                        onChange={(value) =>
+                          onDefinitionChange((d) => ({
+                            ...d,
+                            inputs: d.inputs.map((p, j) =>
+                              i === j ? { ...p, defaultValue: value } : p,
+                            ),
+                          }))
+                        }
+                      />
+                    ) : input.type === "BOOLEAN" ? (
                       <TextField
                         label="Default value"
                         select
@@ -318,6 +340,18 @@ export default function Inspector({
                         disabled={readOnly}
                       />
                     )}
+                    <SourceBindingEditor
+                      input={input}
+                      readOnly={readOnly}
+                      onChange={(source) =>
+                        onDefinitionChange((d) => ({
+                          ...d,
+                          inputs: d.inputs.map((p, j) =>
+                            i === j ? { ...p, source } : p,
+                          ),
+                        }))
+                      }
+                    />
                     <FormControlLabel
                       control={
                         <Switch

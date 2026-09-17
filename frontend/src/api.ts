@@ -1,4 +1,14 @@
-import type { Definition, Execution, Kind, Rule, Version } from "./types";
+import type {
+  Definition,
+  Execution,
+  Kind,
+  Rule,
+  Version,
+  Build,
+  FunctionEntry,
+  DataSource,
+  SourceConfig,
+} from "./types";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
@@ -15,6 +25,31 @@ const post = (body: unknown) => ({
   body: JSON.stringify(body),
 });
 export const api = {
+  functions: () => request<FunctionEntry[]>("/functions"),
+  build: (source: string) => request<Build>("/studio/build", post({ source })),
+  render: (definition: Definition) =>
+    request<{ source: string }>("/studio/render", post(definition)),
+  sources: () => request<DataSource[]>("/sources"),
+  sourceVersions: (id: string) =>
+    request<DataSource[]>(`/sources/${id}/versions`),
+  source: (id: string, version: number) =>
+    request<DataSource>(`/sources/${id}/versions/${version}`),
+  createSource: (id: string, name: string, definition: SourceConfig) =>
+    request<DataSource>("/sources", post({ id, name, definition })),
+  saveSource: (s: DataSource) =>
+    request<DataSource>(`/sources/${s.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: s.name,
+        revision: s.version,
+        definition: s.definition,
+      }),
+    }),
+  testSource: (id: string, version: number, inputs: Record<string, unknown>) =>
+    request<{ result: unknown }>(
+      `/sources/${id}/test`,
+      post({ version, inputs }),
+    ),
   list: () => request<Rule[]>("/rules"),
   get: (id: string) => request<Rule>(`/rules/${encodeURIComponent(id)}`),
   create: (id: string, name: string, description: string, kind: Kind) =>

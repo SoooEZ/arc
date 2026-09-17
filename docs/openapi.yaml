@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ARC — Rules & Calculations
-  version: 0.1.0
+  version: 0.2.0
   description: Unauthenticated authoring and execution API. Published graphs and their pinned dependencies are immutable.
 servers:
   - url: http://localhost:8080/api
@@ -175,6 +175,154 @@ paths:
       responses:
         '200': {$ref: '#/components/responses/Execution'}
         default: {$ref: '#/components/responses/Error'}
+  /functions:
+    get:
+      operationId: listFunctions
+      responses:
+        '200':
+          description: Runtime function catalog, including explicit supported flags and insertion snippets
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Function'}}
+  /studio/build:
+    post:
+      operationId: buildArcScript
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source]
+              properties:
+                source: {type: string, maxLength: 100000}
+      responses:
+        '200':
+          description: Compiled definition or diagnostics with one-based line and column; syntax errors have a null definition
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  definition: {$ref: '#/components/schemas/Definition'}
+                  source: {type: string}
+                  diagnostics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        message: {type: string}
+                        line: {type: integer}
+                        column: {type: integer}
+  /studio/render:
+    post:
+      operationId: renderArcScript
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Definition'}
+      responses:
+        '200':
+          description: Canonical ARC Script preserving graph identity, layout, bindings, and comments
+          content:
+            application/json:
+              schema: {type: object, properties: {source: {type: string}}}
+  /sources:
+    get:
+      operationId: listSources
+      responses:
+        '200':
+          description: Latest data source versions
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/DataSource'}}
+    post:
+      operationId: createSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, name, definition]
+              properties:
+                id: {type: string, pattern: '^[a-z][a-z0-9-]{0,79}$'}
+                name: {type: string, maxLength: 160}
+                definition: {$ref: '#/components/schemas/SourceConfig'}
+      responses:
+        '200':
+          description: Source created with configuration version 1
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataSource'}
+  /sources/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    put:
+      operationId: updateSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, revision, definition]
+              properties:
+                name: {type: string, maxLength: 160}
+                revision: {type: integer, description: Current source version for optimistic concurrency}
+                definition: {$ref: '#/components/schemas/SourceConfig'}
+      responses:
+        '200':
+          description: New immutable configuration version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataSource'}
+        '409': {description: Stale revision}
+  /sources/{id}/versions:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    get:
+      operationId: sourceVersions
+      responses:
+        '200':
+          description: Configuration history, newest first
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/DataSource'}}
+  /sources/{id}/versions/{version}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+      - {name: version, in: path, required: true, schema: {type: integer}}
+    get:
+      operationId: sourceVersion
+      responses:
+        '200':
+          description: Pinned source configuration
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataSource'}
+  /sources/{id}/test:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: testSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inputs]
+              properties:
+                inputs: {type: object, additionalProperties: true}
+                version: {type: integer, minimum: 1}
+      responses:
+        '200':
+          description: Source response, before JSON Pointer extraction
+          content:
+            application/json:
+              schema: {type: object, properties: {result: {nullable: true}}}
 components:
   parameters:
     RuleId:
@@ -204,6 +352,16 @@ components:
               version: {type: integer, nullable: true}
               result: {nullable: true, description: Number, string, boolean, or null}
               durationMicros: {type: integer, format: int64}
+              sources:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    input: {type: string}
+                    sourceId: {type: string}
+                    version: {type: integer}
+                    status: {type: string, enum: [RESOLVED, DEFAULT]}
+                    durationMicros: {type: integer, format: int64}
               trace:
                 type: array
                 items:
@@ -241,6 +399,7 @@ components:
       type: object
       required: [schemaVersion, inputs, nodes, edges]
       properties:
+        notes: {type: array, nullable: true, maxItems: 500, items: {type: string, maxLength: 2000}}
         schemaVersion: {type: integer, enum: [1]}
         inputs:
           type: array
@@ -250,9 +409,10 @@ components:
             required: [name, type, required]
             properties:
               name: {type: string, pattern: '^[A-Za-z_][A-Za-z_0-9]{0,63}$'}
-              type: {type: string, enum: [NUMBER, STRING, BOOLEAN]}
+              type: {type: string, enum: [NUMBER, STRING, BOOLEAN, ARRAY, OBJECT]}
               required: {type: boolean}
               defaultValue: {nullable: true}
+              source: {$ref: '#/components/schemas/SourceBinding'}
         nodes:
           type: array
           minItems: 1
@@ -289,3 +449,51 @@ components:
               source: {type: string}
               target: {type: string}
               sourceHandle: {type: string, enum: [next, 'true', 'false']}
+
+    SourceBinding:
+      type: object
+      nullable: true
+      required: [id, version, bindings, onError]
+      properties:
+        id: {type: string}
+        version: {type: integer, minimum: 1}
+        bindings: {type: object, maxProperties: 20, additionalProperties: {type: string, maxLength: 2000}}
+        pointer: {type: string, maxLength: 500, description: JSON Pointer; empty selects the entire value}
+        onError: {type: string, enum: [FAIL, DEFAULT]}
+    SourceConfig:
+      type: object
+      required: [kind, parameters, timeoutMs]
+      properties:
+        kind: {type: string, enum: [LOOKUP, HTTP]}
+        url: {type: string, maxLength: 2000}
+        parameters:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [name, type, required]
+            properties:
+              name: {type: string}
+              type: {type: string, enum: [NUMBER, STRING, BOOLEAN]}
+              required: {type: boolean}
+              defaultValue: {nullable: true}
+        entries: {type: object, maxProperties: 1000, additionalProperties: true}
+        secretHeaders: {type: object, maxProperties: 10, additionalProperties: {type: string}, description: Header names mapped to ARC_SECRET_ environment aliases; never raw credentials}
+        timeoutMs: {type: integer, minimum: 100, maximum: 10000}
+    DataSource:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        version: {type: integer}
+        definition: {$ref: '#/components/schemas/SourceConfig'}
+    Function:
+      type: object
+      properties:
+        name: {type: string}
+        category: {type: string}
+        signature: {type: string}
+        description: {type: string}
+        snippet: {type: string}
+        supported: {type: boolean}
+        origin: {type: string}

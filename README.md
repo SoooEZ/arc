@@ -122,3 +122,7 @@ GitHub Actions runs the Java tests, frontend build, real PostgreSQL API checks, 
 - Aggregation sources and operations (the **A** in ARC).
 - Rule test suites, richer value types, audit history, and release promotion.
 - Production deployment, request quotas, monitoring, and backup policies.
+
+### Code studio and data sources
+
+Use the separate **Code studio** page for Monaco editing, function chips with hover help, reusable module insertion, and bidirectional graph editing. **Data sources** supplies missing inputs from versioned lookup tables or HTTP JSON APIs. See [the studio guide](docs/studio.md) for syntax, examples, compatibility boundaries, source configuration, and endpoints.

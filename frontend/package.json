@@ -1,7 +1,7 @@
 {
   "name": "arc-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -17,9 +17,11 @@
     "@emotion/styled": "^11.14.1",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
+    "@monaco-editor/react": "^4.7.0",
     "@mui/material": "^9.4.0",
     "@xyflow/react": "^12.11.6",
     "lucide-react": "^0.577.0",
+    "monaco-editor": "^0.56.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
