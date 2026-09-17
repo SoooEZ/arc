@@ -160,7 +160,7 @@ test("references navigate within one modal with back and close all while preserv
         ...node("reuse", "REFERENCE", undefined, "discount", 180),
         ruleId: "apply-discount",
         version: 1,
-        bindings: { amount: "100", rate: "0.1" },
+        bindings: { amount: "100", rate: '"invalid"' },
       },
       node("out", "OUTPUT", "discount", undefined, 360),
     ],
@@ -222,6 +222,18 @@ test("references navigate within one modal with back and close all while preserv
   await expect(
     viewer.getByRole("button", { name: "Back", exact: true }),
   ).toBeDisabled();
+  await viewer.getByRole("button", { name: "Test rule", exact: true }).click();
+  await viewer.getByRole("button", { name: "Run test", exact: true }).click();
+  await viewer
+    .getByRole("button", { name: "Open problem · Amount & rate", exact: true })
+    .click();
+  await expect(
+    viewer.locator('.react-flow__node[data-id="input"] .graph-node'),
+  ).toHaveClass(/node-error/);
+  await viewer.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(
+    viewer.locator('.react-flow__node[data-id="reuse"] .graph-node'),
+  ).toHaveClass(/node-error/);
   await viewer
     .getByRole("button", { name: "Code editor", exact: true })
     .click();

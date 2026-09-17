@@ -10,6 +10,7 @@ export interface ReferenceTarget {
   version: number;
   nodeId?: string;
   mode?: "graph" | "code";
+  problems?: GraphProblem[];
 }
 export default function ReferenceDialog({
   target,
@@ -97,14 +98,18 @@ export default function ReferenceDialog({
             requestedVersion={current.version}
             requestedNode={current.nodeId}
             embedded
-            initialProblems={problems}
+            initialProblems={current.problems || problems}
             onSaved={() => {}}
             onDirty={() => {}}
             notify={setNotice}
             onOpenReference={(next, fromNode) =>
               setStack((s) => [
                 ...s.slice(0, -1),
-                { ...s[s.length - 1], nodeId: fromNode },
+                {
+                  ...s[s.length - 1],
+                  nodeId: fromNode,
+                  problems: next.problems,
+                },
                 next,
               ])
             }

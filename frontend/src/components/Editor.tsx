@@ -139,10 +139,21 @@ function EditorContent({
       setRuntimeProblems(problem ? [problem] : []),
     [],
   );
-  const openReference = (target: ReferenceTarget) =>
-    onOpenReference
-      ? onOpenReference(target, selected)
-      : setReferenceTarget(target);
+  const openReference = (target: ReferenceTarget) => {
+    const next = {
+      ...target,
+      problems: allProblems.map((problem) => ({
+        ...problem,
+        locations: problem.locations.map((location) =>
+          !location.ruleId || location.ruleId === "preview"
+            ? { ...location, ruleId: rule.id, version: requestedVersion }
+            : location,
+        ),
+      })),
+    };
+    if (onOpenReference) onOpenReference(next, selected);
+    else setReferenceTarget(next);
+  };
   const [testOpen, setTestOpen] = useState(false);
   const [trace, setTrace] = useState<Execution | null>(null);
   const [outline, setOutline] = useState(false);
