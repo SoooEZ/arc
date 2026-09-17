@@ -29,7 +29,6 @@ import {
   type EdgeChange,
   type NodeChange,
 } from "@xyflow/react";
-import dagre from "@dagrejs/dagre";
 import {
   CheckCheck,
   ChevronDown,
@@ -444,24 +443,30 @@ function EditorContent({
     }));
     setSelected("input");
   };
-  const layout = () => {
-    const graph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-    graph.setGraph({ rankdir: "TB", nodesep: 65, ranksep: 80 });
-    rule.draft.nodes.forEach((n) =>
-      graph.setNode(n.id, { width: 230, height: 105 }),
-    );
-    rule.draft.edges.forEach((e) => graph.setEdge(e.source, e.target));
-    dagre.layout(graph);
-    changeDefinition((d) => ({
-      ...d,
-      nodes: d.nodes.map((n) => ({
-        ...n,
-        position: { x: graph.node(n.id).x - 115, y: graph.node(n.id).y - 52 },
-      })),
-    }));
-    requestAnimationFrame(
-      () => void flow.fitView({ padding: 0.15, duration: 300 }),
-    );
+  const layout = async () => {
+    if (readOnly || busy) return;
+    setBusy("layout");
+    setError("");
+    const before = rule.draft;
+    try {
+      const { arrangeGraph } = await import("../graphLayout");
+      const arranged = await arrangeGraph(before, measurements);
+      // Preserve any edits made while the layout module was loading. A stale
+      // result must not replace newly added/deleted nodes or edited expressions.
+      setRule((current) =>
+        current.draft === before ? { ...current, draft: arranged } : current,
+      );
+      setSource(null);
+      setDiagnostics([]);
+      setTrace(null);
+      requestAnimationFrame(
+        () => void flow.fitView({ padding: 0.15, duration: 300 }),
+      );
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy("");
+    }
   };
   const focusNode = (id: string) => {
     setSelected(id);
@@ -692,14 +697,18 @@ function EditorContent({
                     <ListTree size={17} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Arrange graph">
+                <Tooltip title="Arrange graph · reduce crossings using True / False exit positions">
                   <span>
                     <IconButton
                       aria-label="Arrange graph"
-                      disabled={readOnly}
+                      disabled={readOnly || !!busy}
                       onClick={layout}
                     >
-                      <LayoutGrid size={16} />
+                      {busy === "layout" ? (
+                        <CircularProgress size={16} />
+                      ) : (
+                        <LayoutGrid size={16} />
+                      )}
                     </IconButton>
                   </span>
                 </Tooltip>
@@ -746,8 +755,8 @@ function EditorContent({
                 onPaneClick={() => setSelectedEdge(null)}
                 onEdgeClick={(_, e) => setSelectedEdge(e.id)}
                 onConnect={connect}
-                nodesDraggable={!readOnly}
-                nodesConnectable={!readOnly}
+                nodesDraggable={!readOnly && !busy}
+                nodesConnectable={!readOnly && !busy}
                 edgesReconnectable={false}
                 deleteKeyCode={null}
                 fitView
@@ -867,7 +876,7 @@ function EditorContent({
               rule.draft.nodes[0]
             }
             rules={rules}
-            readOnly={readOnly}
+            readOnly={readOnly || !!busy}
             onNodeChange={patchNode}
             onDelete={removeNode}
             onDefinitionChange={changeDefinition}

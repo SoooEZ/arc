@@ -40,7 +40,7 @@ The result is `120`, alongside the executed version, timing, and each visited no
 - Add formula, condition, reusable-rule, and output nodes on a zoomable canvas.
 - Connect branches by dragging handles; select an edge to remove it.
 - Use the condition builder or write an expression, including compound conditions.
-- Navigate with the node outline, minimap, auto-layout, or links to referenced rules.
+- Navigate with the node outline, minimap, auto-layout, or links to referenced rules. Arrange graph accounts for the fixed True/False exits and reorders branches to reduce crossings.
 - Map parameters into a reused rule and pin an exact published version.
 - Test the current graph without saving; inspect results and a highlighted execution path.
 - Save incomplete drafts, validate complete graphs, and publish immutable versions.
@@ -51,7 +51,7 @@ The result is `120`, alongside the executed version, timing, and each visited no
 
 ## Technology
 
-- **Frontend:** React 19, TypeScript, [MUI](https://mui.com/material-ui/), [React Flow](https://reactflow.dev/), Dagre, Vite. Fonts are bundled locally.
+- **Frontend:** React 19, TypeScript, [MUI](https://mui.com/material-ui/), [React Flow](https://reactflow.dev/), [ELK](https://github.com/kieler/elkjs), Vite. Fonts are bundled locally.
 - **Backend:** Java 21, [Spring Boot 3.5](https://docs.spring.io/spring-boot/3.5/), JDBC, Flyway.
 - **Storage:** PostgreSQL 17 with JSONB graph documents and immutable version rows.
 - **Execution:** a restricted expression parser using `BigDecimal`/DECIMAL128. No JavaScript evaluation, JVM reflection, SQL expressions, or arbitrary code execution.

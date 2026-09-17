@@ -3,6 +3,7 @@ import { Check, ExternalLink } from "lucide-react";
 import type { RuleNode } from "../types";
 import { nodeLabel } from "../types";
 import { NodeIcon } from "./Icons";
+import { branchHandleX } from "../graphGeometry";
 
 export type FlowNode = Node<
   { model: RuleNode; visited: boolean; inputCount: number },
@@ -40,14 +41,20 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
             type="source"
             position={Position.Bottom}
             id="true"
-            style={{ left: "27%", background: "#348c6a" }}
+            style={{
+              left: `${branchHandleX.true * 100}%`,
+              background: "#348c6a",
+            }}
           />
           <span className="handle-label handle-true">True</span>
           <Handle
             type="source"
             position={Position.Bottom}
             id="false"
-            style={{ left: "73%", background: "#bd8262" }}
+            style={{
+              left: `${branchHandleX.false * 100}%`,
+              background: "#bd8262",
+            }}
           />
           <span className="handle-label handle-false">False</span>
         </>

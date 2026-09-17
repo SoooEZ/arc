@@ -55,6 +55,12 @@ Example reference:
 
 Bindings are expressions evaluated in the caller's scope. The callee receives only mapped inputs and its own defaults; it does not see the caller's other variables. Its result becomes the caller's `output` variable. References can be nested inside every artifact kind, including formulas.
 
+## Canvas layout
+
+**Arrange graph** uses ELK's layered layout with fixed port positions matching the rendered handles: True at 27% of node width, False at 73%, incoming connections at the top center. This lets crossing minimization reorder branch nodes and their downstream nodes with the exit order in view. Measured node dimensions prevent overlaps. Stable input ordering and a fixed seed make repeated arrangements reproducible.
+
+The layout module loads on demand. Layout updates only node positions, preserving IDs, edges, handles, expressions, references, and inputs. Saving persists these positions in the shared graph/ARC Script definition. Incomplete drafts with disconnected nodes can still be arranged; invalid handles fail without dropping connections. Historical versions remain read-only. Crossing minimization is a heuristic; shared descendants or other graph constraints can prevent a completely crossing-free layout.
+
 ## Validation and execution
 
 Draft saves enforce document shape, identifiers, declared input types, and size limits, but allow an unfinished graph. Publishing, validation, and preview require a complete executable graph:
