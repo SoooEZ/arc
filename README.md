@@ -125,6 +125,7 @@ The result is `120`, alongside the executed version, timing, and each visited no
 - Define number, string, and boolean inputs, with required flags and defaults.
 - Add formula, condition, reusable-rule, and output nodes on a zoomable canvas.
 - Connect one result to multiple downstream nodes by dragging from the same handle; select an edge to remove it.
+- Connections route around node cards automatically, including while moving nodes or dragging a new connection. Covered handles show a warning with links to the affected connections; move nodes apart or use **Arrange graph** to restore a clear path.
 - Use the condition builder or write an expression, including compound conditions.
 - Choose an Output’s return value from available inputs/upstream results, enter a typed constant (number, string, boolean, array or null), or write an expression. String constants need no manual quotation marks.
 - Navigate with the node outline, minimap, auto-layout, or links to referenced rules. Arrange graph accounts for the fixed True/False exits and reorders branches to reduce crossings.

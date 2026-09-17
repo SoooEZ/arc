@@ -58,6 +58,8 @@ import type {
 } from "../types";
 import { kindLabel, nodeLabel } from "../types";
 import GraphNode, { type FlowNode } from "./GraphNode";
+import RoutedEdge, { RoutedConnectionLine, RoutingContext } from "./RoutedEdge";
+import { defaultNodeSize } from "../graphGeometry";
 import { KindIcon, NodeIcon } from "./Icons";
 import Inspector from "./Inspector";
 import TestPanel from "./TestPanel";
@@ -67,6 +69,7 @@ import ReferenceDialog, { type ReferenceTarget } from "./ReferenceDialog";
 const CodeStudio = lazy(() => import("./CodeStudio"));
 const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
 const nodeTypes = { arc: GraphNode };
+const edgeTypes = { routed: RoutedEdge };
 interface Props {
   mode: "code" | "graph";
   rule: Rule;
@@ -126,6 +129,27 @@ function EditorContent({
   const [measurements, setMeasurements] = useState<
     Record<string, { width: number; height: number }>
   >({});
+  const [blockedEdges, setBlockedEdges] = useState<Record<string, boolean>>({});
+  const reportBlocked = useCallback((id: string, blocked: boolean) => {
+    setBlockedEdges((current) => {
+      if (!!current[id] === blocked) return current;
+      const next = { ...current };
+      if (blocked) next[id] = true;
+      else delete next[id];
+      return next;
+    });
+  }, []);
+  const routing = useMemo(
+    () => ({
+      nodes: rule.draft.nodes.map((n) => ({
+        id: n.id,
+        ...n.position,
+        ...(measurements[n.id] || defaultNodeSize),
+      })),
+      reportBlocked,
+    }),
+    [rule.draft.nodes, measurements, reportBlocked],
+  );
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [graphProblems, setGraphProblems] = useState<GraphProblem[]>([]);
@@ -301,7 +325,7 @@ function EditorContent({
         );
         return {
           ...e,
-          type: "smoothstep",
+          type: "routed",
           selected: selectedEdge === e.id,
           animated: active,
           style: {
@@ -894,53 +918,78 @@ function EditorContent({
                 )}
               </div>
             </div>
+            {rule.draft.edges.some((e) => blockedEdges[e.id]) && (
+              <Alert severity="warning" className="routing-warning">
+                Connections blocked by overlapping or tightly spaced nodes. Move
+                nodes apart or use Arrange graph:
+                {rule.draft.edges
+                  .filter((e) => blockedEdges[e.id])
+                  .map((e) => (
+                    <Button
+                      key={e.id}
+                      size="small"
+                      onClick={() => {
+                        focusNode(e.source);
+                        setSelectedEdge(e.id);
+                      }}
+                    >
+                      {rule.draft.nodes.find((n) => n.id === e.source)?.label} →{" "}
+                      {rule.draft.nodes.find((n) => n.id === e.target)?.label}
+                    </Button>
+                  ))}
+              </Alert>
+            )}
             <div className="flow-container">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={nodeTypes}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onNodeClick={(_, n) => {
-                  setSelected(n.id);
-                  setSelectedEdge(null);
-                }}
-                onPaneClick={() => setSelectedEdge(null)}
-                onEdgeClick={(_, e) => setSelectedEdge(e.id)}
-                onConnect={connect}
-                nodesDraggable={!readOnly && !busy}
-                nodesConnectable={!readOnly && !busy}
-                edgesReconnectable={false}
-                deleteKeyCode={null}
-                fitView
-                fitViewOptions={{ padding: 0.18 }}
-                minZoom={0.25}
-                maxZoom={1.5}
-                proOptions={{ hideAttribution: true }}
-              >
-                <Background
-                  variant={BackgroundVariant.Dots}
-                  gap={20}
-                  size={1}
-                  color="#cad5cf"
-                />
-                <Controls showInteractive={false} />
-                <MiniMap
-                  nodeColor={(n) =>
-                    nodeErrors[n.id]?.length
-                      ? "#d15a52"
-                      : visited.has(n.id)
-                        ? "#8ebda8"
-                        : n.data?.model &&
-                            (n.data.model as RuleNode).type === "CONDITION"
-                          ? "#e8d8b2"
-                          : "#d4dfd8"
-                  }
-                  maskColor="rgba(245,248,246,.7)"
-                  pannable
-                  zoomable
-                />
-              </ReactFlow>
+              <RoutingContext.Provider value={routing}>
+                <ReactFlow
+                  nodes={nodes}
+                  edges={edges}
+                  nodeTypes={nodeTypes}
+                  edgeTypes={edgeTypes}
+                  connectionLineComponent={RoutedConnectionLine}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  onNodeClick={(_, n) => {
+                    setSelected(n.id);
+                    setSelectedEdge(null);
+                  }}
+                  onPaneClick={() => setSelectedEdge(null)}
+                  onEdgeClick={(_, e) => setSelectedEdge(e.id)}
+                  onConnect={connect}
+                  nodesDraggable={!readOnly && !busy}
+                  nodesConnectable={!readOnly && !busy}
+                  edgesReconnectable={false}
+                  deleteKeyCode={null}
+                  fitView
+                  fitViewOptions={{ padding: 0.18 }}
+                  minZoom={0.25}
+                  maxZoom={1.5}
+                  proOptions={{ hideAttribution: true }}
+                >
+                  <Background
+                    variant={BackgroundVariant.Dots}
+                    gap={20}
+                    size={1}
+                    color="#cad5cf"
+                  />
+                  <Controls showInteractive={false} />
+                  <MiniMap
+                    nodeColor={(n) =>
+                      nodeErrors[n.id]?.length
+                        ? "#d15a52"
+                        : visited.has(n.id)
+                          ? "#8ebda8"
+                          : n.data?.model &&
+                              (n.data.model as RuleNode).type === "CONDITION"
+                            ? "#e8d8b2"
+                            : "#d4dfd8"
+                    }
+                    maskColor="rgba(245,248,246,.7)"
+                    pannable
+                    zoomable
+                  />
+                </ReactFlow>
+              </RoutingContext.Provider>
               {outline && (
                 <div className="node-outline">
                   <div>

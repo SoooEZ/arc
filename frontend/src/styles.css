@@ -1070,6 +1070,12 @@ svg {
   color: #9aaa8c;
   padding: 6px;
 }
+.routing-warning {
+  border-radius: 0 !important;
+  flex-shrink: 0;
+  max-height: 128px;
+  overflow: auto;
+}
 .flow-container {
   position: relative;
   flex: 1;
