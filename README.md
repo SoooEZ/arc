@@ -42,15 +42,47 @@ Normal shutdown preserves saved rules and published versions. `docker compose do
 
 ## Run without Docker (local development)
 
-Prerequisites: **Java 21**, **Maven 3.9+**, **Node.js 24+** with npm, and **PostgreSQL 17**. Docker and Nginx are not required. The following PostgreSQL installation commands are for macOS with Homebrew; on other systems, install PostgreSQL using your platform's package manager or use an existing PostgreSQL server.
+Prerequisites: **Java 21**, **Maven 3.9+**, **Node.js 24+** with npm, and **PostgreSQL 17**. Docker and Nginx are not required. The steps below cover a fresh local setup on **macOS with [Homebrew](https://brew.sh/)**. On other systems, install the same tools using your platform's package manager and substitute your local JDK path and PostgreSQL administrator account.
 
-### 1. Start PostgreSQL
+You create the PostgreSQL role and database once. **ARC creates its tables automatically when the backend starts**; there is no separate manual `CREATE TABLE` or SQL import step.
+
+### 1. Install tools and get the source
+
+If Homebrew is not installed yet, follow [its installation instructions](https://brew.sh/) and complete the displayed shell setup first. Install the application tools:
 
 ```sh
-brew install postgresql@17
-brew services start postgresql@17
-export PATH="$(brew --prefix postgresql@17)/bin:$PATH"
+brew install openjdk@21 maven node@24 postgresql@17
+
+export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+export PATH="$JAVA_HOME/bin:$(brew --prefix node@24)/bin:$(brew --prefix postgresql@17)/bin:$PATH"
+
+java -version
+mvn -v
+node --version
+npm --version
+psql --version
 ```
+
+Check that both `java -version` and `mvn -v` report **Java 21**, Node reports **24 or newer**, and PostgreSQL reports **17**. Homebrew's [Java 21](https://formulae.brew.sh/formula/openjdk@21), [Node 24](https://formulae.brew.sh/formula/node@24), and [PostgreSQL 17](https://formulae.brew.sh/formula/postgresql@17) packages are keg-only, so the explicit paths select the intended versions. Exports apply to the current terminal; repeat them in a new terminal, or add these two export lines to your shell configuration (for example `~/.zshrc`). The backend and frontend commands below repeat the exports they need.
+
+For a new checkout, run this from the directory where you keep projects. If ARC is already checked out, use that repository instead:
+
+```sh
+git clone https://github.com/SoooEZ/arc.git
+cd arc
+```
+
+The first install and build need internet access to download Homebrew, Maven, and npm dependencies.
+
+### 2. Start PostgreSQL and create the database
+
+```sh
+export PATH="$(brew --prefix postgresql@17)/bin:$PATH"
+brew services start postgresql@17
+pg_isready -h localhost -p 5432
+```
+
+Wait for `accepting connections` before continuing. Homebrew initializes the PostgreSQL cluster during installation; you do not need to run `initdb` separately for this setup.
 
 Create the application's database role and database **once**. Enter a password of your choice when prompted, and use the same password in `DB_PASSWORD` below:
 
@@ -61,12 +93,23 @@ createdb --owner=arc arc
 
 These commands assume a local PostgreSQL server on port **5432** and a database administrator role for your OS user, as supplied by a standard Homebrew installation. For another PostgreSQL installation, create the role/database using that server's administrator account and adjust the connection settings below.
 
-### 2. Start the Java backend
+Verify the application's own login and its permission to create tables, using the same TCP connection as the backend. Enter the password you just chose:
+
+```sh
+psql -h localhost -p 5432 -U arc -d arc -W \
+  -c "SELECT current_database(), current_user, has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_tables;"
+```
+
+Expected values: database `arc`, user `arc`, and `can_create_tables = t`. The role owns this fresh database, which gives it the necessary schema permissions in the default PostgreSQL 17 setup. Resolve connection or permission errors before starting Java; Flyway cannot create a missing PostgreSQL role or database.
+
+### 3. Start the Java backend (tables are created here)
 
 In **terminal A**, starting from the repository root:
 
 ```sh
 cd backend
+export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+export PATH="$JAVA_HOME/bin:$PATH"
 export DB_URL='jdbc:postgresql://localhost:5432/arc'
 export DB_USER='arc'
 export DB_PASSWORD='replace-with-the-password-you-chose'
@@ -75,19 +118,79 @@ mvn spring-boot:run
 
 Keep this terminal running. The API listens on port **8080**. The root `.env` file is read by Docker Compose; it is **not automatically loaded** by `mvn spring-boot:run`. Export the `DB_*` variables in the backend's terminal as shown above. If you configure HTTP data sources, also export any needed `ARC_HTTP_ALLOWED_HOSTS` / `ARC_HTTP_PRIVATE_HOSTS` settings there; see [the studio guide](docs/studio.md).
 
-### 3. Start the React frontend
+Maven downloads Java dependencies, compiles the backend, and starts Spring Boot. Its [Flyway integration](https://docs.spring.io/spring-boot/3.5/how-to/data-initialization.html#howto.data-initialization.migration-tool.flyway) runs the versioned SQL files in `backend/src/main/resources/db/migration` automatically. Both native startup and Docker Compose use this same initialization process:
+
+| Created automatically | Purpose | Initialization source |
+| --- | --- | --- |
+| `rules` | Rule metadata and the editable draft graph | [V1__rules.sql](backend/src/main/resources/db/migration/V1__rules.sql) |
+| `rule_versions` | Immutable published rule versions | [V1__rules.sql](backend/src/main/resources/db/migration/V1__rules.sql) |
+| `data_sources` | Data-source metadata | [V2__data_sources.sql](backend/src/main/resources/db/migration/V2__data_sources.sql) |
+| `data_source_versions` | Versioned HTTP or lookup-table configurations | [V2__data_sources.sql](backend/src/main/resources/db/migration/V2__data_sources.sql) |
+| `flyway_schema_history` | Applied migration versions and checksums | Managed by Flyway |
+
+`V2` also inserts the `country-tax` lookup example. After migrations, [Samples.java](backend/src/main/java/dev/arc/store/Samples.java) creates and publishes `apply-discount`, `order-pricing`, and `free-shipping` **only if the `rules` table is empty**. Restarting an initialized workspace preserves existing rules. Later application updates apply new migration versions once; already applied migration files should not be edited or executed manually.
+
+### 4. Verify tables and initial data
+
+With terminal A still running, open another terminal. Use the application's PostgreSQL password whenever prompted:
+
+```sh
+export PATH="$(brew --prefix postgresql@17)/bin:$PATH"
+
+# Backend and database health
+curl --fail http://localhost:8080/actuator/health
+
+# List tables in the public schema
+psql -h localhost -p 5432 -U arc -d arc -W -c '\dt public.*'
+
+# Verify that migrations 1 and 2 succeeded
+psql -h localhost -p 5432 -U arc -d arc -W \
+  -c 'SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank;'
+
+# Verify the three example rules and their published versions
+psql -h localhost -p 5432 -U arc -d arc -W \
+  -c 'SELECT id, published_version FROM rules ORDER BY id;'
+
+# Verify the example lookup source
+psql -h localhost -p 5432 -U arc -d arc -W \
+  -c 'SELECT source_id, version FROM data_source_versions ORDER BY source_id, version;'
+```
+
+On a fresh setup, expect health `UP`, the five tables above, successful migrations `1` and `2`, three rules at published version `1`, and `country-tax` version `1`. An existing workspace may contain additional rules, sources, and versions.
+
+### 5. Start the React frontend
 
 In **terminal B**, starting from the repository root:
 
 ```sh
 cd frontend
+export PATH="$(brew --prefix node@24)/bin:$PATH"
 npm ci
 npm run dev -- --port 3080 --strictPort
 ```
 
 Open [http://localhost:3080](http://localhost:3080). Vite proxies `/api` and `/actuator` to `http://localhost:8080`, so the frontend can call the native backend without Nginx. Both **3080** and **8080** must be available; stop the ARC Compose stack first if it is using those ports. If you change the backend port, update the proxy target in `frontend/vite.config.ts` too.
 
+Use the [execution example below](#verify-either-setup) to check a complete HTTP calculation after startup.
+
+### 6. Stop and restart
+
 Press **Ctrl+C** in each terminal to stop the frontend and backend. PostgreSQL continues running as a Homebrew service; stop it when desired with `brew services stop postgresql@17`.
+
+For subsequent runs, start PostgreSQL if needed, then repeat the backend and frontend startup commands in separate terminals. Do not recreate the role, database, or tables. `npm ci` is needed for the first setup or after dependency/lockfile changes; an unchanged installation can go straight to `npm run dev -- --port 3080 --strictPort`.
+
+### Troubleshooting native startup
+
+| Symptom | Check / fix |
+| --- | --- |
+| `java`, `mvn`, `node`, or `psql` is not found; Maven uses the wrong Java | Repeat the installation/PATH setup in the current terminal. Confirm `JAVA_HOME` and `mvn -v` show Java 21. |
+| PostgreSQL reports `no response` / connection refused | Check `brew services list`, start `postgresql@17`, and run `pg_isready -h localhost -p 5432`. Verify that `DB_URL` points to the same server and port. |
+| Role/database `arc` already exists | Skip its creation on subsequent runs and verify the login with `psql`. Use the existing password and owner; do not drop the database to repeat setup. |
+| `password authentication failed` or database `arc` does not exist | Verify the role/database creation and password, then export matching `DB_USER`, `DB_PASSWORD`, and `DB_URL` in the Java terminal. |
+| `permission denied for schema public` | Run the permission query in step 2. Have the database administrator grant the ARC role `USAGE, CREATE` on schema `public` in the ARC database; existing tables must also be owned by, or writable by, that role. |
+| Tables are missing or Flyway migration fails | Read the backend terminal's first database/Flyway error. Check that you connected to the intended database and that the role can create tables. Run the migration-history query after fixing the error and restarting. Do not manually import the migration SQL or remove migration history. |
+| Port 8080 or 3080 is occupied | On macOS, inspect it with `lsof -nP -iTCP:8080 -sTCP:LISTEN` or `lsof -nP -iTCP:3080 -sTCP:LISTEN`. Stop the conflicting app, or change the port and matching proxy configuration. |
+| Frontend opens, but API requests fail | Check `http://localhost:8080/actuator/health` and `http://localhost:3080/actuator/health`. Start the backend, resolve its startup error, or correct the Vite proxy target. |
 
 **Existing data:** native PostgreSQL and the Compose database volume are separate databases. A fresh native database gets the example rules, not your Docker workspace. To retain custom rules, published versions, and data sources when switching, back up the original database with `pg_dump` and restore it into the destination database before starting ARC there. If Docker cannot start, its existing volume still needs to be recovered before that data can be migrated; keep the volume intact.
 
