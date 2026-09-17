@@ -119,6 +119,20 @@ public class Validator {
   }
 
   public void validate(Definition d, RuleResolver resolver) {
+    try {
+      validateGraph(d, resolver);
+    } catch (ArcException e) {
+      if (!e.locations().isEmpty() || d == null || d.nodes() == null) throw e;
+      Node input =
+          d.nodes().stream()
+              .filter(n -> n != null && "INPUT".equals(n.type()))
+              .findFirst()
+              .orElse(null);
+      throw input == null ? e : e.atNode(null, null, input.id(), input.label());
+    }
+  }
+
+  private void validateGraph(Definition d, RuleResolver resolver) {
     shape(d);
     var inputNames = d.inputs().stream().map(Input::name).collect(Collectors.toSet());
     Map<String, Set<String>> dependencies = new HashMap<>();
@@ -152,65 +166,65 @@ public class Validator {
               ? Set.of("true", "false")
               : n.type().equals("OUTPUT") ? Set.of() : Set.of("next");
       require(
-          edges.size() == expected.size() && handles.equals(expected),
-          n.label() + ": connect " + (expected.isEmpty() ? "no outgoing branches" : expected));
+          handles.equals(expected),
+          n.label() + ": connect " + (expected.isEmpty() ? "no outgoing branches" : expected),
+          n);
     }
+    Set<String> connections = new HashSet<>();
+    for (Edge e : d.edges())
+      require(
+          connections.add(e.source() + ":" + e.sourceHandle() + ":" + e.target()),
+          "Duplicate connection",
+          nodes.get(e.source()));
+    var plan = new GraphPlan(d);
     Set<String> visited = new HashSet<>(), active = new HashSet<>();
     walk(starts.getFirst().id(), outgoing, visited, active);
-    require(
-        visited.size() == nodes.size(),
-        "Every node must be reachable from Input; connect or remove unused nodes");
-    // Topological data-flow analysis: a variable must exist on EVERY path into a node.
-    Map<String, Set<String>> scopes = new HashMap<>();
-    Map<String, Integer> remaining = new HashMap<>();
-    incoming.forEach((id, es) -> remaining.put(id, es.size()));
-    Queue<String> queue = new ArrayDeque<>();
-    queue.add(starts.getFirst().id());
-    while (!queue.isEmpty()) {
-      String id = queue.remove();
-      Node n = nodes.get(id);
-      Set<String> scope = new HashSet<>();
-      List<Edge> parents = incoming.getOrDefault(id, List.of());
-      if (parents.isEmpty()) d.inputs().forEach(p -> scope.add(p.name()));
-      else {
-        scope.addAll(scopes.get(parents.getFirst().source()));
-        for (Edge e : parents) scope.retainAll(scopes.get(e.source()));
-      }
-      if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(n.type()))
-        expression(n.expression(), scope, n.label());
-      if (n.type().equals("REFERENCE")) {
-        require(
-            n.ruleId() != null && n.version() != null && n.version() > 0,
-            n.label() + ": select a published rule and version");
-        Definition child = resolver.resolve(n.ruleId(), n.version());
-        Map<String, String> bindings = n.bindings() == null ? Map.of() : n.bindings();
-        Set<String> childNames =
-            child.inputs().stream().map(Input::name).collect(Collectors.toSet());
-        for (Input p : child.inputs())
+    for (Node n : d.nodes())
+      require(
+          visited.contains(n.id()),
+          "Every node must be reachable from Input; connect or remove unused nodes",
+          n);
+    for (Node n : plan.order) {
+      Set<String> scope = plan.available.get(n.id());
+      try {
+        if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(n.type()))
+          expression(n.expression(), scope, n.label());
+        if (n.type().equals("REFERENCE")) {
           require(
-              !p.required()
-                  || p.defaultValue() != null
-                  || p.source() != null
-                  || bindings.containsKey(p.name()),
-              n.label() + ": missing binding for " + p.name());
-        for (var entry : bindings.entrySet()) {
-          require(
-              childNames.contains(entry.getKey()),
-              n.label() + ": unknown parameter " + entry.getKey());
-          expression(entry.getValue(), scope, n.label() + " / " + entry.getKey());
+              n.ruleId() != null && n.version() != null && n.version() > 0,
+              n.label() + ": select a published rule and version");
+          Definition child = resolver.resolve(n.ruleId(), n.version());
+          Map<String, String> bindings = n.bindings() == null ? Map.of() : n.bindings();
+          Set<String> childNames =
+              child.inputs().stream().map(Input::name).collect(Collectors.toSet());
+          for (Input p : child.inputs())
+            require(
+                !p.required()
+                    || p.defaultValue() != null
+                    || p.source() != null
+                    || bindings.containsKey(p.name()),
+                n.label() + ": missing binding for " + p.name());
+          for (var entry : bindings.entrySet()) {
+            require(
+                childNames.contains(entry.getKey()),
+                n.label() + ": unknown parameter " + entry.getKey());
+            expression(entry.getValue(), scope, n.label() + " / " + entry.getKey());
+          }
         }
+        if (n.type().equals("FORMULA") || n.type().equals("REFERENCE")) {
+          require(identifier(n.output()), n.label() + ": provide a valid result variable");
+          require(
+              d.inputs().stream().noneMatch(p -> p.name().equals(n.output())),
+              n.label() + ": cannot overwrite input " + n.output());
+        }
+      } catch (ArcException e) {
+        throw e.atNode(null, null, n.id(), n.label());
       }
-      if (n.type().equals("FORMULA") || n.type().equals("REFERENCE")) {
-        require(identifier(n.output()), n.label() + ": provide a valid result variable");
-        require(
-            d.inputs().stream().noneMatch(p -> p.name().equals(n.output())),
-            n.label() + ": cannot overwrite input " + n.output());
-        scope.add(n.output());
-      }
-      scopes.put(id, scope);
-      for (Edge e : outgoing.getOrDefault(id, List.of()))
-        if (remaining.merge(e.target(), -1, Integer::sum) == 0) queue.add(e.target());
     }
+  }
+
+  private void require(boolean condition, String message, Node node) {
+    if (!condition) throw ArcException.invalid(message).atNode(null, null, node.id(), node.label());
   }
 
   private void inputCycles(

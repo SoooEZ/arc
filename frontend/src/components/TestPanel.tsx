@@ -8,7 +8,7 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { api, errorMessage } from "../api";
+import { api, ApiError, type ErrorLocation, errorMessage } from "../api";
 import type { Definition, Execution } from "../types";
 import { NodeIcon } from "./Icons";
 
@@ -67,6 +67,7 @@ export default function TestPanel({
   );
   const [result, setResult] = useState<Execution | null>(null);
   const [error, setError] = useState("");
+  const [locations, setLocations] = useState<ErrorLocation[]>([]);
   const [running, setRunning] = useState(false);
   const [tab, setTab] = useState(0);
   const inputSchema = JSON.stringify(definition.inputs);
@@ -77,11 +78,13 @@ export default function TestPanel({
   useEffect(() => {
     setResult(null);
     setError("");
+    setLocations([]);
     onResult(null);
   }, [graph, onResult]);
   const run = async () => {
     setRunning(true);
     setError("");
+    setLocations([]);
     setResult(null);
     onResult(null);
     try {
@@ -96,6 +99,7 @@ export default function TestPanel({
       onResult(execution);
     } catch (e) {
       setError(errorMessage(e));
+      if (e instanceof ApiError) setLocations(e.locations);
     } finally {
       setRunning(false);
     }
@@ -150,6 +154,7 @@ export default function TestPanel({
                 setResult(null);
                 onResult(null);
                 setError("");
+                setLocations([]);
               }}
               className="json-input"
               spellCheck={false}
@@ -169,7 +174,66 @@ export default function TestPanel({
         </div>
         <div className="test-output">
           {error ? (
-            <Alert severity="error">{error}</Alert>
+            <Alert severity="error">
+              {error}
+              <div className="error-actions">
+                {locations
+                  .filter(
+                    (l) =>
+                      !l.ruleId ||
+                      l.ruleId === "preview" ||
+                      (l.ruleId === ruleId && l.version === publishedVersion),
+                  )
+                  .slice(-1)
+                  .map((l) => (
+                    <Button
+                      key={l.nodeId}
+                      size="small"
+                      color="inherit"
+                      onClick={() => onNode(l.nodeId)}
+                    >
+                      Show problem · {l.label}
+                    </Button>
+                  ))}
+                {locations
+                  .filter(
+                    (l) =>
+                      l.ruleId &&
+                      l.ruleId !== "preview" &&
+                      !(l.ruleId === ruleId && l.version === publishedVersion),
+                  )
+                  .map((l, i) => (
+                    <Button
+                      key={i}
+                      size="small"
+                      color="inherit"
+                      href={`#/rules/${encodeURIComponent(l.ruleId!)}?version=${l.version}&node=${encodeURIComponent(l.nodeId)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open problem · {l.label} ↗
+                    </Button>
+                  ))}
+                {!locations.length && (
+                  <Button
+                    size="small"
+                    color="inherit"
+                    onClick={() => {
+                      setTab(0);
+                      requestAnimationFrame(() =>
+                        document
+                          .querySelector<HTMLTextAreaElement>(
+                            '[aria-label="Test input JSON"]',
+                          )
+                          ?.focus(),
+                      );
+                    }}
+                  >
+                    Edit test inputs
+                  </Button>
+                )}
+              </div>
+            </Alert>
           ) : result ? (
             <>
               <div className="test-result">

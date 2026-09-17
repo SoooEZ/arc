@@ -36,7 +36,7 @@ References always contain a rule ID and positive integer version. Publishing nev
 | `FORMULA` | `expression`, `output` variable | `next` |
 | `CONDITION` | Boolean `expression` | `true` and `false` |
 | `REFERENCE` | `ruleId`, `version`, `bindings`, `output` variable | `next` |
-| `OUTPUT` | `expression` returning a scalar result | None |
+| `OUTPUT` | `expression` returning a value | None |
 
 Example reference:
 
@@ -69,14 +69,16 @@ Draft saves enforce document shape, identifiers, declared input types, and size 
 2. Correct outgoing branches for each node; unique node/edge IDs and no dangling edges.
 3. Every node reachable from Input, no graph cycles, and all terminating paths returning through Output.
 4. Parseable expressions and existing referenced versions with required parameter mappings.
-5. Variables available on every incoming path. A topological data-flow analysis intersects the scopes of merged branches.
-6. Result variable names are valid and cannot overwrite an input. Different branches can assign the same result variable before merging.
+5. Variables guaranteed to be available whenever the node runs. Branch-sensitive analysis combines variables from simultaneous upstream computations and checks all alternatives at conditional merges. It uses bounded Boolean decision diagrams rather than enumerating every branch combination.
+6. Result variable names are valid and cannot overwrite an input. Mutually exclusive branches can assign the same result variable. Simultaneous independent writes to the same variable fail at the merge instead of silently overwriting one another; use distinct names. Sequential updates keep the later value.
 
 Input values are not coerced: a numeric string is not a number. Unknown input names are rejected to catch integration typos. An omitted parameter uses its default; an explicitly supplied `null` does not. Required null values fail validation; optional nulls can be tested with `== null`.
 
-The evaluator walks only the selected branch. Conditions require booleans at runtime. Result types and arithmetic operand types are also checked at runtime; graph validation does not prove all possible input values are safe (for example, a denominator may still be zero). Errors identify the failing node.
+Every outgoing handle supports multiple target nodes. The evaluator processes the DAG in topological order with node IDs as a stable tie-breaker. Each activated node runs once; skipped condition branches are resolved without evaluation. A join waits until every incoming predecessor has either executed or been skipped, then merges only the active upstream scopes. Sibling results are not visible until a connecting path brings them into scope. Execution is deterministic and sequential, not concurrent HTTP dispatch. Conditions require booleans at runtime. Result types and arithmetic operand types are also checked at runtime; graph validation does not prove all possible input values are safe (for example, a denominator may still be zero). Errors include structured `locations` with node ID, label, rule ID and version. Nested failures retain both the child location and the calling reference. The test panel can focus the current graph or open a pinned child node in a new tab.
 
-An execution has a local variable scope, depth guard, and shared trace across nested calls. Each trace step includes rule ID, version, node ID, node label, value, chosen branch, and nesting depth. Child steps appear before the reference node's returned result. `durationMicros` measures engine execution and dependency resolution, excluding HTTP and the initial root-version lookup.
+If exactly one Output is reached, its value is returned unchanged. When multiple Outputs are reached, `result` is an object keyed by their node IDs (including null values); Output labels can change without changing these keys. Existing decision trees that select one of several Outputs keep their original result shape. Reused rules follow the same convention.
+
+An execution has isolated per-node variable scopes, a depth guard, and a shared trace across nested calls. Each trace step includes rule ID, version, node ID, node label, value, chosen branch, and nesting depth. Child steps appear before the reference node's returned result. `durationMicros` measures engine execution and dependency resolution, excluding HTTP and the initial root-version lookup.
 
 ## Expression language
 
@@ -96,7 +98,7 @@ Expressions are parsed into a small syntax tree, never delegated to a general-pu
 
 Numeric operations use Java `BigDecimal` with DECIMAL128 (34 significant digits). Decimal addition avoids binary floating-point drift. Nonterminating division is rounded with DECIMAL128; use explicit `round` for business-specific decimal places. Equality treats `1` and `1.0` as equal. Strings support equality and lexicographic ordering; `+` is numeric only. Boolean operators and `if` short-circuit.
 
-Identifiers use letters, digits, and underscores, start with a letter or underscore, and are at most 64 characters. `true`, `false`, and `null` are reserved. Values are scalar: number, string, boolean, or optional null. Arrays, object navigation, dates, loops, regex, arbitrary function calls, reflection, IO, and network access are outside this release.
+Identifiers use letters, digits, and underscores, start with a letter or underscore, and are at most 64 characters. `true`, `false`, and `null` are reserved. Values include numbers, strings, booleans, nulls, arrays and objects. Supported collection operations and object access are described in [the studio guide](studio.md). Reflection, arbitrary host code, and IO inside expressions are unavailable; external values enter through configured data sources.
 
 ## Bounds and deployment
 
@@ -126,3 +128,7 @@ HTTP requests use encoded query parameters, a per-request deadline, 1 MiB respon
 The expression engine keeps decimal arithmetic for core math. Apache POI supplies context-free Excel calculations; these use Excel floating-point semantics. A shared capability registry exposes callable functions and reference-only functions separately. This is an Excel/Dentaku-inspired calculation dialect, not a workbook engine or a drop-in Dentaku implementation. No cell references, workbook formulas, macros, arbitrary Ruby, or host-language calls are evaluated. Functions requiring workbook context or a missing adapter are shown as reference-only.
 
 Arrays and objects are input types. Arrays can be used as Excel ranges. `MAP`, `FILTER`, `ALL`, `ANY`, and `REDUCE` use explicitly scoped local identifiers. `PLUCK` and `GET` accept quoted dot paths. Object property access is available inside ordinary expressions (`customer.country`, `item.price`). Expressions remain bounded by source length, token/depth limits, numeric/string limits, collection size/depth limits, and an iteration budget.
+
+## Typed parameter mapping
+
+The inspector requests `/api/variables` for the current definition and offers inputs and guaranteed connected upstream results. A mapping can select a variable, enter a typed constant, write an ARC expression, or omit the binding to use the callee’s default/source. Plain string constants are escaped into ARC literals automatically, including empty strings, quotes and backslashes. The simple condition builder and data-source mappings use the same controls. Expression mode and ARC Script retain explicit string literal syntax. Rule metadata lives in the gear dialog; applying it updates the draft and Save draft persists it.

@@ -107,7 +107,9 @@ node zero OUTPUT "Below minimum" { return 0; }
   await expect(page.getByLabel("JSON pointer", { exact: true })).toHaveValue(
     "/rate",
   );
-  await page.getByLabel("Source key expression", { exact: true }).fill('"GB"');
+  await page.getByLabel("Source key · value source", { exact: true }).click();
+  await page.getByRole("option", { name: "Constant", exact: true }).click();
+  await page.getByLabel("Source key", { exact: true }).fill("GB");
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
   await expect(page.locator(".view-lines")).toContainText(
     "ROUND(amount * 2, 2)",

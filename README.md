@@ -38,11 +38,12 @@ The result is `120`, alongside the executed version, timing, and each visited no
 - Create a decision tree, formula, or condition rule from a working template.
 - Define number, string, and boolean inputs, with required flags and defaults.
 - Add formula, condition, reusable-rule, and output nodes on a zoomable canvas.
-- Connect branches by dragging handles; select an edge to remove it.
+- Connect one result to multiple downstream nodes by dragging from the same handle; select an edge to remove it.
 - Use the condition builder or write an expression, including compound conditions.
 - Navigate with the node outline, minimap, auto-layout, or links to referenced rules. Arrange graph accounts for the fixed True/False exits and reorders branches to reduce crossings.
-- Map parameters into a reused rule and pin an exact published version.
-- Test the current graph without saving; inspect results and a highlighted execution path.
+- Map parameters using connected upstream variables, typed constants, or expressions, and pin an exact published version. String constants need no manual quotation marks. Referenced rules open in a separate tab.
+- Test the current graph without saving; inspect results and a highlighted execution path. Error actions jump to the affected node, including failures inside referenced rules.
+- Edit the rule name and description with the gear beside the current rule name.
 - Save incomplete drafts, validate complete graphs, and publish immutable versions.
 - Inspect historical versions, export graph JSON, and execute releases in the API playground.
 - Call the service using HTTP/cURL from any origin. Authentication is deliberately deferred.
@@ -68,7 +69,7 @@ Rule (stable ID)
     └── Reference nodes → rule ID + exact version + parameter expressions
 ```
 
-The evaluator starts at the Input node, follows connections, calculates values into a local scope, chooses one branch per condition, and returns the first Output reached. Graphs may merge branches but cannot contain cycles. Node positions are only presentation metadata.
+The evaluator starts at Input and executes active nodes in a deterministic dependency order. A handle may feed several downstream nodes. Joins wait for their active upstream computations and run once; conditions activate only their selected exit. One reached Output returns its value; multiple reached Outputs return an object keyed by node ID, such as `{"tax": 10, "shipping": 5}`. Graphs cannot contain cycles. Node positions are presentation metadata.
 
 - [API reference and request examples](docs/api.md)
 - [Graph schema, expression language, and architecture](docs/architecture.md)
@@ -79,7 +80,7 @@ The evaluator starts at the Input node, follows connections, calculates values i
 Prerequisites for local development: Java 21+, Maven 3.9+, Node.js 24+, and Docker Compose.
 
 ```sh
-# Backend tests (22 tests covering arithmetic, types, graphs, and references)
+# Backend tests covering arithmetic, types, graphs, sources, and references
 cd backend
 mvn test
 

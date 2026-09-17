@@ -119,7 +119,7 @@ public class ArcScript {
         if (edge.matches()) {
           String handle = edge.group(1).toLowerCase(Locale.ROOT),
               target = unquote(edge.group(2), st);
-          unique(assigned, handle, st);
+          unique(assigned, handle + ":" + target, st);
           edges.add(
               new Edge(
                   edge.group(3) == null

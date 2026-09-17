@@ -12,7 +12,9 @@ Base URL: `http://localhost:8080/api` (also proxied by the workspace at `http://
 
 `version` is optional: omit it to run the latest published version. Only published versions can be executed by rule ID. Editing a draft has no effect on this endpoint.
 
-The response includes `ruleId`, `version`, scalar `result`, `durationMicros`, and `trace`. A trace step contains `ruleId`, `version`, `nodeId`, `label`, `type`, `value`, `branch`, and `depth`. A condition's branch is `"true"` or `"false"`; ordinary progression is `"next"`; an Output has `null`. Nested rules have `depth > 0` and their own pinned versions.
+The response includes `ruleId`, `version`, `result`, `durationMicros`, and `trace`. A trace step contains `ruleId`, `version`, `nodeId`, `label`, `type`, `value`, `branch`, and `depth`. A condition's branch is `"true"` or `"false"`; ordinary progression is `"next"`; an Output has `null`. Nested rules have `depth > 0` and their own pinned versions.
+
+Each source handle may have multiple downstream connections. Active nodes execute once after their predecessors are resolved. A single reached Output returns its value, as before. Multiple reached Outputs return an object keyed by Output node ID, for example `"result":{"tax":10,"shipping":5}`. Conditional branches that are skipped do not produce keys. Shared joins combine upstream values before calculating their expression.
 
 ## Create and edit
 
@@ -58,6 +60,8 @@ Supply the most recently read `revision`. A successful save advances it. A stale
 
 `POST /preview` accepts `{"definition": {...}, "inputs": {...}}`. It runs an unsaved graph and returns the same execution structure, with `ruleId: "preview"` and `version: null`. Referenced rules must still be published and explicitly versioned.
 
+`POST /variables` accepts a graph document and returns node IDs mapped to arrays of variable names guaranteed to be available at that node. It accepts incomplete acyclic drafts; it does not execute expressions, fetch sources or resolve referenced rules. The editor uses it for parameter mapping choices. Invalid structure or cycles return `422`.
+
 ## Publish and inspect versions
 
 `POST /rules/{id}/publish` accepts `{"revision":2}`. It validates the current saved draft, creates a new immutable version, advances the edit revision, and returns the updated rule. Publishing invalid drafts never changes the live version.
@@ -71,8 +75,10 @@ The UI saves any changed draft before publishing. API clients should save explic
 ## Errors
 
 ```json
-{"status":422,"message":"Missing required input: orderTotal","issues":["Missing required input: orderTotal"]}
+{"status":422,"message":"Missing required input: orderTotal","issues":["Missing required input: orderTotal"],"locations":[{"ruleId":"preview","version":null,"nodeId":"input","label":"Inputs"}]}
 ```
+
+`locations` identifies affected graph nodes, deepest failure first, followed by reference callers. Validation may use a null rule ID for the submitted graph. Errors outside a graph may omit locations or return an empty array.
 
 | HTTP status | Meaning |
 | --- | --- |

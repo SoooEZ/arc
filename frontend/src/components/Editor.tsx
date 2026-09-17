@@ -41,6 +41,7 @@ import {
   Play,
   Plus,
   Save,
+  Settings,
   Trash2,
   Upload,
   X,
@@ -60,6 +61,7 @@ import GraphNode, { type FlowNode } from "./GraphNode";
 import { KindIcon, NodeIcon } from "./Icons";
 import Inspector from "./Inspector";
 import TestPanel from "./TestPanel";
+import RuleSettings from "./RuleSettings";
 
 const CodeStudio = lazy(() => import("./CodeStudio"));
 const nodeTypes = { arc: GraphNode };
@@ -68,6 +70,7 @@ interface Props {
   rule: Rule;
   rules: Rule[];
   requestedVersion: number | null;
+  requestedNode?: string | null;
   onSaved: (r: Rule) => void;
   onDirty: (value: boolean) => void;
   navigate: (path: string) => void;
@@ -86,6 +89,7 @@ function EditorContent({
   rule: initial,
   rules,
   requestedVersion,
+  requestedNode,
   onSaved,
   onDirty,
   navigate,
@@ -120,6 +124,10 @@ function EditorContent({
   const [trace, setTrace] = useState<Execution | null>(null);
   const [outline, setOutline] = useState(false);
   const [history, setHistory] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pendingFocus, setPendingFocus] = useState<string | null>(
+    requestedNode || null,
+  );
   const [versions, setVersions] = useState<Version[]>([]);
   const [addAnchor, setAddAnchor] = useState<HTMLElement | null>(null);
   const [versionLoading, setVersionLoading] = useState(!!requestedVersion);
@@ -268,30 +276,39 @@ function EditorContent({
   };
   const connect = (connection: Connection) => {
     if (
+      readOnly ||
+      busy ||
       !connection.source ||
       !connection.target ||
       connection.source === connection.target
     )
       return;
-    changeDefinition((d) => ({
-      ...d,
-      edges: [
-        ...d.edges.filter(
+    changeDefinition((d) => {
+      const handle = connection.sourceHandle || "next";
+      if (
+        d.edges.some(
           (e) =>
-            !(
-              e.source === connection.source &&
-              e.sourceHandle === connection.sourceHandle
-            ),
-        ),
-        {
-          id: crypto.randomUUID(),
-          source: connection.source!,
-          target: connection.target!,
-          sourceHandle: connection.sourceHandle || "next",
-        },
-      ],
-    }));
+            e.source === connection.source &&
+            e.target === connection.target &&
+            e.sourceHandle === handle,
+        )
+      )
+        return d;
+      return {
+        ...d,
+        edges: [
+          ...d.edges,
+          {
+            id: crypto.randomUUID(),
+            source: connection.source!,
+            target: connection.target!,
+            sourceHandle: handle,
+          },
+        ],
+      };
+    });
   };
+
   const buildCode = async (): Promise<Definition> => {
     if (hasInvalidJson)
       throw new Error(
@@ -482,6 +499,28 @@ function EditorContent({
         },
       );
   };
+  const jumpToNode = (id: string) => {
+    setSelected(id);
+    setPendingFocus(id);
+    if (mode === "code")
+      navigate(
+        `/rules/${rule.id}${requestedVersion ? `?version=${requestedVersion}` : ""}`,
+      );
+  };
+  useEffect(() => {
+    if (
+      mode !== "graph" ||
+      versionLoading ||
+      !pendingFocus ||
+      !measurements[pendingFocus]
+    )
+      return;
+    const frame = requestAnimationFrame(() => {
+      focusNode(pendingFocus);
+      setPendingFocus(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [mode, versionLoading, pendingFocus, measurements]);
   const exportJson = () => {
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(rule.draft, null, 2)], {
@@ -519,6 +558,16 @@ function EditorContent({
           <div>
             <div className="editor-name">
               <h1>{rule.name}</h1>
+              <Tooltip title="Rule settings">
+                <IconButton
+                  aria-label="Rule settings"
+                  size="small"
+                  disabled={!!busy}
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Settings size={17} />
+                </IconButton>
+              </Tooltip>
               <Chip
                 size="small"
                 className={readOnly ? "published-chip" : "draft-chip"}
@@ -673,7 +722,7 @@ function EditorContent({
               ruleId={rule.id}
               publishedVersion={requestedVersion || rule.publishedVersion}
               onResult={setTrace}
-              onNode={() => void switchView()}
+              onNode={jumpToNode}
               onClose={() => setTestOpen(false)}
             />
           )}
@@ -850,7 +899,7 @@ function EditorContent({
                 ruleId={rule.id}
                 publishedVersion={requestedVersion || rule.publishedVersion}
                 onResult={setTrace}
-                onNode={focusNode}
+                onNode={jumpToNode}
                 onClose={() => setTestOpen(false)}
               />
             )}
@@ -880,11 +929,17 @@ function EditorContent({
             onNodeChange={patchNode}
             onDelete={removeNode}
             onDefinitionChange={changeDefinition}
-            onMetadata={(patch) => setRule((r) => ({ ...r, ...patch }))}
-            navigate={navigate}
             onInvalidJson={onInvalidJson}
           />
         </div>
+      )}
+      {settingsOpen && (
+        <RuleSettings
+          rule={rule}
+          readOnly={readOnly || !!busy}
+          onClose={() => setSettingsOpen(false)}
+          onApply={(patch) => setRule((r) => ({ ...r, ...patch }))}
+        />
       )}
       <Menu
         anchorEl={addAnchor}

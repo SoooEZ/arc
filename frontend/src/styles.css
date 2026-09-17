@@ -3366,3 +3366,30 @@ svg {
 .source-reads small {
   font-size: 9px;
 }
+
+.inspector-heading {
+  min-height: 56px;
+  padding: 20px;
+  border-bottom: 1px solid #e6ebe2;
+  color: #566a4b;
+  font-size: 12px;
+  font-weight: 600;
+}
+.value-binding {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.rule-settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-top: 12px !important;
+}
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}

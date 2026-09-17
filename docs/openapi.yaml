@@ -141,6 +141,25 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/Version'}
         default: {$ref: '#/components/responses/Error'}
+  /variables:
+    post:
+      operationId: availableVariables
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Definition'}
+      responses:
+        '200':
+          description: Guaranteed available variables by node ID, including incomplete acyclic drafts
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items: {type: string}
+        default: {$ref: '#/components/responses/Error'}
   /validate:
     post:
       operationId: validateGraph
@@ -341,8 +360,17 @@ components:
               status: {type: integer}
               message: {type: string}
               issues: {type: array, items: {type: string}}
+              locations:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    ruleId: {type: string, nullable: true}
+                    version: {type: integer, nullable: true}
+                    nodeId: {type: string}
+                    label: {type: string}
     Execution:
-      description: Scalar result and complete execution trace
+      description: Output value or output object and complete execution trace
       content:
         application/json:
           schema:
@@ -350,7 +378,7 @@ components:
             properties:
               ruleId: {type: string}
               version: {type: integer, nullable: true}
-              result: {nullable: true, description: Number, string, boolean, or null}
+              result: {nullable: true, description: A single reached Output value or an object keyed by node ID when multiple Outputs are reached}
               durationMicros: {type: integer, format: int64}
               sources:
                 type: array

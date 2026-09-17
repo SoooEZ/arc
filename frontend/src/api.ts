@@ -10,6 +10,19 @@ import type {
   SourceConfig,
 } from "./types";
 
+export interface ErrorLocation {
+  ruleId: string | null;
+  version: number | null;
+  nodeId: string;
+  label: string;
+}
+export class ApiError extends Error {
+  locations: ErrorLocation[];
+  constructor(message: string, locations: ErrorLocation[] = []) {
+    super(message);
+    this.locations = locations;
+  }
+}
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...options,
@@ -17,7 +30,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   const body = await response.json().catch(() => null);
   if (!response.ok)
-    throw new Error(body?.message || `Request failed (${response.status})`);
+    throw new ApiError(
+      body?.message || `Request failed (${response.status})`,
+      body?.locations || [],
+    );
   return body as T;
 }
 const post = (body: unknown) => ({
@@ -25,6 +41,8 @@ const post = (body: unknown) => ({
   body: JSON.stringify(body),
 });
 export const api = {
+  variables: (definition: Definition) =>
+    request<Record<string, string[]>>("/variables", post(definition)),
   functions: () => request<FunctionEntry[]>("/functions"),
   build: (source: string) => request<Build>("/studio/build", post({ source })),
   render: (definition: Definition) =>

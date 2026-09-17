@@ -294,6 +294,7 @@ export default function App() {
             rules={rules}
             mode={route.startsWith("/studio/") ? "code" : "graph"}
             requestedVersion={requestedVersion}
+            requestedNode={new URLSearchParams(route.split("?")[1]).get("node")}
             onSaved={upsert}
             onDirty={setDirty}
             navigate={navigate}

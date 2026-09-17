@@ -40,11 +40,16 @@ test("library, graph preview, reference navigation, and published API execution"
     .locator(".node-outline")
     .getByRole("button", { name: /Premium discount/ })
     .click();
-  await page.getByRole("button", { name: "Open referenced rule" }).click();
+  const popup = page.waitForEvent("popup");
+  await page.getByRole("link", { name: "Open referenced rule" }).click();
+  const referenced = await popup;
   await expect(
-    page.getByRole("heading", { name: "Apply discount", exact: true }),
+    referenced.getByRole("heading", { name: "Apply discount", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Immutable published version")).toBeVisible();
+  await expect(
+    referenced.getByText("Immutable published version"),
+  ).toBeVisible();
+  await referenced.close();
   await page
     .getByRole("button", { name: "API playground", exact: true })
     .click();
@@ -108,7 +113,11 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
   await page
     .getByRole("option", { name: "Apply discount", exact: true })
     .click();
+  await page.getByLabel("amount * · value source", { exact: true }).click();
+  await page.getByRole("option", { name: "Expression", exact: true }).click();
   await page.getByLabel("amount *", { exact: true }).fill("total");
+  await page.getByLabel("rate * · value source", { exact: true }).click();
+  await page.getByRole("option", { name: "Constant", exact: true }).click();
   await page.getByLabel("rate *", { exact: true }).fill("0.2");
   await page.getByLabel("Result variable", { exact: true }).fill("finalPrice");
   const referenceId = await page

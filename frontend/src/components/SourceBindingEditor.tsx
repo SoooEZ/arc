@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, MenuItem, TextField } from "@mui/material";
 import { api, errorMessage } from "../api";
+import ValueBinding, { type VariableOption } from "./ValueBinding";
 import type { Input, DataSource, SourceBinding } from "../types";
 export default function SourceBindingEditor({
   input,
   onChange,
   readOnly,
+  variables,
 }: {
   input: Input;
+  variables: VariableOption[];
   onChange: (source: SourceBinding | null) => void;
   readOnly: boolean;
 }) {
@@ -62,9 +65,7 @@ export default function SourceBindingEditor({
               ? {
                   id: s.id,
                   version: s.version,
-                  bindings: Object.fromEntries(
-                    s.definition.parameters.map((p) => [p.name, '"value"']),
-                  ),
+                  bindings: {},
                   pointer: "",
                   onError: "FAIL",
                 }
@@ -102,18 +103,19 @@ export default function SourceBindingEditor({
             )}
           </TextField>
           {config?.parameters.map((p) => (
-            <TextField
-              key={p.name}
-              label={`Source ${p.name} expression`}
-              helperText="Map from another input or use a literal"
-              value={source.bindings[p.name] || ""}
+            <ValueBinding
+              key={`${source.id}:${source.version}:${p.name}`}
+              label={`Source ${p.name}`}
+              type={p.type}
+              value={source.bindings[p.name]}
+              variables={variables}
               disabled={readOnly}
-              onChange={(e) =>
-                onChange({
-                  ...source,
-                  bindings: { ...source.bindings, [p.name]: e.target.value },
-                })
-              }
+              onChange={(value) => {
+                const bindings = { ...source.bindings };
+                if (value === undefined) delete bindings[p.name];
+                else bindings[p.name] = value;
+                onChange({ ...source, bindings });
+              }}
             />
           ))}
           <TextField
