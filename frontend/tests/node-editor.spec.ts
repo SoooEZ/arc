@@ -77,6 +77,9 @@ test("node expressions edit one node, group functions, and flag all invalid expr
   const out = page.locator('.react-flow__node[data-id="out"] .graph-node');
   await expect(calc).toHaveClass(/node-error/);
   await expect(out).toHaveClass(/node-error/);
+  const nodeHeight = await calc.evaluate(
+    (e) => e.getBoundingClientRect().height,
+  );
   await calc.locator(".node-error-message").hover();
   await expect(page.getByRole("tooltip")).toContainText("missing");
   await page
@@ -119,6 +122,9 @@ test("node expressions edit one node, group functions, and flag all invalid expr
   await dialog.getByRole("button", { name: "Apply to graph" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(calc).not.toHaveClass(/node-error/);
+  expect(
+    await calc.evaluate((e) => e.getBoundingClientRect().height),
+  ).toBeCloseTo(nodeHeight, 1);
   await expect(out).toHaveClass(/node-error/);
   await page
     .getByRole("button", { name: "Node expression · out", exact: true })

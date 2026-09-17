@@ -129,6 +129,9 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
   await page
     .getByRole("button", { name: "Arrange graph", exact: true })
     .click();
+  await expect(
+    page.getByRole("button", { name: "Arrange graph", exact: true }),
+  ).toBeEnabled();
   const connectNodes = async (source: string, target: string) => {
     const from = page.locator(
       `.react-flow__node[data-id="${source}"] .react-flow__handle.source`,
@@ -145,6 +148,11 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
       )
       .toContain("transform");
     await from.dragTo(to);
+    await expect(
+      page.locator(
+        `.react-flow__edge[aria-label="Edge from ${source} to ${target}"]`,
+      ),
+    ).toHaveCount(1);
   };
   await connectNodes("calculate", referenceId!);
   await connectNodes(referenceId!, "result");

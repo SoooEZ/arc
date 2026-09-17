@@ -67,7 +67,7 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
         >
           <div className="node-error-message" role="status">
             <AlertCircle size={13} />
-            <span>{data.errors[0]}</span>
+            <span>Error</span>
           </div>
         </Tooltip>
       )}

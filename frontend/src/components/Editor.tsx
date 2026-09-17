@@ -577,9 +577,10 @@ function EditorContent({
       setSource(null);
       setDiagnostics([]);
       setTrace(null);
-      requestAnimationFrame(
-        () => void flow.fitView({ padding: 0.15, duration: 300 }),
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
       );
+      await flow.fitView({ padding: 0.15, duration: 300 });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
