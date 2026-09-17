@@ -4,14 +4,14 @@ import {
   GitBranch,
   LogIn,
   LogOut,
-  Workflow,
+  Network,
 } from "lucide-react";
 import type { Kind, NodeType } from "../types";
 
 export function KindIcon({ kind, size = 20 }: { kind: Kind; size?: number }) {
   const Icon =
     kind === "DECISION_TREE"
-      ? Workflow
+      ? Network
       : kind === "FORMULA"
         ? Calculator
         : GitBranch;

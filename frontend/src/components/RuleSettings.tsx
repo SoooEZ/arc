@@ -7,6 +7,7 @@ import {
   DialogTitle,
   TextField,
 } from "@mui/material";
+import { kindLabel, kindDescription } from "../types";
 import type { Rule } from "../types";
 export default function RuleSettings({
   rule,
@@ -48,6 +49,14 @@ export default function RuleSettings({
           disabled={readOnly}
           fullWidth
         />
+        <div className="read-only-field">
+          <span>Rule type</span>
+          <strong>{kindLabel[rule.kind]}</strong>
+        </div>
+        <p className="muted-copy">
+          {kindDescription[rule.kind]} All types support the same graph nodes
+          and execution engine.
+        </p>
         <div className="read-only-field">
           <span>API identifier</span>
           <code>{rule.id}</code>

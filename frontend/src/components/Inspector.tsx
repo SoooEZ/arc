@@ -92,6 +92,18 @@ export default function Inspector({
   }, [node.type, node.ruleId]);
   const patch = (value: Partial<RuleNode>) => onNodeChange(node.id, value);
   const child = refVersions.find((v) => v.version === node.version);
+  const upstream = new Set<string>();
+  const parents = rule.draft.edges
+    .filter((e) => e.target === node.id)
+    .map((e) => e.source);
+  while (parents.length) {
+    const id = parents.pop()!;
+    if (id === node.id || upstream.has(id)) continue;
+    upstream.add(id);
+    parents.push(
+      ...rule.draft.edges.filter((e) => e.target === id).map((e) => e.source),
+    );
+  }
   const allVariables: VariableOption[] = [
     ...rule.draft.inputs.map((p) => ({
       name: p.name,
@@ -102,14 +114,25 @@ export default function Inspector({
       .filter(
         (n) =>
           n.output &&
-          n.id !== node.id &&
+          upstream.has(n.id) &&
           available[node.id]?.includes(n.output),
       )
       .map((n) => ({ name: n.output!, type: "RESULT", label: n.label })),
   ];
-  const variables = allVariables.filter(
-    (v, i) => allVariables.findIndex((other) => other.name === v.name) === i,
-  );
+  const variables = allVariables
+    .filter(
+      (v, i) => allVariables.findIndex((other) => other.name === v.name) === i,
+    )
+    .map((v) => ({
+      ...v,
+      label: [
+        ...new Set(
+          allVariables
+            .filter((other) => other.name === v.name)
+            .map((other) => other.label),
+        ),
+      ].join(" / "),
+    }));
   const condition = simpleComparison(node.expression || "");
   const simpleCondition =
     node.type === "CONDITION" && !!condition && !expressionMode;
@@ -469,7 +492,23 @@ export default function Inspector({
                     </button>
                   )}
                 </div>
-                {simpleCondition ? (
+                {node.type === "OUTPUT" ? (
+                  <>
+                    <ValueBinding
+                      key={node.id}
+                      label="Return value"
+                      type="ANY"
+                      value={node.expression ?? undefined}
+                      variables={variables}
+                      disabled={readOnly}
+                      optional={false}
+                      onChange={(value) => patch({ expression: value ?? "" })}
+                    />
+                    <div className="expression-preview">
+                      <code>{node.expression || "Choose a return value"}</code>
+                    </div>
+                  </>
+                ) : simpleCondition ? (
                   <div className="condition-builder">
                     <Autocomplete
                       freeSolo
@@ -529,11 +568,7 @@ export default function Inspector({
                 ) : (
                   <TextField
                     className="expression-field"
-                    label={
-                      node.type === "OUTPUT"
-                        ? "Result expression"
-                        : "Expression"
-                    }
+                    label="Expression"
                     multiline
                     minRows={3}
                     value={node.expression || ""}

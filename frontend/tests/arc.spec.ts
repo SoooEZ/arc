@@ -150,9 +150,8 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
     .locator(".node-outline")
     .getByRole("button", { name: /Return total/ })
     .click();
-  await page
-    .getByLabel("Result expression", { exact: true })
-    .fill("finalPrice");
+  await page.getByLabel("Return value", { exact: true }).click();
+  await page.getByRole("option", { name: /finalPrice ·/ }).click();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(
     page.getByText("Version 2 published and ready to call"),

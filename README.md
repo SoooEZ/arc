@@ -40,6 +40,7 @@ The result is `120`, alongside the executed version, timing, and each visited no
 - Add formula, condition, reusable-rule, and output nodes on a zoomable canvas.
 - Connect one result to multiple downstream nodes by dragging from the same handle; select an edge to remove it.
 - Use the condition builder or write an expression, including compound conditions.
+- Choose an Output’s return value from available inputs/upstream results, enter a typed constant (number, string, boolean, array or null), or write an expression. String constants need no manual quotation marks.
 - Navigate with the node outline, minimap, auto-layout, or links to referenced rules. Arrange graph accounts for the fixed True/False exits and reorders branches to reduce crossings.
 - Map parameters using connected upstream variables, typed constants, or expressions, and pin an exact published version. String constants need no manual quotation marks. Referenced rules open in a separate tab.
 - Test the current graph without saving; inspect results and a highlighted execution path. Error actions jump to the affected node, including failures inside referenced rules.
@@ -60,7 +61,15 @@ The result is `120`, alongside the executed version, timing, and each visited no
 
 ## Model and API
 
-Every executable artifact uses the same graph schema. `kind` is an organizational label; formulas and condition rules compose with decision trees using the same reference mechanism.
+Every executable artifact uses the same graph schema. `kind` is an organizational label, not an execution restriction:
+
+| Type | Intended use | Example |
+| --- | --- | --- |
+| Formula | Calculate a value | `amount * (1 - rate)` |
+| Condition rule | Decide whether a condition is met | `amount >= 100` → true/false |
+| Decision tree | Combine branching decisions and calculations | Choose a discount by customer tier and order total |
+
+All types support the same nodes, references, fan-out, and output values. Currently new Formula and Decision tree artifacts share the basic calculation template; Condition rule starts with a boolean branching template. Existing graphs are never constrained by their category.
 
 ```text
 Rule (stable ID)

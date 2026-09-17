@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { api, errorMessage } from "./api";
 import type { Kind, Rule } from "./types";
-import { kindLabel } from "./types";
+import { kindLabel, kindDescription } from "./types";
 import { ArcMark, KindIcon } from "./components/Icons";
 import Library from "./components/Library";
 import Editor from "./components/Editor";
@@ -360,6 +360,7 @@ export default function App() {
             <TextField
               select
               label="Rule type"
+              helperText={kindDescription[kind]}
               value={kind}
               onChange={(e) => setKind(e.target.value as Kind)}
             >

@@ -79,6 +79,11 @@ export const kindLabel: Record<Kind, string> = {
   FORMULA: "Formula",
   RULE: "Condition rule",
 };
+export const kindDescription: Record<Kind, string> = {
+  FORMULA: "Calculate a value, such as a price or a score.",
+  RULE: "Evaluate a condition, such as whether an order is eligible.",
+  DECISION_TREE: "Combine conditions and calculations across branching paths.",
+};
 export const nodeLabel: Record<NodeType, string> = {
   INPUT: "Input",
   FORMULA: "Formula",

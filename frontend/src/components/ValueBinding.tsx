@@ -7,6 +7,27 @@ export interface VariableOption {
   type: string;
   label: string;
 }
+type ConstantType = "NUMBER" | "STRING" | "BOOLEAN" | "ARRAY" | "NULL";
+const constantDefaults: Record<ConstantType, string> = {
+  NUMBER: "0",
+  STRING: '""',
+  BOOLEAN: "false",
+  ARRAY: "[]",
+  NULL: "null",
+};
+function constantType(value: string): ConstantType | null {
+  const text = value.trim();
+  if (literalText(text) !== null) return "STRING";
+  if (/^(true|false)$/i.test(text)) return "BOOLEAN";
+  if (/^null$/i.test(text)) return "NULL";
+  if (/^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return "NUMBER";
+  try {
+    if (Array.isArray(JSON.parse(text))) return "ARRAY";
+  } catch {
+    /* Expressions remain editable as expressions. */
+  }
+  return null;
+}
 type Mode = "variable" | "constant" | "expression" | "default";
 // Use ARC's escapes; plain text is never treated as executable source.
 export const quoteText = (text: string) =>
@@ -38,7 +59,7 @@ export default function ValueBinding({
   helperText,
 }: {
   label: string;
-  type: InputType;
+  type: InputType | "ANY";
   value?: string;
   variables: VariableOption[];
   disabled: boolean;
@@ -47,29 +68,39 @@ export default function ValueBinding({
   helperText?: string;
 }) {
   const [chosenMode, setChosenMode] = useState<Mode | null>(null);
-  const literal = literalText(value ?? "");
+  const [chosenType, setChosenType] = useState<ConstantType | null>(null);
+  const inferredType = constantType(value ?? "");
+  const effectiveType =
+    type === "ANY" ? (chosenType ?? inferredType ?? "NUMBER") : type;
+  const literal = literalText((value ?? "").trim());
   const isConstant =
+    (type === "ANY" && inferredType !== null) ||
     literal !== null ||
     /^(true|false|-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)$/i.test(value ?? "");
   const mode: Mode =
     chosenMode ??
     (!value
       ? "variable"
-      : variables.some((v) => v.name === value)
+      : variables.some((v) => v.name === value) ||
+          (!isConstant && /^[A-Za-z_][A-Za-z_0-9]*$/.test(value))
         ? "variable"
         : isConstant
           ? "constant"
           : "expression");
   const choices = variables.filter(
-    (v) => v.type === type || v.type === "RESULT",
+    (v) => type === "ANY" || v.type === type || v.type === "RESULT",
   );
   const constant =
-    type === "STRING" && literal !== null ? literal : (value ?? "");
+    effectiveType === "STRING" && literal !== null ? literal : (value ?? "");
   const chooseMode = (next: Mode) => {
     setChosenMode(next);
     if (next === "default") onChange(undefined);
     else if (next === "variable") {
       if (!choices.some((v) => v.name === value)) onChange(undefined);
+    } else if (next === "constant" && type === "ANY") {
+      const nextType = inferredType ?? chosenType ?? "NUMBER";
+      setChosenType(nextType);
+      if (inferredType === null) onChange(constantDefaults[nextType]);
     } else if (next === "constant" && !isConstant)
       onChange(
         type === "STRING"
@@ -95,7 +126,35 @@ export default function ValueBinding({
         <MenuItem value="expression">Expression</MenuItem>
         {optional && <MenuItem value="default">Use default / omit</MenuItem>}
       </TextField>
-      {mode === "variable" ? (
+      {mode === "constant" && type === "ANY" && (
+        <TextField
+          select
+          label="Constant type"
+          value={effectiveType}
+          disabled={disabled}
+          onChange={(e) => {
+            const next = e.target.value as ConstantType;
+            setChosenType(next);
+            onChange(constantDefaults[next]);
+          }}
+        >
+          {(["NUMBER", "STRING", "BOOLEAN", "ARRAY", "NULL"] as const).map(
+            (t) => (
+              <MenuItem key={t} value={t}>
+                {t.toLowerCase()}
+              </MenuItem>
+            ),
+          )}
+        </TextField>
+      )}
+      {mode === "constant" && effectiveType === "NULL" ? (
+        <TextField
+          label={label}
+          value="null"
+          disabled
+          helperText="Returns an explicit null value"
+        />
+      ) : mode === "variable" ? (
         <TextField
           select
           label={label}
@@ -116,11 +175,11 @@ export default function ValueBinding({
             </MenuItem>
           ))}
         </TextField>
-      ) : mode === "constant" && type === "BOOLEAN" ? (
+      ) : mode === "constant" && effectiveType === "BOOLEAN" ? (
         <TextField
           select
           label={label}
-          value={value || "false"}
+          value={value?.trim().toLowerCase() || "false"}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           helperText={helperText}
@@ -134,23 +193,32 @@ export default function ValueBinding({
           value={mode === "constant" ? constant : (value ?? "")}
           disabled={disabled}
           multiline={
-            mode === "expression" || type === "ARRAY" || type === "OBJECT"
+            mode === "expression" ||
+            effectiveType === "ARRAY" ||
+            effectiveType === "OBJECT"
           }
           minRows={mode === "expression" ? 2 : undefined}
-          type={mode === "constant" && type === "NUMBER" ? "number" : "text"}
+          type={
+            mode === "constant" && effectiveType === "NUMBER"
+              ? "number"
+              : "text"
+          }
           onChange={(e) =>
             onChange(
-              mode === "constant" && type === "STRING"
+              mode === "constant" && effectiveType === "STRING"
                 ? quoteText(e.target.value)
                 : e.target.value || undefined,
             )
           }
           helperText={
-            mode === "constant" && type === "STRING"
+            mode === "constant" && effectiveType === "STRING"
               ? "Text value · no quotation marks needed"
               : mode === "expression"
                 ? "ARC expression · quote literal text here"
-                : helperText || type.toLowerCase()
+                : helperText ||
+                  (effectiveType === "ARRAY"
+                    ? "ARC array literal, for example [1, 2, 3]"
+                    : effectiveType.toLowerCase())
           }
         />
       ) : (
