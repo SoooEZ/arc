@@ -11,3 +11,11 @@ test-results/
 .local/
 *.log
 *.tsbuildinfo
+# Rails runtime and local gems
+backend-rails/.bundle/
+backend-rails/vendor/bundle/
+backend-rails/tmp/
+backend-rails/log/
+
+__pycache__/
+*.pyc

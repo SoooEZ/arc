@@ -8,7 +8,9 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: arc-ci-java
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -22,27 +24,43 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Test Java engine
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3.11'
+          bundler-cache: true
+          working-directory: backend-rails
+      - name: Test Java backend
         working-directory: backend
-        run: mvn -B test
-      - name: Install frontend dependencies
+        run: mvn -B -ntp verify
+      - name: Test native Rails runtime
+        working-directory: backend-rails
+        run: bundle exec ruby test/run.rb
+      - name: Install and build frontend
         working-directory: frontend
-        run: npm ci
-      - name: Type check and build frontend
-        working-directory: frontend
-        run: npm run build
-      - name: Start fresh Compose stack
-        run: docker compose up -d --build --wait --wait-timeout 180
-      - name: API integration tests
+        run: npm ci && npm run build
+      - name: Start fresh Java and Rails stacks
         run: |
-          python3 scripts/smoke.py
-          python3 scripts/studio_smoke.py
+          docker compose up -d --build --wait --wait-timeout 240
+          COMPOSE_PROJECT_NAME=arc-ci-rails ARC_API_PORT=18081 ARC_WEB_PORT=13081 docker compose -f compose.yaml -f compose.rails.yaml up -d --build --wait --wait-timeout 240
+      - name: API conformance and integration tests on both backends
+        run: |
+          python3 scripts/contract.py http://localhost:8080 http://localhost:18081
+          python3 scripts/function_contract.py http://localhost:8080 http://localhost:18081
+          COMPOSE_PROJECT_NAME=arc-ci-rails docker compose -f compose.yaml -f compose.rails.yaml exec -T api sh -c '! command -v java && ! command -v javac && test -z "$(find /app -name "*.jar" -print -quit)"'
+          for url in http://localhost:8080 http://localhost:18081; do
+            ARC_API_URL="$url" python3 scripts/smoke.py
+            ARC_API_URL="$url" python3 scripts/studio_smoke.py
+          done
+      - name: Verify switching backends preserves the database
+        run: python3 scripts/switch_backend_test.py
       - name: Install Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium
-      - name: Browser workflows
+      - name: Browser workflows on Java and Rails
         working-directory: frontend
-        run: npm run test:e2e
+        run: |
+          npm run test:e2e
+          ARC_WEB_URL=http://localhost:13081 npm run test:e2e
       - name: Upload browser report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -52,7 +70,11 @@ jobs:
           retention-days: 7
       - name: Container logs
         if: failure()
-        run: docker compose logs --no-color
-      - name: Stop test stack
+        run: |
+          docker compose logs --no-color
+          COMPOSE_PROJECT_NAME=arc-ci-rails docker compose -f compose.yaml -f compose.rails.yaml logs --no-color
+      - name: Stop test stacks
         if: always()
-        run: docker compose down -v
+        run: |
+          docker compose down -v
+          COMPOSE_PROJECT_NAME=arc-ci-rails docker compose -f compose.yaml -f compose.rails.yaml down -v

@@ -1,0 +1,16 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: <%= ENV.fetch("DB_HOST", "localhost") %>
+  port: <%= ENV.fetch("DB_PORT", "5432") %>
+  database: <%= ENV.fetch("DB_NAME", "arc") %>
+  username: <%= ENV.fetch("DB_USER", "arc") %>
+  password: <%= ENV.fetch("DB_PASSWORD", "arc-local-development") %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", "5") %>
+development:
+  <<: *default
+test:
+  <<: *default
+  database: <%= ENV.fetch("DB_NAME", "arc_test") %>
+production:
+  <<: *default

@@ -58,6 +58,12 @@ class ExpressionsTest {
   }
 
   @Test
+  void inverseRejectsSingularMatrices() {
+    assertThatThrownBy(() -> eval("MINVERSE([[1,2],[2,4]])"))
+        .isInstanceOf(ArcException.class).hasMessage("MINVERSE: #NUM!");
+  }
+
+  @Test
   void arbitraryCodeAndExcessiveWorkAreRejected() {
     for (String expression :
         new String[] {

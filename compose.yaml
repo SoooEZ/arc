@@ -15,7 +15,9 @@ services:
       retries: 20
     restart: unless-stopped
   api:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       ARC_HTTP_ALLOWED_HOSTS: ${ARC_HTTP_ALLOWED_HOSTS:-}
       ARC_HTTP_PRIVATE_HOSTS: ${ARC_HTTP_PRIVATE_HOSTS:-}

@@ -31,16 +31,13 @@ public class Samples implements ApplicationRunner {
             node("result", "OUTPUT", "Return total", 280, 320, "total", null)),
             List.of(edge("input", "calculate", "next"), edge("calculate", "result", "next")));
     }
-    @Override @Transactional
-    public void run(ApplicationArguments args) {
-        if (!store.list().isEmpty()) return;
+    public static List<RuleService.Create> definitions() {
         Definition discount = new Definition(1, List.of(new Input("amount", "NUMBER", true, null), new Input("rate", "NUMBER", true, null)), List.of(
             node("input", "INPUT", "Amount & rate", 280, 0, null, null),
             node("discount", "FORMULA", "Apply discount", 280, 160, "round(amount * (1 - rate), 2)", "discounted"),
             node("result", "OUTPUT", "Discounted amount", 280, 320, "discounted", null)),
             List.of(edge("input", "discount", "next"), edge("discount", "result", "next")));
-        var formula = store.create("apply-discount", "Apply discount", "A reusable formula for percentage discounts, rounded to two decimal places.", "FORMULA", discount);
-        service.publish(formula.id(), formula.revision());
+        var formula = new RuleService.Create("apply-discount", "Apply discount", "A reusable formula for percentage discounts, rounded to two decimal places.", "FORMULA", discount);
         Definition pricing = new Definition(1, List.of(new Input("orderTotal", "NUMBER", true, null), new Input("customerTier", "STRING", true, null)), List.of(
             node("input", "INPUT", "Order details", 310, 0, null, null),
             node("tier", "CONDITION", "Premium customer?", 310, 150, "customerTier == \"premium\"", null),
@@ -51,9 +48,16 @@ public class Samples implements ApplicationRunner {
             node("result", "OUTPUT", "Discounted price", 170, 690, "price", null)),
             List.of(edge("input", "tier", "next"), edge("tier", "premium", "true"), edge("tier", "threshold", "false"),
                 edge("premium", "result", "next"), edge("threshold", "standard", "true"), edge("threshold", "regular", "false"), edge("standard", "result", "next")));
-        var tree = store.create("order-pricing", "Order pricing", "Reward premium customers and larger orders with the right discount.", "DECISION_TREE", pricing);
-        service.publish(tree.id(), tree.revision());
-        var eligibility = store.create("free-shipping", "Free shipping", "Check whether an order qualifies for complimentary shipping.", "RULE", blank("RULE"));
-        service.publish(eligibility.id(), eligibility.revision());
+        var tree = new RuleService.Create("order-pricing", "Order pricing", "Reward premium customers and larger orders with the right discount.", "DECISION_TREE", pricing);
+        var eligibility = new RuleService.Create("free-shipping", "Free shipping", "Check whether an order qualifies for complimentary shipping.", "RULE", blank("RULE"));
+        return List.of(formula, tree, eligibility);
+    }
+    @Override @Transactional
+    public void run(ApplicationArguments args) {
+        if (!store.list().isEmpty()) return;
+        for (var sample : definitions()) {
+            var rule = service.create(sample);
+            service.publish(rule.id(), rule.revision());
+        }
     }
 }

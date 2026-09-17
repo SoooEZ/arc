@@ -1,0 +1,3836 @@
+[
+  {
+    "name": "ABS",
+    "category": "Math",
+    "signature": "ABS(number)",
+    "description": "Decimal numeric operation; FLOOR and CEIL round to an integer.",
+    "snippet": "ABS(${1:amount})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "ABSREF",
+    "category": "Workbook & other",
+    "signature": "ABSREF(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ABSREF(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ACCRINT",
+    "category": "Finance",
+    "signature": "ACCRINT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ACCRINT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ACCRINTM",
+    "category": "Finance",
+    "signature": "ACCRINTM(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ACCRINTM(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ACOS",
+    "category": "Trigonometry",
+    "signature": "ACOS(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ACOS(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ACOSH",
+    "category": "Trigonometry",
+    "signature": "ACOSH(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ACOSH(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ADDRESS",
+    "category": "Lookup",
+    "signature": "ADDRESS(argument1, argument2, ...)",
+    "description": "Excel-compatible calculation. Accepts 2–5 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ADDRESS(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ALL",
+    "category": "Collections",
+    "signature": "ALL(array, item, expression)",
+    "description": "Binds item inside expression. Object fields support dot access. No host code runs.",
+    "snippet": "ALL(${1:items}, item, ${2:item.price > 10})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "AMORDEGRC",
+    "category": "Finance",
+    "signature": "AMORDEGRC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "AMORDEGRC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "AMORLINC",
+    "category": "Finance",
+    "signature": "AMORLINC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "AMORLINC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "AND",
+    "category": "Logic",
+    "signature": "AND(boolean, ...)",
+    "description": "Combines boolean values.",
+    "snippet": "AND(${1:true}, ${2:false})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "ANY",
+    "category": "Collections",
+    "signature": "ANY(array, item, expression)",
+    "description": "Binds item inside expression. Object fields support dot access. No host code runs.",
+    "snippet": "ANY(${1:items}, item, ${2:item.price > 10})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "APP.TITLE",
+    "category": "Workbook & other",
+    "signature": "APP.TITLE(, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "APP.TITLE()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "AREAS",
+    "category": "Lookup",
+    "signature": "AREAS(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "AREAS(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ARGUMENT",
+    "category": "Workbook & other",
+    "signature": "ARGUMENT(, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ARGUMENT()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ASC",
+    "category": "Text",
+    "signature": "ASC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ASC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ASIN",
+    "category": "Trigonometry",
+    "signature": "ASIN(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ASIN(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ASINH",
+    "category": "Trigonometry",
+    "signature": "ASINH(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ASINH(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ATAN",
+    "category": "Trigonometry",
+    "signature": "ATAN(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ATAN(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ATAN2",
+    "category": "Trigonometry",
+    "signature": "ATAN2(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ATAN2(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ATANH",
+    "category": "Trigonometry",
+    "signature": "ATANH(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ATANH(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "AVEDEV",
+    "category": "Statistics",
+    "signature": "AVEDEV(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "AVEDEV(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "AVERAGE",
+    "category": "Math",
+    "signature": "AVERAGE(number or array, ...)",
+    "description": "Aggregates numbers or nested numeric arrays with decimal arithmetic.",
+    "snippet": "AVERAGE(${1:values})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "AVERAGEA",
+    "category": "Statistics",
+    "signature": "AVERAGEA(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "AVERAGEA(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "AVERAGEIF",
+    "category": "Statistics",
+    "signature": "AVERAGEIF(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "AVERAGEIF(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "AVERAGEIFS",
+    "category": "Statistics",
+    "signature": "AVERAGEIFS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "AVERAGEIFS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "AVG",
+    "category": "Math",
+    "signature": "AVG(number or array, ...)",
+    "description": "Aggregates numbers or nested numeric arrays with decimal arithmetic.",
+    "snippet": "AVG(${1:values})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "BAHTTEXT",
+    "category": "Text",
+    "signature": "BAHTTEXT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BAHTTEXT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BESSELI",
+    "category": "Engineering",
+    "signature": "BESSELI(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BESSELI(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BESSELJ",
+    "category": "Engineering",
+    "signature": "BESSELJ(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BESSELJ(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BESSELK",
+    "category": "Engineering",
+    "signature": "BESSELK(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BESSELK(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BESSELY",
+    "category": "Engineering",
+    "signature": "BESSELY(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BESSELY(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BETADIST",
+    "category": "Probability",
+    "signature": "BETADIST(argument1, argument2, argument3, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BETADIST(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BETAINV",
+    "category": "Probability",
+    "signature": "BETAINV(argument1, argument2, argument3, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BETAINV(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BIN2DEC",
+    "category": "Engineering",
+    "signature": "BIN2DEC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BIN2DEC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BIN2HEX",
+    "category": "Engineering",
+    "signature": "BIN2HEX(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BIN2HEX(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BIN2OCT",
+    "category": "Engineering",
+    "signature": "BIN2OCT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BIN2OCT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "BINOMDIST",
+    "category": "Probability",
+    "signature": "BINOMDIST(argument1, argument2, argument3, argument4)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "BINOMDIST(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CALL",
+    "category": "Workbook & other",
+    "signature": "CALL(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CALL(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CEIL",
+    "category": "Math",
+    "signature": "CEIL(number)",
+    "description": "Decimal numeric operation; FLOOR and CEIL round to an integer.",
+    "snippet": "CEIL(${1:amount})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "CEILING",
+    "category": "Math",
+    "signature": "CEILING(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "CEILING(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "CEILING.MATH",
+    "category": "Math",
+    "signature": "CEILING.MATH(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CEILING.MATH(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CEILING.PRECISE",
+    "category": "Math",
+    "signature": "CEILING.PRECISE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CEILING.PRECISE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CELL",
+    "category": "Workbook & other",
+    "signature": "CELL(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CELL(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CHAR",
+    "category": "Text",
+    "signature": "CHAR(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "CHAR(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "CHIDIST",
+    "category": "Probability",
+    "signature": "CHIDIST(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CHIDIST(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CHIINV",
+    "category": "Probability",
+    "signature": "CHIINV(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CHIINV(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CHITEST",
+    "category": "Probability",
+    "signature": "CHITEST(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CHITEST(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CHOOSE",
+    "category": "Lookup",
+    "signature": "CHOOSE(argument1, argument2, ...)",
+    "description": "Excel-compatible calculation. Accepts 2–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "CHOOSE(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "CLEAN",
+    "category": "Text",
+    "signature": "CLEAN(text)",
+    "description": "Transforms text: letter case, whitespace, or nonprinting characters.",
+    "snippet": "CLEAN(${1:\"text\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "CODE",
+    "category": "Text",
+    "signature": "CODE(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "CODE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COLUMN",
+    "category": "Workbook & other",
+    "signature": "COLUMN(, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COLUMN()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COLUMNS",
+    "category": "Lookup",
+    "signature": "COLUMNS(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "COLUMNS(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COMBIN",
+    "category": "Math",
+    "signature": "COMBIN(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "COMBIN(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COMPLEX",
+    "category": "Engineering",
+    "signature": "COMPLEX(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COMPLEX(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CONCAT",
+    "category": "Text",
+    "signature": "CONCAT(value, ...)",
+    "description": "Joins scalar values or flattened arrays as text.",
+    "snippet": "CONCAT(${1:firstName}, \" \", ${2:lastName})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "CONCATENATE",
+    "category": "Text",
+    "signature": "CONCATENATE(, ...)",
+    "description": "Excel-compatible calculation. Accepts 0–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "CONCATENATE()",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "CONFIDENCE",
+    "category": "Probability",
+    "signature": "CONFIDENCE(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CONFIDENCE(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CONTAINS",
+    "category": "Text",
+    "signature": "CONTAINS(text or array, value)",
+    "description": "Checks text substring or array membership (case sensitive).",
+    "snippet": "CONTAINS(${1:name}, ${2:\"arc\"})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "CONVERT",
+    "category": "Engineering",
+    "signature": "CONVERT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CONVERT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CORREL",
+    "category": "Statistics",
+    "signature": "CORREL(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "CORREL(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COS",
+    "category": "Trigonometry",
+    "signature": "COS(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "COS(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COSH",
+    "category": "Trigonometry",
+    "signature": "COSH(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "COSH(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUNT",
+    "category": "Math",
+    "signature": "COUNT(number or array, ...)",
+    "description": "Aggregates numbers or nested numeric arrays with decimal arithmetic.",
+    "snippet": "COUNT(${1:values})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "COUNTA",
+    "category": "Collections",
+    "signature": "COUNTA(, ...)",
+    "description": "Excel-compatible calculation. Accepts 0–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "COUNTA()",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUNTBLANK",
+    "category": "Collections",
+    "signature": "COUNTBLANK(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "COUNTBLANK(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUNTIF",
+    "category": "Statistics",
+    "signature": "COUNTIF(range, criteria)",
+    "description": "Counts cells matching an Excel criterion such as >10 or a text value.",
+    "snippet": "COUNTIF(${1:values}, ${2:\">10\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUNTIFS",
+    "category": "Collections",
+    "signature": "COUNTIFS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COUNTIFS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUPDAYBS",
+    "category": "Finance",
+    "signature": "COUPDAYBS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COUPDAYBS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUPDAYS",
+    "category": "Finance",
+    "signature": "COUPDAYS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COUPDAYS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUPDAYSNC",
+    "category": "Finance",
+    "signature": "COUPDAYSNC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COUPDAYSNC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUPNCD",
+    "category": "Finance",
+    "signature": "COUPNCD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COUPNCD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUPNUM",
+    "category": "Finance",
+    "signature": "COUPNUM(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COUPNUM(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COUPPCD",
+    "category": "Finance",
+    "signature": "COUPPCD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COUPPCD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COVAR",
+    "category": "Statistics",
+    "signature": "COVAR(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "COVAR(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "COVARIANCE.P",
+    "category": "Statistics",
+    "signature": "COVARIANCE.P(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COVARIANCE.P(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "COVARIANCE.S",
+    "category": "Statistics",
+    "signature": "COVARIANCE.S(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "COVARIANCE.S(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CRITBINOM",
+    "category": "Probability",
+    "signature": "CRITBINOM(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CRITBINOM(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUBEKPIMEMBER",
+    "category": "Workbook & other",
+    "signature": "CUBEKPIMEMBER(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUBEKPIMEMBER(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUBEMEMBER",
+    "category": "Workbook & other",
+    "signature": "CUBEMEMBER(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUBEMEMBER(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUBEMEMBERPROPERTY",
+    "category": "Workbook & other",
+    "signature": "CUBEMEMBERPROPERTY(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUBEMEMBERPROPERTY(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUBERANKEDMEMBER",
+    "category": "Workbook & other",
+    "signature": "CUBERANKEDMEMBER(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUBERANKEDMEMBER(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUBESET",
+    "category": "Workbook & other",
+    "signature": "CUBESET(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUBESET(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUBESETCOUNT",
+    "category": "Workbook & other",
+    "signature": "CUBESETCOUNT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUBESETCOUNT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUBEVALUE",
+    "category": "Workbook & other",
+    "signature": "CUBEVALUE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUBEVALUE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUMIPMT",
+    "category": "Finance",
+    "signature": "CUMIPMT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUMIPMT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "CUMPRINC",
+    "category": "Finance",
+    "signature": "CUMPRINC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "CUMPRINC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DATE",
+    "category": "Date & time",
+    "signature": "DATE(year, month, day)",
+    "description": "Returns an Excel serial date (1900 date system). No system clock is read.",
+    "snippet": "DATE(${1:2026}, ${2:9}, ${3:16})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DATEDIF",
+    "category": "Date & time",
+    "signature": "DATEDIF(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DATEDIF(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DATESTRING",
+    "category": "Date & time",
+    "signature": "DATESTRING(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DATESTRING(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DATEVALUE",
+    "category": "Date & time",
+    "signature": "DATEVALUE(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DATEVALUE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DAVERAGE",
+    "category": "Database",
+    "signature": "DAVERAGE(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DAVERAGE(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DAY",
+    "category": "Date & time",
+    "signature": "DAY(serialDate)",
+    "description": "Extracts a calendar component from an Excel serial date.",
+    "snippet": "DAY(${1:DATE(2026, 9, 16)})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DAYS",
+    "category": "Date & time",
+    "signature": "DAYS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DAYS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DAYS360",
+    "category": "Date & time",
+    "signature": "DAYS360(argument1, argument2, ...)",
+    "description": "Excel-compatible calculation. Accepts 2–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DAYS360(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DB",
+    "category": "Finance",
+    "signature": "DB(argument1, argument2, argument3, argument4, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DB(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DBCS",
+    "category": "Text",
+    "signature": "DBCS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DBCS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DCOUNT",
+    "category": "Database",
+    "signature": "DCOUNT(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DCOUNT(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DCOUNTA",
+    "category": "Database",
+    "signature": "DCOUNTA(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DCOUNTA(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DDB",
+    "category": "Finance",
+    "signature": "DDB(argument1, argument2, argument3, argument4, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DDB(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DEC2BIN",
+    "category": "Engineering",
+    "signature": "DEC2BIN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DEC2BIN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DEC2HEX",
+    "category": "Engineering",
+    "signature": "DEC2HEX(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DEC2HEX(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DEC2OCT",
+    "category": "Engineering",
+    "signature": "DEC2OCT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DEC2OCT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DEGREES",
+    "category": "Trigonometry",
+    "signature": "DEGREES(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DEGREES(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DELTA",
+    "category": "Engineering",
+    "signature": "DELTA(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DELTA(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DEVSQ",
+    "category": "Statistics",
+    "signature": "DEVSQ(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DEVSQ(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DGET",
+    "category": "Lookup",
+    "signature": "DGET(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DGET(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DISC",
+    "category": "Finance",
+    "signature": "DISC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DISC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DMAX",
+    "category": "Database",
+    "signature": "DMAX(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DMAX(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DMIN",
+    "category": "Database",
+    "signature": "DMIN(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DMIN(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DOLLAR",
+    "category": "Text",
+    "signature": "DOLLAR(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DOLLAR(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DOLLARDE",
+    "category": "Finance",
+    "signature": "DOLLARDE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DOLLARDE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DOLLARFR",
+    "category": "Finance",
+    "signature": "DOLLARFR(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DOLLARFR(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DPRODUCT",
+    "category": "Database",
+    "signature": "DPRODUCT(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DPRODUCT(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DSTDEV",
+    "category": "Database",
+    "signature": "DSTDEV(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DSTDEV(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DSTDEVP",
+    "category": "Database",
+    "signature": "DSTDEVP(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DSTDEVP(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DSUM",
+    "category": "Database",
+    "signature": "DSUM(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DSUM(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DURATION",
+    "category": "Finance",
+    "signature": "DURATION(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "DURATION(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "DVAR",
+    "category": "Database",
+    "signature": "DVAR(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DVAR(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "DVARP",
+    "category": "Database",
+    "signature": "DVARP(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "DVARP(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "EDATE",
+    "category": "Date & time",
+    "signature": "EDATE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "EDATE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "EFFECT",
+    "category": "Finance",
+    "signature": "EFFECT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "EFFECT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ENABLE.TOOL",
+    "category": "Workbook & other",
+    "signature": "ENABLE.TOOL(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ENABLE.TOOL(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "END.IF",
+    "category": "Workbook & other",
+    "signature": "END.IF()",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "END.IF()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "EOMONTH",
+    "category": "Date & time",
+    "signature": "EOMONTH(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "EOMONTH(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ERF",
+    "category": "Engineering",
+    "signature": "ERF(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ERF(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ERFC",
+    "category": "Engineering",
+    "signature": "ERFC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ERFC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ERROR",
+    "category": "Workbook & other",
+    "signature": "ERROR(, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ERROR()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ERROR.TYPE",
+    "category": "Type & error checks",
+    "signature": "ERROR.TYPE(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ERROR.TYPE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "EVALUATE",
+    "category": "Workbook & other",
+    "signature": "EVALUATE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "EVALUATE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "EVEN",
+    "category": "Math",
+    "signature": "EVEN(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "EVEN(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "EXACT",
+    "category": "Text",
+    "signature": "EXACT(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "EXACT(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "EXEC",
+    "category": "Workbook & other",
+    "signature": "EXEC(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "EXEC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "EXP",
+    "category": "Math",
+    "signature": "EXP(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "EXP(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "EXPONDIST",
+    "category": "Probability",
+    "signature": "EXPONDIST(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "EXPONDIST(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FACT",
+    "category": "Math",
+    "signature": "FACT(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "FACT(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "FACTDOUBLE",
+    "category": "Math",
+    "signature": "FACTDOUBLE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FACTDOUBLE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FALSE",
+    "category": "Logic",
+    "signature": "FALSE()",
+    "description": "Excel-compatible calculation. Accepts 0–0 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "FALSE()",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "FDIST",
+    "category": "Probability",
+    "signature": "FDIST(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FDIST(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FILTER",
+    "category": "Collections",
+    "signature": "FILTER(array, item, expression)",
+    "description": "Binds item inside expression. Object fields support dot access. No host code runs.",
+    "snippet": "FILTER(${1:items}, item, ${2:item.price > 10})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "FIND",
+    "category": "Text",
+    "signature": "FIND(needle, text, start = 1)",
+    "description": "Returns the one-based, case-sensitive position. Missing text is an error.",
+    "snippet": "FIND(${1:\"a\"}, ${2:\"arc\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "FINDB",
+    "category": "Text",
+    "signature": "FINDB(argument1, argument2, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FINDB(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FINV",
+    "category": "Probability",
+    "signature": "FINV(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FINV(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FISHER",
+    "category": "Statistics",
+    "signature": "FISHER(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FISHER(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FISHERINV",
+    "category": "Statistics",
+    "signature": "FISHERINV(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FISHERINV(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FIXED",
+    "category": "Text",
+    "signature": "FIXED(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "FIXED(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "FLOOR",
+    "category": "Math",
+    "signature": "FLOOR(number)",
+    "description": "Decimal numeric operation; FLOOR and CEIL round to an integer.",
+    "snippet": "FLOOR(${1:amount})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "FLOOR.MATH",
+    "category": "Math",
+    "signature": "FLOOR.MATH(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FLOOR.MATH(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FLOOR.PRECISE",
+    "category": "Math",
+    "signature": "FLOOR.PRECISE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FLOOR.PRECISE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FORECAST",
+    "category": "Statistics",
+    "signature": "FORECAST(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "FORECAST(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "FORECAST.LINEAR",
+    "category": "Statistics",
+    "signature": "FORECAST.LINEAR(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FORECAST.LINEAR(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FREQUENCY",
+    "category": "Statistics",
+    "signature": "FREQUENCY(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "FREQUENCY(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "FTEST",
+    "category": "Probability",
+    "signature": "FTEST(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FTEST(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "FV",
+    "category": "Finance",
+    "signature": "FV(argument1, argument2, argument3, ...)",
+    "description": "Excel-compatible calculation. Accepts 3–5 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "FV(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "FVSCHEDULE",
+    "category": "Finance",
+    "signature": "FVSCHEDULE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "FVSCHEDULE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GAMMADIST",
+    "category": "Probability",
+    "signature": "GAMMADIST(argument1, argument2, argument3, argument4)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GAMMADIST(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GAMMAINV",
+    "category": "Probability",
+    "signature": "GAMMAINV(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GAMMAINV(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GAMMALN",
+    "category": "Probability",
+    "signature": "GAMMALN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GAMMALN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GCD",
+    "category": "Math",
+    "signature": "GCD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GCD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GEOMEAN",
+    "category": "Statistics",
+    "signature": "GEOMEAN(number or array, ...)",
+    "description": "Calculates an Excel statistical measure over the supplied numeric values.",
+    "snippet": "GEOMEAN(${1:values})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "GESTEP",
+    "category": "Engineering",
+    "signature": "GESTEP(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GESTEP(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GET",
+    "category": "Collections",
+    "signature": "GET(object, \"field.path\", default = null)",
+    "description": "Reads an object path or array index safely.",
+    "snippet": "GET(${1:customer}, \"${2:address.country}\", ${3:\"US\"})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "GET.CELL",
+    "category": "Workbook & other",
+    "signature": "GET.CELL(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GET.CELL(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GET.DOCUMENT",
+    "category": "Workbook & other",
+    "signature": "GET.DOCUMENT(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GET.DOCUMENT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GET.WINDOW",
+    "category": "Workbook & other",
+    "signature": "GET.WINDOW(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GET.WINDOW(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GET.WORKBOOK",
+    "category": "Workbook & other",
+    "signature": "GET.WORKBOOK(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GET.WORKBOOK(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GET.WORKSPACE",
+    "category": "Workbook & other",
+    "signature": "GET.WORKSPACE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GET.WORKSPACE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GETPIVOTDATA",
+    "category": "Workbook & other",
+    "signature": "GETPIVOTDATA(argument1, argument2, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GETPIVOTDATA(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GOTO",
+    "category": "Workbook & other",
+    "signature": "GOTO(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GOTO(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "GROWTH",
+    "category": "Statistics",
+    "signature": "GROWTH(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "GROWTH(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "HARMEAN",
+    "category": "Statistics",
+    "signature": "HARMEAN(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "HARMEAN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "HEX2BIN",
+    "category": "Engineering",
+    "signature": "HEX2BIN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "HEX2BIN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "HEX2DEC",
+    "category": "Engineering",
+    "signature": "HEX2DEC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "HEX2DEC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "HEX2OCT",
+    "category": "Engineering",
+    "signature": "HEX2OCT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "HEX2OCT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "HLOOKUP",
+    "category": "Lookup",
+    "signature": "HLOOKUP(key, table, row, approximate = true)",
+    "description": "Searches the first row. Rows are one-based; false requests an exact match.",
+    "snippet": "HLOOKUP(${1:key}, ${2:[[1, 2], [10, 20]]}, ${3:2}, false)",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "HOUR",
+    "category": "Date & time",
+    "signature": "HOUR(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "HOUR(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "HYPERLINK",
+    "category": "Workbook & other",
+    "signature": "HYPERLINK(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "HYPERLINK(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "HYPGEOMDIST",
+    "category": "Probability",
+    "signature": "HYPGEOMDIST(argument1, argument2, argument3, argument4)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "HYPGEOMDIST(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IF",
+    "category": "Logic",
+    "signature": "IF(condition, yes, no)",
+    "description": "Evaluates only the selected branch.",
+    "snippet": "IF(${1:amount > 100}, ${2:0.1}, ${3:0})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "IFERROR",
+    "category": "Logic",
+    "signature": "IFERROR(expression, fallback)",
+    "description": "Returns fallback when evaluation fails.",
+    "snippet": "IFERROR(${1:amount / count}, ${2:0})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "IFNA",
+    "category": "Logic",
+    "signature": "IFNA(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IFNA(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IFS",
+    "category": "Logic",
+    "signature": "IFS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IFS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMABS",
+    "category": "Engineering",
+    "signature": "IMABS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMABS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMAGINARY",
+    "category": "Engineering",
+    "signature": "IMAGINARY(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMAGINARY(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMARGUMENT",
+    "category": "Engineering",
+    "signature": "IMARGUMENT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMARGUMENT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMCONJUGATE",
+    "category": "Engineering",
+    "signature": "IMCONJUGATE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMCONJUGATE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMCOS",
+    "category": "Engineering",
+    "signature": "IMCOS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMCOS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMDIV",
+    "category": "Engineering",
+    "signature": "IMDIV(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMDIV(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMEXP",
+    "category": "Engineering",
+    "signature": "IMEXP(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMEXP(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMLN",
+    "category": "Engineering",
+    "signature": "IMLN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMLN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMLOG10",
+    "category": "Engineering",
+    "signature": "IMLOG10(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMLOG10(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMLOG2",
+    "category": "Engineering",
+    "signature": "IMLOG2(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMLOG2(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMPOWER",
+    "category": "Engineering",
+    "signature": "IMPOWER(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMPOWER(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMPRODUCT",
+    "category": "Engineering",
+    "signature": "IMPRODUCT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMPRODUCT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMREAL",
+    "category": "Engineering",
+    "signature": "IMREAL(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMREAL(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMSIN",
+    "category": "Engineering",
+    "signature": "IMSIN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMSIN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMSQRT",
+    "category": "Engineering",
+    "signature": "IMSQRT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMSQRT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMSUB",
+    "category": "Engineering",
+    "signature": "IMSUB(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMSUB(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IMSUM",
+    "category": "Engineering",
+    "signature": "IMSUM(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "IMSUM(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "INDEX",
+    "category": "Lookup",
+    "signature": "INDEX(array, row, column?)",
+    "description": "Returns a one-based position within an array or matrix.",
+    "snippet": "INDEX(${1:values}, ${2:1}, ${3:1})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "INDIRECT",
+    "category": "Workbook & other",
+    "signature": "INDIRECT(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "INDIRECT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "INFO",
+    "category": "Workbook & other",
+    "signature": "INFO(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "INFO(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "INT",
+    "category": "Math",
+    "signature": "INT(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "INT(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "INTERCEPT",
+    "category": "Statistics",
+    "signature": "INTERCEPT(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "INTERCEPT(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "INTRATE",
+    "category": "Finance",
+    "signature": "INTRATE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "INTRATE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "IPMT",
+    "category": "Finance",
+    "signature": "IPMT(argument1, argument2, argument3, argument4, ...)",
+    "description": "Excel-compatible calculation. Accepts 4–6 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "IPMT(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "IRR",
+    "category": "Finance",
+    "signature": "IRR(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "IRR(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISBLANK",
+    "category": "Type & error checks",
+    "signature": "ISBLANK(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISBLANK(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISERR",
+    "category": "Type & error checks",
+    "signature": "ISERR(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISERR(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISERROR",
+    "category": "Type & error checks",
+    "signature": "ISERROR(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISERROR(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISEVEN",
+    "category": "Type & error checks",
+    "signature": "ISEVEN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ISEVEN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISLOGICAL",
+    "category": "Type & error checks",
+    "signature": "ISLOGICAL(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISLOGICAL(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISNA",
+    "category": "Type & error checks",
+    "signature": "ISNA(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISNA(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISNONTEXT",
+    "category": "Type & error checks",
+    "signature": "ISNONTEXT(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISNONTEXT(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISNUMBER",
+    "category": "Type & error checks",
+    "signature": "ISNUMBER(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISNUMBER(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISODD",
+    "category": "Type & error checks",
+    "signature": "ISODD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ISODD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISPMT",
+    "category": "Finance",
+    "signature": "ISPMT(argument1, argument2, argument3, argument4)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ISPMT(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISREF",
+    "category": "Type & error checks",
+    "signature": "ISREF(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISREF(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ISTEXT",
+    "category": "Type & error checks",
+    "signature": "ISTEXT(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ISTEXT(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "JIS",
+    "category": "Text",
+    "signature": "JIS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "JIS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "KURT",
+    "category": "Statistics",
+    "signature": "KURT(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "KURT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LARGE",
+    "category": "Statistics",
+    "signature": "LARGE(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "LARGE(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "LAST.ERROR",
+    "category": "Workbook & other",
+    "signature": "LAST.ERROR()",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "LAST.ERROR()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LCM",
+    "category": "Math",
+    "signature": "LCM(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "LCM(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LEFT",
+    "category": "Text",
+    "signature": "LEFT(text, characters = 1)",
+    "description": "Takes characters from the start of a string.",
+    "snippet": "LEFT(${1:\"text\"}, ${2:3})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "LEFTB",
+    "category": "Text",
+    "signature": "LEFTB(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "LEFTB(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LEN",
+    "category": "Text",
+    "signature": "LEN(text)",
+    "description": "Counts characters in a string.",
+    "snippet": "LEN(${1:\"text\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "LENB",
+    "category": "Text",
+    "signature": "LENB(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "LENB(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LINEST",
+    "category": "Statistics",
+    "signature": "LINEST(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "LINEST(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LN",
+    "category": "Math",
+    "signature": "LN(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "LN(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "LOG",
+    "category": "Math",
+    "signature": "LOG(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "LOG(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "LOG10",
+    "category": "Math",
+    "signature": "LOG10(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "LOG10(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "LOGEST",
+    "category": "Statistics",
+    "signature": "LOGEST(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "LOGEST(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LOGINV",
+    "category": "Probability",
+    "signature": "LOGINV(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "LOGINV(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LOGNORMDIST",
+    "category": "Probability",
+    "signature": "LOGNORMDIST(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "LOGNORMDIST(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "LOOKUP",
+    "category": "Lookup",
+    "signature": "LOOKUP(argument1, argument2, ...)",
+    "description": "Excel-compatible calculation. Accepts 2–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "LOOKUP(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "LOWER",
+    "category": "Text",
+    "signature": "LOWER(text)",
+    "description": "Transforms text: letter case, whitespace, or nonprinting characters.",
+    "snippet": "LOWER(${1:\"text\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MAP",
+    "category": "Collections",
+    "signature": "MAP(array, item, expression)",
+    "description": "Binds item inside expression. Object fields support dot access. No host code runs.",
+    "snippet": "MAP(${1:items}, item, ${2:item.price > 10})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "MATCH",
+    "category": "Lookup",
+    "signature": "MATCH(key, array, matchType = 1)",
+    "description": "Returns a one-based matching position. Use 0 for an exact match.",
+    "snippet": "MATCH(${1:key}, ${2:values}, 0)",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MAX",
+    "category": "Math",
+    "signature": "MAX(number or array, ...)",
+    "description": "Aggregates numbers or nested numeric arrays with decimal arithmetic.",
+    "snippet": "MAX(${1:values})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "MAXA",
+    "category": "Statistics",
+    "signature": "MAXA(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MAXA(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MAXIFS",
+    "category": "Statistics",
+    "signature": "MAXIFS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "MAXIFS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "MDETERM",
+    "category": "Matrices",
+    "signature": "MDETERM(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MDETERM(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MDURATION",
+    "category": "Finance",
+    "signature": "MDURATION(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "MDURATION(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "MEDIAN",
+    "category": "Statistics",
+    "signature": "MEDIAN(number or array, ...)",
+    "description": "Calculates an Excel statistical measure over the supplied numeric values.",
+    "snippet": "MEDIAN(${1:values})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MID",
+    "category": "Text",
+    "signature": "MID(text, start, count)",
+    "description": "Extracts characters; start is one-based.",
+    "snippet": "MID(${1:\"hello\"}, ${2:2}, ${3:3})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MIDB",
+    "category": "Text",
+    "signature": "MIDB(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "MIDB(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "MIN",
+    "category": "Math",
+    "signature": "MIN(number or array, ...)",
+    "description": "Aggregates numbers or nested numeric arrays with decimal arithmetic.",
+    "snippet": "MIN(${1:values})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "MINA",
+    "category": "Statistics",
+    "signature": "MINA(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MINA(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MINIFS",
+    "category": "Statistics",
+    "signature": "MINIFS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "MINIFS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "MINUTE",
+    "category": "Date & time",
+    "signature": "MINUTE(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MINUTE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MINVERSE",
+    "category": "Matrices",
+    "signature": "MINVERSE(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MINVERSE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MIRR",
+    "category": "Finance",
+    "signature": "MIRR(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MIRR(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MMULT",
+    "category": "Matrices",
+    "signature": "MMULT(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MMULT(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MOD",
+    "category": "Math",
+    "signature": "MOD(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MOD(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MODE",
+    "category": "Statistics",
+    "signature": "MODE(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "MODE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MONTH",
+    "category": "Date & time",
+    "signature": "MONTH(serialDate)",
+    "description": "Extracts a calendar component from an Excel serial date.",
+    "snippet": "MONTH(${1:DATE(2026, 9, 16)})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "MROUND",
+    "category": "Math",
+    "signature": "MROUND(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "MROUND(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "MUL",
+    "category": "Math",
+    "signature": "MUL(number or array, ...)",
+    "description": "Aggregates numbers or nested numeric arrays with decimal arithmetic.",
+    "snippet": "MUL(${1:values})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "MULTINOMIAL",
+    "category": "Math",
+    "signature": "MULTINOMIAL(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "MULTINOMIAL(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "N",
+    "category": "Type & error checks",
+    "signature": "N(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "N(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NA",
+    "category": "Type & error checks",
+    "signature": "NA()",
+    "description": "Excel-compatible calculation. Accepts 0–0 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "NA()",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "NEGBINOMDIST",
+    "category": "Probability",
+    "signature": "NEGBINOMDIST(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NEGBINOMDIST(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NETWORKDAYS",
+    "category": "Date & time",
+    "signature": "NETWORKDAYS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NETWORKDAYS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NOMINAL",
+    "category": "Finance",
+    "signature": "NOMINAL(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NOMINAL(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NORM.DIST",
+    "category": "Probability",
+    "signature": "NORM.DIST(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NORM.DIST(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NORM.INV",
+    "category": "Probability",
+    "signature": "NORM.INV(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NORM.INV(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NORM.S.DIST",
+    "category": "Probability",
+    "signature": "NORM.S.DIST(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NORM.S.DIST(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NORM.S.INV",
+    "category": "Probability",
+    "signature": "NORM.S.INV(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NORM.S.INV(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NORMDIST",
+    "category": "Probability",
+    "signature": "NORMDIST(argument1, argument2, argument3, argument4)",
+    "description": "Excel-compatible calculation. Accepts 4–4 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "NORMDIST(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "NORMINV",
+    "category": "Probability",
+    "signature": "NORMINV(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "NORMINV(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "NORMSDIST",
+    "category": "Probability",
+    "signature": "NORMSDIST(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "NORMSDIST(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "NORMSINV",
+    "category": "Probability",
+    "signature": "NORMSINV(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "NORMSINV(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "NOT",
+    "category": "Logic",
+    "signature": "NOT(boolean)",
+    "description": "Reverses a boolean.",
+    "snippet": "NOT(${1:true})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "NOW",
+    "category": "Date & time",
+    "signature": "NOW()",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NOW()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NPER",
+    "category": "Finance",
+    "signature": "NPER(argument1, argument2, argument3, ...)",
+    "description": "Excel-compatible calculation. Accepts 3–5 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "NPER(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "NPV",
+    "category": "Finance",
+    "signature": "NPV(rate, cashflow, ...)",
+    "description": "Discounts future cash flows at a constant per-period rate.",
+    "snippet": "NPV(${1:0.1}, ${2:[100, 200, 300]})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "NUMBERSTRING",
+    "category": "Text",
+    "signature": "NUMBERSTRING(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NUMBERSTRING(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "NUMBERVALUE",
+    "category": "Text",
+    "signature": "NUMBERVALUE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "NUMBERVALUE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "OCT2BIN",
+    "category": "Engineering",
+    "signature": "OCT2BIN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "OCT2BIN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "OCT2DEC",
+    "category": "Engineering",
+    "signature": "OCT2DEC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "OCT2DEC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "OCT2HEX",
+    "category": "Engineering",
+    "signature": "OCT2HEX(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "OCT2HEX(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ODD",
+    "category": "Math",
+    "signature": "ODD(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ODD(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ODDFPRICE",
+    "category": "Finance",
+    "signature": "ODDFPRICE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ODDFPRICE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ODDFYIELD",
+    "category": "Finance",
+    "signature": "ODDFYIELD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ODDFYIELD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ODDLPRICE",
+    "category": "Finance",
+    "signature": "ODDLPRICE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ODDLPRICE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ODDLYIELD",
+    "category": "Finance",
+    "signature": "ODDLYIELD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ODDLYIELD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "OFFSET",
+    "category": "Workbook & other",
+    "signature": "OFFSET(argument1, argument2, argument3, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "OFFSET(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "OR",
+    "category": "Logic",
+    "signature": "OR(boolean, ...)",
+    "description": "Combines boolean values.",
+    "snippet": "OR(${1:true}, ${2:false})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "PEARSON",
+    "category": "Statistics",
+    "signature": "PEARSON(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "PEARSON(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "PERCENTILE",
+    "category": "Statistics",
+    "signature": "PERCENTILE(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "PERCENTILE(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "PERCENTRANK",
+    "category": "Statistics",
+    "signature": "PERCENTRANK(argument1, argument2, ...)",
+    "description": "Excel-compatible calculation. Accepts 2–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "PERCENTRANK(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "PERCENTRANK.EXC",
+    "category": "Statistics",
+    "signature": "PERCENTRANK.EXC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PERCENTRANK.EXC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PERCENTRANK.INC",
+    "category": "Statistics",
+    "signature": "PERCENTRANK.INC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PERCENTRANK.INC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PERMUT",
+    "category": "Statistics",
+    "signature": "PERMUT(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PERMUT(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PHONETIC",
+    "category": "Text",
+    "signature": "PHONETIC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PHONETIC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PI",
+    "category": "Math",
+    "signature": "PI()",
+    "description": "Excel-compatible calculation. Accepts 0–0 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "PI()",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "PLUCK",
+    "category": "Collections",
+    "signature": "PLUCK(array, \"field.path\", default = null)",
+    "description": "Extracts a field from each object; missing values use default.",
+    "snippet": "PLUCK(${1:items}, \"${2:price}\")",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "PMT",
+    "category": "Finance",
+    "signature": "PMT(rate, periods, presentValue, futureValue = 0, type = 0)",
+    "description": "Calculates a periodic payment using a rate per period. Type 0 pays at period end.",
+    "snippet": "PMT(${1:0.05 / 12}, ${2:60}, ${3:10000})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "POISSON",
+    "category": "Probability",
+    "signature": "POISSON(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "POISSON(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "POISSON.DIST",
+    "category": "Probability",
+    "signature": "POISSON.DIST(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "POISSON.DIST(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "POWER",
+    "category": "Math",
+    "signature": "POWER(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "POWER(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "PPMT",
+    "category": "Finance",
+    "signature": "PPMT(argument1, argument2, argument3, argument4, ...)",
+    "description": "Excel-compatible calculation. Accepts 4–6 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "PPMT(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "PRESS.TOOL",
+    "category": "Workbook & other",
+    "signature": "PRESS.TOOL(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PRESS.TOOL(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PRICE",
+    "category": "Finance",
+    "signature": "PRICE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PRICE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PRICEDISC",
+    "category": "Finance",
+    "signature": "PRICEDISC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PRICEDISC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PRICEMAT",
+    "category": "Finance",
+    "signature": "PRICEMAT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PRICEMAT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PROB",
+    "category": "Probability",
+    "signature": "PROB(argument1, argument2, argument3, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "PROB(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "PRODUCT",
+    "category": "Math",
+    "signature": "PRODUCT(, ...)",
+    "description": "Excel-compatible calculation. Accepts 0–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "PRODUCT()",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "PROPER",
+    "category": "Text",
+    "signature": "PROPER(text)",
+    "description": "Transforms text: letter case, whitespace, or nonprinting characters.",
+    "snippet": "PROPER(${1:\"text\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "PV",
+    "category": "Finance",
+    "signature": "PV(argument1, argument2, argument3, ...)",
+    "description": "Excel-compatible calculation. Accepts 3–5 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "PV(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "QUARTILE",
+    "category": "Statistics",
+    "signature": "QUARTILE(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "QUARTILE(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "QUOTIENT",
+    "category": "Math",
+    "signature": "QUOTIENT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "QUOTIENT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "RADIANS",
+    "category": "Trigonometry",
+    "signature": "RADIANS(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "RADIANS(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "RAND",
+    "category": "Workbook & other",
+    "signature": "RAND()",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "RAND()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "RANDBETWEEN",
+    "category": "Workbook & other",
+    "signature": "RANDBETWEEN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "RANDBETWEEN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "RANK",
+    "category": "Statistics",
+    "signature": "RANK(argument1, argument2, ...)",
+    "description": "Excel-compatible calculation. Accepts 2–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "RANK(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "RATE",
+    "category": "Finance",
+    "signature": "RATE(argument1, argument2, argument3, ...)",
+    "description": "Excel-compatible calculation. Accepts 3–6 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "RATE(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "RECEIVED",
+    "category": "Finance",
+    "signature": "RECEIVED(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "RECEIVED(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "REDUCE",
+    "category": "Collections",
+    "signature": "REDUCE(array, item, acc, initial, expression)",
+    "description": "Folds an array with explicit local item and accumulator variables.",
+    "snippet": "REDUCE(${1:items}, item, acc, 0, acc + item.price)",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "REGISTER.ID",
+    "category": "Workbook & other",
+    "signature": "REGISTER.ID(argument1, argument2, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "REGISTER.ID(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "RELREF",
+    "category": "Workbook & other",
+    "signature": "RELREF(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "RELREF(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "REPLACE",
+    "category": "Text",
+    "signature": "REPLACE(argument1, argument2, argument3, argument4)",
+    "description": "Excel-compatible calculation. Accepts 4–4 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "REPLACE(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "REPLACEB",
+    "category": "Text",
+    "signature": "REPLACEB(argument1, argument2, argument3, argument4)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "REPLACEB(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "REPT",
+    "category": "Text",
+    "signature": "REPT(text, count)",
+    "description": "Repeats text. ARC limits the result to 2,000 characters.",
+    "snippet": "REPT(${1:\"x\"}, ${2:3})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "RETURN",
+    "category": "Workbook & other",
+    "signature": "RETURN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "RETURN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "RIGHT",
+    "category": "Text",
+    "signature": "RIGHT(text, characters = 1)",
+    "description": "Takes characters from the end of a string.",
+    "snippet": "RIGHT(${1:\"text\"}, ${2:3})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "RIGHTB",
+    "category": "Text",
+    "signature": "RIGHTB(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "RIGHTB(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ROMAN",
+    "category": "Math",
+    "signature": "ROMAN(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ROMAN(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "ROUND",
+    "category": "Math",
+    "signature": "ROUND(number, digits = 0)",
+    "description": "Rounds to -12…12 decimal places. ROUND uses half up; DOWN toward zero; UP away from zero.",
+    "snippet": "ROUND(${1:amount}, ${2:2})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "ROUNDDOWN",
+    "category": "Math",
+    "signature": "ROUNDDOWN(number, digits = 0)",
+    "description": "Rounds to -12…12 decimal places. ROUND uses half up; DOWN toward zero; UP away from zero.",
+    "snippet": "ROUNDDOWN(${1:amount}, ${2:2})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "ROUNDUP",
+    "category": "Math",
+    "signature": "ROUNDUP(number, digits = 0)",
+    "description": "Rounds to -12…12 decimal places. ROUND uses half up; DOWN toward zero; UP away from zero.",
+    "snippet": "ROUNDUP(${1:amount}, ${2:2})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "ROW",
+    "category": "Workbook & other",
+    "signature": "ROW(, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ROW()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ROWS",
+    "category": "Lookup",
+    "signature": "ROWS(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "ROWS(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "RSQ",
+    "category": "Statistics",
+    "signature": "RSQ(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "RSQ(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "RTD",
+    "category": "Workbook & other",
+    "signature": "RTD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "RTD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SAVE.TOOLBAR",
+    "category": "Workbook & other",
+    "signature": "SAVE.TOOLBAR(, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SAVE.TOOLBAR()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SEARCH",
+    "category": "Text",
+    "signature": "SEARCH(needle, text, start = 1)",
+    "description": "Finds a case-insensitive, one-based text position.",
+    "snippet": "SEARCH(${1:\"a\"}, ${2:\"ARC\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SEARCHB",
+    "category": "Text",
+    "signature": "SEARCHB(argument1, argument2, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SEARCHB(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SECOND",
+    "category": "Date & time",
+    "signature": "SECOND(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SECOND(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SERIESSUM",
+    "category": "Math",
+    "signature": "SERIESSUM(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SERIESSUM(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SHEET",
+    "category": "Workbook & other",
+    "signature": "SHEET(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SHEET(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SIGN",
+    "category": "Math",
+    "signature": "SIGN(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SIGN(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SIN",
+    "category": "Trigonometry",
+    "signature": "SIN(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SIN(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SINGLE",
+    "category": "Workbook & other",
+    "signature": "SINGLE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SINGLE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SINH",
+    "category": "Trigonometry",
+    "signature": "SINH(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SINH(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SKEW",
+    "category": "Statistics",
+    "signature": "SKEW(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SKEW(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SLN",
+    "category": "Finance",
+    "signature": "SLN(argument1, argument2, argument3)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SLN(${1:value}, ${2:value}, ${3:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SLOPE",
+    "category": "Statistics",
+    "signature": "SLOPE(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SLOPE(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SMALL",
+    "category": "Statistics",
+    "signature": "SMALL(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SMALL(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SQRT",
+    "category": "Math",
+    "signature": "SQRT(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SQRT(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SQRTPI",
+    "category": "Math",
+    "signature": "SQRTPI(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SQRTPI(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "STANDARDIZE",
+    "category": "Statistics",
+    "signature": "STANDARDIZE(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "STANDARDIZE(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "STDEV",
+    "category": "Statistics",
+    "signature": "STDEV(number or array, ...)",
+    "description": "Calculates an Excel statistical measure over the supplied numeric values.",
+    "snippet": "STDEV(${1:values})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "STDEV.P",
+    "category": "Statistics",
+    "signature": "STDEV.P(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "STDEV.P(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "STDEV.S",
+    "category": "Statistics",
+    "signature": "STDEV.S(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "STDEV.S(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "STDEVA",
+    "category": "Statistics",
+    "signature": "STDEVA(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "STDEVA(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "STDEVP",
+    "category": "Statistics",
+    "signature": "STDEVP(number or array, ...)",
+    "description": "Calculates an Excel statistical measure over the supplied numeric values.",
+    "snippet": "STDEVP(${1:values})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "STDEVPA",
+    "category": "Statistics",
+    "signature": "STDEVPA(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "STDEVPA(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "STEP",
+    "category": "Workbook & other",
+    "signature": "STEP()",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "STEP()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "STEYX",
+    "category": "Statistics",
+    "signature": "STEYX(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "STEYX(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUBSTITUTE",
+    "category": "Text",
+    "signature": "SUBSTITUTE(text, old, replacement, occurrence?)",
+    "description": "Replaces all matches, or only the selected occurrence.",
+    "snippet": "SUBSTITUTE(${1:\"hello\"}, ${2:\"l\"}, ${3:\"r\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUBTOTAL",
+    "category": "Math",
+    "signature": "SUBTOTAL(argument1, argument2, ...)",
+    "description": "Excel-compatible calculation. Accepts 2–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SUBTOTAL(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUM",
+    "category": "Math",
+    "signature": "SUM(number or array, ...)",
+    "description": "Aggregates numbers or nested numeric arrays with decimal arithmetic.",
+    "snippet": "SUM(${1:values})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "SUMIF",
+    "category": "Statistics",
+    "signature": "SUMIF(range, criteria, sumRange?)",
+    "description": "Sums matching cells, optionally from a separate range.",
+    "snippet": "SUMIF(${1:values}, ${2:\">10\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUMIFS",
+    "category": "Math",
+    "signature": "SUMIFS(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SUMIFS(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUMPRODUCT",
+    "category": "Math",
+    "signature": "SUMPRODUCT(array, ...)",
+    "description": "Multiplies matching positions then adds the products.",
+    "snippet": "SUMPRODUCT(${1:prices}, ${2:quantities})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUMSQ",
+    "category": "Math",
+    "signature": "SUMSQ(, ...)",
+    "description": "Excel-compatible calculation. Accepts 0–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SUMSQ()",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUMX2MY2",
+    "category": "Math",
+    "signature": "SUMX2MY2(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SUMX2MY2(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUMX2PY2",
+    "category": "Math",
+    "signature": "SUMX2PY2(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SUMX2PY2(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SUMXMY2",
+    "category": "Math",
+    "signature": "SUMXMY2(argument1, argument2)",
+    "description": "Excel-compatible calculation. Accepts 2–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "SUMXMY2(${1:value}, ${2:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "SWITCH",
+    "category": "Logic",
+    "signature": "SWITCH(value, case, result, ..., default)",
+    "description": "Selects the first matching case; default is optional.",
+    "snippet": "SWITCH(${1:tier}, \"premium\", ${2:0.2}, ${3:0})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "SYD",
+    "category": "Finance",
+    "signature": "SYD(argument1, argument2, argument3, argument4)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "SYD(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "T",
+    "category": "Text",
+    "signature": "T(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "T(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "T.DIST",
+    "category": "Probability",
+    "signature": "T.DIST(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "T.DIST(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "T.DIST.2T",
+    "category": "Probability",
+    "signature": "T.DIST.2T(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "T.DIST.2T(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "T.DIST.RT",
+    "category": "Probability",
+    "signature": "T.DIST.RT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "T.DIST.RT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TAN",
+    "category": "Trigonometry",
+    "signature": "TAN(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TAN(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TANH",
+    "category": "Trigonometry",
+    "signature": "TANH(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TANH(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TBILLEQ",
+    "category": "Finance",
+    "signature": "TBILLEQ(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TBILLEQ(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TBILLPRICE",
+    "category": "Finance",
+    "signature": "TBILLPRICE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TBILLPRICE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TBILLYIELD",
+    "category": "Finance",
+    "signature": "TBILLYIELD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TBILLYIELD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TDIST",
+    "category": "Probability",
+    "signature": "TDIST(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TDIST(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TEXT",
+    "category": "Text",
+    "signature": "TEXT(value, format)",
+    "description": "Formats a number using an Excel format string.",
+    "snippet": "TEXT(${1:amount}, ${2:\"0.00\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TEXTJOIN",
+    "category": "Text",
+    "signature": "TEXTJOIN(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TEXTJOIN(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TIME",
+    "category": "Date & time",
+    "signature": "TIME(argument1, argument2, argument3)",
+    "description": "Excel-compatible calculation. Accepts 3–3 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TIME(${1:value}, ${2:value}, ${3:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TIMEVALUE",
+    "category": "Date & time",
+    "signature": "TIMEVALUE(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TIMEVALUE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TINV",
+    "category": "Probability",
+    "signature": "TINV(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TINV(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TODAY",
+    "category": "Date & time",
+    "signature": "TODAY()",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TODAY()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TRANSPOSE",
+    "category": "Lookup",
+    "signature": "TRANSPOSE(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TRANSPOSE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TREND",
+    "category": "Statistics",
+    "signature": "TREND(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–4 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TREND(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TRIM",
+    "category": "Text",
+    "signature": "TRIM(text)",
+    "description": "Transforms text: letter case, whitespace, or nonprinting characters.",
+    "snippet": "TRIM(${1:\"text\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TRIMMEAN",
+    "category": "Statistics",
+    "signature": "TRIMMEAN(argument1, argument2)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TRIMMEAN(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TRUE",
+    "category": "Logic",
+    "signature": "TRUE()",
+    "description": "Excel-compatible calculation. Accepts 0–0 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TRUE()",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TRUNC",
+    "category": "Math",
+    "signature": "TRUNC(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–2 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "TRUNC(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "TTEST",
+    "category": "Probability",
+    "signature": "TTEST(argument1, argument2, argument3, argument4)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TTEST(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "TYPE",
+    "category": "Type & error checks",
+    "signature": "TYPE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "TYPE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "UPPER",
+    "category": "Text",
+    "signature": "UPPER(text)",
+    "description": "Transforms text: letter case, whitespace, or nonprinting characters.",
+    "snippet": "UPPER(${1:\"text\"})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "USDOLLAR",
+    "category": "Text",
+    "signature": "USDOLLAR(argument1, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "USDOLLAR(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "VALUE",
+    "category": "Text",
+    "signature": "VALUE(argument1)",
+    "description": "Excel-compatible calculation. Accepts 1–1 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "VALUE(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "VAR",
+    "category": "Statistics",
+    "signature": "VAR(number or array, ...)",
+    "description": "Calculates an Excel statistical measure over the supplied numeric values.",
+    "snippet": "VAR(${1:values})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "VAR.P",
+    "category": "Statistics",
+    "signature": "VAR.P(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "VAR.P(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "VAR.S",
+    "category": "Statistics",
+    "signature": "VAR.S(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "VAR.S(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "VARA",
+    "category": "Statistics",
+    "signature": "VARA(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "VARA(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "VARP",
+    "category": "Statistics",
+    "signature": "VARP(number or array, ...)",
+    "description": "Calculates an Excel statistical measure over the supplied numeric values.",
+    "snippet": "VARP(${1:values})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "VARPA",
+    "category": "Statistics",
+    "signature": "VARPA(argument1, ...)",
+    "description": "Excel-compatible calculation. Accepts 1–30 arguments; arrays represent ranges. Uses Excel numeric semantics.",
+    "snippet": "VARPA(${1:value})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "VDB",
+    "category": "Finance",
+    "signature": "VDB(argument1, argument2, argument3, argument4, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "VDB(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "VLOOKUP",
+    "category": "Lookup",
+    "signature": "VLOOKUP(key, table, column, approximate = true)",
+    "description": "Searches the first column. Columns are one-based; false requests an exact match. Approximate tables must be sorted.",
+    "snippet": "VLOOKUP(${1:key}, ${2:[[1, 10], [2, 20]]}, ${3:2}, false)",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "WEBSERVICE",
+    "category": "Workbook & other",
+    "signature": "WEBSERVICE(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "WEBSERVICE(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "WEEKDAY",
+    "category": "Date & time",
+    "signature": "WEEKDAY(serialDate)",
+    "description": "Extracts a calendar component from an Excel serial date.",
+    "snippet": "WEEKDAY(${1:DATE(2026, 9, 16)})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "WEEKNUM",
+    "category": "Date & time",
+    "signature": "WEEKNUM(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "WEEKNUM(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "WEIBULL",
+    "category": "Probability",
+    "signature": "WEIBULL(argument1, argument2, argument3, argument4)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "WEIBULL(${1:value}, ${2:value}, ${3:value}, ${4:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "WINDOW.TITLE",
+    "category": "Workbook & other",
+    "signature": "WINDOW.TITLE(, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "WINDOW.TITLE()",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "WORKDAY",
+    "category": "Date & time",
+    "signature": "WORKDAY(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "WORKDAY(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "WORKDAY.INTL",
+    "category": "Date & time",
+    "signature": "WORKDAY.INTL(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "WORKDAY.INTL(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "XIRR",
+    "category": "Finance",
+    "signature": "XIRR(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "XIRR(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "XLOOKUP",
+    "category": "Lookup",
+    "signature": "XLOOKUP(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "XLOOKUP(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "XMATCH",
+    "category": "Lookup",
+    "signature": "XMATCH(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "XMATCH(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "XNPV",
+    "category": "Finance",
+    "signature": "XNPV(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "XNPV(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "XOR",
+    "category": "Logic",
+    "signature": "XOR(boolean, ...)",
+    "description": "Combines boolean values.",
+    "snippet": "XOR(${1:true}, ${2:false})",
+    "supported": true,
+    "origin": "ARC / Excel / Dentaku-style"
+  },
+  {
+    "name": "YEAR",
+    "category": "Date & time",
+    "signature": "YEAR(serialDate)",
+    "description": "Extracts a calendar component from an Excel serial date.",
+    "snippet": "YEAR(${1:DATE(2026, 9, 16)})",
+    "supported": true,
+    "origin": "Excel"
+  },
+  {
+    "name": "YEARFRAC",
+    "category": "Date & time",
+    "signature": "YEARFRAC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "YEARFRAC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "YIELD",
+    "category": "Finance",
+    "signature": "YIELD(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "YIELD(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "YIELDDISC",
+    "category": "Finance",
+    "signature": "YIELDDISC(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "YIELDDISC(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "YIELDMAT",
+    "category": "Finance",
+    "signature": "YIELDMAT(argument1)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "YIELDMAT(${1:value})",
+    "supported": false,
+    "origin": "Excel"
+  },
+  {
+    "name": "ZTEST",
+    "category": "Probability",
+    "signature": "ZTEST(argument1, argument2, ...)",
+    "description": "Reference only: this function needs workbook context or is not implemented by the ARC adapter.",
+    "snippet": "ZTEST(${1:value}, ${2:value})",
+    "supported": false,
+    "origin": "Excel"
+  }
+]
