@@ -83,6 +83,9 @@ test("settings modal and runtime/validation errors jump to the failing node from
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
+  await expect(
+    page.locator('.react-flow__node[data-id="bad"] .graph-node'),
+  ).toHaveClass(/node-error/);
   await page
     .getByRole("button", { name: "Show problem · bad", exact: true })
     .click();
@@ -121,7 +124,7 @@ test("settings modal and runtime/validation errors jump to the failing node from
   );
 });
 
-test("connected parameter dropdowns, unquoted string constants and reference tabs preserve the draft", async ({
+test("connected parameter dropdowns, unquoted string constants and reference modals preserve the draft", async ({
   page,
   request,
 }) => {
@@ -205,14 +208,15 @@ test("connected parameter dropdowns, unquoted string constants and reference tab
     page.getByText("Text value · no quotation marks needed"),
   ).toBeVisible();
   await page.getByLabel("Node name", { exact: true }).fill("Edited reuse");
-  const pop = page.waitForEvent("popup");
   await page
-    .getByRole("link", { name: "Open referenced rule", exact: true })
+    .getByRole("button", { name: "Open referenced rule", exact: true })
     .click();
-  const tab = await pop;
-  await expect(tab).toHaveURL(new RegExp(`/rules/${childId}\\?version=1`));
-  await expect(tab.getByText("Immutable published version")).toBeVisible();
-  await tab.close();
+  const viewer = page.getByRole("dialog", { name: "Referenced rule viewer" });
+  await expect(viewer.getByText("Immutable published version")).toBeVisible();
+  await expect(
+    viewer.getByRole("button", { name: "Back", exact: true }),
+  ).toBeDisabled();
+  await viewer.getByRole("button", { name: "Close all", exact: true }).click();
   await expect(page.getByLabel("Node name", { exact: true })).toHaveValue(
     "Edited reuse",
   );
@@ -339,7 +343,7 @@ test("condition string builder quotes text and graph connections retain multiple
   await expect(page.locator(".view-lines")).toContainText('next -> "tax"');
 });
 
-test("errors inside reused rules open the failing published node in a separate tab", async ({
+test("errors inside reused rules open the failing published node in a modal", async ({
   page,
   request,
 }) => {
@@ -392,17 +396,19 @@ test("errors inside reused rules open the failing published node in a separate t
   await expect(
     page.getByRole("button", { name: "Show problem · reuse", exact: true }),
   ).toBeVisible();
-  const pop = page.waitForEvent("popup");
+  await expect(
+    page.locator('.react-flow__node[data-id="reuse"] .graph-node'),
+  ).toHaveClass(/node-error/);
   await page
-    .getByRole("link", { name: "Open problem · broken ↗", exact: true })
+    .getByRole("button", { name: "Open problem · broken", exact: true })
     .click();
-  const tab = await pop;
-  await expect(tab.getByLabel("Node name", { exact: true })).toHaveValue(
+  const viewer = page.getByRole("dialog", { name: "Referenced rule viewer" });
+  await expect(viewer.getByLabel("Node name", { exact: true })).toHaveValue(
     "broken",
   );
-  await expect(tab.locator('.react-flow__node[data-id="broken"]')).toHaveClass(
-    /selected/,
-  );
-  await tab.close();
+  await expect(
+    viewer.locator('.react-flow__node[data-id="broken"] .graph-node'),
+  ).toHaveClass(/node-error/);
+  await viewer.getByRole("button", { name: "Close all", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/rules/${id}`));
 });

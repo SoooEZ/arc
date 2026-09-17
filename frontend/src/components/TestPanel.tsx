@@ -8,7 +8,14 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { api, ApiError, type ErrorLocation, errorMessage } from "../api";
+import {
+  api,
+  ApiError,
+  type ErrorLocation,
+  type GraphProblem,
+  errorMessage,
+} from "../api";
+import type { ReferenceTarget } from "./ReferenceDialog";
 import type { Definition, Execution } from "../types";
 import { NodeIcon } from "./Icons";
 
@@ -52,6 +59,8 @@ export default function TestPanel({
   ruleId,
   publishedVersion,
   onResult,
+  onError,
+  onOpenReference,
   onNode,
   onClose,
 }: {
@@ -59,6 +68,8 @@ export default function TestPanel({
   ruleId: string;
   publishedVersion: number | null;
   onResult: (r: Execution | null) => void;
+  onError: (problem: GraphProblem | null) => void;
+  onOpenReference: (target: ReferenceTarget) => void;
   onNode: (id: string) => void;
   onClose: () => void;
 }) {
@@ -87,6 +98,7 @@ export default function TestPanel({
     setLocations([]);
     setResult(null);
     onResult(null);
+    onError(null);
     try {
       const values: unknown = JSON.parse(input);
       if (values == null || typeof values !== "object" || Array.isArray(values))
@@ -99,7 +111,10 @@ export default function TestPanel({
       onResult(execution);
     } catch (e) {
       setError(errorMessage(e));
-      if (e instanceof ApiError) setLocations(e.locations);
+      if (e instanceof ApiError) {
+        setLocations(e.locations);
+        onError({ message: e.message, locations: e.locations });
+      }
     } finally {
       setRunning(false);
     }
@@ -155,6 +170,7 @@ export default function TestPanel({
                 onResult(null);
                 setError("");
                 setLocations([]);
+                onError(null);
               }}
               className="json-input"
               spellCheck={false}
@@ -207,11 +223,15 @@ export default function TestPanel({
                       key={i}
                       size="small"
                       color="inherit"
-                      href={`#/rules/${encodeURIComponent(l.ruleId!)}?version=${l.version}&node=${encodeURIComponent(l.nodeId)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      onClick={() =>
+                        onOpenReference({
+                          ruleId: l.ruleId!,
+                          version: l.version!,
+                          nodeId: l.nodeId,
+                        })
+                      }
                     >
-                      Open problem · {l.label} ↗
+                      Open problem · {l.label}
                     </Button>
                   ))}
                 {!locations.length && (

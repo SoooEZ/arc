@@ -43,6 +43,8 @@ The result is `120`, alongside the executed version, timing, and each visited no
 - Choose an Output’s return value from available inputs/upstream results, enter a typed constant (number, string, boolean, array or null), or write an expression. String constants need no manual quotation marks.
 - Navigate with the node outline, minimap, auto-layout, or links to referenced rules. Arrange graph accounts for the fixed True/False exits and reorders branches to reduce crossings.
 - Map parameters using connected upstream variables, typed constants, or expressions, and pin an exact published version. String constants need no manual quotation marks. Referenced rules open in a separate tab.
+- Open a node’s **Node expression** editor to change its calculations, mappings and connections together. Syntax and scope errors mark their owning nodes red; runtime failures also mark the calling reference.
+- Browse referenced versions in one modal with **Back** and **Close all**, preserving the parent draft.
 - Test the current graph without saving; inspect results and a highlighted execution path. Error actions jump to the affected node, including failures inside referenced rules.
 - Edit the rule name and description with the gear beside the current rule name.
 - Save incomplete drafts, validate complete graphs, and publish immutable versions.
@@ -135,4 +137,4 @@ GitHub Actions runs the Java tests, frontend build, real PostgreSQL API checks, 
 
 ### Code studio and data sources
 
-Use the separate **Code studio** page for Monaco editing, function chips with hover help, reusable module insertion, and bidirectional graph editing. **Data sources** supplies missing inputs from versioned lookup tables or HTTP JSON APIs. See [the studio guide](docs/studio.md) for syntax, examples, compatibility boundaries, source configuration, and endpoints.
+Use the separate **Code studio** page for Monaco editing, function chips grouped by purpose with expandable categories, search and hover help, reusable module insertion, and bidirectional graph editing. **Data sources** supplies missing inputs from versioned lookup tables or HTTP JSON APIs. See [the studio guide](docs/studio.md) for syntax, examples, compatibility boundaries, source configuration, and endpoints.

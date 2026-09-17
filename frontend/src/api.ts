@@ -16,6 +16,10 @@ export interface ErrorLocation {
   nodeId: string;
   label: string;
 }
+export interface GraphProblem {
+  message: string;
+  locations: ErrorLocation[];
+}
 export class ApiError extends Error {
   locations: ErrorLocation[];
   constructor(message: string, locations: ErrorLocation[] = []) {
@@ -41,6 +45,15 @@ const post = (body: unknown) => ({
   body: JSON.stringify(body),
 });
 export const api = {
+  diagnostics: (definition: Definition) =>
+    request<GraphProblem[]>("/diagnostics", post(definition)),
+  renderNode: (definition: Definition, nodeId: string) =>
+    request<{ source: string }>(
+      "/studio/node/render",
+      post({ definition, nodeId }),
+    ),
+  buildNode: (definition: Definition, nodeId: string, source: string) =>
+    request<Build>("/studio/node/build", post({ definition, nodeId, source })),
   variables: (definition: Definition) =>
     request<Record<string, string[]>>("/variables", post(definition)),
   functions: () => request<FunctionEntry[]>("/functions"),

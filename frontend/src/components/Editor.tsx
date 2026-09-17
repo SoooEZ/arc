@@ -46,7 +46,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { api, errorMessage } from "../api";
+import { api, ApiError, errorMessage, type GraphProblem } from "../api";
 import type {
   Definition,
   Diagnostic,
@@ -62,8 +62,10 @@ import { KindIcon, NodeIcon } from "./Icons";
 import Inspector from "./Inspector";
 import TestPanel from "./TestPanel";
 import RuleSettings from "./RuleSettings";
+import ReferenceDialog, { type ReferenceTarget } from "./ReferenceDialog";
 
 const CodeStudio = lazy(() => import("./CodeStudio"));
+const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
 const nodeTypes = { arc: GraphNode };
 interface Props {
   mode: "code" | "graph";
@@ -75,6 +77,9 @@ interface Props {
   onDirty: (value: boolean) => void;
   navigate: (path: string) => void;
   notify: (message: string) => void;
+  embedded?: boolean;
+  onOpenReference?: (target: ReferenceTarget, fromNode?: string) => void;
+  initialProblems?: GraphProblem[];
 }
 const snapshot = (r: Rule) => JSON.stringify([r.name, r.description, r.draft]);
 export default function Editor(props: Props) {
@@ -94,6 +99,9 @@ function EditorContent({
   onDirty,
   navigate,
   notify,
+  embedded = false,
+  onOpenReference,
+  initialProblems,
 }: Props) {
   const [rule, setRule] = useState(initial);
   const [invalidJson, setInvalidJson] = useState<Record<string, boolean>>({});
@@ -120,6 +128,21 @@ function EditorContent({
   >({});
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [graphProblems, setGraphProblems] = useState<GraphProblem[]>([]);
+  const [runtimeProblems, setRuntimeProblems] = useState<GraphProblem[]>([]);
+  const [nodeCode, setNodeCode] = useState<string | null>(null);
+  const [nodeCodeProblems, setNodeCodeProblems] = useState<string[]>([]);
+  const [referenceTarget, setReferenceTarget] =
+    useState<ReferenceTarget | null>(null);
+  const reportRuntimeError = useCallback(
+    (problem: GraphProblem | null) =>
+      setRuntimeProblems(problem ? [problem] : []),
+    [],
+  );
+  const openReference = (target: ReferenceTarget) =>
+    onOpenReference
+      ? onOpenReference(target, selected)
+      : setReferenceTarget(target);
   const [testOpen, setTestOpen] = useState(false);
   const [trace, setTrace] = useState<Execution | null>(null);
   const [outline, setOutline] = useState(false);
@@ -133,6 +156,67 @@ function EditorContent({
   const [versionLoading, setVersionLoading] = useState(!!requestedVersion);
   const flow = useReactFlow<FlowNode>();
   const readOnly = !!requestedVersion;
+  const problemKey = JSON.stringify({
+    ...rule.draft,
+    nodes: rule.draft.nodes.map(({ position: _position, ...n }) => n),
+  });
+  useEffect(() => {
+    if (versionLoading) return;
+    let live = true;
+    setRuntimeProblems([]);
+    const timer = setTimeout(() => {
+      api
+        .diagnostics(rule.draft)
+        .then((problems) => {
+          if (live) setGraphProblems(problems);
+        })
+        .catch((e) => {
+          if (live) setError(`Could not check graph: ${errorMessage(e)}`);
+        });
+    }, 350);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [problemKey, versionLoading]);
+  const allProblems = [
+    ...graphProblems,
+    ...runtimeProblems,
+    ...(initialProblems || []),
+  ];
+  const localProblems = [
+    ...graphProblems,
+    ...runtimeProblems,
+    ...(initialProblems || []).map((problem) => ({
+      ...problem,
+      locations: problem.locations.filter(
+        (l) => l.ruleId === rule.id && l.version === requestedVersion,
+      ),
+    })),
+  ];
+  const nodeErrors: Record<string, string[]> = {};
+  for (const problem of localProblems)
+    for (const location of problem.locations) {
+      if (
+        location.ruleId &&
+        location.ruleId !== "preview" &&
+        !(location.ruleId === rule.id && location.version === requestedVersion)
+      )
+        continue;
+      (nodeErrors[location.nodeId] ||= []).push(problem.message);
+    }
+  if (hasInvalidJson) {
+    const input = rule.draft.nodes.find((n) => n.type === "INPUT");
+    if (input)
+      (nodeErrors[input.id] ||= []).push(
+        "Fix the invalid JSON parameter value.",
+      );
+  }
+  if (nodeCode && nodeCodeProblems.length)
+    (nodeErrors[nodeCode] ||= []).push(...nodeCodeProblems);
+  for (const id of Object.keys(nodeErrors))
+    nodeErrors[id] = [...new Set(nodeErrors[id])];
+  const errorsKey = JSON.stringify(nodeErrors);
   const dirty =
     !readOnly && (hasInvalidJson || sourceDirty || snapshot(rule) !== baseline);
   useEffect(() => {
@@ -189,9 +273,11 @@ function EditorContent({
           model: n,
           visited: visited.has(n.id),
           inputCount: rule.draft.inputs.length,
+          errors: nodeErrors[n.id] || [],
+          onExpression: () => setNodeCode(n.id),
         },
       })),
-    [rule.draft, selected, visited, measurements],
+    [rule.draft, selected, visited, measurements, errorsKey],
   );
   const edges = useMemo(
     () =>
@@ -336,6 +422,8 @@ function EditorContent({
       notify("Code built. Graph is valid.");
     } catch (e) {
       setError(errorMessage(e));
+      if (e instanceof ApiError)
+        reportRuntimeError({ message: e.message, locations: e.locations });
     } finally {
       setBusy("");
     }
@@ -414,6 +502,8 @@ function EditorContent({
       }
     } catch (e) {
       setError(errorMessage(e));
+      if (e instanceof ApiError)
+        reportRuntimeError({ message: e.message, locations: e.locations });
     } finally {
       setBusy("");
     }
@@ -635,7 +725,7 @@ function EditorContent({
               </Button>
             </>
           )}
-          {readOnly && (
+          {readOnly && !embedded && (
             <Button
               variant="contained"
               onClick={() => navigate(`/rules/${rule.id}`)}
@@ -722,6 +812,8 @@ function EditorContent({
               ruleId={rule.id}
               publishedVersion={requestedVersion || rule.publishedVersion}
               onResult={setTrace}
+              onError={reportRuntimeError}
+              onOpenReference={openReference}
               onNode={jumpToNode}
               onClose={() => setTestOpen(false)}
             />
@@ -823,12 +915,14 @@ function EditorContent({
                 <Controls showInteractive={false} />
                 <MiniMap
                   nodeColor={(n) =>
-                    visited.has(n.id)
-                      ? "#8ebda8"
-                      : n.data?.model &&
-                          (n.data.model as RuleNode).type === "CONDITION"
-                        ? "#e8d8b2"
-                        : "#d4dfd8"
+                    nodeErrors[n.id]?.length
+                      ? "#d15a52"
+                      : visited.has(n.id)
+                        ? "#8ebda8"
+                        : n.data?.model &&
+                            (n.data.model as RuleNode).type === "CONDITION"
+                          ? "#e8d8b2"
+                          : "#d4dfd8"
                   }
                   maskColor="rgba(245,248,246,.7)"
                   pannable
@@ -899,6 +993,8 @@ function EditorContent({
                 ruleId={rule.id}
                 publishedVersion={requestedVersion || rule.publishedVersion}
                 onResult={setTrace}
+                onError={reportRuntimeError}
+                onOpenReference={openReference}
                 onNode={jumpToNode}
                 onClose={() => setTestOpen(false)}
               />
@@ -930,8 +1026,34 @@ function EditorContent({
             onDelete={removeNode}
             onDefinitionChange={changeDefinition}
             onInvalidJson={onInvalidJson}
+            errors={nodeErrors[selected] || []}
+            onExpression={(id) => setNodeCode(id)}
+            onOpenReference={openReference}
           />
         </div>
+      )}
+      {referenceTarget && (
+        <ReferenceDialog
+          target={referenceTarget}
+          rules={rules}
+          problems={allProblems}
+          onClose={() => setReferenceTarget(null)}
+        />
+      )}
+      {nodeCode && rule.draft.nodes.some((n) => n.id === nodeCode) && (
+        <Suspense fallback={null}>
+          <NodeExpressionDialog
+            definition={rule.draft}
+            node={rule.draft.nodes.find((n) => n.id === nodeCode)!}
+            readOnly={readOnly}
+            onProblems={setNodeCodeProblems}
+            onApply={(d) => changeDefinition(() => d)}
+            onClose={() => {
+              setNodeCode(null);
+              setNodeCodeProblems([]);
+            }}
+          />
+        </Suspense>
       )}
       {settingsOpen && (
         <RuleSettings

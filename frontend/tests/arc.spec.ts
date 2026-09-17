@@ -40,16 +40,19 @@ test("library, graph preview, reference navigation, and published API execution"
     .locator(".node-outline")
     .getByRole("button", { name: /Premium discount/ })
     .click();
-  const popup = page.waitForEvent("popup");
-  await page.getByRole("link", { name: "Open referenced rule" }).click();
-  const referenced = await popup;
+  await page.getByRole("button", { name: "Open referenced rule" }).click();
+  const referenced = page.getByRole("dialog", {
+    name: "Referenced rule viewer",
+  });
   await expect(
     referenced.getByRole("heading", { name: "Apply discount", exact: true }),
   ).toBeVisible();
   await expect(
     referenced.getByText("Immutable published version"),
   ).toBeVisible();
-  await referenced.close();
+  await referenced
+    .getByRole("button", { name: "Close all", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "API playground", exact: true })
     .click();

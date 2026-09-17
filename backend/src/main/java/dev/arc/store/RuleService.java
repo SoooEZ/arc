@@ -122,6 +122,23 @@ public class RuleService {
     sources.validateBindings(definition, memoizedResolver(), new HashSet<>(), 0);
   }
 
+  public List<Validator.Problem> diagnostics(Definition definition) {
+    var resolver = memoizedResolver();
+    var problems = validator.diagnostics(definition, resolver);
+    // Check stored source contracts only. Diagnostics never perform HTTP requests.
+    try {
+      validator.shape(definition);
+      if (definition.nodes().stream().filter(n -> n.type().equals("INPUT")).count() == 1)
+        sources.validateBindings(definition, resolver, new HashSet<>(), 0);
+    } catch (ArcException e) {
+      if (!e.locations().isEmpty()) {
+        var problem = Validator.Problem.from(e);
+        if (!problems.contains(problem)) problems.add(problem);
+      }
+    }
+    return problems;
+  }
+
   private RuleResolver memoizedResolver() {
     Map<String, Definition> cache = new HashMap<>();
     return (id, version) ->

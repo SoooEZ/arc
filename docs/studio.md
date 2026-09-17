@@ -90,3 +90,12 @@ A source can be tested before binding it to a rule. Saving edits creates a new v
 | POST | `/api/sources/{id}/test` | `{ version, inputs }` → `{ result }` |
 
 Source definitions contain `kind` (`LOOKUP` or `HTTP`), `parameters`, and `timeoutMs` (HTTP: 100–10,000). LOOKUP adds `entries` and requires one parameter `key`; HTTP adds `url` and optional `secretHeaders`. HTTP responses and inbound API requests are limited to 1 MiB. Execution responses now include a `sources` array with input, sourceId, version, status and durationMicros.
+
+
+### Node expressions and connections
+
+Use the `</>` button on a canvas node, or **Node expression** in its inspector, to edit the whole node. A condition has a `when` expression; a formula has `let`; an output has `return`; a reused rule has `use`, `bind` and `as`. The Input node includes the rule’s parameters and source mappings. **Apply to graph** synchronizes the edit without saving or publishing. Syntax errors must be fixed before applying; other graph validation errors remain visible on the canvas while you finish the draft.
+
+An edge is a connection: `next -> "output";` sends execution to that node; `true ->` and `false ->` select a condition branch. The optional `edge "connection-id"` suffix preserves the connection’s identity during code/graph round trips; it is not a calculation. Several statements can connect one exit to multiple targets.
+
+The function library groups entries by purpose (math, text, logic, statistics, dates, finance and others). Expand a group, or search to reveal matching functions. Referenced rules open their pinned versions in a single modal with **Back** and **Close all**.

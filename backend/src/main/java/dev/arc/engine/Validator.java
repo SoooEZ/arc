@@ -38,35 +38,39 @@ public class Validator {
         "Too many or oversized comments");
     Set<String> ids = new HashSet<>();
     for (Node n : d.nodes()) {
-      require(
-          n != null && n.id() != null && n.id().matches("[A-Za-z0-9_-]{1,80}"),
-          "Every node needs a valid ID");
-      require(
-          n.position() == null
-              || Double.isFinite(n.position().x())
-                  && Double.isFinite(n.position().y())
-                  && Math.abs(n.position().x()) <= 1_000_000
-                  && Math.abs(n.position().y()) <= 1_000_000,
-          "Node position must be finite and within canvas bounds");
-      require(ids.add(n.id()), "Duplicate node ID: " + n.id());
-      require(TYPES.contains(n.type() == null ? "" : n.type()), "Unknown node type: " + n.type());
-      require(
-          n.label() != null && !n.label().isBlank() && n.label().length() <= 160,
-          "Every node needs a label of 1 to 160 characters");
-      require(
-          n.expression() == null || n.expression().length() <= 2000,
-          "Expression exceeds 2,000 characters");
-      require(
-          n.bindings() == null || n.bindings().size() <= 50,
-          "Provide at most 50 parameter bindings");
-      if (n.bindings() != null)
-        for (var binding : n.bindings().entrySet()) {
-          require(
-              identifier(binding.getKey())
-                  && binding.getValue() != null
-                  && binding.getValue().length() <= 2000,
-              "Invalid parameter binding");
-        }
+      try {
+        require(
+            n != null && n.id() != null && n.id().matches("[A-Za-z0-9_-]{1,80}"),
+            "Every node needs a valid ID");
+        require(
+            n.position() == null
+                || Double.isFinite(n.position().x())
+                    && Double.isFinite(n.position().y())
+                    && Math.abs(n.position().x()) <= 1_000_000
+                    && Math.abs(n.position().y()) <= 1_000_000,
+            "Node position must be finite and within canvas bounds");
+        require(ids.add(n.id()), "Duplicate node ID: " + n.id());
+        require(TYPES.contains(n.type() == null ? "" : n.type()), "Unknown node type: " + n.type());
+        require(
+            n.label() != null && !n.label().isBlank() && n.label().length() <= 160,
+            "Every node needs a label of 1 to 160 characters");
+        require(
+            n.expression() == null || n.expression().length() <= 2000,
+            "Expression exceeds 2,000 characters");
+        require(
+            n.bindings() == null || n.bindings().size() <= 50,
+            "Provide at most 50 parameter bindings");
+        if (n.bindings() != null)
+          for (var binding : n.bindings().entrySet()) {
+            require(
+                identifier(binding.getKey())
+                    && binding.getValue() != null
+                    && binding.getValue().length() <= 2000,
+                "Invalid parameter binding");
+          }
+      } catch (ArcException e) {
+        throw n == null ? e : e.atNode(null, null, n.id(), n.label());
+      }
     }
     Set<String> edgeIds = new HashSet<>();
     for (Edge e : d.edges()) {
@@ -186,41 +190,102 @@ public class Validator {
           n);
     for (Node n : plan.order) {
       Set<String> scope = plan.available.get(n.id());
-      try {
-        if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(n.type()))
-          expression(n.expression(), scope, n.label());
-        if (n.type().equals("REFERENCE")) {
+      validateNode(d, n, scope, resolver);
+    }
+  }
+
+  private void validateNode(Definition d, Node n, Set<String> scope, RuleResolver resolver) {
+    try {
+      if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(n.type()))
+        expression(n.expression(), scope, n.label());
+      if (n.type().equals("REFERENCE")) {
+        require(
+            n.ruleId() != null && n.version() != null && n.version() > 0,
+            n.label() + ": select a published rule and version");
+        Definition child = resolver.resolve(n.ruleId(), n.version());
+        Map<String, String> bindings = n.bindings() == null ? Map.of() : n.bindings();
+        Set<String> childNames =
+            child.inputs().stream().map(Input::name).collect(Collectors.toSet());
+        for (Input p : child.inputs())
           require(
-              n.ruleId() != null && n.version() != null && n.version() > 0,
-              n.label() + ": select a published rule and version");
-          Definition child = resolver.resolve(n.ruleId(), n.version());
-          Map<String, String> bindings = n.bindings() == null ? Map.of() : n.bindings();
-          Set<String> childNames =
-              child.inputs().stream().map(Input::name).collect(Collectors.toSet());
-          for (Input p : child.inputs())
-            require(
-                !p.required()
-                    || p.defaultValue() != null
-                    || p.source() != null
-                    || bindings.containsKey(p.name()),
-                n.label() + ": missing binding for " + p.name());
-          for (var entry : bindings.entrySet()) {
-            require(
-                childNames.contains(entry.getKey()),
-                n.label() + ": unknown parameter " + entry.getKey());
-            expression(entry.getValue(), scope, n.label() + " / " + entry.getKey());
-          }
+              !p.required()
+                  || p.defaultValue() != null
+                  || p.source() != null
+                  || bindings.containsKey(p.name()),
+              n.label() + ": missing binding for " + p.name());
+        for (var entry : bindings.entrySet()) {
+          require(
+              childNames.contains(entry.getKey()),
+              n.label() + ": unknown parameter " + entry.getKey());
+          expression(entry.getValue(), scope, n.label() + " / " + entry.getKey());
         }
-        if (n.type().equals("FORMULA") || n.type().equals("REFERENCE")) {
-          require(identifier(n.output()), n.label() + ": provide a valid result variable");
-          require(
-              d.inputs().stream().noneMatch(p -> p.name().equals(n.output())),
-              n.label() + ": cannot overwrite input " + n.output());
+      }
+      if (n.type().equals("FORMULA") || n.type().equals("REFERENCE")) {
+        require(identifier(n.output()), n.label() + ": provide a valid result variable");
+        require(
+            d.inputs().stream().noneMatch(p -> p.name().equals(n.output())),
+            n.label() + ": cannot overwrite input " + n.output());
+      }
+    } catch (ArcException e) {
+      throw e.atNode(null, null, n.id(), n.label());
+    }
+  }
+
+  public record Problem(String message, List<ArcException.Location> locations) {
+    public static Problem from(ArcException e) {
+      return new Problem(e.getMessage(), e.locations());
+    }
+  }
+
+  public List<Problem> diagnostics(Definition d, RuleResolver resolver) {
+    var problems = new LinkedHashSet<Problem>();
+    try {
+      shape(d);
+    } catch (ArcException e) {
+      try {
+        validate(d, resolver);
+      } catch (ArcException located) {
+        problems.add(Problem.from(located));
+      }
+      return new ArrayList<>(problems);
+    }
+    Map<String, Set<String>> scope = null;
+    try {
+      scope = new GraphPlan(d).available;
+    } catch (ArcException e) {
+      problems.add(Problem.from(e));
+    }
+    for (Node n : d.nodes()) {
+      try {
+        if (scope != null) validateNode(d, n, scope.getOrDefault(n.id(), Set.of()), resolver);
+        else {
+          if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(n.type()))
+            Expressions.compile(n.expression());
+          if (n.bindings() != null)
+            for (String expr : n.bindings().values()) Expressions.compile(expr);
         }
       } catch (ArcException e) {
-        throw e.atNode(null, null, n.id(), n.label());
+        problems.add(Problem.from(e.atNode(null, null, n.id(), n.label())));
       }
     }
+    Node input = d.nodes().stream().filter(n -> n.type().equals("INPUT")).findFirst().orElse(null);
+    var names = d.inputs().stream().map(Input::name).collect(Collectors.toSet());
+    for (Input p : d.inputs())
+      if (p.source() != null) {
+        for (var binding : p.source().bindings().entrySet())
+          try {
+            expression(binding.getValue(), names, p.name() + " source / " + binding.getKey());
+          } catch (ArcException e) {
+            problems.add(
+                Problem.from(input == null ? e : e.atNode(null, null, input.id(), input.label())));
+          }
+      }
+    try {
+      validate(d, resolver);
+    } catch (ArcException e) {
+      problems.add(Problem.from(e));
+    }
+    return new ArrayList<>(problems);
   }
 
   private void require(boolean condition, String message, Node node) {

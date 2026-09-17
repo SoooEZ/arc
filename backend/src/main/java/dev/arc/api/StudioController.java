@@ -19,6 +19,18 @@ public class StudioController {
 
   public record Code(String source) {}
 
+  public record NodeCode(Definition definition, String nodeId, String source) {}
+
+  @PostMapping("/studio/node/render")
+  public Object renderNode(@RequestBody NodeCode code) {
+    return Map.of("source", script.renderNode(code.definition(), code.nodeId()));
+  }
+
+  @PostMapping("/studio/node/build")
+  public Object buildNode(@RequestBody NodeCode code) {
+    return script.buildNode(code.definition(), code.nodeId(), code.source());
+  }
+
   @GetMapping("/functions")
   public Object functions() {
     return Functions.catalog();

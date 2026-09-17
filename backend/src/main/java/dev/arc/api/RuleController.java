@@ -78,4 +78,9 @@ public class RuleController {
     service.validate(definition);
     return Map.of("valid", true);
   }
+
+  @PostMapping("/diagnostics")
+  public Object diagnostics(@RequestBody Definition definition) {
+    return service.diagnostics(definition);
+  }
 }

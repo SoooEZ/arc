@@ -1,79 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import MonacoEditor, { loader } from "@monaco-editor/react";
-import * as monaco from "monaco-editor/editor/editor.api";
-import "monaco-editor/features/register.all";
-import EditorWorker from "monaco-editor/editor/editor.worker?worker";
-import {
-  Alert,
-  Button,
-  Chip,
-  MenuItem,
-  TextField,
-  Tooltip,
-} from "@mui/material";
-import { Braces, Check, Code2, GitBranch, Puzzle, Search } from "lucide-react";
+import MonacoEditor from "@monaco-editor/react";
+import { monaco } from "./arcLanguage";
+import FunctionLibrary from "./FunctionLibrary";
+import { Alert, Button } from "@mui/material";
+import { Braces, Check, Code2, GitBranch, Puzzle } from "lucide-react";
 import { api, errorMessage } from "../api";
 import type { Definition, Diagnostic, FunctionEntry, Rule } from "../types";
 
-self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
-loader.config({ monaco });
-monaco.languages.register({ id: "arc" });
-monaco.languages.setLanguageConfiguration("arc", {
-  comments: { lineComment: "//" },
-  brackets: [
-    ["{", "}"],
-    ["(", ")"],
-    ["[", "]"],
-  ],
-  autoClosingPairs: [
-    { open: '"', close: '"' },
-    { open: "{", close: "}" },
-    { open: "(", close: ")" },
-    { open: "[", close: "]" },
-  ],
-  indentationRules: {
-    increaseIndentPattern: /\{[^}]*$/,
-    decreaseIndentPattern: /^\s*\}/,
-  },
-});
-monaco.languages.setMonarchTokensProvider("arc", {
-  tokenizer: {
-    root: [
-      [/\/\/.*$/, "comment"],
-      [/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/, "string"],
-      [
-        /\b(schema|inputs|node|at|let|when|return|use|version|bind|as|next|edge|source|required|optional|default)\b/,
-        "keyword",
-      ],
-      [
-        /\b(INPUT|FORMULA|CONDITION|REFERENCE|OUTPUT|NUMBER|STRING|BOOLEAN|ARRAY|OBJECT)\b/,
-        "type",
-      ],
-      [/\b(true|false|null)\b/, "constant"],
-      [/[A-Za-z_][\w.]*(?=\s*\()/, "function"],
-      [/\d+(\.\d+)?/, "number"],
-      [/[{}()[\]]/, "@brackets"],
-      [/[+\-*/=><!&|^]+/, "operator"],
-    ],
-  },
-});
-monaco.editor.defineTheme("arc-light", {
-  base: "vs",
-  inherit: true,
-  rules: [
-    { token: "keyword", foreground: "875295" },
-    { token: "type", foreground: "327966" },
-    { token: "function", foreground: "8B682F" },
-    { token: "comment", foreground: "8C9792" },
-    { token: "string", foreground: "277B61" },
-  ],
-  colors: {
-    "editor.background": "#fcfdfc",
-    "editorLineNumber.foreground": "#a5b1aa",
-    "editor.lineHighlightBackground": "#f2f6f3",
-    "editor.selectionBackground": "#dbece2",
-  },
-});
 const modules = [
   {
     name: "Formula",
@@ -128,9 +61,6 @@ export default function CodeStudio({
 }: Props) {
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [functions, setFunctions] = useState<FunctionEntry[]>([]);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
-  const [reference, setReference] = useState(false);
   const [error, setError] = useState("");
   const [pane, setPane] = useState("functions");
   const latest = useRef({ onBuild, onSave });
@@ -262,12 +192,6 @@ export default function CodeStudio({
       setError(errorMessage(e));
     }
   };
-  const shown = functions.filter(
-    (f) =>
-      f.supported !== reference &&
-      (category === "All" || f.category === category) &&
-      `${f.name} ${f.description}`.toLowerCase().includes(search.toLowerCase()),
-  );
   return (
     <div className="code-studio">
       <aside className="studio-library">
@@ -287,86 +211,11 @@ export default function CodeStudio({
           ))}
         </div>
         {pane === "functions" ? (
-          <>
-            <TextField
-              size="small"
-              placeholder="Search functions…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              slotProps={{ input: { startAdornment: <Search size={15} /> } }}
-            />
-            <TextField
-              select
-              size="small"
-              label="Category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {[
-                "All",
-                "Math",
-                "Logic",
-                "Text",
-                "Collections",
-                "Lookup",
-                "Statistics",
-                "Date & time",
-                "Finance",
-                "Excel",
-              ].map((c) => (
-                <MenuItem key={c} value={c}>
-                  {c}
-                </MenuItem>
-              ))}
-            </TextField>
-            <div className="function-scope">
-              <button
-                className={!reference ? "active" : ""}
-                onClick={() => setReference(false)}
-              >
-                Available · {functions.filter((f) => f.supported).length}
-              </button>
-              <button
-                className={reference ? "active" : ""}
-                onClick={() => setReference(true)}
-              >
-                Reference only
-              </button>
-            </div>
-            <p className="studio-hint">
-              Hover for usage. Click to insert at your cursor. Arrays act as
-              Excel ranges.
-            </p>
-            <div className="function-chips">
-              {shown.map((f) => (
-                <Tooltip
-                  key={f.name}
-                  arrow
-                  placement="right"
-                  title={
-                    <div className="function-tooltip">
-                      <strong>{f.signature}</strong>
-                      <p>{f.description}</p>
-                      <small>{f.origin}</small>
-                    </div>
-                  }
-                >
-                  <span>
-                    <Chip
-                      size="small"
-                      label={f.name}
-                      variant="outlined"
-                      disabled={readOnly || !f.supported}
-                      onClick={() => insert(f.snippet)}
-                    />
-                  </span>
-                </Tooltip>
-              ))}
-            </div>
-            {!shown.length && (
-              <p className="studio-hint">No matching functions.</p>
-            )}
-          </>
+          <FunctionLibrary
+            functions={functions}
+            readOnly={readOnly}
+            onInsert={insert}
+          />
         ) : pane === "modules" ? (
           <>
             <p className="studio-hint">

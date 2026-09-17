@@ -13,6 +13,7 @@ import {
 import {
   ArrowUpRight,
   Braces,
+  Code2,
   ChevronRight,
   Info,
   Plus,
@@ -25,6 +26,7 @@ import { NodeIcon } from "./Icons";
 import SourceBindingEditor from "./SourceBindingEditor";
 import JsonField from "./JsonField";
 import ValueBinding, { type VariableOption, literalText } from "./ValueBinding";
+import type { ReferenceTarget } from "./ReferenceDialog";
 
 interface Props {
   rule: Rule;
@@ -35,6 +37,9 @@ interface Props {
   onDelete: (id: string) => void;
   onDefinitionChange: (fn: (d: Definition) => Definition) => void;
   onInvalidJson: (key: string, invalid: boolean) => void;
+  onExpression: (id: string) => void;
+  onOpenReference: (target: ReferenceTarget) => void;
+  errors: string[];
 }
 export default function Inspector({
   rule,
@@ -45,6 +50,9 @@ export default function Inspector({
   onDelete,
   onDefinitionChange,
   onInvalidJson,
+  onExpression,
+  onOpenReference,
+  errors,
 }: Props) {
   const scroll = useRef<HTMLDivElement>(null);
   const [available, setAvailable] = useState<Record<string, string[]>>({});
@@ -162,8 +170,22 @@ export default function Inspector({
     });
   return (
     <aside className="inspector">
-      <div className="inspector-heading">Node settings</div>
+      <div className="inspector-heading">
+        <span>Node settings</span>
+        <Button
+          size="small"
+          startIcon={<Code2 size={13} />}
+          onClick={() => onExpression(node.id)}
+        >
+          Node expression
+        </Button>
+      </div>
       <div className="inspector-scroll" ref={scroll}>
+        {errors.map((error, i) => (
+          <Alert key={i} severity="error">
+            {error}
+          </Alert>
+        ))}
         <div className="inspector-section">
           <div className="inspector-node-title">
             <span className={`node-icon ${node.type.toLowerCase()}`}>
@@ -436,9 +458,12 @@ export default function Inspector({
                   <Button
                     size="small"
                     endIcon={<ArrowUpRight size={14} />}
-                    href={`#/rules/${encodeURIComponent(node.ruleId)}?version=${node.version}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={() =>
+                      onOpenReference({
+                        ruleId: node.ruleId!,
+                        version: node.version!,
+                      })
+                    }
                   >
                     Open referenced rule
                   </Button>

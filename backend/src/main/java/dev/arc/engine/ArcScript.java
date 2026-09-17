@@ -193,29 +193,84 @@ public class ArcScript {
   }
 
   public String render(Definition d) {
+    return render(d, null);
+  }
+
+  public String renderNode(Definition d, String nodeId) {
+    validator.shape(d);
+    if (d.nodes().stream().noneMatch(n -> n.id().equals(nodeId)))
+      throw ArcException.invalid("Node not found");
+    return render(d, nodeId);
+  }
+
+  public Build buildNode(Definition d, String nodeId, String source) {
+    try {
+      validator.shape(d);
+      Node original =
+          d.nodes().stream()
+              .filter(n -> n.id().equals(nodeId))
+              .findFirst()
+              .orElseThrow(() -> ArcException.invalid("Node not found"));
+      Definition fragment = parse(source);
+      if (fragment.nodes().size() != 1
+          || !fragment.nodes().getFirst().id().equals(nodeId)
+          || !fragment.nodes().getFirst().type().equals(original.type()))
+        throw ArcException.invalid(
+            "Keep exactly this node, with the same ID and type. Use Code studio to edit the whole"
+                + " graph.");
+      if (!original.type().equals("INPUT") && !fragment.inputs().isEmpty())
+        throw ArcException.invalid("Edit parameters in the Input node.");
+      var edges =
+          new ArrayList<>(d.edges().stream().filter(e -> !e.source().equals(nodeId)).toList());
+      edges.addAll(fragment.edges());
+      Definition merged =
+          new Definition(
+              d.schemaVersion(),
+              original.type().equals("INPUT") ? fragment.inputs() : d.inputs(),
+              d.nodes().stream()
+                  .map(n -> n.id().equals(nodeId) ? fragment.nodes().getFirst() : n)
+                  .toList(),
+              edges,
+              d.notes());
+      validator.shape(merged);
+      return new Build(merged, renderNode(merged, nodeId), List.of());
+    } catch (ScriptError e) {
+      return new Build(null, source, List.of(new Diagnostic(e.getMessage(), e.line, e.column)));
+    } catch (ArcException e) {
+      return new Build(null, source, List.of(new Diagnostic(e.getMessage(), 1, 1)));
+    }
+  }
+
+  private String render(Definition d, String nodeId) {
     validator.shape(d);
     StringBuilder out = new StringBuilder("schema 1;\n\n");
-    if (d.notes() != null)
+    if (nodeId == null && d.notes() != null)
       for (String note : d.notes())
         for (String line : note.split("\\R", -1)) out.append("// ").append(line).append('\n');
-    out.append("inputs {\n");
-    for (Input p : d.inputs()) {
-      out.append("  ")
-          .append(p.name())
-          .append(": ")
-          .append(p.type())
-          .append(p.required() ? " required" : " optional");
-      if (p.defaultValue() != null) out.append(" default ").append(write(p.defaultValue()));
-      out.append(";\n");
-      if (p.source() != null)
-        out.append("  source ")
+    boolean includeInputs =
+        nodeId == null
+            || d.nodes().stream().anyMatch(n -> n.id().equals(nodeId) && n.type().equals("INPUT"));
+    if (includeInputs) {
+      out.append("inputs {\n");
+      for (Input p : d.inputs()) {
+        out.append("  ")
             .append(p.name())
-            .append(" = ")
-            .append(write(p.source()))
-            .append(";\n");
+            .append(": ")
+            .append(p.type())
+            .append(p.required() ? " required" : " optional");
+        if (p.defaultValue() != null) out.append(" default ").append(write(p.defaultValue()));
+        out.append(";\n");
+        if (p.source() != null)
+          out.append("  source ")
+              .append(p.name())
+              .append(" = ")
+              .append(write(p.source()))
+              .append(";\n");
+      }
+      out.append("}\n");
     }
-    out.append("}\n");
     for (Node n : d.nodes()) {
+      if (nodeId != null && !n.id().equals(nodeId)) continue;
       out.append("\nnode ")
           .append(write(n.id()))
           .append(' ')
