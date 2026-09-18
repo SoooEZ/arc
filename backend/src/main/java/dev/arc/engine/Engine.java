@@ -129,6 +129,27 @@ public class Engine {
               value = Expressions.bool(Expressions.evaluate(node.expression(), scope));
               branch = value.toString();
             }
+            case "SWITCH" -> {
+              branch = "default";
+              for (BranchCase option : node.cases()) {
+                if (matches(option, scope)) {
+                  branch = "case:" + option.id();
+                  break;
+                }
+              }
+              value = branch;
+            }
+            case "TRANSFORM" -> {
+              if (node.fields() == null || node.fields().isEmpty()) {
+                value = Expressions.evaluate(node.expression(), scope);
+              } else {
+                var transformed = new LinkedHashMap<String, Object>();
+                for (Field field : node.fields())
+                  transformed.put(
+                      field.name(), evaluateAt(field.expression(), scope, "Field " + field.name()));
+                value = Expressions.bounded(transformed);
+              }
+            }
             case "REFERENCE" -> {
               var bound = new LinkedHashMap<String, Object>();
               if (node.bindings() != null)
@@ -153,8 +174,7 @@ public class Engine {
             }
             default -> throw ArcException.invalid("Unknown node type");
           }
-          if (node.type().equals("FORMULA") || node.type().equals("REFERENCE"))
-            values.put(node.output(), new Value(value, node.id()));
+          if (node.storesResult()) values.put(node.output(), new Value(value, node.id()));
           scopes.put(node.id(), values);
           branches.put(node.id(), branch);
           if (trace.size() >= 1000) throw ArcException.invalid("Execution exceeds 1,000 steps");
@@ -171,6 +191,22 @@ public class Engine {
       throw e.inRule(ruleId, version);
     } finally {
       stack.remove(key);
+    }
+  }
+
+  private Object evaluateAt(String expression, Map<String, Object> scope, String label) {
+    try {
+      return Expressions.evaluate(expression, scope);
+    } catch (ArcException e) {
+      throw ArcException.invalid(label + ": " + e.getMessage());
+    }
+  }
+
+  private boolean matches(BranchCase option, Map<String, Object> scope) {
+    try {
+      return Expressions.bool(Expressions.evaluate(option.expression(), scope));
+    } catch (ArcException e) {
+      throw ArcException.invalid("Case " + option.label() + ": " + e.getMessage());
     }
   }
 }

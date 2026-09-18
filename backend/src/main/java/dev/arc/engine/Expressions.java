@@ -161,6 +161,13 @@ public final class Expressions {
 
   private static Object function(String name, List<Expr> args, Map<String, Object> scope) {
     tick();
+    if (name.equals("COALESCE")) {
+      for (Expr argument : args) {
+        Object value = argument.eval(scope);
+        if (value != null) return value;
+      }
+      return null;
+    }
     if (name.equals("IF")) return args.get(bool(args.get(0).eval(scope)) ? 1 : 2).eval(scope);
     if (Set.of("ISERROR", "ISERR", "ISNA").contains(name)) {
       try {

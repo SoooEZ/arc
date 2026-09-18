@@ -1,10 +1,17 @@
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import {
+  Handle,
+  Position,
+  useUpdateNodeInternals,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
+import { Fragment, useEffect, useRef } from "react";
 import { AlertCircle, Check, Code2, ExternalLink } from "lucide-react";
 import { Tooltip } from "@mui/material";
 import type { RuleNode } from "../types";
 import { nodeLabel } from "../types";
 import { NodeIcon } from "./Icons";
-import { branchHandleX } from "../graphGeometry";
+import { nodeWidth, sourcePorts } from "../domain/nodePorts";
 
 export type FlowNode = Node<
   {
@@ -18,9 +25,22 @@ export type FlowNode = Node<
 >;
 export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
   const n = data.model;
+  const ports = sourcePorts(n);
+  const portKey = ports.map((port) => port.id).join(",");
+  const updateInternals = useUpdateNodeInternals();
+  const previousPorts = useRef(portKey);
+  useEffect(() => {
+    // Initial measurement belongs to React Flow; forcing it per node can fit
+    // the viewport before the rest of the graph has been measured.
+    if (previousPorts.current !== portKey) {
+      previousPorts.current = portKey;
+      updateInternals(n.id);
+    }
+  }, [n.id, portKey, updateInternals]);
   return (
     <div
       className={`graph-node node-${n.type.toLowerCase()} ${selected ? "node-selected" : ""} ${data.visited ? "node-visited" : ""} ${data.errors.length ? "node-error" : ""}`}
+      style={{ width: nodeWidth(n) }}
     >
       {n.type !== "INPUT" && <Handle type="target" position={Position.Top} />}
       <div className="node-type-line">
@@ -52,7 +72,11 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
           ? `${data.inputCount} input parameters`
           : n.type === "REFERENCE"
             ? `${n.ruleId || "Select a rule"}${n.version ? ` · v${n.version}` : ""}`
-            : n.expression || "Add an expression"}
+            : n.type === "SWITCH"
+              ? `${n.cases?.length ?? 0} cases · first match + default`
+              : n.type === "TRANSFORM" && n.fields?.length
+                ? `${n.fields.length} fields → ${n.output || "data"}`
+                : n.expression || "Add an expression"}
       </div>
       {!!data.errors.length && (
         <Tooltip
@@ -71,32 +95,26 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
           </div>
         </Tooltip>
       )}
-      {n.type === "CONDITION" ? (
-        <>
+      {ports.map((port) => (
+        <Fragment key={port.id}>
           <Handle
             type="source"
             position={Position.Bottom}
-            id="true"
-            style={{
-              left: `${branchHandleX.true * 100}%`,
-              background: "#348c6a",
-            }}
+            id={port.id}
+            style={{ left: `${port.ratio * 100}%` }}
+            aria-label={`${n.label} · ${port.label || "Next"}`}
           />
-          <span className="handle-label handle-true">True</span>
-          <Handle
-            type="source"
-            position={Position.Bottom}
-            id="false"
-            style={{
-              left: `${branchHandleX.false * 100}%`,
-              background: "#bd8262",
-            }}
-          />
-          <span className="handle-label handle-false">False</span>
-        </>
-      ) : n.type !== "OUTPUT" ? (
-        <Handle type="source" position={Position.Bottom} id="next" />
-      ) : null}
+          {port.label && (
+            <span
+              title={port.label}
+              className={`handle-label handle-caption ${port.id === "false" || port.id === "default" ? "handle-fallback" : ""}`}
+              style={{ left: `${port.ratio * 100}%` }}
+            >
+              {port.label}
+            </span>
+          )}
+        </Fragment>
+      ))}
     </div>
   );
 }

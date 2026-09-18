@@ -5,6 +5,7 @@ import type { InputType } from "../types";
 import type { VariableOption } from "../domain/graph";
 export type { VariableOption } from "../domain/graph";
 import { literalText, quoteText } from "../domain/expressions";
+import ExpressionField from "./ExpressionField";
 export { literalText, quoteText } from "../domain/expressions";
 type ConstantType = "NUMBER" | "STRING" | "BOOLEAN" | "ARRAY" | "NULL";
 const constantDefaults: Record<ConstantType, string> = {
@@ -167,17 +168,21 @@ export default function ValueBinding({
           <MenuItem value="true">true</MenuItem>
           <MenuItem value="false">false</MenuItem>
         </TextField>
+      ) : mode === "expression" ? (
+        <ExpressionField
+          label={label}
+          value={value ?? ""}
+          variables={variables}
+          disabled={disabled}
+          onChange={(expression) => onChange(expression || undefined)}
+          helperText="ARC expression · quote literal text here"
+        />
       ) : mode !== "default" ? (
         <TextField
           label={label}
           value={mode === "constant" ? constant : (value ?? "")}
           disabled={disabled}
-          multiline={
-            mode === "expression" ||
-            effectiveType === "ARRAY" ||
-            effectiveType === "OBJECT"
-          }
-          minRows={mode === "expression" ? 2 : undefined}
+          multiline={effectiveType === "ARRAY" || effectiveType === "OBJECT"}
           type={
             mode === "constant" && effectiveType === "NUMBER"
               ? "number"
@@ -193,12 +198,10 @@ export default function ValueBinding({
           helperText={
             mode === "constant" && effectiveType === "STRING"
               ? "Text value · no quotation marks needed"
-              : mode === "expression"
-                ? "ARC expression · quote literal text here"
-                : helperText ||
-                  (effectiveType === "ARRAY"
-                    ? "ARC array literal, for example [1, 2, 3]"
-                    : effectiveType.toLowerCase())
+              : helperText ||
+                (effectiveType === "ARRAY"
+                  ? "ARC array literal, for example [1, 2, 3]"
+                  : effectiveType.toLowerCase())
           }
         />
       ) : (

@@ -37,6 +37,8 @@ References always contain a rule ID and positive integer version. Publishing nev
 | `INPUT` | Uses graph-level `inputs`. Exactly one per graph. | `next` |
 | `FORMULA` | `expression`, `output` variable | `next` |
 | `CONDITION` | Boolean `expression` | `true` and `false` |
+| `SWITCH` | Ordered `cases`: `{id, label, expression}` | `case:<id>` for each case, then `default` |
+| `TRANSFORM` | `fields`: `{name, expression}` mappings **or** one `expression`; `output` variable | `next` |
 | `REFERENCE` | `ruleId`, `version`, `bindings`, `output` variable | `next` |
 | `OUTPUT` | `expression` returning a value | None |
 
@@ -57,9 +59,15 @@ Example reference:
 
 Bindings are expressions evaluated in the caller's scope. The callee receives only mapped inputs and its own defaults; it does not see the caller's other variables. Its result becomes the caller's `output` variable. References can be nested inside every artifact kind, including formulas.
 
+Switch evaluates boolean case expressions in their stored order and activates only the first match. Later predicates are not evaluated; no match activates `default`. Every case and default must be connected for validation/publication. Each selected exit can still fan out to multiple nodes. Case IDs are stable and case-sensitive; labels and order can change without reconnecting edges. The UI removes only the corresponding outgoing edges when deleting a case. Static scope analysis models case gates as mutually exclusive, including default, so branches can produce a common variable that is guaranteed at a join.
+
+Transform creates a new value without mutating inputs. Field mappings produce an object with literal field names; each expression reads the same incoming scope, not sibling field results. Use another node for dependent calculations. Whole-expression mode can return any supported value, including arrays through `MAP`/`FILTER`. `fields` and `expression` cannot both be populated. Transformation rules are ordinary versioned graphs and can be reused through Reference nodes. The new optional node properties extend schema 1; existing nodes and stored versions keep their original behavior.
+
 ## Canvas layout
 
 **Arrange graph** uses ELK's layered layout with fixed port positions matching the rendered handles: True at 27% of node width, False at 73%, incoming connections at the top center. This lets crossing minimization reorder branch nodes and their downstream nodes with the exit order in view. Measured node dimensions prevent overlaps. Stable input ordering and a fixed seed make repeated arrangements reproducible.
+
+Switch ports are ordered left to right by case priority, with Default last. Cards widen to keep exit labels separated. Canvas, connection validation and layout share the same port definitions.
 
 The layout module loads on demand. Layout updates only node positions, preserving IDs, edges, handles, expressions, references, and inputs. Saving persists these positions in the shared graph/ARC Script definition. Incomplete drafts with disconnected nodes can still be arranged; invalid handles fail without dropping connections. Historical versions remain read-only. Crossing minimization is a heuristic; shared descendants or other graph constraints can prevent a completely crossing-free layout.
 
@@ -105,6 +113,7 @@ Identifiers use letters, digits, and underscores, start with a letter or undersc
 ## Bounds and deployment
 
 - At most 50 inputs, 100 nodes, and 200 edges per graph.
+- At most 20 ordered cases per Switch and 50 fields per Transform; case/field expressions retain the normal expression limits.
 - Expressions at most 2,000 characters, 256 tokens, and 48 nested parse levels.
 - Strings at most 2,000 characters; numbers have bounded precision and scale.
 - At most 16 nested rule calls and 1,000 total execution steps.

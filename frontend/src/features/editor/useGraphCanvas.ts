@@ -9,6 +9,7 @@ import type { Definition, Execution } from "../../types";
 import type { FlowNode } from "../../components/GraphNode";
 import { defaultNodeSize } from "../../graphGeometry";
 import { connectGraphNodes, type DefinitionChange } from "../../domain/graph";
+import { nodeWidth, sourcePorts } from "../../domain/nodePorts";
 interface Options {
   definition: Definition;
   selected: string;
@@ -52,7 +53,7 @@ export function useGraphCanvas({
       nodes: definition.nodes.map((n) => ({
         id: n.id,
         ...n.position,
-        ...(measurements[n.id] || defaultNodeSize),
+        ...(measurements[n.id] || { ...defaultNodeSize, width: nodeWidth(n) }),
       })),
       reportBlocked,
     }),
@@ -70,6 +71,7 @@ export function useGraphCanvas({
         type: "arc",
         position: n.position || { x: 0, y: 0 },
         measured: measurements[n.id],
+        style: { width: nodeWidth(n) },
         selected: n.id === selected,
         data: {
           model: n,
@@ -104,11 +106,9 @@ export function useGraphCanvas({
             strokeWidth: active || selectedEdge === e.id ? 2.3 : 1.6,
           },
           label:
-            e.sourceHandle === "next"
-              ? undefined
-              : e.sourceHandle === "true"
-                ? "True"
-                : "False",
+            sourcePorts(
+              definition.nodes.find((node) => node.id === e.source)!,
+            ).find((port) => port.id === e.sourceHandle)?.label || undefined,
           labelStyle: {
             fill: e.sourceHandle === "false" ? "#956a4a" : "#47765d",
             fontSize: 10,
@@ -118,7 +118,7 @@ export function useGraphCanvas({
           labelBgPadding: [5, 3] as [number, number],
         };
       }),
-    [definition.edges, selectedEdge, trace],
+    [definition.edges, definition.nodes, selectedEdge, trace],
   );
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {

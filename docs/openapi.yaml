@@ -203,6 +203,29 @@ paths:
           content:
             application/json:
               schema: {type: array, items: {$ref: '#/components/schemas/Function'}}
+  /studio/expression/check:
+    post:
+      operationId: checkExpression
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expression]
+              properties:
+                expression: {type: string, maxLength: 2000}
+      responses:
+        '200':
+          description: Syntax/dependency check without execution or external data access
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: {type: boolean}
+                  variables: {type: array, items: {type: string}}
+                  error: {type: string, nullable: true}
   /studio/build:
     post:
       operationId: buildArcScript
@@ -450,7 +473,7 @@ components:
             required: [id, type, label]
             properties:
               id: {type: string, pattern: '^[A-Za-z0-9_-]{1,80}$'}
-              type: {type: string, enum: [INPUT, FORMULA, CONDITION, REFERENCE, OUTPUT]}
+              type: {type: string, enum: [INPUT, FORMULA, CONDITION, SWITCH, TRANSFORM, REFERENCE, OUTPUT]}
               label: {type: string, minLength: 1, maxLength: 160}
               position:
                 type: object
@@ -461,6 +484,29 @@ components:
               output: {type: string, nullable: true}
               ruleId: {type: string, nullable: true}
               version: {type: integer, minimum: 1, nullable: true}
+              cases:
+                type: array
+                nullable: true
+                maxItems: 20
+                description: SWITCH only; ordered first-match boolean cases, with stable case-sensitive IDs
+                items:
+                  type: object
+                  required: [id, label, expression]
+                  properties:
+                    id: {type: string, pattern: '^[A-Za-z0-9_-]{1,64}$'}
+                    label: {type: string, minLength: 1, maxLength: 160}
+                    expression: {type: string, maxLength: 2000}
+              fields:
+                type: array
+                nullable: true
+                maxItems: 50
+                description: TRANSFORM only; unique literal field names; cannot combine nonempty fields with expression
+                items:
+                  type: object
+                  required: [name, expression]
+                  properties:
+                    name: {type: string, minLength: 1, maxLength: 160}
+                    expression: {type: string, maxLength: 2000}
               bindings:
                 type: object
                 nullable: true
@@ -476,7 +522,7 @@ components:
               id: {type: string, maxLength: 100}
               source: {type: string}
               target: {type: string}
-              sourceHandle: {type: string, enum: [next, 'true', 'false']}
+              sourceHandle: {type: string, pattern: '^(next|true|false|default|case:[A-Za-z0-9_-]{1,64})$'}
 
     SourceBinding:
       type: object

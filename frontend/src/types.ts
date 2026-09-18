@@ -1,6 +1,12 @@
 export type Kind = "DECISION_TREE" | "FORMULA" | "RULE";
 export type NodeType =
-  "INPUT" | "FORMULA" | "CONDITION" | "REFERENCE" | "OUTPUT";
+  | "INPUT"
+  | "FORMULA"
+  | "CONDITION"
+  | "SWITCH"
+  | "TRANSFORM"
+  | "REFERENCE"
+  | "OUTPUT";
 export type InputType = "NUMBER" | "STRING" | "BOOLEAN" | "ARRAY" | "OBJECT";
 export interface Input {
   name: string;
@@ -19,6 +25,17 @@ export interface RuleNode {
   ruleId?: string | null;
   version?: number | null;
   bindings?: Record<string, string> | null;
+  cases?: BranchCase[] | null;
+  fields?: TransformField[] | null;
+}
+export interface BranchCase {
+  id: string;
+  label: string;
+  expression: string;
+}
+export interface TransformField {
+  name: string;
+  expression: string;
 }
 export interface RuleEdge {
   id: string;
@@ -88,6 +105,8 @@ export const nodeLabel: Record<NodeType, string> = {
   INPUT: "Input",
   FORMULA: "Formula",
   CONDITION: "Condition",
+  SWITCH: "Switch",
+  TRANSFORM: "Transform",
   REFERENCE: "Reuse rule",
   OUTPUT: "Output",
 };

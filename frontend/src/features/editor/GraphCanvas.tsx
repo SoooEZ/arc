@@ -106,7 +106,7 @@ export default function GraphCanvas({
               <ListTree size={17} />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Arrange graph · reduce crossings using True / False exit positions">
+          <Tooltip title="Arrange graph · reduce crossings using branch exit positions">
             <span>
               <IconButton
                 aria-label="Arrange graph"

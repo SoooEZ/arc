@@ -49,21 +49,35 @@ public final class GraphPlan {
 
   private void availability(Definition d) {
     Logic logic = new Logic();
-    Map<String, Integer> activation = new HashMap<>(), predicates = new HashMap<>();
+    Map<String, Integer> activation = new HashMap<>();
+    Map<String, Map<String, Integer>> branchGates = new HashMap<>();
     Map<String, Map<String, Integer>> scopes = new HashMap<>();
     int index = 0;
-    for (Node n : order)
-      if (n.type().equals("CONDITION")) predicates.put(n.id(), logic.variable(index++));
+    for (Node n : order) {
+      if (n.type().equals("CONDITION")) {
+        int test = logic.variable(index++);
+        branchGates.put(n.id(), Map.of("true", test, "false", logic.not(test)));
+      } else if (n.type().equals("SWITCH")) {
+        Map<String, Integer> gates = new HashMap<>();
+        int remaining = 1;
+        for (BranchCase option : n.cases() == null ? List.<BranchCase>of() : n.cases()) {
+          int test = logic.variable(index++);
+          gates.put("case:" + option.id(), logic.and(remaining, test));
+          remaining = logic.and(remaining, logic.not(test));
+        }
+        gates.put("default", remaining);
+        branchGates.put(n.id(), gates);
+      }
+    }
     for (Node n : order) {
       int active = n.type().equals("INPUT") ? 1 : 0;
       Map<String, Integer> scope = new HashMap<>();
       if (n.type().equals("INPUT")) for (Input p : d.inputs()) scope.put(p.name(), 1);
       for (Edge edge : incoming.getOrDefault(n.id(), List.of())) {
         int gate = activation.get(edge.source());
-        if (!edge.sourceHandle().equals("next") && predicates.containsKey(edge.source())) {
-          int test = predicates.get(edge.source());
-          gate = logic.and(gate, edge.sourceHandle().equals("true") ? test : logic.not(test));
-        }
+        if (branchGates.containsKey(edge.source()))
+          gate =
+              logic.and(gate, branchGates.get(edge.source()).getOrDefault(edge.sourceHandle(), 0));
         active = logic.or(active, gate);
         for (var entry : scopes.get(edge.source()).entrySet()) {
           int present = logic.and(gate, entry.getValue());
@@ -75,8 +89,7 @@ public final class GraphPlan {
         for (var entry : scope.entrySet())
           if (logic.and(active, logic.not(entry.getValue())) == 0) guaranteed.add(entry.getKey());
       available.put(n.id(), guaranteed);
-      if ((n.type().equals("FORMULA") || n.type().equals("REFERENCE")) && n.output() != null)
-        scope.put(n.output(), active);
+      if (n.storesResult() && n.output() != null) scope.put(n.output(), active);
       activation.put(n.id(), active);
       scopes.put(n.id(), scope);
     }

@@ -1,10 +1,7 @@
 import ELK, { type ElkNode, type ElkPort } from "elkjs/lib/elk.bundled.js";
 import type { Definition } from "./types";
-import {
-  branchHandleX,
-  defaultNodeSize,
-  type NodeSizes,
-} from "./graphGeometry";
+import { defaultNodeSize, type NodeSizes } from "./graphGeometry";
+import { nodeWidth, sourcePorts } from "./domain/nodePorts";
 
 const elk = new ELK();
 const portId = (nodeId: string, handle: string) => `${nodeId}:${handle}`;
@@ -31,8 +28,7 @@ export async function arrangeGraph(
     },
     children: [...definition.nodes].sort(compareId).map((node) => {
       const measured = sizes[node.id];
-      const width =
-        measured?.width > 0 ? measured.width : defaultNodeSize.width;
+      const width = measured?.width > 0 ? measured.width : nodeWidth(node);
       const height =
         measured?.height > 0 ? measured.height : defaultNodeSize.height;
       const port = (
@@ -49,10 +45,8 @@ export async function arrangeGraph(
       });
       const ports: ElkPort[] = [];
       if (node.type !== "INPUT") ports.push(port("target", 0.5, false));
-      if (node.type === "CONDITION") {
-        ports.push(port("true", branchHandleX.true, true));
-        ports.push(port("false", branchHandleX.false, true));
-      } else if (node.type !== "OUTPUT") ports.push(port("next", 0.5, true));
+      for (const exit of sourcePorts(node))
+        ports.push(port(exit.id, exit.ratio, true));
       return {
         id: node.id,
         width,

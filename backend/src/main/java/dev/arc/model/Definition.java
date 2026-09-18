@@ -22,6 +22,11 @@ public record Definition(
 
   public record Position(double x, double y) {}
 
+  /** Case identity stays stable when its label, predicate or priority changes. */
+  public record BranchCase(String id, String label, String expression) {}
+
+  public record Field(String name, String expression) {}
+
   public record Node(
       String id,
       String type,
@@ -31,7 +36,26 @@ public record Definition(
       String output,
       String ruleId,
       Integer version,
-      Map<String, String> bindings) {}
+      Map<String, String> bindings,
+      List<BranchCase> cases,
+      List<Field> fields) {
+    public Node(
+        String id,
+        String type,
+        String label,
+        Position position,
+        String expression,
+        String output,
+        String ruleId,
+        Integer version,
+        Map<String, String> bindings) {
+      this(id, type, label, position, expression, output, ruleId, version, bindings, null, null);
+    }
+
+    public boolean storesResult() {
+      return "FORMULA".equals(type) || "REFERENCE".equals(type) || "TRANSFORM".equals(type);
+    }
+  }
 
   public record Edge(String id, String source, String target, String sourceHandle) {}
 }

@@ -36,7 +36,9 @@ Dependencies point from HTTP into application services, and from application ser
 
 For a function, update catalog metadata and its execution implementation, then test arity, types, edge cases, and a studio build/execution round trip. A reference-only entry must never advertise itself as executable. Monaco help and function chips use `/api/functions`, so they should not duplicate a handwritten function catalog.
 
-A node kind changes the graph contract, not just a switch statement: review `Definition`, `Validator`, `GraphPlan`, `Engine`, `ArcScript`, frontend types, node defaults, the inspector registry, graph presentation, and documentation together. Add path/scope tests and a code/graph round trip. Existing node kinds deliberately remain explicit in the engine; a plugin hierarchy would hide the graph invariants without helping the current five kinds.
+A node kind changes the graph contract, not just a switch statement: review `Definition`, `Validator`, `GraphPlan`, `Engine`, `ArcScript`, frontend types, node defaults, the inspector registry, graph presentation, and documentation together. Add path/scope tests and a code/graph round trip. Node kinds deliberately remain explicit in the engine; a plugin hierarchy would hide the graph invariants without helping these related execution behaviors.
+
+`Node.storesResult()` identifies result-producing backend nodes. Frontend `domain/nodePorts.ts` supplies stable handles and positions to graph mutations, canvas rendering, and layout. Switch case order controls first-match priority; its case IDs own the connections. `DataFunctions` owns object construction and explicit scalar conversion, while lazy `COALESCE` stays with the expression evaluator.
 
 ## Frontend boundaries
 
@@ -62,6 +64,8 @@ Graph and code edits share one document reducer. Building code updates the graph
 Async reads use a key describing the requested resource, an `AbortSignal`, and cleanup on selection changes/unmount. `semanticGraphKey` excludes positions: dragging a card changes the draft but does not refetch variables or diagnostics. A different expression or connection does. If a new consumer adds a query parameter, include it in the key; changing a loader closure alone does not refetch. Mutation commands remain explicit and serialize through the document controller.
 
 Monaco providers are disposed on cleanup and restricted to their own model, so nested editors do not contribute duplicate suggestions to each other. The inspector registry must cover every `NodeType`. Reuse the existing value-binding controls for variable/constant/expression selection and string escaping.
+
+`ExpressionField` keeps ordinary graph text inputs lightweight and lazy-loads `ExpressionDialog` on demand. That dialog reuses Code studio's catalog, insertion and Monaco providers, offering only in-scope variable names and no graph-module snippets. `/studio/expression/check` parses syntax and reports dependencies without evaluating values; the dialog cancels obsolete checks and preserves its caller's draft until Apply. Runtime type checks still belong to preview/execution.
 
 ## Design choices
 

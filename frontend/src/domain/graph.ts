@@ -1,5 +1,6 @@
 import type { Definition, NodeType, Rule, RuleNode } from "../types";
 import { nodeLabel } from "../types";
+import { sourcePorts } from "./nodePorts";
 export type DefinitionChange = (definition: Definition) => Definition;
 export const ruleSnapshot = (rule: Rule) =>
   JSON.stringify([rule.name, rule.description, rule.draft]);
@@ -14,11 +15,21 @@ export function patchGraphNode(
   id: string,
   patch: Partial<RuleNode>,
 ): Definition {
+  const updated = definition.nodes.find((node) => node.id === id);
+  const validHandles =
+    updated && patch.cases
+      ? new Set(sourcePorts({ ...updated, ...patch }).map((port) => port.id))
+      : null;
   return {
     ...definition,
     nodes: definition.nodes.map((node) =>
       node.id === id ? { ...node, ...patch } : node,
     ),
+    edges: validHandles
+      ? definition.edges.filter(
+          (edge) => edge.source !== id || validHandles.has(edge.sourceHandle),
+        )
+      : definition.edges,
   };
 }
 export function removeGraphNode(
@@ -48,6 +59,12 @@ export function connectGraphNodes(
     !definition.nodes.some((node) => node.id === target)
   )
     return definition;
+  const sourceNode = definition.nodes.find((node) => node.id === source)!;
+  if (
+    !sourcePorts(sourceNode).some((port) => port.id === sourceHandle) ||
+    definition.nodes.find((node) => node.id === target)?.type === "INPUT"
+  )
+    return definition;
   if (
     definition.edges.some(
       (edge) =>
@@ -69,6 +86,8 @@ const nodeDefaults: Record<
   INPUT: {},
   FORMULA: { expression: "1 + 1", storesResult: true },
   CONDITION: { expression: "true" },
+  SWITCH: {},
+  TRANSFORM: { storesResult: true },
   REFERENCE: { storesResult: true },
   OUTPUT: { expression: "0" },
 };
@@ -87,6 +106,17 @@ export function createGraphNode(
     expression: defaults.expression,
     output: defaults.storesResult ? `result_${index}` : undefined,
     bindings: type === "REFERENCE" ? {} : undefined,
+    cases:
+      type === "SWITCH"
+        ? [
+            { id: "case-1", label: "Case 1", expression: "true" },
+            { id: "case-2", label: "Case 2", expression: "false" },
+          ]
+        : undefined,
+    fields:
+      type === "TRANSFORM"
+        ? [{ name: "value", expression: "null" }]
+        : undefined,
   };
 }
 export interface VariableOption {

@@ -16,6 +16,13 @@ public class StudioController {
 
   public record Code(String source) {}
 
+  public record ExpressionCode(String expression) {}
+
+  @PostMapping("/studio/expression/check")
+  public ArcScript.ExpressionCheck checkExpression(@RequestBody ExpressionCode code) {
+    return script.checkExpression(code.expression());
+  }
+
   public record NodeCode(Definition definition, String nodeId, String source) {}
 
   @PostMapping("/studio/node/render")

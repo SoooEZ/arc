@@ -1,6 +1,7 @@
 import { Autocomplete, MenuItem, TextField } from "@mui/material";
 import { ChevronRight } from "lucide-react";
 import ValueBinding from "../../../components/ValueBinding";
+import ExpressionField from "../../../components/ExpressionField";
 import { literalText, simpleComparison } from "../../../domain/expressions";
 import { useState } from "react";
 import type { NodeFieldsProps } from "./types";
@@ -105,20 +106,26 @@ export default function ExpressionFields({
           <div className="expression-preview">
             <code>{node.expression}</code>
           </div>
+          <ExpressionField
+            label="Condition"
+            value={node.expression || ""}
+            variables={variables}
+            disabled={readOnly}
+            hideInput
+            onChange={(expression) => patch({ expression })}
+          />
         </div>
       ) : (
-        <TextField
-          className="expression-field"
+        <ExpressionField
           label="Expression"
-          multiline
-          minRows={3}
           value={node.expression || ""}
-          onChange={(e) => patch({ expression: e.target.value })}
+          onChange={(expression) => patch({ expression })}
+          variables={variables}
           disabled={readOnly}
           helperText={
             node.type === "CONDITION"
               ? "Combine checks with &&, ||, and parentheses."
-              : "Use variables, arithmetic, or a quoted text value."
+              : "Nested functions, arrays, object fields and arithmetic are supported."
           }
         />
       )}

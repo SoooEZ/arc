@@ -18,7 +18,7 @@ public class ArcScript {
       Pattern.compile(
           "node\\s+"
               + ID
-              + "\\s+(INPUT|FORMULA|CONDITION|REFERENCE|OUTPUT)\\s+(\"(?:[^\"\\\\]|\\\\.)*\")(?:\\s+at\\s*\\(\\s*(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\s*\\))?",
+              + "\\s+(INPUT|FORMULA|CONDITION|SWITCH|TRANSFORM|REFERENCE|OUTPUT)\\s+(\"(?:[^\"\\\\]|\\\\.)*\")(?:\\s+at\\s*\\(\\s*(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\s*\\))?",
           Pattern.CASE_INSENSITIVE);
   private static final Pattern INPUT =
       Pattern.compile(
@@ -26,14 +26,33 @@ public class ArcScript {
           Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
   private static final Pattern EDGE =
       Pattern.compile(
-          "(next|true|false)\\s*->\\s*" + ID + "(?:\\s+edge\\s+" + ID + ")?",
+          "(next|true|false|default|case:[A-Za-z0-9_-]{1,64})\\s*->\\s*"
+              + ID
+              + "(?:\\s+edge\\s+"
+              + ID
+              + ")?",
           Pattern.CASE_INSENSITIVE);
+  private static final Pattern CASE =
+      Pattern.compile("case\\s+" + ID + "\\s+" + ID + "\\s+when\\s+(.+)", Pattern.DOTALL);
+  private static final Pattern FIELD =
+      Pattern.compile("field\\s+" + ID + "\\s*=\\s*(.+)", Pattern.DOTALL);
 
   private record Statement(String text, int line, int column) {}
 
   public record Diagnostic(String message, int line, int column) {}
 
   public record Build(Definition definition, String source, List<Diagnostic> diagnostics) {}
+
+  public record ExpressionCheck(boolean valid, Set<String> variables, String error) {}
+
+  /** Syntax and dependencies only; never evaluates functions or fetches data. */
+  public ExpressionCheck checkExpression(String expression) {
+    try {
+      return new ExpressionCheck(true, Expressions.compile(expression).variables(), null);
+    } catch (ArcException e) {
+      return new ExpressionCheck(false, Set.of(), e.getMessage());
+    }
+  }
 
   public ArcScript(ObjectMapper json, Validator validator) {
     this.json = json;
@@ -112,12 +131,19 @@ public class ArcScript {
       String expression = null, output = null, ruleId = null;
       Integer version = null;
       var bindings = new LinkedHashMap<String, String>();
+      var cases = new ArrayList<BranchCase>();
+      var fields = new ArrayList<Field>();
       var assigned = new HashSet<String>();
       for (Statement st : scanner.body()) {
         String text = st.text();
         Matcher edge = EDGE.matcher(text);
         if (edge.matches()) {
-          String handle = edge.group(1).toLowerCase(Locale.ROOT),
+          String rawHandle = edge.group(1);
+          String
+              handle =
+                  rawHandle.toLowerCase(Locale.ROOT).startsWith("case:")
+                      ? "case:" + rawHandle.substring(5)
+                      : rawHandle.toLowerCase(Locale.ROOT),
               target = unquote(edge.group(2), st);
           unique(assigned, handle + ":" + target, st);
           edges.add(
@@ -130,12 +156,27 @@ public class ArcScript {
                   handle));
           continue;
         }
-        if (text.startsWith("let ") && type.equals("FORMULA")) {
+        if (text.startsWith("let ") && (type.equals("FORMULA") || type.equals("TRANSFORM"))) {
           var assignment = assignment(text.substring(4), st);
           unique(assigned, "expression", st);
+          unique(assigned, "as", st);
           output = assignment[0];
           expression = assignment[1];
           checkExpression(expression, st);
+        } else if (text.startsWith("case ") && type.equals("SWITCH")) {
+          var option = CASE.matcher(text);
+          if (!option.matches()) throw error("Use: case id \"Label\" when expression;", st);
+          String caseId = unquote(option.group(1), st);
+          unique(assigned, "case:" + caseId, st);
+          checkExpression(option.group(3), st);
+          cases.add(new BranchCase(caseId, unquote(option.group(2), st), option.group(3).trim()));
+        } else if (text.startsWith("field ") && type.equals("TRANSFORM")) {
+          var field = FIELD.matcher(text);
+          if (!field.matches()) throw error("Use: field \"name\" = expression;", st);
+          String fieldName = unquote(field.group(1), st);
+          unique(assigned, "field:" + fieldName, st);
+          checkExpression(field.group(2), st);
+          fields.add(new Field(fieldName, field.group(2).trim()));
         } else if (text.startsWith("when ") && type.equals("CONDITION")) {
           unique(assigned, "expression", st);
           expression = text.substring(5).trim();
@@ -159,7 +200,8 @@ public class ArcScript {
           unique(assigned, "bind:" + assignment[0], st);
           checkExpression(assignment[1], st);
           bindings.put(assignment[0], assignment[1]);
-        } else if (text.startsWith("as ") && type.equals("REFERENCE")) {
+        } else if (text.startsWith("as ")
+            && (type.equals("REFERENCE") || type.equals("TRANSFORM"))) {
           unique(assigned, "as", st);
           output = text.substring(3).trim();
         } else throw error("Unsupported statement for " + type + ": " + text, st);
@@ -174,7 +216,9 @@ public class ArcScript {
               output,
               ruleId,
               version,
-              type.equals("REFERENCE") ? bindings : null));
+              type.equals("REFERENCE") ? bindings : null,
+              type.equals("SWITCH") ? cases : null,
+              type.equals("TRANSFORM") && !fields.isEmpty() ? fields : null));
     }
     for (String name : sources.keySet())
       if (inputs.stream().noneMatch(p -> p.name().equals(name)))
@@ -291,6 +335,34 @@ public class ArcScript {
                 .append(" = ")
                 .append(n.expression() == null ? "0" : n.expression())
                 .append(";\n");
+        case "SWITCH" -> {
+          if (n.cases() != null)
+            for (BranchCase option : n.cases())
+              out.append("  case ")
+                  .append(write(option.id()))
+                  .append(' ')
+                  .append(write(option.label()))
+                  .append(" when ")
+                  .append(option.expression())
+                  .append(";\n");
+        }
+        case "TRANSFORM" -> {
+          if (n.fields() != null && !n.fields().isEmpty()) {
+            for (Field field : n.fields())
+              out.append("  field ")
+                  .append(write(field.name()))
+                  .append(" = ")
+                  .append(field.expression())
+                  .append(";\n");
+            out.append("  as ").append(n.output() == null ? "data" : n.output()).append(";\n");
+          } else {
+            out.append("  let ")
+                .append(n.output() == null ? "data" : n.output())
+                .append(" = ")
+                .append(n.expression() == null ? "OBJECT()" : n.expression())
+                .append(";\n");
+          }
+        }
         case "CONDITION" ->
             out.append("  when ")
                 .append(n.expression() == null ? "true" : n.expression())

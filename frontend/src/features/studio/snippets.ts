@@ -1,5 +1,15 @@
 export const modules = [
   {
+    name: "Switch cases",
+    snippet:
+      '\nnode "${1:switch}" SWITCH "${2:Choose a branch}" {\n  case "premium" "Premium" when ${3:amount >= 100};\n  case "standard" "Standard" when ${4:amount >= 50};\n  case:premium -> "${5:premium}";\n  case:standard -> "${6:standard}";\n  default -> "${7:fallback}";\n}\n',
+  },
+  {
+    name: "Transform data",
+    snippet:
+      '\nnode "${1:transform}" TRANSFORM "${2:Normalize data}" {\n  field "${3:name}" = ${4:UPPER(TRIM(customer.name))};\n  field "${5:amount}" = ${6:TO_NUMBER(customer.amount)};\n  as ${7:normalized};\n  next -> "${8:output}";\n}\n',
+  },
+  {
     name: "Formula",
     snippet:
       '\nnode "${1:calculate}" FORMULA "${2:Calculate}" {\n  let ${3:total} = ${4:ROUND(amount * 1.2, 2)};\n  next -> "${5:output}";\n}\n',

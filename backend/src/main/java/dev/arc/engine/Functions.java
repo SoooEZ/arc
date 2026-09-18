@@ -44,6 +44,16 @@ public final class Functions {
     }
     Object first = args.isEmpty() ? null : args.getFirst();
     switch (name) {
+      case "OBJECT":
+        return DataFunctions.object(args);
+      case "MERGE":
+        return DataFunctions.merge(args);
+      case "TO_NUMBER":
+        return DataFunctions.number(first);
+      case "TO_STRING":
+        return DataFunctions.text(first);
+      case "TO_BOOLEAN":
+        return DataFunctions.bool(first);
       case "ABS":
         return Expressions.number(first).abs();
       case "FLOOR":

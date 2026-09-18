@@ -115,7 +115,8 @@ export default function CodeStudio({
           <>
             <p className="studio-hint">
               Insert nodes at the end of your script, then connect their next /
-              true / false targets. Input declarations go inside inputs.
+              true / false / case / default targets. Input declarations go
+              inside inputs.
             </p>
             {modules.map((m) => (
               <button

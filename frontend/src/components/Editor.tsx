@@ -407,16 +407,23 @@ function EditorContent({
         open={!!addAnchor}
         onClose={() => setAddAnchor(null)}
       >
-        {(["FORMULA", "CONDITION", "REFERENCE", "OUTPUT"] as NodeType[]).map(
-          (type) => (
-            <MenuItem key={type} onClick={() => addNode(type)}>
-              <span className={`node-icon ${type.toLowerCase()}`}>
-                <NodeIcon type={type} />
-              </span>
-              <span style={{ marginLeft: 10 }}>{nodeLabel[type]}</span>
-            </MenuItem>
-          ),
-        )}
+        {(
+          [
+            "FORMULA",
+            "CONDITION",
+            "SWITCH",
+            "TRANSFORM",
+            "REFERENCE",
+            "OUTPUT",
+          ] as NodeType[]
+        ).map((type) => (
+          <MenuItem key={type} onClick={() => addNode(type)}>
+            <span className={`node-icon ${type.toLowerCase()}`}>
+              <NodeIcon type={type} />
+            </span>
+            <span style={{ marginLeft: 10 }}>{nodeLabel[type]}</span>
+          </MenuItem>
+        ))}
       </Menu>
     </div>
   );

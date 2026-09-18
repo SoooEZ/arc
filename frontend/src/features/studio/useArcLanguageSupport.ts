@@ -6,7 +6,8 @@ import { modules } from "./snippets";
 export function useArcLanguageSupport(
   editor: RefObject<monaco.editor.IStandaloneCodeEditor | null>,
   functions: FunctionEntry[],
-  definition: Definition,
+  definition: Definition | string[],
+  includeModules = true,
 ) {
   useEffect(() => {
     const completions = monaco.languages.registerCompletionItemProvider("arc", {
@@ -33,7 +34,7 @@ export function useArcLanguageSupport(
                   monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                 range,
               })),
-            ...modules.map((m) => ({
+            ...(includeModules ? modules : []).map((m) => ({
               label: m.name,
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertText: m.snippet,
@@ -41,10 +42,15 @@ export function useArcLanguageSupport(
                 monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               range,
             })),
-            ...[
-              ...definition.inputs.map((i) => i.name),
-              ...definition.nodes.flatMap((n) => (n.output ? [n.output] : [])),
-            ].map((name) => ({
+            ...(Array.isArray(definition)
+              ? definition
+              : [
+                  ...definition.inputs.map((i) => i.name),
+                  ...definition.nodes.flatMap((n) =>
+                    n.output ? [n.output] : [],
+                  ),
+                ]
+            ).map((name) => ({
               label: name,
               kind: monaco.languages.CompletionItemKind.Variable,
               insertText: name,
@@ -73,7 +79,7 @@ export function useArcLanguageSupport(
       completions.dispose();
       hover.dispose();
     };
-  }, [editor, functions, definition]);
+  }, [editor, functions, definition, includeModules]);
 }
 export function insertSnippet(
   editor: monaco.editor.IStandaloneCodeEditor | null,

@@ -98,6 +98,54 @@ final class FunctionCatalog {
 
   static {
     add(
+        "OBJECT",
+        0,
+        100,
+        "Data transformation",
+        "OBJECT(\"key\", value, ...)",
+        "Builds an object from key/value pairs, including nested objects and arrays. Keys must be unique; OBJECT() returns an empty object.",
+        "OBJECT(\"${1:name}\", ${2:value})");
+    add(
+        "MERGE",
+        1,
+        50,
+        "Data transformation",
+        "MERGE(object, ...)",
+        "Creates a shallow merged object. Later objects replace matching fields; inputs stay unchanged.",
+        "MERGE(${1:customer}, OBJECT(\"${2:status}\", ${3:\"active\"}))");
+    add(
+        "COALESCE",
+        1,
+        50,
+        "Data transformation",
+        "COALESCE(value, ..., fallback)",
+        "Returns the first non-null value, evaluating only as far as needed. Empty text, zero and false are retained.",
+        "COALESCE(${1:customer.name}, ${2:\"Unknown\"})");
+    add(
+        "TO_NUMBER",
+        1,
+        1,
+        "Data transformation",
+        "TO_NUMBER(value)",
+        "Converts numeric text to a decimal number without floating-point loss. Null stays null; invalid text is an error.",
+        "TO_NUMBER(${1:\"12.50\"})");
+    add(
+        "TO_STRING",
+        1,
+        1,
+        "Data transformation",
+        "TO_STRING(value)",
+        "Converts a number or boolean to text. Null stays null; objects and arrays are rejected.",
+        "TO_STRING(${1:amount})");
+    add(
+        "TO_BOOLEAN",
+        1,
+        1,
+        "Data transformation",
+        "TO_BOOLEAN(value)",
+        "Accepts a boolean or text true/false (ignoring case and outer whitespace). Null stays null; other values are rejected.",
+        "TO_BOOLEAN(${1:\"true\"})");
+    add(
         "IF",
         3,
         3,
@@ -424,6 +472,8 @@ final class FunctionCatalog {
   }
 
   public static void arity(String name, int count) {
+    if (name.equals("OBJECT") && count % 2 != 0)
+      throw ArcException.invalid("OBJECT expects key/value pairs");
     Spec spec = CUSTOM.get(name);
     if (spec != null) {
       if (count < spec.min || count > spec.max)

@@ -335,3 +335,5 @@ GitHub Actions runs module-boundary checks, Java and frontend formatting checks,
 ### Code studio and data sources
 
 Use the separate **Code studio** page for Monaco editing, function chips grouped by purpose with expandable categories, search and hover help, reusable module insertion, and bidirectional graph editing. **Data sources** supplies missing inputs from versioned lookup tables or HTTP JSON APIs. See [the studio guide](docs/studio.md) for syntax, examples, compatibility boundaries, source configuration, and endpoints.
+
+Graph expressions also offer **Functions & editor**, with the same catalog, completion, variable insertion and validation. **Switch** nodes provide ordered, first-match cases plus Default; **Transform** nodes provide field mappings or whole object/array expressions for data cleaning, conversion and reshaping. Both round-trip through Code studio and use the normal save, publish and reuse workflow. Existing True/False Condition nodes retain their behavior.

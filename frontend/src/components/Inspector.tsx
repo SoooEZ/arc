@@ -12,6 +12,8 @@ import InputFields from "../features/editor/inspector/InputFields";
 import ReferenceFields from "../features/editor/inspector/ReferenceFields";
 import ExpressionFields from "../features/editor/inspector/ExpressionFields";
 import ResultFields from "../features/editor/inspector/ResultFields";
+import SwitchFields from "../features/editor/inspector/SwitchFields";
+import TransformFields from "../features/editor/inspector/TransformFields";
 import type { NodeFieldsProps } from "../features/editor/inspector/types";
 // Exhaustive registry: every portable node kind has an editor.
 const fieldsByType: Record<NodeType, ComponentType<NodeFieldsProps>> = {
@@ -19,6 +21,8 @@ const fieldsByType: Record<NodeType, ComponentType<NodeFieldsProps>> = {
   REFERENCE: ReferenceFields,
   FORMULA: ExpressionFields,
   CONDITION: ExpressionFields,
+  SWITCH: SwitchFields,
+  TRANSFORM: TransformFields,
   OUTPUT: ExpressionFields,
 };
 interface Props {
@@ -100,13 +104,17 @@ export default function Inspector({
               <span>
                 {node.type === "CONDITION"
                   ? "Split your logic into two paths"
-                  : node.type === "REFERENCE"
-                    ? "Connect a published rule"
-                    : node.type === "FORMULA"
-                      ? "Calculate a value for the next step"
-                      : node.type === "OUTPUT"
-                        ? "Return the final result"
-                        : "Define the data your rule needs"}
+                  : node.type === "SWITCH"
+                    ? "Choose the first matching branch"
+                    : node.type === "TRANSFORM"
+                      ? "Shape, clean and map data"
+                      : node.type === "REFERENCE"
+                        ? "Connect a published rule"
+                        : node.type === "FORMULA"
+                          ? "Calculate a value for the next step"
+                          : node.type === "OUTPUT"
+                            ? "Return the final result"
+                            : "Define the data your rule needs"}
               </span>
             </div>
           </div>

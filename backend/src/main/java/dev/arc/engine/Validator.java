@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class Validator {
   private static final Set<String> TYPES =
-      Set.of("INPUT", "FORMULA", "CONDITION", "REFERENCE", "OUTPUT");
+      Set.of("INPUT", "FORMULA", "CONDITION", "SWITCH", "TRANSFORM", "REFERENCE", "OUTPUT");
 
   public static boolean identifier(String s) {
     return s != null
@@ -57,6 +57,48 @@ public class Validator {
         require(
             n.expression() == null || n.expression().length() <= 2000,
             "Expression exceeds 2,000 characters");
+        require(n.cases() == null || n.type().equals("SWITCH"), "Cases belong to Switch nodes");
+        require(
+            n.fields() == null || n.type().equals("TRANSFORM"), "Fields belong to Transform nodes");
+        if (n.cases() != null) {
+          require(n.cases().size() <= 20, "Provide at most 20 cases");
+          var caseIds = new HashSet<String>();
+          for (BranchCase option : n.cases()) {
+            require(
+                option != null
+                    && option.id() != null
+                    && option.id().matches("[A-Za-z0-9_-]{1,64}")
+                    && caseIds.add(option.id()),
+                "Every case needs a unique, stable ID");
+            require(
+                option.label() != null
+                    && !option.label().isBlank()
+                    && option.label().length() <= 160,
+                "Every case needs a label of 1 to 160 characters");
+            require(
+                option.expression() != null && option.expression().length() <= 2000,
+                "Case expression exceeds 2,000 characters or is missing");
+          }
+        }
+        if (n.fields() != null) {
+          require(n.fields().size() <= 50, "Provide at most 50 transform fields");
+          var fieldNames = new HashSet<String>();
+          for (Field field : n.fields()) {
+            require(
+                field != null
+                    && field.name() != null
+                    && !field.name().isBlank()
+                    && field.name().length() <= 160
+                    && fieldNames.add(field.name()),
+                "Transform fields need unique names of 1 to 160 characters");
+            require(
+                field.expression() != null && field.expression().length() <= 2000,
+                "Field expression exceeds 2,000 characters or is missing");
+          }
+          require(
+              n.fields().isEmpty() || n.expression() == null,
+              "Transform uses either field mappings or one expression, not both");
+        }
         require(
             n.bindings() == null || n.bindings().size() <= 50,
             "Provide at most 50 parameter bindings");
@@ -81,8 +123,9 @@ public class Validator {
           ids.contains(e.source()) && ids.contains(e.target()),
           "Connection refers to a missing node");
       require(
-          Set.of("next", "true", "false")
-              .contains(e.sourceHandle() == null ? "" : e.sourceHandle()),
+          e.sourceHandle() != null
+              && (Set.of("next", "true", "false", "default").contains(e.sourceHandle())
+                  || e.sourceHandle().matches("case:[A-Za-z0-9_-]{1,64}")),
           "Invalid connection handle");
     }
     Set<String> names = new HashSet<>();
@@ -165,10 +208,7 @@ public class Validator {
     for (Node n : d.nodes()) {
       List<Edge> edges = outgoing.getOrDefault(n.id(), List.of());
       Set<String> handles = edges.stream().map(Edge::sourceHandle).collect(Collectors.toSet());
-      Set<String> expected =
-          n.type().equals("CONDITION")
-              ? Set.of("true", "false")
-              : n.type().equals("OUTPUT") ? Set.of() : Set.of("next");
+      Set<String> expected = handles(n);
       require(
           handles.equals(expected),
           n.label() + ": connect " + (expected.isEmpty() ? "no outgoing branches" : expected),
@@ -198,6 +238,18 @@ public class Validator {
     try {
       if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(n.type()))
         expression(n.expression(), scope, n.label());
+      if (n.type().equals("SWITCH")) {
+        require(n.cases() != null && !n.cases().isEmpty(), n.label() + ": add at least one case");
+        for (BranchCase option : n.cases())
+          expression(option.expression(), scope, n.label() + " / Case " + option.label());
+      }
+      if (n.type().equals("TRANSFORM")) {
+        if (n.fields() == null || n.fields().isEmpty())
+          expression(n.expression(), scope, n.label());
+        else
+          for (Field field : n.fields())
+            expression(field.expression(), scope, n.label() + " / Field " + field.name());
+      }
       if (n.type().equals("REFERENCE")) {
         require(
             n.ruleId() != null && n.version() != null && n.version() > 0,
@@ -220,7 +272,7 @@ public class Validator {
           expression(entry.getValue(), scope, n.label() + " / " + entry.getKey());
         }
       }
-      if (n.type().equals("FORMULA") || n.type().equals("REFERENCE")) {
+      if (n.storesResult()) {
         require(identifier(n.output()), n.label() + ": provide a valid result variable");
         require(
             d.inputs().stream().noneMatch(p -> p.name().equals(n.output())),
@@ -263,6 +315,12 @@ public class Validator {
             Expressions.compile(n.expression());
           if (n.bindings() != null)
             for (String expr : n.bindings().values()) Expressions.compile(expr);
+          if (n.cases() != null)
+            for (BranchCase option : n.cases()) Expressions.compile(option.expression());
+          if (n.fields() != null)
+            for (Field field : n.fields()) Expressions.compile(field.expression());
+          if (n.type().equals("TRANSFORM") && (n.fields() == null || n.fields().isEmpty()))
+            Expressions.compile(n.expression());
         }
       } catch (ArcException e) {
         problems.add(Problem.from(e.atNode(null, null, n.id(), n.label())));
@@ -290,6 +348,19 @@ public class Validator {
 
   private void require(boolean condition, String message, Node node) {
     if (!condition) throw ArcException.invalid(message).atNode(null, null, node.id(), node.label());
+  }
+
+  private Set<String> handles(Node node) {
+    if (node.type().equals("OUTPUT")) return Set.of();
+    if (node.type().equals("CONDITION")) return Set.of("true", "false");
+    if (node.type().equals("SWITCH")) {
+      var handles = new LinkedHashSet<String>();
+      if (node.cases() != null)
+        for (BranchCase option : node.cases()) handles.add("case:" + option.id());
+      handles.add("default");
+      return handles;
+    }
+    return Set.of("next");
   }
 
   private void inputCycles(
