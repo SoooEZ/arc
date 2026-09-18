@@ -3,7 +3,7 @@ package dev.arc.engine;
 import static dev.arc.engine.EngineTest.*;
 import static org.assertj.core.api.Assertions.*;
 
-import dev.arc.api.ArcException;
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import java.math.BigDecimal;

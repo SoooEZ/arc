@@ -1,6 +1,6 @@
 package dev.arc.engine;
 
-import dev.arc.api.ArcException;
+import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.*;

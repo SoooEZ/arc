@@ -2,7 +2,7 @@ package dev.arc.engine;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.arc.api.ArcException;
+import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

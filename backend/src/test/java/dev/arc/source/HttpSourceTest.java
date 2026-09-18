@@ -4,14 +4,15 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import dev.arc.model.SourceDefinition;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class HttpSourceTest {
-  private SourceService.Config config(String url, int timeout) {
-    return new SourceService.Config("HTTP", url, List.of(), null, Map.of(), timeout);
+  private SourceDefinition config(String url, int timeout) {
+    return new SourceDefinition("HTTP", url, List.of(), null, Map.of(), timeout);
   }
 
   @Test
@@ -25,7 +26,7 @@ class HttpSourceTest {
     assertThatThrownBy(
             () ->
                 http.validate(
-                    new SourceService.Config(
+                    new SourceDefinition(
                         "HTTP",
                         "https://example.com",
                         List.of(),

@@ -1,7 +1,6 @@
-package dev.arc.source;
+package dev.arc.engine;
 
-import dev.arc.api.ArcException;
-import dev.arc.engine.*;
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition.*;
 import java.util.*;
 
@@ -10,12 +9,12 @@ public final class Parameters {
   public record Read(
       String input, String sourceId, int version, String status, long durationMicros) {}
 
-  private final SourceService sources;
+  private final SourceReader sources;
   private final List<Read> reads = new ArrayList<>();
   private int fetches;
 
-  public Parameters(SourceService sources) {
-    this.sources = sources;
+  public Parameters(SourceReader sources) {
+    this.sources = sources == null ? SourceReader.unavailable() : sources;
   }
 
   public List<Read> reads() {
@@ -60,8 +59,7 @@ public final class Parameters {
       }
       if (++fetches > 50) throw ArcException.invalid("Execution exceeds 50 source reads");
       try {
-        if (sources == null) throw ArcException.invalid("Data sources unavailable");
-        value = sources.extract(sources.fetch(b.id(), b.version(), args), b.pointer());
+        value = sources.read(b, args);
         if (value == null && p.required())
           throw ArcException.invalid("Source returned null for required input");
         if (value != null) value = Validator.checkType(p.name(), p.type(), value);

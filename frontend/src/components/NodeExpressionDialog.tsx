@@ -10,6 +10,10 @@ import {
   DialogTitle,
 } from "@mui/material";
 import { monaco } from "./arcLanguage";
+import {
+  useArcLanguageSupport,
+  insertSnippet,
+} from "../features/studio/useArcLanguageSupport";
 import FunctionLibrary from "./FunctionLibrary";
 import { api, errorMessage } from "../api";
 import type { Definition, Diagnostic, FunctionEntry, RuleNode } from "../types";
@@ -96,13 +100,9 @@ export default function NodeExpressionDialog({
         })),
       );
   }, [diagnostics]);
+  useArcLanguageSupport(editor, functions, definition);
   const insert = (snippet: string) => {
-    if (readOnly) return;
-    const e = editor.current;
-    e?.focus();
-    e?.getContribution<{ insert: (text: string) => void; dispose: () => void }>(
-      "snippetController2",
-    )?.insert(snippet);
+    if (!readOnly) insertSnippet(editor.current, snippet);
   };
   return (
     <Dialog

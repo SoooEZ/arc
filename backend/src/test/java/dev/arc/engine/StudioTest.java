@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.model.Definition.*;
-import dev.arc.store.Samples;
+import dev.arc.rule.RuleSamples;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -15,7 +15,7 @@ class StudioTest {
   @Test
   void graphAndCodeRoundTripPreservesExecutionAndLayout() {
     for (String kind : List.of("RULE", "FORMULA", "DECISION_TREE")) {
-      var before = Samples.blank(kind);
+      var before = RuleSamples.blank(kind);
       var build = script.build(script.render(before));
       assertThat(build.diagnostics()).isEmpty();
       assertThat(build.definition().inputs()).isEqualTo(before.inputs());

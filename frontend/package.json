@@ -9,7 +9,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test:e2e": "playwright test",
     "format": "prettier --write src tests *.ts *.json",
-    "format:check": "prettier --check src tests *.ts *.json"
+    "format:check": "prettier --check src tests *.ts *.json",
+    "test:unit": "playwright test tests/unit"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

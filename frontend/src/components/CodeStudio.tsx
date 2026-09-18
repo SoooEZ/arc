@@ -7,32 +7,12 @@ import { Braces, Check, Code2, GitBranch, Puzzle } from "lucide-react";
 import { api, errorMessage } from "../api";
 import type { Definition, Diagnostic, FunctionEntry, Rule } from "../types";
 
-const modules = [
-  {
-    name: "Formula",
-    snippet:
-      '\nnode "${1:calculate}" FORMULA "${2:Calculate}" {\n  let ${3:total} = ${4:ROUND(amount * 1.2, 2)};\n  next -> "${5:output}";\n}\n',
-  },
-  {
-    name: "Decision branch",
-    snippet:
-      '\nnode "${1:decision}" CONDITION "${2:Check eligibility}" {\n  when ${3:amount >= 100};\n  true -> "${4:approved}";\n  false -> "${5:declined}";\n}\n',
-  },
-  {
-    name: "Output",
-    snippet:
-      '\nnode "${1:output}" OUTPUT "${2:Result}" {\n  return ${3:total};\n}\n',
-  },
-  {
-    name: "Input declaration",
-    snippet: "${1:amount}: ${2:NUMBER} required default ${3:100};",
-  },
-  {
-    name: "External parameter",
-    snippet:
-      'source ${1:taxRate} = {"id":"${2:country-tax}","version":1,"bindings":{"key":"${3:country}"},"pointer":"/rate","onError":"FAIL"};',
-  },
-];
+import { modules } from "../features/studio/snippets";
+import {
+  useArcLanguageSupport,
+  insertSnippet,
+} from "../features/studio/useArcLanguageSupport";
+import { useAsyncResource } from "../hooks/useAsyncResource";
 interface Props {
   rule: Rule;
   rules: Rule[];
@@ -60,104 +40,19 @@ export default function CodeStudio({
   onSave,
 }: Props) {
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const [functions, setFunctions] = useState<FunctionEntry[]>([]);
+  const { data: functions, error: catalogError } = useAsyncResource(
+    "functions",
+    (signal) => api.functions({ signal }),
+    [] as FunctionEntry[],
+  );
   const [error, setError] = useState("");
   const [pane, setPane] = useState("functions");
   const latest = useRef({ onBuild, onSave });
   latest.current = { onBuild, onSave };
-  useEffect(() => {
-    let live = true;
-    api
-      .functions()
-      .then((f) => {
-        if (live) setFunctions(f);
-      })
-      .catch((e) => {
-        if (live) setError(errorMessage(e));
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
   const insert = (snippet: string, atEnd = false) => {
-    const e = editor.current;
-    if (!e || readOnly) return;
-    e.focus();
-    if (atEnd) {
-      const m = e.getModel()!;
-      e.setPosition({
-        lineNumber: m.getLineCount(),
-        column: m.getLineMaxColumn(m.getLineCount()),
-      });
-    }
-    e.getContribution<{ insert: (text: string) => void; dispose: () => void }>(
-      "snippetController2",
-    )?.insert(snippet);
+    if (!readOnly) insertSnippet(editor.current, snippet, atEnd);
   };
-  useEffect(() => {
-    const completions = monaco.languages.registerCompletionItemProvider("arc", {
-      provideCompletionItems: (model, position) => {
-        const w = model.getWordUntilPosition(position);
-        const range = {
-          startLineNumber: position.lineNumber,
-          endLineNumber: position.lineNumber,
-          startColumn: w.startColumn,
-          endColumn: w.endColumn,
-        };
-        return {
-          suggestions: [
-            ...functions
-              .filter((f) => f.supported)
-              .map((f) => ({
-                label: f.name,
-                kind: monaco.languages.CompletionItemKind.Function,
-                detail: f.signature,
-                documentation: f.description,
-                insertText: f.snippet,
-                insertTextRules:
-                  monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                range,
-              })),
-            ...modules.map((m) => ({
-              label: m.name,
-              kind: monaco.languages.CompletionItemKind.Snippet,
-              insertText: m.snippet,
-              insertTextRules:
-                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              range,
-            })),
-            ...[
-              ...definition.inputs.map((i) => i.name),
-              ...definition.nodes.flatMap((n) => (n.output ? [n.output] : [])),
-            ].map((name) => ({
-              label: name,
-              kind: monaco.languages.CompletionItemKind.Variable,
-              insertText: name,
-              range,
-            })),
-          ],
-        };
-      },
-    });
-    const hover = monaco.languages.registerHoverProvider("arc", {
-      provideHover: (model, position) => {
-        const w = model.getWordAtPosition(position);
-        const f = functions.find((f) => f.name === w?.word.toUpperCase());
-        return f
-          ? {
-              contents: [
-                { value: "```arc\n" + f.signature + "\n```" },
-                { value: f.description },
-              ],
-            }
-          : null;
-      },
-    });
-    return () => {
-      completions.dispose();
-      hover.dispose();
-    };
-  }, [functions, definition]);
+  useArcLanguageSupport(editor, functions, definition);
   useEffect(() => {
     const model = editor.current?.getModel();
     if (model)
@@ -268,9 +163,12 @@ export default function CodeStudio({
               ))}
           </>
         )}
-        {error && (
-          <Alert severity="error" onClose={() => setError("")}>
-            {error}
+        {(error || catalogError) && (
+          <Alert
+            severity="error"
+            onClose={error ? () => setError("") : undefined}
+          >
+            {error || catalogError}
           </Alert>
         )}
       </aside>

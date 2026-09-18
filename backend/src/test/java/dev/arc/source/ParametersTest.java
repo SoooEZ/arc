@@ -3,23 +3,24 @@ package dev.arc.source;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.arc.api.ArcException;
+import dev.arc.engine.Parameters;
+import dev.arc.engine.SourceReader;
 import dev.arc.engine.Validator;
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
-import dev.arc.store.Samples;
+import dev.arc.rule.RuleSamples;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class ParametersTest {
-  private final SourceService source =
-      new SourceService(null, new ObjectMapper(), null) {
-        @Override
-        public Object fetch(String id, int version, Map<String, Object> inputs) {
-          if (!Objects.equals(inputs.get("key"), "US")) throw ArcException.invalid("Missing key");
-          return Map.of("rate", 0.07, "version", version);
-        }
+  private final JsonPointerExtractor extractor = new JsonPointerExtractor(new ObjectMapper());
+  private final SourceReader source =
+      (binding, inputs) -> {
+        if (!Objects.equals(inputs.get("key"), "US")) throw ArcException.invalid("Missing key");
+        return extractor.extract(
+            Map.of("rate", 0.07, "version", binding.version()), binding.pointer());
       };
 
   private Input rate(String policy) {
@@ -54,7 +55,7 @@ class ParametersTest {
         .hasMessageContaining("Missing key");
     assertThatThrownBy(() -> new Parameters(source).resolve(inputs, Map.of("rate", "0.5")))
         .hasMessageContaining("must be number");
-    assertThatThrownBy(() -> source.extract(Map.of("a", 1), "/missing"))
+    assertThatThrownBy(() -> extractor.extract(Map.of("a", 1), "/missing"))
         .hasMessageContaining("pointer");
   }
 
@@ -74,7 +75,7 @@ class ParametersTest {
             true,
             null,
             new SourceBinding("source", 1, Map.of("key", "a"), "", "FAIL"));
-    var blank = Samples.blank("FORMULA");
+    var blank = RuleSamples.blank("FORMULA");
     var d = new Definition(1, List.of(a, b), blank.nodes(), blank.edges());
     assertThatThrownBy(() -> new Validator().validate(d, (id, v) -> null))
         .hasMessageContaining("Circular source");

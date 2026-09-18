@@ -1,86 +1,68 @@
 package dev.arc.api;
 
-import dev.arc.engine.GraphPlan;
-import dev.arc.engine.Validator;
-import dev.arc.model.Definition;
-import dev.arc.store.RuleService;
-import dev.arc.store.RuleService.*;
-import dev.arc.store.RuleStore;
-import java.util.Map;
+import dev.arc.model.*;
+import dev.arc.rule.RuleExecutionService;
+import dev.arc.rule.RuleExecutionService.*;
+import dev.arc.rule.RuleService;
+import dev.arc.rule.RuleService.*;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
 public class RuleController {
-  private final RuleStore store;
-  private final RuleService service;
+  private final RuleService rules;
+  private final RuleExecutionService execution;
 
-  public RuleController(RuleStore store, RuleService service) {
-    this.store = store;
-    this.service = service;
+  public RuleController(RuleService rules, RuleExecutionService execution) {
+    this.rules = rules;
+    this.execution = execution;
   }
 
   @GetMapping("/rules")
-  public Object list() {
-    return store.list();
+  public List<Rule> list() {
+    return rules.list();
   }
 
   @PostMapping("/rules")
   @ResponseStatus(HttpStatus.CREATED)
-  public Object create(@RequestBody Create request) {
-    return service.create(request);
+  public Rule create(@RequestBody Create request) {
+    return rules.create(request);
   }
 
   @GetMapping("/rules/{id}")
-  public Object get(@PathVariable String id) {
-    return store.get(id);
+  public Rule get(@PathVariable String id) {
+    return rules.get(id);
   }
 
   @PutMapping("/rules/{id}")
-  public Object update(@PathVariable String id, @RequestBody Update request) {
-    return service.update(id, request);
+  public Rule update(@PathVariable String id, @RequestBody Update request) {
+    return rules.update(id, request);
   }
 
   @PostMapping("/rules/{id}/publish")
-  public Object publish(@PathVariable String id, @RequestBody Publish request) {
-    return service.publish(id, request.revision());
+  public Rule publish(@PathVariable String id, @RequestBody Publish request) {
+    return rules.publish(id, request.revision());
   }
 
   @GetMapping("/rules/{id}/versions")
-  public Object versions(@PathVariable String id) {
-    return store.versions(id);
+  public List<RuleVersion> versions(@PathVariable String id) {
+    return rules.versions(id);
   }
 
   @GetMapping("/rules/{id}/versions/{version}")
-  public Object version(@PathVariable String id, @PathVariable int version) {
-    return store.version(id, version);
+  public RuleVersion version(@PathVariable String id, @PathVariable int version) {
+    return rules.version(id, version);
   }
 
   @PostMapping("/rules/{id}/execute")
-  public Object execute(@PathVariable String id, @RequestBody Execution request) {
-    return service.execute(id, request);
+  public ExecutionResponse execute(@PathVariable String id, @RequestBody Execution request) {
+    return execution.execute(id, request);
   }
 
   @PostMapping("/preview")
-  public Object preview(@RequestBody Preview request) {
-    return service.preview(request);
-  }
-
-  @PostMapping("/variables")
-  public Object variables(@RequestBody Definition definition) {
-    new Validator().shape(definition);
-    return new GraphPlan(definition).available;
-  }
-
-  @PostMapping("/validate")
-  public Object validate(@RequestBody Definition definition) {
-    service.validate(definition);
-    return Map.of("valid", true);
-  }
-
-  @PostMapping("/diagnostics")
-  public Object diagnostics(@RequestBody Definition definition) {
-    return service.diagnostics(definition);
+  public ExecutionResponse preview(@RequestBody Preview request) {
+    return execution.preview(request);
   }
 }

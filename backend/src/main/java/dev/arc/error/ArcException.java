@@ -1,4 +1,4 @@
-package dev.arc.api;
+package dev.arc.error;
 
 import java.util.*;
 

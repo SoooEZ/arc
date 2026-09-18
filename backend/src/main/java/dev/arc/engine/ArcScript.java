@@ -1,7 +1,7 @@
 package dev.arc.engine;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.arc.api.ArcException;
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import java.util.*;

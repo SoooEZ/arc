@@ -128,7 +128,7 @@ Maven downloads Java dependencies, compiles the backend, and starts Spring Boot.
 | `data_source_versions` | Versioned HTTP or lookup-table configurations | [V2__data_sources.sql](backend/src/main/resources/db/migration/V2__data_sources.sql) |
 | `flyway_schema_history` | Applied migration versions and checksums | Managed by Flyway |
 
-`V2` also inserts the `country-tax` lookup example. After migrations, [Samples.java](backend/src/main/java/dev/arc/store/Samples.java) creates and publishes `apply-discount`, `order-pricing`, and `free-shipping` **only if the `rules` table is empty**. Restarting an initialized workspace preserves existing rules. Later application updates apply new migration versions once; already applied migration files should not be edited or executed manually.
+`V2` also inserts the `country-tax` lookup example. After migrations, [RuleSamples.java](backend/src/main/java/dev/arc/rule/RuleSamples.java) creates and publishes `apply-discount`, `order-pricing`, and `free-shipping` **only if the `rules` table is empty**. Restarting an initialized workspace preserves existing rules. Later application updates apply new migration versions once; already applied migration files should not be edited or executed manually.
 
 ### 4. Verify tables and initial data
 
@@ -274,6 +274,7 @@ The evaluator starts at Input and executes active nodes in a deterministic depen
 
 - [API reference and request examples](docs/api.md)
 - [Graph schema, expression language, and architecture](docs/architecture.md)
+- [Module boundaries, design patterns, and extension guide](docs/maintaining.md)
 - [OpenAPI specification](docs/openapi.yaml)
 
 ## Development and verification
@@ -281,15 +282,20 @@ The evaluator starts at Input and executes active nodes in a deterministic depen
 Use Java 21, Maven 3.9+, and Node.js 24+ for the checks below. Browser and live API tests also require a running ARC stack, started with either method above. Start these commands from the repository root.
 
 ```sh
-# Backend tests covering arithmetic, types, graphs, sources, and references
+# Check module dependency boundaries
+python3 scripts/check_architecture.py
+
+# Backend formatting check and tests for arithmetic, graphs, sources and references
 cd backend
-mvn test
+mvn clean verify
 
 # Install frontend dependencies
 cd ../frontend
 npm ci
 
-# Production type check and build
+# Frontend formatting, pure unit tests (no browser/server), type check and build
+npm run format:check
+npm run test:unit
 npm run build
 
 # End-to-end browser tests, with ARC running at localhost:3080
@@ -299,6 +305,7 @@ npm run test:e2e
 # Live API integration tests, from the repository root
 cd ..
 python3 scripts/smoke.py
+python3 scripts/studio_smoke.py
 ```
 
 Browser and API tests create identifiable `e2e-formula-*` and `smoke-*` rules. Run them against a disposable Compose project when you want to keep your own workspace clean:
@@ -306,6 +313,7 @@ Browser and API tests create identifiable `e2e-formula-*` and `smoke-*` rules. R
 ```sh
 COMPOSE_PROJECT_NAME=arc-test ARC_WEB_PORT=3081 ARC_API_PORT=8081 docker compose up -d --build --wait
 ARC_API_URL=http://localhost:8081 python3 scripts/smoke.py
+ARC_API_URL=http://localhost:8081 python3 scripts/studio_smoke.py
 cd frontend
 ARC_WEB_URL=http://localhost:3081 npm run test:e2e
 cd ..
@@ -314,7 +322,7 @@ COMPOSE_PROJECT_NAME=arc-test ARC_WEB_PORT=3081 ARC_API_PORT=8081 docker compose
 
 The final command deletes only that test project's containers and database volume. Normal `docker compose down` preserves the development database.
 
-GitHub Actions runs the Java tests, frontend build, real PostgreSQL API checks, and Chromium end-to-end tests.
+GitHub Actions runs module-boundary checks, Java and frontend formatting checks, unit tests, the frontend build, real PostgreSQL API checks, and Chromium end-to-end tests. To format code before committing, run `mvn -f backend/pom.xml spotless:apply` and `npm --prefix frontend run format`. See [the maintenance guide](docs/maintaining.md) for where to add providers, functions, nodes, and UI behavior.
 
 ## Next phases
 

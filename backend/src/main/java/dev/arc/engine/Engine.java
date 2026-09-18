@@ -1,9 +1,8 @@
 package dev.arc.engine;
 
-import dev.arc.api.ArcException;
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
-import dev.arc.source.*;
 import java.util.*;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +35,8 @@ public class Engine {
       Definition definition,
       Map<String, Object> inputs,
       RuleResolver resolver) {
-    return execute(ruleId, version, definition, inputs, resolver, new Parameters(null));
+    return execute(
+        ruleId, version, definition, inputs, resolver, new Parameters(SourceReader.unavailable()));
   }
 
   public Result execute(

@@ -1,5 +1,7 @@
 # Architecture and graph contract
 
+For package boundaries, frontend state ownership, design patterns, and extension steps, see [Maintaining and extending ARC](maintaining.md).
+
 ## Storage and versioning
 
 `rules` stores identity, metadata, a mutable draft graph, edit revision, and latest published version. `rule_versions` stores immutable snapshots, keyed by `(rule_id, version)`. Flyway owns relational schema migrations; JSON graph documents carry `schemaVersion` for future graph migrations.

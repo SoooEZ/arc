@@ -1,5 +1,6 @@
 package dev.arc.api;
 
+import dev.arc.error.ArcException;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;

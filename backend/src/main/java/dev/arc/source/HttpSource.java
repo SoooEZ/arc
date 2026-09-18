@@ -1,7 +1,8 @@
 package dev.arc.source;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.arc.api.ArcException;
+import dev.arc.error.ArcException;
+import dev.arc.model.SourceDefinition;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -42,7 +43,7 @@ public class HttpSource {
     return Set.copyOf(set);
   }
 
-  public URI validate(SourceService.Config c) {
+  public URI validate(SourceDefinition c) {
     URI uri;
     try {
       uri = URI.create(c.url());
@@ -103,7 +104,7 @@ public class HttpSource {
         || x == 203 && y == 0;
   }
 
-  public Object fetch(SourceService.Config c, Map<String, Object> inputs) {
+  public Object fetch(SourceDefinition c, Map<String, Object> inputs) {
     URI uri = validate(c);
     try {
       var builder = new URIBuilder(uri);

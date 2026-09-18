@@ -2,11 +2,10 @@ import { useState } from "react";
 import { MenuItem, TextField } from "@mui/material";
 import type { InputType } from "../types";
 
-export interface VariableOption {
-  name: string;
-  type: string;
-  label: string;
-}
+import type { VariableOption } from "../domain/graph";
+export type { VariableOption } from "../domain/graph";
+import { literalText, quoteText } from "../domain/expressions";
+export { literalText, quoteText } from "../domain/expressions";
 type ConstantType = "NUMBER" | "STRING" | "BOOLEAN" | "ARRAY" | "NULL";
 const constantDefaults: Record<ConstantType, string> = {
   NUMBER: "0",
@@ -29,25 +28,6 @@ function constantType(value: string): ConstantType | null {
   return null;
 }
 type Mode = "variable" | "constant" | "expression" | "default";
-// Use ARC's escapes; plain text is never treated as executable source.
-export const quoteText = (text: string) =>
-  '"' +
-  text
-    .replaceAll("\\", "\\\\")
-    .replaceAll('"', '\\"')
-    .replaceAll("\n", "\\n")
-    .replaceAll("\r", "\\r")
-    .replaceAll("\t", "\\t") +
-  '"';
-export function literalText(value: string): string | null {
-  if (!/^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')$/s.test(value)) return null;
-  return value
-    .slice(1, -1)
-    .replace(
-      /\\(.)/gs,
-      (_, c: string) => ({ n: "\n", r: "\r", t: "\t" })[c] ?? c,
-    );
-}
 export default function ValueBinding({
   label,
   type,

@@ -22,15 +22,20 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Test Java engine
+      - name: Check module boundaries
+        run: python3 scripts/check_architecture.py
+      - name: Check Java formatting and tests
         working-directory: backend
-        run: mvn -B test
+        run: mvn -B clean verify
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      - name: Type check and build frontend
+      - name: Check frontend formatting, unit tests, types and build
         working-directory: frontend
-        run: npm run build
+        run: |
+          npm run format:check
+          npm run test:unit
+          npm run build
       - name: Start fresh Compose stack
         run: docker compose up -d --build --wait --wait-timeout 180
       - name: API integration tests

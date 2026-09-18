@@ -4,14 +4,14 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.model.Definition;
-import dev.arc.store.Samples;
+import dev.arc.rule.RuleSamples;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class NodeEditorTest {
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
-  private final RuleResolver noRefs = (id, v) -> Samples.blank("FORMULA");
+  private final RuleResolver noRefs = (id, v) -> RuleSamples.blank("FORMULA");
 
   @Test
   void executableFunctionsHaveUsefulCategories() {
