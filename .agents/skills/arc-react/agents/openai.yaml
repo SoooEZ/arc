@@ -1,0 +1,4 @@
+interface:
+  display_name: "ARC React"
+  short_description: "Build React editors with predictable state and effects"
+  default_prompt: "Use $arc-react to implement this ARC frontend change with clear state ownership and tested user behavior."

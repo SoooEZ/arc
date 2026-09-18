@@ -2,6 +2,8 @@
 
 ARC remains one React application and one Java application. The HTTP paths, graph JSON, ARC Script, published versions, database migrations, and execution semantics remain the public contracts. Start with [the graph contract](architecture.md) and [API reference](api.md) before changing them.
 
+For AI-assisted changes, [the project guidance and Skills](ai-quality.md) turn these boundaries into implementation, refactoring and review workflows. Their [pinned upstream references](ai-sources.md) document the ideas selected and adapted to ARC.
+
 ## Backend boundaries
 
 | Package | Responsibility | Extension point |

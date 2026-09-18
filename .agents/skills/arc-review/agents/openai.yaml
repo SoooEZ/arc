@@ -1,0 +1,4 @@
+interface:
+  display_name: "ARC Review"
+  short_description: "Review ARC changes for regressions and maintainability"
+  default_prompt: "Use $arc-review to review the current ARC changes and report concrete bugs and maintainability suggestions."

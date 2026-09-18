@@ -1,0 +1,4 @@
+interface:
+  display_name: "ARC Java"
+  short_description: "Develop Java rules and sources with clear boundaries"
+  default_prompt: "Use $arc-java to implement this ARC backend change while preserving rule, source, and API contracts."

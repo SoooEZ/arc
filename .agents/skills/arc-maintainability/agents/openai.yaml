@@ -1,0 +1,4 @@
+interface:
+  display_name: "ARC Maintainability"
+  short_description: "Refactor ARC with clear ownership and minimal coupling"
+  default_prompt: "Use $arc-maintainability to improve the selected ARC module while preserving its observable behavior."
