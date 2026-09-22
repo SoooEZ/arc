@@ -6,43 +6,22 @@ import {
   MenuItem,
   TextField,
 } from "@mui/material";
-import { Database, Globe2, Plus, Play, Save, ArrowRight } from "lucide-react";
-import { fresh } from "../features/sources/model";
+import { Database, Globe2, Plus, Save, ArrowRight } from "lucide-react";
+import { createSourceDraft } from "../features/sources/model";
 import { useSourceEditor } from "../features/sources/useSourceEditor";
+import SourceConfigurationFields from "../features/sources/SourceConfigurationFields";
+import SourceTestPanel from "../features/sources/SourceTestPanel";
+
 export default function SourcesPage({
   onDirty,
   notify,
 }: {
   onDirty: (dirty: boolean) => void;
-  notify: (s: string) => void;
+  notify: (message: string) => void;
 }) {
-  const {
-    sources,
-    selected,
-    params,
-    entries,
-    headers,
-    test,
-    result,
-    error,
-    busy,
-    versions,
-    viewVersion,
-    dirty,
-    historical,
-    select,
-    configPatch,
-    save,
-    run,
-    displayConfig,
-    setSelected,
-    setParams,
-    setEntries,
-    setHeaders,
-    setTest,
-    setViewVersion,
-    setError,
-  } = useSourceEditor({ onDirty, notify });
+  const editor = useSourceEditor({ onDirty, notify });
+  const { document, saving, historical, dirty } = editor;
+  const selected = document?.source;
   return (
     <div className="sources-page">
       <div className="page-eyebrow">CONNECTED INPUTS</div>
@@ -56,7 +35,7 @@ export default function SourcesPage({
         <Button
           variant="contained"
           startIcon={<Plus size={16} />}
-          onClick={() => select(fresh())}
+          onClick={() => editor.select(createSourceDraft())}
         >
           New source
         </Button>
@@ -72,21 +51,24 @@ export default function SourcesPage({
       </div>
       <div className="sources-layout">
         <aside className="source-list">
-          {sources.map((s) => (
+          {editor.loading && (
+            <CircularProgress size={20} aria-label="Loading data sources" />
+          )}
+          {editor.sources.map((source) => (
             <button
-              className={selected?.id === s.id ? "active" : ""}
-              key={s.id}
-              onClick={() => select(s)}
+              className={selected?.id === source.id ? "active" : ""}
+              key={source.id}
+              onClick={() => editor.select(source)}
             >
-              {s.definition.kind === "HTTP" ? (
+              {source.definition.kind === "HTTP" ? (
                 <Globe2 size={19} />
               ) : (
                 <Database size={19} />
               )}
               <span>
-                {s.name}
+                {source.name}
                 <small>
-                  {s.id} · v{s.version}
+                  {source.id} · v{source.version}
                 </small>
               </span>
             </button>
@@ -97,12 +79,17 @@ export default function SourcesPage({
           </p>
         </aside>
         <section className="source-detail">
-          {error && (
-            <Alert severity="error" onClose={() => setError("")}>
-              {error}
+          {editor.error && (
+            <Alert severity="error" onClose={editor.dismissError}>
+              {editor.error}
             </Alert>
           )}
-          {!selected ? (
+          {editor.versionsError && (
+            <Alert severity="error">
+              Could not load source versions: {editor.versionsError}
+            </Alert>
+          )}
+          {!document || !selected ? (
             <p>Select or create a data source.</p>
           ) : (
             <>
@@ -123,10 +110,10 @@ export default function SourcesPage({
                 <Button
                   variant="contained"
                   startIcon={
-                    busy ? <CircularProgress size={14} /> : <Save size={15} />
+                    saving ? <CircularProgress size={14} /> : <Save size={15} />
                   }
-                  disabled={busy || historical || !dirty}
-                  onClick={() => void save()}
+                  disabled={saving || historical || !dirty}
+                  onClick={() => void editor.save()}
                 >
                   {selected.version ? "Save new version" : "Create source"}
                 </Button>
@@ -135,33 +122,30 @@ export default function SourcesPage({
                 <TextField
                   label="Source ID"
                   value={selected.id}
-                  disabled={!!selected.version || busy || historical}
+                  disabled={!!selected.version || saving || historical}
                   placeholder="customer-profile"
-                  onChange={(e) =>
-                    setSelected({ ...selected, id: e.target.value })
+                  onChange={(event) =>
+                    editor.changeMetadata({ id: event.target.value })
                   }
                 />
                 <TextField
                   label="Name"
                   value={selected.name}
-                  disabled={busy || historical}
-                  onChange={(e) =>
-                    setSelected({ ...selected, name: e.target.value })
+                  disabled={saving || historical}
+                  onChange={(event) =>
+                    editor.changeMetadata({ name: event.target.value })
                   }
                 />
                 <TextField
                   select
                   label="Provider"
                   value={selected.definition.kind}
-                  disabled={busy || historical}
-                  onChange={(e) => {
-                    configPatch({ kind: e.target.value as "HTTP" | "LOOKUP" });
-                    setParams(
-                      e.target.value === "LOOKUP"
-                        ? '[{"name":"key","type":"STRING","required":true}]'
-                        : '[{"name":"customerId","type":"STRING","required":true}]',
-                    );
-                  }}
+                  disabled={saving || historical}
+                  onChange={(event) =>
+                    editor.changeProvider(
+                      event.target.value as "HTTP" | "LOOKUP",
+                    )
+                  }
                 >
                   <MenuItem value="LOOKUP">Local lookup table</MenuItem>
                   <MenuItem value="HTTP">HTTP GET · JSON response</MenuItem>
@@ -170,14 +154,17 @@ export default function SourcesPage({
                   <TextField
                     select
                     label="Inspect version"
-                    value={viewVersion}
-                    onChange={(e) => setViewVersion(Number(e.target.value))}
+                    value={document.viewedVersion}
+                    disabled={saving || editor.versionsLoading}
+                    onChange={(event) =>
+                      editor.inspectVersion(Number(event.target.value))
+                    }
                   >
-                    {versions.length ? (
-                      versions.map((v) => (
-                        <MenuItem key={v.version} value={v.version}>
-                          v{v.version}
-                          {v.version === selected.version
+                    {editor.versions.length ? (
+                      editor.versions.map((version) => (
+                        <MenuItem key={version.version} value={version.version}>
+                          v{version.version}
+                          {version.version === selected.version
                             ? " · latest"
                             : " · immutable"}
                         </MenuItem>
@@ -197,109 +184,28 @@ export default function SourcesPage({
                     version to edit.
                   </Alert>
                   <pre className="source-json">
-                    {JSON.stringify(displayConfig, null, 2)}
+                    {JSON.stringify(editor.displayConfig, null, 2)}
                   </pre>
                 </>
               ) : (
-                <>
-                  {selected.definition.kind === "HTTP" && (
-                    <>
-                      <TextField
-                        label="HTTP URL"
-                        placeholder="https://api.example.com/customer"
-                        value={selected.definition.url || ""}
-                        disabled={busy}
-                        onChange={(e) => configPatch({ url: e.target.value })}
-                        helperText="Mapped parameters become URL-encoded query parameters. The response must be JSON."
-                      />
-                      <TextField
-                        label="Timeout (ms)"
-                        type="number"
-                        value={selected.definition.timeoutMs}
-                        disabled={busy}
-                        onChange={(e) =>
-                          configPatch({ timeoutMs: Number(e.target.value) })
-                        }
-                      />
-                    </>
-                  )}
-                  <TextField
-                    label="Source parameters · JSON"
-                    multiline
-                    minRows={3}
-                    value={params}
-                    disabled={busy}
-                    onChange={(e) => setParams(e.target.value)}
-                    helperText={
-                      selected.definition.kind === "LOOKUP"
-                        ? 'Lookup tables require a parameter named "key".'
-                        : "Declare name, type (STRING / NUMBER / BOOLEAN), required, and optional defaultValue."
-                    }
-                    slotProps={{ input: { className: "json-input" } }}
-                  />
-                  {selected.definition.kind === "LOOKUP" ? (
-                    <TextField
-                      label="Lookup entries · JSON object"
-                      multiline
-                      minRows={8}
-                      maxRows={20}
-                      value={entries}
-                      disabled={busy}
-                      onChange={(e) => setEntries(e.target.value)}
-                      helperText='Map keys to values or records. Example: {"US":{"rate":0.07}}'
-                      slotProps={{ input: { className: "json-input" } }}
-                    />
-                  ) : (
-                    <>
-                      <TextField
-                        label="Secret header aliases · JSON"
-                        multiline
-                        minRows={2}
-                        value={headers}
-                        disabled={busy}
-                        onChange={(e) => setHeaders(e.target.value)}
-                        helperText='Example: {"Authorization":"CRM_TOKEN"}. Server reads ARC_SECRET_CRM_TOKEN; enter the full header value only in server configuration.'
-                        slotProps={{ input: { className: "json-input" } }}
-                      />
-                      <p className="studio-hint">
-                        HTTP destinations are public by default. Server
-                        operators can allow specific internal hosts. Sending
-                        secrets requires an explicit host allowlist. Redirects
-                        are disabled.
-                      </p>
-                    </>
-                  )}
-                </>
-              )}
-              <div className="source-test">
-                <h3>Test this source</h3>
-                <p>
-                  {dirty
-                    ? "Save changes before testing the new configuration."
-                    : `Calls stored version ${viewVersion}. No rule execution required.`}
-                </p>
-                <TextField
-                  label="Test parameters · JSON"
-                  multiline
-                  minRows={3}
-                  value={test}
-                  onChange={(e) => setTest(e.target.value)}
-                  slotProps={{ input: { className: "json-input" } }}
+                <SourceConfigurationFields
+                  configuration={selected.definition}
+                  buffers={document.buffers}
+                  disabled={saving}
+                  onConfig={editor.changeConfig}
+                  onBuffer={editor.changeBuffer}
                 />
-                <Button
-                  variant="outlined"
-                  startIcon={<Play size={15} />}
-                  disabled={busy || !selected.version || dirty}
-                  onClick={() => void run()}
-                >
-                  Fetch sample
-                </Button>
-                {result !== undefined && (
-                  <pre className="source-json" data-testid="source-result">
-                    {JSON.stringify(result, null, 2)}
-                  </pre>
-                )}
-              </div>
+              )}
+              <SourceTestPanel
+                version={document.viewedVersion}
+                input={document.testInput}
+                result={document.result}
+                running={document.testing !== null}
+                disabled={saving || !selected.version || dirty}
+                dirty={dirty}
+                onInput={editor.changeTestInput}
+                onRun={editor.run}
+              />
               <Alert severity="info">
                 To use this source, select an Input node in the graph and choose
                 its value provider. Or insert an External parameter module in

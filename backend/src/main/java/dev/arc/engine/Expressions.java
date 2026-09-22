@@ -131,32 +131,36 @@ public final class Expressions {
     BigDecimal x = number(a), y = number(b);
     if ((op.equals("/") || op.equals("%")) && y.signum() == 0)
       throw ArcException.invalid("Division by zero");
-    return bounded(
-        switch (op) {
-          case "+" -> x.add(y, MATH);
-          case "-" -> x.subtract(y, MATH);
-          case "*" -> x.multiply(y, MATH);
-          case "/" -> x.divide(y, MATH);
-          case "%" -> x.remainder(y, MATH);
-          case "^" -> {
-            int exponent;
-            try {
-              exponent = y.intValueExact();
-            } catch (ArithmeticException e) {
-              throw ArcException.invalid("Exponent must be an integer");
+    try {
+      return bounded(
+          switch (op) {
+            case "+" -> x.add(y, MATH);
+            case "-" -> x.subtract(y, MATH);
+            case "*" -> x.multiply(y, MATH);
+            case "/" -> x.divide(y, MATH);
+            case "%" -> x.remainder(y, MATH);
+            case "^" -> {
+              int exponent;
+              try {
+                exponent = y.intValueExact();
+              } catch (ArithmeticException e) {
+                throw ArcException.invalid("Exponent must be an integer");
+              }
+              if (Math.abs((long) exponent) > 100)
+                throw ArcException.invalid("Exponent must be -100 to 100");
+              try {
+                yield exponent < 0
+                    ? BigDecimal.ONE.divide(x.pow(-exponent, MATH), MATH)
+                    : x.pow(exponent, MATH);
+              } catch (ArithmeticException e) {
+                throw ArcException.invalid("Invalid power");
+              }
             }
-            if (Math.abs((long) exponent) > 100)
-              throw ArcException.invalid("Exponent must be -100 to 100");
-            try {
-              yield exponent < 0
-                  ? BigDecimal.ONE.divide(x.pow(-exponent, MATH), MATH)
-                  : x.pow(exponent, MATH);
-            } catch (ArithmeticException e) {
-              throw ArcException.invalid("Invalid power");
-            }
-          }
-          default -> throw ArcException.invalid("Unknown operator: " + op);
-        });
+            default -> throw ArcException.invalid("Unknown operator: " + op);
+          });
+    } catch (ArithmeticException error) {
+      throw ArcException.invalid("Decimal operation exceeds supported precision");
+    }
   }
 
   private static Object function(String name, List<Expr> args, Map<String, Object> scope) {
@@ -291,22 +295,8 @@ public final class Expressions {
                     : number(operand.eval(s));
       }
       if (token.startsWith("\"") || token.startsWith("'")) {
-        StringBuilder value = new StringBuilder();
-        for (int i = 1; i < token.length() - 1; i++) {
-          char c = token.charAt(i);
-          if (c == '\\') {
-            c = token.charAt(++i);
-            c =
-                switch (c) {
-                  case 'n' -> '\n';
-                  case 't' -> '\t';
-                  case 'r' -> '\r';
-                  default -> c;
-                };
-          }
-          value.append(c);
-        }
-        return s -> value.toString();
+        String value = stringLiteral(token);
+        return s -> value;
       }
       if (Character.isDigit(token.charAt(0)) || token.charAt(0) == '.') {
         try {
@@ -400,6 +390,38 @@ public final class Expressions {
             ? s.get(root)
             : Functions.get(s.get(root), token.substring(root.length() + 1), null);
       };
+    }
+
+    private String stringLiteral(String token) {
+      var value = new StringBuilder();
+      for (int index = 1; index < token.length() - 1; index++) {
+        char character = token.charAt(index);
+        if (character == '\\') {
+          character = token.charAt(++index);
+          if (character == 'u') {
+            int escapeEnd = index + 5;
+            if (escapeEnd > token.length() - 1)
+              throw ArcException.invalid("Unicode escape needs four hexadecimal digits");
+            String digits = token.substring(index + 1, escapeEnd);
+            if (!digits.matches("[0-9A-Fa-f]{4}"))
+              throw ArcException.invalid("Unicode escape needs four hexadecimal digits");
+            character = (char) Integer.parseInt(digits, 16);
+            index += 4;
+          } else {
+            character =
+                switch (character) {
+                  case 'b' -> '\b';
+                  case 'f' -> '\f';
+                  case 'n' -> '\n';
+                  case 't' -> '\t';
+                  case 'r' -> '\r';
+                  default -> character;
+                };
+          }
+        }
+        value.append(character);
+      }
+      return value.toString();
     }
   }
 }

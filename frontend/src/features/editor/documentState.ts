@@ -24,11 +24,16 @@ export type DocumentAction =
   | { type: "graph/arranged"; before: Definition; definition: Definition }
   | { type: "version/loaded"; definition: Definition }
   | { type: "rule/metadata"; patch: Pick<Rule, "name" | "description"> }
-  | { type: "rule/saved"; rule: Rule }
+  | { type: "rule/saved"; rule: Rule; submitted: Rule }
   | { type: "source/changed"; source: string }
-  | { type: "source/rendered"; source: string }
-  | { type: "source/built"; definition: Definition; source: string }
-  | { type: "source/diagnostics"; diagnostics: Diagnostic[] }
+  | { type: "source/rendered"; before: Definition; source: string }
+  | {
+      type: "source/built";
+      before: string;
+      definition: Definition;
+      source: string;
+    }
+  | { type: "source/diagnostics"; before: string; diagnostics: Diagnostic[] }
   | { type: "execution/completed"; trace: Execution | null };
 
 /** Draft/code transitions are atomic; layout and async renders cannot replace newer edits. */
@@ -63,7 +68,15 @@ export function documentReducer(
     case "rule/saved":
       return {
         ...state,
-        rule: action.rule,
+        rule:
+          ruleSnapshot(state.rule) === ruleSnapshot(action.submitted)
+            ? action.rule
+            : {
+                ...action.rule,
+                name: state.rule.name,
+                description: state.rule.description,
+                draft: state.rule.draft,
+              },
         baseline: ruleSnapshot(action.rule),
       };
     case "source/changed":
@@ -76,10 +89,11 @@ export function documentReducer(
             diagnostics: [],
           };
     case "source/rendered":
-      return state.source === null
+      return state.source === null && state.rule.draft === action.before
         ? { ...state, source: action.source }
         : state;
     case "source/built":
+      if (state.source !== action.before) return state;
       return {
         ...state,
         rule: { ...state.rule, draft: action.definition },
@@ -89,7 +103,9 @@ export function documentReducer(
         trace: null,
       };
     case "source/diagnostics":
-      return { ...state, diagnostics: action.diagnostics };
+      return state.source === action.before
+        ? { ...state, diagnostics: action.diagnostics }
+        : state;
     case "execution/completed":
       return { ...state, trace: action.trace };
   }

@@ -140,6 +140,7 @@ export default function GraphCanvas({
               variant="outlined"
               startIcon={<Plus size={15} />}
               endIcon={<ChevronDown size={13} />}
+              disabled={!!busy}
               onClick={(e) => onAddMenu(e.currentTarget)}
             >
               Add node
@@ -250,6 +251,7 @@ export default function GraphCanvas({
               size="small"
               color="error"
               startIcon={<Trash2 size={14} />}
+              disabled={!!busy}
               onClick={() => {
                 changeDefinition((d) => ({
                   ...d,

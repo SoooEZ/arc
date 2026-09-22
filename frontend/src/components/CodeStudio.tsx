@@ -7,7 +7,7 @@ import { Braces, Check, Code2, GitBranch, Puzzle } from "lucide-react";
 import { api, errorMessage } from "../api";
 import type { Definition, Diagnostic, FunctionEntry, Rule } from "../types";
 
-import { modules } from "../features/studio/snippets";
+import { modules, referenceSnippet } from "../features/studio/snippets";
 import {
   useArcLanguageSupport,
   insertSnippet,
@@ -49,6 +49,8 @@ export default function CodeStudio({
   const [pane, setPane] = useState("functions");
   const latest = useRef({ onBuild, onSave });
   latest.current = { onBuild, onSave };
+  const editable = useRef(!readOnly);
+  editable.current = !readOnly;
   const insert = (snippet: string, atEnd = false) => {
     if (!readOnly) insertSnippet(editor.current, snippet, atEnd);
   };
@@ -72,15 +74,14 @@ export default function CodeStudio({
   const reuse = async (r: Rule) => {
     try {
       const v = await api.version(r.id, r.publishedVersion!);
-      const bindings = v.definition.inputs
-        .filter((p) => p.required && !p.source && p.defaultValue == null)
-        .map(
-          (p) =>
-            `  bind ${p.name} = ${definition.inputs.some((x) => x.name === p.name) ? p.name : p.type === "STRING" ? '"value"' : p.type === "BOOLEAN" ? "true" : p.type === "ARRAY" ? "[]" : p.type === "OBJECT" ? "null" : "0"};`,
-        )
-        .join("\n");
+      if (!editable.current || !editor.current?.getModel()) return;
       insert(
-        `\nnode "reuse-${r.id}-${Math.random().toString(36).slice(2, 6)}" REFERENCE ${JSON.stringify(r.name)} {\n  use "${r.id}" version ${r.publishedVersion};\n${bindings}\n  as \${1:reusedResult};\n  next -> "\${2:output}";\n}\n`,
+        referenceSnippet(
+          r,
+          v,
+          definition,
+          `reuse-${r.id}-${Math.random().toString(36).slice(2, 6)}`,
+        ),
         true,
       );
     } catch (e) {

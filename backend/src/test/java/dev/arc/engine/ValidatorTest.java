@@ -144,4 +144,57 @@ class ValidatorTest {
     assertThatThrownBy(() -> validator.validate(d, (id, v) -> child))
         .hasMessageContaining("missing binding for amount");
   }
+
+  @Test
+  void cyclicGraphsStillDiagnoseSwitchAndTransformExpressions() {
+    var decision =
+        new Node(
+            "decision",
+            "SWITCH",
+            "Decision",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(new BranchCase("yes", "Yes", "1 +")),
+            null);
+    var transform =
+        new Node(
+            "transform",
+            "TRANSFORM",
+            "Transform",
+            null,
+            null,
+            "data",
+            null,
+            null,
+            null,
+            null,
+            List.of(new Field("name", "UPPER(")));
+    var definition =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                decision,
+                transform,
+                node("out", "OUTPUT", "0", null)),
+            List.of(
+                edge("input", "decision", "next"),
+                edge("decision", "transform", "case:yes"),
+                edge("decision", "out", "default"),
+                edge("transform", "decision", "next")));
+
+    var problems = validator.diagnostics(definition, resolver);
+    assertThat(
+            problems.stream()
+                .filter(problem -> problem.message().contains("Incomplete expression")))
+        .flatExtracting(Validator.Problem::locations)
+        .extracting(ArcException.Location::nodeId)
+        .containsExactly("decision", "transform");
+    assertThat(problems).anyMatch(problem -> problem.message().contains("cycles"));
+  }
 }

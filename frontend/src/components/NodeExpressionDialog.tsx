@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import {
   Alert,
@@ -15,8 +15,10 @@ import {
   insertSnippet,
 } from "../features/studio/useArcLanguageSupport";
 import FunctionLibrary from "./FunctionLibrary";
-import { api, errorMessage } from "../api";
-import type { Definition, Diagnostic, FunctionEntry, RuleNode } from "../types";
+import { studioApi } from "../api/studio";
+import { useAsyncResource } from "../hooks/useAsyncResource";
+import { useNodeExpressionDraft } from "../features/editor/useNodeExpressionDraft";
+import type { Definition, FunctionEntry, RuleNode } from "../types";
 
 export default function NodeExpressionDialog({
   definition,
@@ -33,57 +35,21 @@ export default function NodeExpressionDialog({
   onClose: () => void;
   onProblems: (messages: string[]) => void;
 }) {
-  const [source, setSource] = useState<string | null>(null);
-  const [functions, setFunctions] = useState<FunctionEntry[]>([]);
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { source, changeSource, diagnostics, error, busy, apply } =
+    useNodeExpressionDraft({
+      definition,
+      nodeId: node.id,
+      readOnly,
+      onApply,
+      onClose,
+      onProblems,
+    });
+  const { data: functions, error: catalogError } = useAsyncResource(
+    "functions",
+    (signal) => studioApi.functions({ signal }),
+    [] as FunctionEntry[],
+  );
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const validationSequence = useRef(0);
-  useEffect(() => {
-    let live = true;
-    Promise.all([api.renderNode(definition, node.id), api.functions()])
-      .then(([code, catalog]) => {
-        if (live) {
-          setSource(code.source);
-          setFunctions(catalog);
-        }
-      })
-      .catch((e) => {
-        if (live) setError(errorMessage(e));
-      });
-    return () => {
-      live = false;
-    };
-  }, [definition, node.id]);
-  useEffect(() => {
-    if (source === null || readOnly) return;
-    const sequence = ++validationSequence.current;
-    let live = true;
-    const timer = setTimeout(async () => {
-      try {
-        const built = await api.buildNode(definition, node.id, source);
-        const issues = built.definition
-          ? await api.diagnostics(built.definition)
-          : [];
-        if (!live || sequence !== validationSequence.current) return;
-        const messages = issues
-          .filter((p) =>
-            p.locations.some((l) => !l.ruleId && l.nodeId === node.id),
-          )
-          .map((p) => p.message);
-        setDiagnostics(built.diagnostics);
-        setError(messages.join("\n"));
-        onProblems([...built.diagnostics.map((d) => d.message), ...messages]);
-      } catch (e) {
-        if (live) setError(errorMessage(e));
-      }
-    }, 350);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [source, definition, node.id, readOnly, onProblems]);
   useEffect(() => {
     const model = editor.current?.getModel();
     if (model)
@@ -138,7 +104,7 @@ export default function NodeExpressionDialog({
               language="arc"
               theme="arc-light"
               value={source}
-              onChange={(s) => setSource(s ?? "")}
+              onChange={(s) => changeSource(s ?? "")}
               onMount={(e) => {
                 editor.current = e;
               }}
@@ -163,7 +129,9 @@ export default function NodeExpressionDialog({
             Line {d.line}: {d.message}
           </Alert>
         ))}
-        {error && <Alert severity="error">{error}</Alert>}
+        {(error || catalogError) && (
+          <Alert severity="error">{error || catalogError}</Alert>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={busy}>
@@ -173,26 +141,7 @@ export default function NodeExpressionDialog({
           <Button
             variant="contained"
             disabled={busy || source === null || !!diagnostics.length}
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              try {
-                const result = await api.buildNode(
-                  definition,
-                  node.id,
-                  source!,
-                );
-                setDiagnostics(result.diagnostics);
-                if (result.definition) {
-                  onApply(result.definition);
-                  onClose();
-                } else onProblems(result.diagnostics.map((d) => d.message));
-              } catch (e) {
-                setError(errorMessage(e));
-              } finally {
-                setBusy(false);
-              }
-            }}
+            onClick={() => void apply()}
           >
             Apply to graph
           </Button>

@@ -2,6 +2,7 @@ package dev.arc.engine;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -70,6 +71,41 @@ class ExpressionsTest {
           "(".repeat(60) + "1" + ")".repeat(60)
         }) {
       assertThatThrownBy(() -> eval(expression)).as(expression).isInstanceOf(ArcException.class);
+    }
+  }
+
+  @Test
+  void decimalFailuresRemainCatchableExpressionErrors() {
+    assertThatThrownBy(() -> eval("1e40 % 3"))
+        .isInstanceOf(ArcException.class)
+        .hasMessageContaining("Decimal operation");
+    assertThat(eval("IFERROR(1e40 % 3, 7)")).isEqualTo(new BigDecimal("7"));
+  }
+
+  @Test
+  void roundingRejectsIntegerMinimumPrecisionWithoutOverflow() {
+    for (String function : new String[] {"ROUND", "ROUNDDOWN", "ROUNDUP"}) {
+      assertThatThrownBy(() -> eval(function + "(1, -2147483648)"))
+          .isInstanceOf(ArcException.class)
+          .hasMessageContaining("-12 to 12");
+    }
+  }
+
+  @Test
+  void jsonEncodedStringConstantsPreserveTheirCharacters() throws Exception {
+    String original = "control:\b\f" + (char) 0 + "\n\t\r quote:\" slash:\\ 中文";
+    String literal = new ObjectMapper().writeValueAsString(original);
+    assertThat(eval(literal)).isEqualTo(original);
+    assertThat(eval("\"\\u4e2d\\u6587\\uD83D\\uDE00\"")).isEqualTo("中文😀");
+    assertThat(eval("'it\\'s \\u0041\\b\\f'")).isEqualTo("it's A\b\f");
+  }
+
+  @Test
+  void malformedUnicodeEscapesAreExpressionErrors() {
+    for (String literal : new String[] {"\"\\u12\"", "\"\\uZZZZ\"", "'\\u-123'"}) {
+      assertThatThrownBy(() -> eval(literal))
+          .isInstanceOf(ArcException.class)
+          .hasMessageContaining("Unicode escape");
     }
   }
 }

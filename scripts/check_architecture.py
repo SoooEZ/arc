@@ -20,11 +20,22 @@ ALLOWED_JAVA = {
     "persistence": {"persistence", "rule", "source", "engine", "model", "error"},
     "api": {"api", "rule", "source", "engine", "model", "error"},
 }
+PURE_FRONTEND = {
+    "domain/": ("types", "domain/"),
+    "features/editor/documentState.ts": ("types", "domain/"),
+    "features/sources/model.ts": ("types", "domain/"),
+    "features/sources/sourceDocument.ts": ("types", "domain/", "features/sources/model"),
+    "features/studio/snippets.ts": ("types", "domain/"),
+}
 errors = []
 
 
 def reject(path, dependency, reason):
     errors.append(f"{path.relative_to(ROOT)}: {dependency}: {reason}")
+
+
+def matches_boundary(path, boundary):
+    return path.startswith(boundary) if boundary.endswith("/") else path == boundary
 
 
 for path in sorted(JAVA.rglob("*.java")):
@@ -47,7 +58,11 @@ for path in sorted(JAVA.rglob("*.java")):
 
 for path in sorted(FRONTEND.rglob("*.ts*")):
     relative = path.relative_to(FRONTEND).as_posix()
-    pure = relative.startswith("domain/") or relative == "features/editor/documentState.ts"
+    pure_imports = next((
+        allowed for owner, allowed in PURE_FRONTEND.items()
+        if matches_boundary(relative, owner)
+    ), None)
+    pure = pure_imports is not None
     transport = relative.startswith("api/")
     if not (pure or transport):
         continue
@@ -57,8 +72,10 @@ for path in sorted(FRONTEND.rglob("*.ts*")):
             reject(path, dependency, "pure domain and HTTP modules cannot import UI libraries")
             continue
         target = (path.parent / dependency).resolve().relative_to(FRONTEND).as_posix()
-        allowed = (target == "types" or target.startswith("domain/")) if pure else (
-            target == "types" or target.startswith("api/")
+        allowed_targets = pure_imports if pure else ("types", "api/")
+        allowed = any(
+            matches_boundary(target, owner)
+            for owner in allowed_targets
         )
         if not allowed:
             reject(path, dependency, "dependency crosses the domain/transport boundary")

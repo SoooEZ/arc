@@ -382,9 +382,10 @@ function EditorContent({
       {nodeCode && rule.draft.nodes.some((n) => n.id === nodeCode) && (
         <Suspense fallback={null}>
           <NodeExpressionDialog
+            key={nodeCode}
             definition={rule.draft}
             node={rule.draft.nodes.find((n) => n.id === nodeCode)!}
-            readOnly={readOnly}
+            readOnly={readOnly || !!busy}
             onProblems={setNodeCodeProblems}
             onApply={(d) => changeDefinition(() => d)}
             onClose={() => {
@@ -417,7 +418,7 @@ function EditorContent({
             "OUTPUT",
           ] as NodeType[]
         ).map((type) => (
-          <MenuItem key={type} onClick={() => addNode(type)}>
+          <MenuItem key={type} disabled={!!busy} onClick={() => addNode(type)}>
             <span className={`node-icon ${type.toLowerCase()}`}>
               <NodeIcon type={type} />
             </span>

@@ -86,6 +86,66 @@ test("stale layout cannot replace an expression edited while arrangement was pen
   expect(ruleSnapshot(after.rule)).not.toBe(after.baseline);
 });
 
+test("saving advances the server revision without discarding edits made after submission", () => {
+  const start = initialDocument(rule());
+  const submitted = start.rule;
+  const edited = documentReducer(start, {
+    type: "graph/change",
+    change: (definition) =>
+      patchGraphNode(definition, "left", { expression: "amount * 0.5" }),
+  });
+  const response = { ...submitted, revision: 2 };
+  const completed = documentReducer(edited, {
+    type: "rule/saved",
+    submitted,
+    rule: response,
+  });
+  expect(completed.rule.draft.nodes[1].expression).toBe("amount * 0.5");
+  expect(completed.rule.revision).toBe(2);
+  expect(completed.baseline).toBe(ruleSnapshot(response));
+  expect(ruleSnapshot(completed.rule)).not.toBe(completed.baseline);
+});
+
+test("a build response cannot erase a newer source buffer", () => {
+  const start = documentReducer(initialDocument(rule()), {
+    type: "source/changed",
+    source: "first buffer",
+  });
+  const edited = documentReducer(start, {
+    type: "source/changed",
+    source: "newer buffer",
+  });
+  const completed = documentReducer(edited, {
+    type: "source/built",
+    before: "first buffer",
+    source: "canonical first buffer",
+    definition: patchGraphNode(start.rule.draft, "left", { expression: "42" }),
+  });
+  expect(completed).toBe(edited);
+});
+
+test("a late rendered buffer cannot describe an older graph even while source is empty", () => {
+  const start = initialDocument(rule());
+  const edited = documentReducer(start, {
+    type: "graph/change",
+    change: (definition) =>
+      patchGraphNode(definition, "left", { expression: "42" }),
+  });
+  const stale = documentReducer(edited, {
+    type: "source/rendered",
+    before: start.rule.draft,
+    source: "outdated graph source",
+  });
+  expect(stale).toBe(edited);
+  const current = documentReducer(stale, {
+    type: "source/rendered",
+    before: edited.rule.draft,
+    source: "current graph source",
+  });
+  expect(current.source).toBe("current graph source");
+  expect(current.sourceDirty).toBe(false);
+});
+
 test("code errors retain the user's buffer and draft until a successful build", () => {
   const start = initialDocument(rule());
   const edited = documentReducer(start, {
@@ -94,10 +154,12 @@ test("code errors retain the user's buffer and draft until a successful build", 
   });
   const failed = documentReducer(edited, {
     type: "source/diagnostics",
+    before: "incomplete code",
     diagnostics: [{ message: "Missing node", line: 1, column: 1 }],
   });
   const lateRender = documentReducer(failed, {
     type: "source/rendered",
+    before: start.rule.draft,
     source: "outdated graph source",
   });
   expect(lateRender.source).toBe("incomplete code");
@@ -106,6 +168,7 @@ test("code errors retain the user's buffer and draft until a successful build", 
   const draft = patchGraphNode(start.rule.draft, "left", { expression: "42" });
   const built = documentReducer(lateRender, {
     type: "source/built",
+    before: "incomplete code",
     definition: draft,
     source: "valid code",
   });
@@ -115,6 +178,7 @@ test("code errors retain the user's buffer and draft until a successful build", 
   expect(built.baseline).toBe(start.baseline);
   const saved = documentReducer(built, {
     type: "rule/saved",
+    submitted: built.rule,
     rule: { ...built.rule, revision: 2 },
   });
   expect(saved.baseline).toBe(ruleSnapshot(saved.rule));

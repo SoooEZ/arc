@@ -1,3 +1,43 @@
+import type { Definition, InputType, Rule, Version } from "../../types";
+
+const bindingPlaceholder: Record<InputType, string> = {
+  STRING: '"value"',
+  BOOLEAN: "true",
+  ARRAY: "[]",
+  OBJECT: "null",
+  NUMBER: "0",
+};
+
+export function referenceSnippet(
+  rule: Pick<Rule, "id" | "name">,
+  version: Version,
+  caller: Definition,
+  nodeId: string,
+): string {
+  const bindings = version.definition.inputs
+    .filter(
+      (input) => input.required && !input.source && input.defaultValue == null,
+    )
+    .map((input) => {
+      const expression = caller.inputs.some(
+        (candidate) => candidate.name === input.name,
+      )
+        ? input.name
+        : bindingPlaceholder[input.type];
+      return `  bind ${input.name} = ${expression};`;
+    });
+  return [
+    "",
+    `node ${JSON.stringify(nodeId)} REFERENCE ${JSON.stringify(rule.name)} {`,
+    `  use ${JSON.stringify(rule.id)} version ${version.version};`,
+    ...bindings,
+    "  as ${1:reusedResult};",
+    '  next -> "${2:output}";',
+    "}",
+    "",
+  ].join("\n");
+}
+
 export const modules = [
   {
     name: "Switch cases",

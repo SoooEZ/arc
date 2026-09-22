@@ -187,7 +187,7 @@ test("data source UI creates, tests and versions a lookup table", async ({
     .click();
   await expect(
     page.getByText(
-      "Data source v2 saved. Existing rules keep their pinned version.",
+      "Data source Exchange table v2 saved. Existing rules keep their pinned version.",
     ),
   ).toBeVisible();
   const old = await (

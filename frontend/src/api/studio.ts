@@ -14,8 +14,11 @@ export const studioApi = {
     http.post<Record<string, string[]>>("/variables", definition, options),
   validate: (definition: Definition) =>
     http.post<{ valid: boolean }>("/validate", definition),
-  preview: (definition: Definition, inputs: Record<string, unknown>) =>
-    http.post<Execution>("/preview", { definition, inputs }),
+  preview: (
+    definition: Definition,
+    inputs: Record<string, unknown>,
+    options?: RequestOptions,
+  ) => http.post<Execution>("/preview", { definition, inputs }, options),
   functions: (options?: RequestOptions) =>
     http.get<FunctionEntry[]>("/functions", options),
   render: (definition: Definition, options?: RequestOptions) =>

@@ -70,7 +70,8 @@ public final class Functions {
           } catch (ArithmeticException e) {
             throw ArcException.invalid("Round precision must be an integer");
           }
-          if (Math.abs(scale) > 12) throw ArcException.invalid("Round precision must be -12 to 12");
+          if (scale < -12 || scale > 12)
+            throw ArcException.invalid("Round precision must be -12 to 12");
           return Expressions.number(first)
               .setScale(
                   scale,

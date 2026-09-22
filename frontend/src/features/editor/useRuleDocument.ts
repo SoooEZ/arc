@@ -32,6 +32,8 @@ export function useRuleDocument({
     initialDocument,
   );
   const { rule, source, sourceDirty, baseline } = state;
+  const latestState = useRef(state);
+  latestState.current = state;
   const [invalidJson, setInvalidJson] = useState<Record<string, boolean>>({});
   const hasInvalidJson = Object.values(invalidJson).some(Boolean);
   const [busy, setBusy] = useState("");
@@ -99,7 +101,7 @@ export function useRuleDocument({
   }, [initial.id, requestedVersion, fail]);
   const changeDefinition = useCallback(
     (change: DefinitionChange) => {
-      if (readOnly) return;
+      if (readOnly || running.current) return;
       dispatch({ type: "graph/change", change });
       setError("");
     },
@@ -112,13 +114,22 @@ export function useRuleDocument({
       );
     if (!sourceDirty || source === null || readOnly) return rule.draft;
     const result = await studioApi.build(source);
-    dispatch({ type: "source/diagnostics", diagnostics: result.diagnostics });
+    if (latestState.current.source !== source)
+      throw new Error(
+        "The code changed while building. Build the current buffer again.",
+      );
+    dispatch({
+      type: "source/diagnostics",
+      before: source,
+      diagnostics: result.diagnostics,
+    });
     if (!result.definition)
       throw new Error(
         result.diagnostics[0]?.message || "Code could not be built",
       );
     dispatch({
       type: "source/built",
+      before: source,
       definition: result.definition,
       source: result.source,
     });
@@ -131,7 +142,11 @@ export function useRuleDocument({
       .render(rule.draft, { signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted)
-          dispatch({ type: "source/rendered", source: result.source });
+          dispatch({
+            type: "source/rendered",
+            before: rule.draft,
+            source: result.source,
+          });
       })
       .catch((failure) => {
         if (!controller.signal.aborted) fail(failure);
@@ -176,7 +191,7 @@ export function useRuleDocument({
     });
   const save = async (candidate: Rule) => {
     const saved = await ruleApi.save(candidate);
-    dispatch({ type: "rule/saved", rule: saved });
+    dispatch({ type: "rule/saved", submitted: candidate, rule: saved });
     onSaved(saved);
     return saved;
   };
@@ -198,7 +213,7 @@ export function useRuleDocument({
           ? await save(candidate)
           : candidate;
       const published = await ruleApi.publish(saved.id, saved.revision);
-      dispatch({ type: "rule/saved", rule: published });
+      dispatch({ type: "rule/saved", submitted: saved, rule: published });
       onSaved(published);
       notify(
         `Version ${published.publishedVersion} published and ready to call`,

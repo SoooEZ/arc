@@ -155,4 +155,28 @@ class EngineTest {
             List.of(edge("input", "result", "next")));
     assertThat(run(d, Map.of()).result()).isEqualTo(BigDecimal.ZERO);
   }
+
+  @Test
+  void decimalFailuresIdentifyTheNodeForErrorNavigation() {
+    for (String expression : new String[] {"1e40 % 3", "ROUND(1, -2147483648)"}) {
+      var definition =
+          new Definition(
+              1,
+              List.of(),
+              List.of(
+                  node("input", "INPUT", null, null),
+                  node("calculate", "FORMULA", expression, "value"),
+                  node("result", "OUTPUT", "value", null)),
+              List.of(edge("input", "calculate", "next"), edge("calculate", "result", "next")));
+      assertThatThrownBy(() -> run(definition, Map.of()))
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(422);
+                assertThat(error.locations())
+                    .containsExactly(
+                        new ArcException.Location("test", 1, "calculate", "calculate"));
+              });
+    }
+  }
 }

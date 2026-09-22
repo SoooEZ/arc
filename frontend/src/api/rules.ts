@@ -15,8 +15,17 @@ export const ruleApi = {
     }),
   publish: (id: string, revision: number) =>
     http.post<Rule>(`/rules/${pathId(id)}/publish`, { revision }),
-  execute: (id: string, inputs: Record<string, unknown>, version?: number) =>
-    http.post<Execution>(`/rules/${pathId(id)}/execute`, { inputs, version }),
+  execute: (
+    id: string,
+    inputs: Record<string, unknown>,
+    version?: number,
+    options?: RequestOptions,
+  ) =>
+    http.post<Execution>(
+      `/rules/${pathId(id)}/execute`,
+      { inputs, version },
+      options,
+    ),
   versions: (id: string, options?: RequestOptions) =>
     http.get<Version[]>(`/rules/${pathId(id)}/versions`, options),
   version: (id: string, version: number, options?: RequestOptions) =>

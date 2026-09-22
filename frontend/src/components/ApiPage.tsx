@@ -9,8 +9,13 @@ import {
   Terminal,
 } from "lucide-react";
 import { api, errorMessage } from "../api";
-import type { Definition, Execution, Rule, Version } from "../types";
-import { curlExample, sampleInputs } from "./TestPanel";
+import type { Rule, Version } from "../types";
+import {
+  curlExample,
+  parseExecutionInputs,
+  sampleInputs,
+} from "../domain/executionInputs";
+import { useExecutionRequest } from "../features/execution/useExecutionRequest";
 
 export default function ApiPage({
   mode,
@@ -29,20 +34,21 @@ export default function ApiPage({
   );
   const [versions, setVersions] = useState<Version[]>([]);
   const [version, setVersion] = useState<number | "">("");
-  const [definition, setDefinition] = useState<Definition | null>(null);
+  const definition = versions.find(
+    (candidate) => candidate.version === version,
+  )?.definition;
   const [inputs, setInputs] = useState("{}");
-  const [result, setResult] = useState<Execution | null>(null);
-  const [error, setError] = useState("");
-  const [running, setRunning] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const execution = useExecutionRequest(JSON.stringify([id, version, inputs]));
+  const { result, running } = execution;
+  const error = loadError || execution.error;
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     if (!id) return;
     let active = true;
     setLoading(true);
-    setError("");
-    setResult(null);
+    setLoadError("");
     setVersions([]);
-    setDefinition(null);
     setVersion("");
     api
       .versions(id)
@@ -53,7 +59,7 @@ export default function ApiPage({
         }
       })
       .catch((e) => {
-        if (active) setError(errorMessage(e));
+        if (active) setLoadError(errorMessage(e));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -63,41 +69,27 @@ export default function ApiPage({
     };
   }, [id]);
   useEffect(() => {
-    const d = versions.find((v) => v.version === version)?.definition;
-    if (d) {
-      setDefinition(d);
-      setInputs(JSON.stringify(sampleInputs(d), null, 2));
-      setResult(null);
-    }
-  }, [versions, version]);
-  const run = async () => {
-    setError("");
-    setRunning(true);
-    setResult(null);
-    try {
-      const body: unknown = JSON.parse(inputs);
-      if (!body || typeof body !== "object" || Array.isArray(body))
-        throw new Error("Inputs must be a JSON object.");
-      setResult(
-        await api.execute(
-          id,
-          body as Record<string, unknown>,
-          version || undefined,
-        ),
-      );
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setRunning(false);
-    }
-  };
+    if (definition)
+      setInputs(JSON.stringify(sampleInputs(definition), null, 2));
+  }, [definition]);
+  const run = () =>
+    execution.run((signal) =>
+      api.execute(id, parseExecutionInputs(inputs), version || undefined, {
+        signal,
+      }),
+    );
   let values = {};
   try {
     values = JSON.parse(inputs);
   } catch {
     /* Code sample stays available while editing. */
   }
-  const curl = curlExample(id || "order-pricing", values, version || undefined);
+  const curl = curlExample(
+    window.location.origin,
+    id || "order-pricing",
+    values,
+    version || undefined,
+  );
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(curl);
@@ -209,10 +201,7 @@ export default function ApiPage({
               multiline
               rows={7}
               value={inputs}
-              onChange={(e) => {
-                setInputs(e.target.value);
-                setResult(null);
-              }}
+              onChange={(e) => setInputs(e.target.value)}
               className="json-input"
               slotProps={{ htmlInput: { "aria-label": "API input JSON" } }}
               spellCheck={false}
@@ -259,7 +248,7 @@ export default function ApiPage({
               {result ? JSON.stringify(result, null, 2) : curl}
             </pre>
             {result && (
-              <button className="text-link" onClick={() => setResult(null)}>
+              <button className="text-link" onClick={execution.clear}>
                 Show cURL request <ArrowRight size={13} />
               </button>
             )}

@@ -8,52 +8,18 @@ import {
   Terminal,
   X,
 } from "lucide-react";
+import { studioApi } from "../api/studio";
+import type { GraphProblem } from "../api/errors";
 import {
-  api,
-  ApiError,
-  type ErrorLocation,
-  type GraphProblem,
-  errorMessage,
-} from "../api";
+  curlExample,
+  parseExecutionInputs,
+  sampleInputs,
+} from "../domain/executionInputs";
+import { useExecutionRequest } from "../features/execution/useExecutionRequest";
 import type { ReferenceTarget } from "./ReferenceDialog";
 import type { Definition, Execution } from "../types";
 import { NodeIcon } from "./Icons";
 
-export function sampleInputs(definition: Definition): Record<string, unknown> {
-  return Object.fromEntries(
-    definition.inputs
-      .filter((p) => !p.source && (p.required || p.defaultValue != null))
-      .map((p) => [
-        p.name,
-        p.defaultValue ??
-          (p.type === "ARRAY"
-            ? []
-            : p.type === "OBJECT"
-              ? {}
-              : p.type === "NUMBER"
-                ? p.name === "rate"
-                  ? 0.1
-                  : 150
-                : p.type === "BOOLEAN"
-                  ? true
-                  : p.name === "customerTier"
-                    ? "premium"
-                    : "example"),
-      ]),
-  );
-}
-export function curlExample(
-  id: string,
-  inputs: Record<string, unknown>,
-  version?: number | null,
-) {
-  const body = JSON.stringify(
-    { inputs, ...(version ? { version } : {}) },
-    null,
-    2,
-  );
-  return `curl -X POST '${window.location.origin}/api/rules/${id}/execute' \\\n  -H 'Content-Type: application/json' \\\n  -d '${body.replace(/'/g, "'\\''")}'`;
-}
 export default function TestPanel({
   definition,
   ruleId,
@@ -76,49 +42,22 @@ export default function TestPanel({
   const [input, setInput] = useState(() =>
     JSON.stringify(sampleInputs(definition), null, 2),
   );
-  const [result, setResult] = useState<Execution | null>(null);
-  const [error, setError] = useState("");
-  const [locations, setLocations] = useState<ErrorLocation[]>([]);
-  const [running, setRunning] = useState(false);
   const [tab, setTab] = useState(0);
   const inputSchema = JSON.stringify(definition.inputs);
-  const graph = JSON.stringify(definition);
+  const execution = useExecutionRequest(JSON.stringify([definition, input]));
+  const { result, error, running, problem } = execution;
+  const locations = problem?.locations ?? [];
   useEffect(() => {
     setInput(JSON.stringify(sampleInputs(definition), null, 2));
   }, [inputSchema]); // Reset example values when the input contract changes.
   useEffect(() => {
-    setResult(null);
-    setError("");
-    setLocations([]);
-    onResult(null);
-  }, [graph, onResult]);
-  const run = async () => {
-    setRunning(true);
-    setError("");
-    setLocations([]);
-    setResult(null);
-    onResult(null);
-    onError(null);
-    try {
-      const values: unknown = JSON.parse(input);
-      if (values == null || typeof values !== "object" || Array.isArray(values))
-        throw new Error("Inputs must be a JSON object.");
-      const execution = await api.preview(
-        definition,
-        values as Record<string, unknown>,
-      );
-      setResult(execution);
-      onResult(execution);
-    } catch (e) {
-      setError(errorMessage(e));
-      if (e instanceof ApiError) {
-        setLocations(e.locations);
-        onError({ message: e.message, locations: e.locations });
-      }
-    } finally {
-      setRunning(false);
-    }
-  };
+    onResult(result);
+    onError(problem);
+  }, [result, problem, onResult, onError]);
+  const run = () =>
+    execution.run((signal) =>
+      studioApi.preview(definition, parseExecutionInputs(input), { signal }),
+    );
   let parsed: Record<string, unknown> = {};
   try {
     parsed = JSON.parse(input);
@@ -164,14 +103,7 @@ export default function TestPanel({
               multiline
               rows={6}
               value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                setResult(null);
-                onResult(null);
-                setError("");
-                setLocations([]);
-                onError(null);
-              }}
+              onChange={(e) => setInput(e.target.value)}
               className="json-input"
               spellCheck={false}
             />
@@ -180,7 +112,14 @@ export default function TestPanel({
               {!publishedVersion && (
                 <span>Publish this rule to enable its endpoint.</span>
               )}
-              <pre>{curlExample(ruleId, parsed, publishedVersion)}</pre>
+              <pre>
+                {curlExample(
+                  window.location.origin,
+                  ruleId,
+                  parsed,
+                  publishedVersion,
+                )}
+              </pre>
               <small>
                 cURL executes the published version. Preview uses the graph
                 above.

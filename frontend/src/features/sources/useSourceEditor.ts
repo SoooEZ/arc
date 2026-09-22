@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { sourceApi } from "../../api/sources";
 import { errorMessage } from "../../api/errors";
+import { useAsyncResource } from "../../hooks/useAsyncResource";
 import type { DataSource, SourceConfig } from "../../types";
+import { mergeSourceLists, sourceCandidate, type SourceBuffers } from "./model";
+import { sourceDocumentReducer, sourceIsDirty } from "./sourceDocument";
+
 export function useSourceEditor({
   onDirty,
   notify,
@@ -10,165 +14,173 @@ export function useSourceEditor({
   notify: (message: string) => void;
 }) {
   const [sources, setSources] = useState<DataSource[]>([]);
-  const [selected, setSelected] = useState<DataSource | null>(null);
-  const [baseline, setBaseline] = useState("");
-  const [params, setParams] = useState("");
-  const [entries, setEntries] = useState("");
-  const [headers, setHeaders] = useState("{}");
-  const [test, setTest] = useState('{"key":"US"}');
-  const [result, setResult] = useState<unknown>(undefined);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [versions, setVersions] = useState<DataSource[]>([]);
-  const [viewVersion, setViewVersion] = useState(0);
-  const snapshot = JSON.stringify([selected, params, entries, headers]);
-  const dirty = !!selected && snapshot !== baseline;
-  const historical = !!selected && viewVersion !== selected.version;
-  const choose = (s: DataSource) => {
-    const p = JSON.stringify(s.definition.parameters, null, 2),
-      e = JSON.stringify(s.definition.entries ?? {}, null, 2),
-      h = JSON.stringify(s.definition.secretHeaders ?? {}, null, 2);
-    setSelected(s);
-    setViewVersion(s.version);
-    setParams(p);
-    setEntries(e);
-    setHeaders(h);
-    setBaseline(JSON.stringify([s, p, e, h]));
-    setResult(undefined);
-    setError("");
-    setTest(
-      JSON.stringify(
-        Object.fromEntries(
-          s.definition.parameters.map((p) => [
-            p.name,
-            p.defaultValue ??
-              (p.type === "NUMBER"
-                ? 1
-                : p.type === "BOOLEAN"
-                  ? true
-                  : p.name === "key"
-                    ? "US"
-                    : "example"),
-          ]),
-        ),
-        null,
-        2,
-      ),
-    );
-  };
-  const load = async () => {
-    try {
-      const rows = await sourceApi.sources();
-      setSources(rows);
-      if (!selected && rows.length) choose(rows[0]);
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  };
+  const [document, dispatch] = useReducer(sourceDocumentReducer, null);
+  const [listError, setListError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const selection = useRef(0);
+  const requestSequence = useRef(0);
+  const [savingIds, setSavingIds] = useState<string[]>([]);
+  const mounted = useRef(true);
+  const dirty = document !== null && sourceIsDirty(document);
+  const historical =
+    document !== null && document.viewedVersion !== document.source.version;
+  const saving = document !== null && savingIds.includes(document.source.id);
+  const selected = document?.source;
+  const versions = useAsyncResource(
+    JSON.stringify([selected?.id, selected?.version]),
+    (signal) => sourceApi.sourceVersions(selected!.id, { signal }),
+    [] as DataSource[],
+    0,
+    !!selected?.version,
+  );
+
   useEffect(() => {
-    void load();
+    mounted.current = true;
+    const controller = new AbortController();
+    sourceApi
+      .sources({ signal: controller.signal })
+      .then((rows) => {
+        if (controller.signal.aborted) return;
+        setSources((current) => mergeSourceLists(current, rows));
+        // A new source can be started before the initial list arrives.
+        if (selection.current === 0 && rows.length) {
+          dispatch({
+            type: "select",
+            source: rows[0],
+            selection: ++selection.current,
+          });
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setListError(errorMessage(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => {
+      mounted.current = false;
+      controller.abort();
+    };
   }, []);
   useEffect(() => {
     onDirty(dirty);
   }, [dirty, onDirty]);
-  useEffect(() => {
-    let live = true;
-    if (selected?.version)
-      sourceApi
-        .sourceVersions(selected.id)
-        .then((rows) => {
-          if (live) setVersions(rows);
-        })
-        .catch((e) => {
-          if (live) setError(errorMessage(e));
-        });
-    else setVersions([]);
-    return () => {
-      live = false;
-    };
-  }, [selected?.id, selected?.version]);
-  const select = (s: DataSource) => {
+
+  const select = (source: DataSource) => {
     if (dirty && !window.confirm("Discard unsaved source changes?")) return;
-    choose(s);
+    dispatch({ type: "select", source, selection: ++selection.current });
   };
-  const configPatch = (patch: Partial<SourceConfig>) => {
-    if (selected)
-      setSelected({
-        ...selected,
-        definition: { ...selected.definition, ...patch },
-      });
+  const inspectVersion = (version: number) => {
+    const source = versions.data.find(
+      (candidate) => candidate.version === version,
+    );
+    if (source)
+      dispatch({ type: "version", version, configuration: source.definition });
   };
   const save = async () => {
-    if (!selected) return;
-    setBusy(true);
-    setError("");
+    if (!document || historical || saving) return;
+    const sourceId = document.source.id;
+    const request = ++requestSequence.current;
+    setSavingIds((ids) => [...ids, sourceId]);
+    dispatch({ type: "save/start", request });
     try {
-      const c = {
-        ...selected.definition,
-        parameters: JSON.parse(params),
-        entries: JSON.parse(entries),
-        secretHeaders: JSON.parse(headers),
-      };
-      const saved = selected.version
-        ? await sourceApi.saveSource({ ...selected, definition: c })
-        : await sourceApi.createSource(selected.id, selected.name, c);
-      setSources((rows) => [saved, ...rows.filter((r) => r.id !== saved.id)]);
-      choose(saved);
+      const candidate = sourceCandidate(document.source, document.buffers);
+      const saved = candidate.version
+        ? await sourceApi.saveSource(candidate)
+        : await sourceApi.createSource(
+            candidate.id,
+            candidate.name,
+            candidate.definition,
+          );
+      if (!mounted.current) return;
+      // Refresh the library even when another source is being edited.
+      setSources((rows) => mergeSourceLists([saved], rows));
+      dispatch({
+        type: "save/success",
+        request,
+        selection: document.selection,
+        source: saved,
+      });
       notify(
-        `Data source v${saved.version} saved. Existing rules keep their pinned version.`,
+        `Data source ${saved.name} v${saved.version} saved. Existing rules keep their pinned version.`,
       );
-    } catch (e) {
-      setError(errorMessage(e));
+    } catch (error) {
+      if (mounted.current)
+        dispatch({
+          type: "save/failure",
+          request,
+          selection: document.selection,
+          error: errorMessage(error),
+        });
     } finally {
-      setBusy(false);
+      if (mounted.current)
+        setSavingIds((ids) => ids.filter((id) => id !== sourceId));
     }
   };
   const run = async () => {
-    if (!selected) return;
-    setBusy(true);
-    setError("");
-    setResult(undefined);
+    if (
+      !document ||
+      !document.source.version ||
+      dirty ||
+      saving ||
+      document.testing !== null
+    )
+      return;
+    const request = ++requestSequence.current;
+    dispatch({ type: "test/start", request });
     try {
+      const inputs: unknown = JSON.parse(document.testInput);
+      if (
+        inputs === null ||
+        typeof inputs !== "object" ||
+        Array.isArray(inputs)
+      )
+        throw new Error("Test parameters must be a JSON object.");
       const response = await sourceApi.testSource(
-        selected.id,
-        viewVersion,
-        JSON.parse(test),
+        document.source.id,
+        document.viewedVersion,
+        inputs as Record<string, unknown>,
       );
-      setResult(response.result);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
+      if (mounted.current)
+        dispatch({ type: "test/success", request, result: response.result });
+    } catch (error) {
+      if (mounted.current)
+        dispatch({ type: "test/failure", request, error: errorMessage(error) });
     }
   };
   const displayConfig = historical
-    ? versions.find((v) => v.version === viewVersion)?.definition
-    : selected?.definition;
+    ? versions.data.find((source) => source.version === document?.viewedVersion)
+        ?.definition
+    : document?.source.definition;
+
   return {
     sources,
-    selected,
-    params,
-    entries,
-    headers,
-    test,
-    result,
-    error,
-    busy,
-    versions,
-    viewVersion,
+    document,
+    loading,
     dirty,
     historical,
+    saving,
+    versions: versions.data,
+    versionsLoading: versions.loading,
+    error: document?.error || listError,
+    versionsError: versions.error,
+    displayConfig,
     select,
-    configPatch,
+    inspectVersion,
     save,
     run,
-    displayConfig,
-    setSelected,
-    setParams,
-    setEntries,
-    setHeaders,
-    setTest,
-    setViewVersion,
-    setError,
+    changeMetadata: (patch: Pick<Partial<DataSource>, "id" | "name">) =>
+      dispatch({ type: "metadata", patch }),
+    changeConfig: (patch: Partial<SourceConfig>) =>
+      dispatch({ type: "configuration", patch }),
+    changeBuffer: (field: keyof SourceBuffers, value: string) =>
+      dispatch({ type: "buffer", field, value }),
+    changeProvider: (kind: SourceConfig["kind"]) =>
+      dispatch({ type: "provider", kind }),
+    changeTestInput: (value: string) => dispatch({ type: "test/input", value }),
+    dismissError: () => {
+      dispatch({ type: "error/clear" });
+      setListError("");
+    },
   };
 }

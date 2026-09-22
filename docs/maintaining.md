@@ -23,6 +23,10 @@ Dependencies point from HTTP into application services, and from application ser
 
 `Functions` is the evaluator-facing facade. `FunctionCatalog` owns immutable function metadata, arity, help, and supported/reference-only entries. `ExcelFunctionAdapter` owns POI value conversion and invocation. ARC decimal operations retain their existing semantics; POI calculations retain Excel floating-point semantics.
 
+`Validator` coordinates executable graph checks and diagnostic collection. `DefinitionShape` owns draft structure and limits, `InputValidation` owns declared parameter types and source-binding shape, and `NodeValidation` owns node semantics and the expressions a node contains. Full validation and syntax-only diagnostics use the same expression enumeration. Add a node's expression fields there so incomplete or cyclic graphs receive the same syntax coverage as executable graphs. The helpers are package-private concrete collaborators; callers retain the existing `Validator` API.
+
+`ArcScript` is the studio facade. `ArcScriptScanner` tracks statement boundaries, quoting, comments and source locations; `ArcScriptParser` builds graph records; `ArcScriptRenderer` produces canonical text. Single-node replacement belongs to the facade because it combines a parsed fragment with its containing graph. A fragment may replace only its node and outgoing edges (plus parameters for Input); incoming edges, unrelated nodes and graph notes remain owned by the containing graph. Grammar changes need both parser and renderer changes, with canonical-text and round-trip tests.
+
 ### Adding a data source
 
 1. Implement `SourceAdapter` as a Spring component with a unique `kind()`, configuration validation, and `fetch(...)`. `SourceAdapters` discovers it through constructor injection and rejects duplicate kinds on startup. No dispatch branch is needed in `SourceService`.
@@ -49,17 +53,27 @@ A node kind changes the graph contract, not just a switch statement: review `Def
 | `app/` | Hash navigation, dirty-document guards, library loading, sidebar and create dialog |
 | `features/editor/documentState.ts` | Pure, atomic draft/code/trace state transitions |
 | `features/editor/useRuleDocument.ts` | Save/build/publish commands, versions, dirty state and code synchronization |
+| `features/editor/useNodeExpressionDraft.ts` | One node-code editing session: loading, diagnostics and applying a fragment |
 | `features/editor/useGraphProblems.ts` | Static diagnostics, runtime errors and referenced-node error projection |
 | `features/editor/useGraphCanvas.ts` | React Flow nodes, edges and UI measurements |
 | `features/editor/inspector/` | Node-specific forms selected by an exhaustive node-type registry |
-| `features/studio/` | Module snippets and shared Monaco insertion, completion and hover behavior |
-| `features/sources/` | Source editor state and operations |
+| `features/studio/` | Pure module/reference snippets and shared Monaco insertion, completion and hover behavior |
+| `features/execution/useExecutionRequest.ts` | Request ownership, cancellation, result and error state for preview and published execution |
+| `features/sources/sourceDocument.ts` | Pure source selection, JSON buffers, saved baseline, version and request transitions |
+| `features/sources/useSourceEditor.ts` | Source commands and resource loading around the source document |
+| `features/sources/SourceConfigurationFields.tsx` | Provider-specific source configuration forms |
 | `hooks/useAsyncResource.ts` | Debounced reads, abort/cleanup, stale-response suppression |
 | `components/` | Reusable UI and page composition |
 
 `api.ts` remains a compatibility facade over the resource clients. New controllers/hooks should import the relevant resource client. Pure domain functions and the document reducer must not import React, MUI, React Flow or network clients. They can be tested without mounting the editor or starting a server.
 
 Graph and code edits share one document reducer. Building code updates the graph atomically; failed code builds preserve the buffer and prior graph. Saving advances the saved baseline. Node measurements never enter the graph document. Arrange results carry the draft they started from, so a late layout cannot replace a newer edit.
+
+Save acknowledgements also carry the submitted rule. The reducer advances the server revision and saved baseline while preserving edits made after submission; a stale code build must not replace a newer buffer. Disabled controls communicate pending commands, but reducer checks enforce the draft contract independently of those controls.
+
+Preview and published execution share a narrow request hook. Its key includes the graph/version and input buffer; changing either, rerunning, or unmounting invalidates the previous request. Only a current result may update the graph's trace or error locations. Example inputs, JSON-object parsing and cURL formatting live in `domain/executionInputs.ts`, so the API page does not import a test-panel component for data helpers.
+
+Each source selection receives a session identity. Save responses update the source list and carry their source, selection and request identities. They cannot select another source or replace newer edits. Reopening the same source during its save can adopt the completed server revision while preserving any subsequent changes. Test responses additionally belong to the selected version and input buffer. Source reducers and buffer helpers stay free of React and network calls, allowing these race conditions to be tested as state transitions.
 
 Async reads use a key describing the requested resource, an `AbortSignal`, and cleanup on selection changes/unmount. `semanticGraphKey` excludes positions: dragging a card changes the draft but does not refetch variables or diagnostics. A different expression or connection does. If a new consumer adds a query parameter, include it in the key; changing a loader closure alone does not refetch. Mutation commands remain explicit and serialize through the document controller.
 
