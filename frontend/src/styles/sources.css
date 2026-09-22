@@ -1,0 +1,138 @@
+.source-binding {
+  border-top: 1px dashed #d6e1d8;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin-top: 14px;
+  padding-top: 16px;
+}
+.sources-page {
+  padding: 36px 42px;
+  max-width: 1600px;
+  margin: auto;
+}
+.sources-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.sources-heading h1 {
+  font-size: 32px;
+  letter-spacing: -1.2px;
+  margin: 10px 0;
+}
+.sources-heading p {
+  font-size: 13px;
+  color: #849186;
+}
+.source-explainer {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 18px 20px;
+  background: #f0f5ef;
+  border: 1px solid #e2e9df;
+  border-radius: 9px;
+  color: #718268;
+  font-size: 11px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.sources-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 28px;
+}
+.source-list button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  width: 100%;
+  padding: 17px 12px;
+  font-size: 12px;
+  color: #56705e;
+  border-radius: 8px;
+  margin-bottom: 7px;
+}
+.source-list button.active {
+  background: #eaf1e9;
+  color: #2c6746;
+}
+.source-list small {
+  display: block;
+  font-size: 9px;
+  margin-top: 6px;
+  color: #8c9b8d;
+}
+.source-list p {
+  font-size: 11px;
+  color: #96a195;
+  line-height: 1.8;
+  padding: 12px;
+}
+.source-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border: 1px solid #e2e8e0;
+  border-radius: 11px;
+  padding: 26px;
+  background: #fff;
+  min-width: 0;
+}
+.source-detail-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.source-detail-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.source-detail h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.source-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.json-input,
+.source-json {
+  font-family: "JetBrains Mono", monospace !important;
+  font-size: 12px !important;
+  line-height: 1.8;
+}
+.source-json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f5f8f3;
+  border: 1px solid #e0e8dc;
+  padding: 18px;
+  border-radius: 7px;
+  margin: 0;
+}
+.source-test {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding-top: 24px;
+  border-top: 1px solid #e4e9e1;
+}
+.source-test h3 {
+  font-size: 13px;
+  margin: 0;
+}
+.source-test p {
+  font-size: 11px;
+  color: #8a978b;
+  margin: 0;
+}
+.source-test > .MuiButton-root {
+  align-self: start;
+}

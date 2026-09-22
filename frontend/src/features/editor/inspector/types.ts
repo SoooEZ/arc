@@ -1,6 +1,6 @@
 import type { Definition, Rule, RuleNode } from "../../../types";
 import type { VariableOption } from "../../../domain/graph";
-import type { ReferenceTarget } from "../../../components/ReferenceDialog";
+import type { ReferenceTarget } from "../types";
 export interface NodeFieldsProps {
   rule: Rule;
   node: RuleNode;

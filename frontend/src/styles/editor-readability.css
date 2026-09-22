@@ -1,0 +1,21 @@
+.graph-node > strong {
+  font-size: 14px;
+}
+.node-type-line {
+  font-size: 10px;
+  color: #71816a;
+}
+.node-detail {
+  font-size: 10px;
+  color: #6c7e62;
+}
+.node-input .node-detail {
+  font-size: 10px;
+}
+.branch-explainer > div {
+  color: #7d8c72;
+}
+.test-empty p,
+.test-empty strong {
+  color: #7d906d;
+}

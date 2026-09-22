@@ -4,37 +4,61 @@ ARC remains one React application and one Java application. The HTTP paths, grap
 
 For AI-assisted changes, [the project guidance and Skills](ai-quality.md) turn these boundaries into implementation, refactoring and review workflows. Their [pinned upstream references](ai-sources.md) document the ideas selected and adapted to ARC.
 
+Read the applicable [review lessons](review-lessons.md) before changing a boundary. They connect failures found in earlier reviews to preventive rules and existing behavior tests; dated reports retain the original evidence.
+
 ## Backend boundaries
 
 | Package | Responsibility | Extension point |
 | --- | --- | --- |
 | `api` | HTTP binding, response status, error translation, request limits | Controllers call application services; no SQL |
 | `rule` | Draft commands, publication transactions, definition checks, execution orchestration | `RuleRepository` separates storage; definition and execution services are separate |
-| `engine` | Parsing, graph planning, scope analysis, expressions, parameter resolution | `RuleResolver` and `SourceReader` expose only the capabilities an execution needs |
-| `source` | Versioned source commands, binding validation, typed inputs, provider dispatch | `SourceAdapter` implementations registered by `SourceAdapters` |
+| `engine` | Narrow dependency ports and shared identifier/value policies | `RuleResolver`, `SourceReader`, `MemoizingRuleResolver`, `Identifiers`, `InputTypes` |
+| `engine.expression` | Expression parsing, evaluation, bounded values and function capabilities | `Expressions` and `Functions`; POI stays behind `ExcelFunctionAdapter` |
+| `engine.script` | ARC Script scanning, document/node grammar and canonical rendering | `ArcScript` owns whole-graph and single-node build/render operations |
+| `engine.graph` | Topological order, ancestry and branch-sensitive available variables | Read-only `GraphPlan`; topology, scopes and Boolean conditions remain internal |
+| `engine.validation` | Draft shape, executable graph checks and editor diagnostics | `Validator` coordinates shared shape and node checks |
+| `engine.execution` | Graph execution sessions, joins, traces and parameter resolution | `Engine` creates a `GraphExecution`; nested calls share execution limits |
+| `source` | Version commands, static binding checks, typed reads and provider registry | `SourceService` owns writes; `SourceExecutionService` implements `SourceReader` |
+| `source.http`, `source.lookup` | Provider-specific validation and fetching | `SourceAdapter` implementations registered by `SourceAdapters` |
 | `persistence` | JDBC, row locks, JSONB serialization, repository implementations | `JdbcRuleRepository`, `JdbcSourceRepository`, `JsonCodec` |
 | `model`, `error` | Portable records and structured application errors | No Spring, JDBC, or HTTP imports |
 
 Dependencies point from HTTP into application services, and from application services into the engine and repository interfaces. JDBC implementations depend on those interfaces. The engine does not depend on controllers, JDBC, or source application services. Spring constructor injection assembles the implementations; its component annotations in the engine are intentional, so this is not a framework-free core.
 
+The root `engine` package contains shared contracts, not feature orchestration. `Identifiers.isValid` owns identifier syntax and reserved words; `InputTypes.check` owns strict declared value types. Expressions and source providers can use these policies without depending on graph validation. Required, missing, explicit-null and default handling remain with the caller. Keep implementation helpers package-private within their feature; moving files should not turn every helper into a public API.
+
 `RuleService` owns create/save/publish transaction boundaries. A publish must lock the draft, check its revision, validate pinned dependencies, and insert the version in one transaction. Repository replacements must preserve these guarantees, including `409` conflicts. Source revisions use the same application transaction boundary. Never move a write outside that boundary just to shorten a service method.
 
 `RuleExecutionService` creates one `MemoizingRuleResolver` and one `Parameters` instance per execution. The resolver is a decorator keyed by rule ID and version, reused during validation and execution. The parameter read budget is shared across nested calls. Neither cache nor execution state belongs in a singleton bean. Static diagnostics use source definitions but never fetch external values.
 
-`Functions` is the evaluator-facing facade. `FunctionCatalog` owns immutable function metadata, arity, help, and supported/reference-only entries. `ExcelFunctionAdapter` owns POI value conversion and invocation. ARC decimal operations retain their existing semantics; POI calculations retain Excel floating-point semantics.
+Within `engine.execution`, the stateless `Engine` facade creates a `GraphExecution` for each call. That session owns nested rule dispatch, active-rule guards and the shared trace. `ExecutionScope` owns values and their producing nodes, so joins distinguish sequential updates from conflicting sibling writes. `Parameters` owns recursive source argument resolution, overrides, fallbacks and the shared read budget. Keep these policies together when extending execution; a node-kind hierarchy would obscure the related branch and join invariants.
 
-`Validator` coordinates executable graph checks and diagnostic collection. `DefinitionShape` owns draft structure and limits, `InputValidation` owns declared parameter types and source-binding shape, and `NodeValidation` owns node semantics and the expressions a node contains. Full validation and syntax-only diagnostics use the same expression enumeration. Add a node's expression fields there so incomplete or cyclic graphs receive the same syntax coverage as executable graphs. The helpers are package-private concrete collaborators; callers retain the existing `Validator` API.
+`engine.expression.Expressions.compile/evaluate` and `Compiled.variables/evaluate` are the expression entry points. `ExpressionParser` owns tokenization, precedence and lexical dependency analysis; it compiles without evaluating data. `ExpressionRuntime` owns operators, lazy functions and scoped collection execution. Each evaluation gets an explicit context and operation budget; child collection scopes share that budget, while separate or reentrant evaluations do not. Compiled code is immutable and hides its raw evaluation nodes, so callers cannot bypass the evaluation boundary. No thread-local execution state or global expression cache is used.
 
-`ArcScript` is the studio facade. `ArcScriptScanner` tracks statement boundaries, quoting, comments and source locations; `ArcScriptParser` builds graph records; `ArcScriptRenderer` produces canonical text. Single-node replacement belongs to the facade because it combines a parsed fragment with its containing graph. A fragment may replace only its node and outgoing edges (plus parameters for Input); incoming edges, unrelated nodes and graph notes remain owned by the containing graph. Grammar changes need both parser and renderer changes, with canonical-text and round-trip tests.
+String literal decoding uses a private Jackson `JsonFactory` configured for ARC's existing single quotes, unknown escapes and raw control characters. It does not change the application's HTTP, source or stored-JSON parser settings. `ExpressionCompatibilityTest` covers the language contracts needed by any future parser/library replacement, including decimal literals, strict types, case-sensitive names, lazy failures, missing/null values and repeated/concurrent execution. See [the library assessment](reviews/2026-09-22-library-options.md) before substituting another engine.
+
+`Functions` is the evaluator-facing facade. `FunctionCatalog` assembles immutable capabilities and checks arity. `BuiltinFunctionCatalog` pairs ARC-owned help with argument bounds; `ExcelFunctionHelp` supplies typed documentation overrides, and `ExcelFunctionCategories` groups the remaining POI entries. `ExcelFunctionAdapter` owns POI value conversion and invocation. ARC decimal operations retain their existing semantics; POI calculations retain Excel floating-point semantics. Ordinary functions belong in `Functions`, lazy/collection evaluation in `ExpressionRuntime`; change the parser only when a function introduces binding syntax, such as the item/accumulator identifiers in `REDUCE`. The catalog fixtures preserve API order, help, snippets and arity; update them explicitly for intentional capability changes rather than regenerating them to accept a refactor.
+
+`engine.validation.Validator` coordinates `GraphValidation` for executable checks and `GraphDiagnostics` for ordered diagnostic collection. Both reuse `DefinitionShape` for draft structure/limits and `NodeValidation` for node semantics and expression enumeration. `InputValidation` owns input declarations and source-binding shape, using the shared identifier/type policies. Add a node's expression fields to `NodeValidation` so incomplete or cyclic graphs receive the same syntax coverage as executable graphs. Diagnostic collection must retain partial graph locations and must not fetch source values.
+
+`engine.graph.GraphPlan` exposes order, incoming/outgoing edges, ancestry and guaranteed variables through read-only accessors. `GraphTopology` owns graph indexing and stable topological order; `BranchScopes` owns conditional variable availability; `BooleanConditions` owns the bounded Boolean decision diagram operations. Keep the scope algorithm cohesive: it reasons about mutually exclusive branches and simultaneous writes, rather than enumerating every execution path.
+
+`Validator.plan` returns the topology already produced by its checks. `Engine` consumes that plan instead of recomputing it immediately after validation; source dependency checks likewise reuse the compiled expression used to validate their names. Application-level source-contract validation remains separate, and this does not cache or skip validation of referenced rules.
+
+`engine.script.ArcScript` is the studio facade. `ArcScriptScanner` tracks statement boundaries, quoting, comments and source locations; `ArcScriptParser` owns document declarations and input schemas; each `ArcScriptNodeParser` owns one node's declarations, expressions, pins and outgoing edges. `ArcScriptSyntax` shares lexical forms and strict JSON literal decoding, and `ArcScriptRenderer` produces canonical text. Single-node replacement belongs to the facade because it combines a parsed fragment with its containing graph. A fragment may replace only its node and outgoing edges (plus parameters for Input); incoming edges, unrelated nodes and graph notes remain owned by the containing graph. Grammar changes need both parser and renderer changes, with canonical-text and round-trip tests. The embedded parser bounds source at 1,048,576 characters; HTTP independently limits the encoded JSON request to 1 MiB bytes.
 
 ### Adding a data source
 
-1. Implement `SourceAdapter` as a Spring component with a unique `kind()`, configuration validation, and `fetch(...)`. `SourceAdapters` discovers it through constructor injection and rejects duplicate kinds on startup. No dispatch branch is needed in `SourceService`.
-2. Preserve strict typed input/default handling in `SourceService`; return the provider's JSON-compatible value. Field extraction stays in `JsonPointerExtractor`, and missing/fallback policy stays in `Parameters`.
+1. Implement `SourceAdapter` in a provider package as a Spring component with a unique `kind()`, configuration validation, and `fetch(...)`. `SourceAdapters` discovers it through constructor injection and rejects duplicate kinds on startup. No dispatch branch is needed in either source service.
+2. Preserve strict typed input/default handling in `SourceExecutionService`; return the provider's JSON-compatible value. Field extraction stays in `JsonPointerExtractor`, and missing/fallback policy stays in `engine.execution.Parameters`.
 3. If the provider needs new configuration, extend the portable `SourceDefinition`, frontend `SourceConfig`, source form, API specification, and ARC Script round-trip handling where applicable. Registering a strategy alone does not create its UI or storage contract. Unsupported-kind errors are generated from the registered kinds.
 4. Test the adapter independently and add an API workflow for source creation, pinned versions, missing values and failures. For HTTP-based implementations, reuse the bounded transport and host/secret policy rather than creating an unrestricted HTTP client.
 
-`SourceServiceTest` demonstrates an additional in-memory adapter without changing the service. Use that pattern for new providers. Use repository mocks for command ordering and rejected writes; real PostgreSQL smoke tests cover actual revision locks and transactions.
+`SourceService` owns versioned configuration commands and their transactions. `SourceExecutionService` owns test/read dispatch and implements the engine's narrow `SourceReader` port. An omitted test version uses `SourceRepository.latest` to read the persisted current pointer and definition once; an explicit version or rule binding remains pinned. Neither path loads the full version history. `JdbcSourceRepository` shares one typed row mapper across those reads.
+
+`SourceServiceTest` and `SourceExecutionServiceTest` demonstrate an additional provider through configuration validation and typed reads. Use that pattern for new providers. Use repository mocks for command ordering and rejected writes; real PostgreSQL smoke tests cover actual revision locks, transactions, and latest/pinned selection.
+
+Within `source.http`, `HttpDestinationPolicy` owns configured URL/host/secret-header policy and implements HttpClient5's `DnsResolver`, checking IP addresses when the connection resolves. Configuration validation itself does not perform DNS or HTTP requests. Keep reserved prefixes explicit and test both sides of their boundaries. An allowed hostname does not grant a private-address exception. `HttpSource` owns request construction, total deadlines, bounded response parsing and transport error translation; changing destination policy should not require rewriting that transport. `HttpSourceAdapter` connects those responsibilities to the registry. The local table provider remains in `source.lookup`.
 
 ### Adding a function or node kind
 
@@ -50,26 +74,38 @@ A node kind changes the graph contract, not just a switch statement: review `Def
 | --- | --- |
 | `api/` | Typed resource clients and injectable HTTP transport; status and graph error locations |
 | `domain/` | Pure graph mutations, semantic identity, upstream variable choices, expression literals |
-| `app/` | Hash navigation, dirty-document guards, library loading, sidebar and create dialog |
+| `app/` | Hash navigation, dirty-document guards, library loading, workspace header/sidebar, theme and create dialog |
+| `features/library/` | Library page, filtering, rule cards and rule previews |
+| `features/editor/Editor.tsx` | Compose the document, graph/code view, inspector, execution panel and dialogs |
 | `features/editor/documentState.ts` | Pure, atomic draft/code/trace state transitions |
 | `features/editor/useRuleDocument.ts` | Save/build/publish commands, versions, dirty state and code synchronization |
 | `features/editor/useNodeExpressionDraft.ts` | One node-code editing session: loading, diagnostics and applying a fragment |
 | `features/editor/useGraphProblems.ts` | Static diagnostics, runtime errors and referenced-node error projection |
-| `features/editor/useGraphCanvas.ts` | React Flow nodes, edges and UI measurements |
-| `features/editor/inspector/` | Node-specific forms selected by an exhaustive node-type registry |
-| `features/studio/` | Pure module/reference snippets and shared Monaco insertion, completion and hover behavior |
-| `features/execution/useExecutionRequest.ts` | Request ownership, cancellation, result and error state for preview and published execution |
+| `features/editor/canvas/` | Graph rendering, toolbar/outline, transient measurements, routing, layout, graph commands and focus |
+| `features/editor/inspector/` | Exhaustive node-form registry, input cards/default controls and stable input-row editing identity |
+| `features/expressions/` | Shared variable/constant/expression selection and the expression dialog |
+| `features/studio/` | Code studio, insertion library, outline/problems, pure snippets and Monaco initialization/lifecycle |
+| `features/execution/` | Preview panel, published API playground/reference, result/error views and cancellable execution requests |
 | `features/sources/sourceDocument.ts` | Pure source selection, JSON buffers, saved baseline, version and request transitions |
 | `features/sources/useSourceEditor.ts` | Source commands and resource loading around the source document |
 | `features/sources/SourceConfigurationFields.tsx` | Provider-specific source configuration forms |
 | `hooks/useAsyncResource.ts` | Debounced reads, abort/cleanup, stale-response suppression |
-| `components/` | Reusable UI and page composition |
+| `components/` | Feature-independent controls and icons; no imports from feature controllers or APIs |
+| `styles/` | Named view/shared styles and responsive rules; `index.css` explicitly owns cascade order |
 
-`api.ts` remains a compatibility facade over the resource clients. New controllers/hooks should import the relevant resource client. Pure domain functions and the document reducer must not import React, MUI, React Flow or network clients. They can be tested without mounting the editor or starting a server.
+Import the relevant resource client from `api/rules`, `api/sources` or `api/studio`, and transport errors from `api/errors`. The unused aggregate facade has been removed. Pure domain functions and the document reducer must not import React, MUI, React Flow or network clients. They can be tested without mounting the editor or starting a server. The architecture check also guards shared controls from importing application/feature orchestration, and keeps routing geometry and source-binding reconciliation pure.
+
+Place a component beside the feature that owns its behavior. `components/` is for controls usable independently of a particular feature; multiple callers alone do not make a domain editor generic. Shared rule-reference types belong to `features/editor/types`, so execution/error views do not import a dialog for their contract. Monaco and ELK remain behind lazy feature boundaries.
+
+Use file length as a review signal, not a quota. A component around 200–300 lines should prompt a check for mixed responsibilities; retain a longer cohesive coordinator or algorithm when splitting it would merely forward props or fragment an invariant. Extract independently changeable regions, name their inputs/actions, and remove migrated entry points. Avoid duplicating state to make individual files shorter.
 
 Graph and code edits share one document reducer. Building code updates the graph atomically; failed code builds preserve the buffer and prior graph. Saving advances the saved baseline. Node measurements never enter the graph document. Arrange results carry the draft they started from, so a late layout cannot replace a newer edit.
 
+Arrange finishes with an immediate viewport fit. Do not await a cancelable React Flow transition while holding the document's command lock: user input can interrupt its animation without settling the returned promise. Other optional viewport animations must not control whether draft commands become available again.
+
 Save acknowledgements also carry the submitted rule. The reducer advances the server revision and saved baseline while preserving edits made after submission; a stale code build must not replace a newer buffer. Disabled controls communicate pending commands, but reducer checks enforce the draft contract independently of those controls.
+
+Read-only guards belong at command entry points as well as UI controls: a hidden Save button does not disable a Monaco keyboard action. Published-version loading has explicit loading/ready/failed states. A failed version fetch must not reveal the initial current draft under a historical-version label or send its definition for diagnostics, testing or export. Callers mount the document controller with a key containing rule ID and requested version; retry stays within that version's session.
 
 Preview and published execution share a narrow request hook. Its key includes the graph/version and input buffer; changing either, rerunning, or unmounting invalidates the previous request. Only a current result may update the graph's trace or error locations. Example inputs, JSON-object parsing and cURL formatting live in `domain/executionInputs.ts`, so the API page does not import a test-panel component for data helpers.
 
@@ -79,13 +115,19 @@ Async reads use a key describing the requested resource, an `AbortSignal`, and c
 
 Monaco providers are disposed on cleanup and restricted to their own model, so nested editors do not contribute duplicate suggestions to each other. The inspector registry must cover every `NodeType`. Reuse the existing value-binding controls for variable/constant/expression selection and string escaping.
 
+`useArcEditor` owns the mounted model and diagnostic markers, including diagnostics received before Monaco finishes loading. Catalog insertion, outline navigation and problem navigation are separate studio regions. Module snippets declare cursor/end placement independently of their display name. Dynamic ARC literals must be escaped for Monaco snippet syntax after ARC/JSON quoting; actual argument tab stops remain executable. Pending reference-insertion reads abort on unmount and consult the current draft/read-only state on completion.
+
+`useInputParameterRows` owns UI-only row identity across immutable input edits; neither array index nor an editable parameter name is a stable component key. Removing an input must discard only its raw JSON buffer/validity and keep other rows' unfinished edits and focus. Changing an input's type explicitly resets its default editor. The source catalog is loaded once per Input inspector. Source-version selection retains only mappings accepted by the selected pinned contract through `bindSourceVersion`; hidden obsolete parameters must not remain in the submitted graph.
+
+Styles remain global, but are separated into named files. Their entry-point import order preserves shared rules, responsive rules and later overrides; avoid sorting imports alphabetically or moving a shared override into a lazy component. A stylesheet relocation can be checked against the original parsed CSS for selector/declaration and order equivalence, followed by affected narrow-viewport workflows.
+
 `ExpressionField` keeps ordinary graph text inputs lightweight and lazy-loads `ExpressionDialog` on demand. That dialog reuses Code studio's catalog, insertion and Monaco providers, offering only in-scope variable names and no graph-module snippets. `/studio/expression/check` parses syntax and reports dependencies without evaluating values; the dialog cancels obsolete checks and preserves its caller's draft until Apply. Runtime type checks still belong to preview/execution.
 
 ## Design choices
 
 The concrete SOLID applications are single-purpose services and forms, source strategies open to registration, substitutable repository/source contracts, narrow engine ports, and constructor-injected dependencies. The patterns used here are Repository, Strategy with a registry, Adapter, a request-scoped Decorator, and a reducer for document transitions. They address actual change points; there is no generic repository framework, event bus, or class hierarchy for every node.
 
-These boundaries are maintenance rules, not a claim that every class is permanently complete. The expression parser and graph planner remain cohesive algorithms; split them when a new independent responsibility appears, not based on line count alone.
+These boundaries are maintenance rules, not a claim that every class is permanently complete. Keep grammar, expression execution and graph planning cohesive within their owners; split further only when a new independent responsibility appears, not based on line count alone.
 
 ## Verification
 

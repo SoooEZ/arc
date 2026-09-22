@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from "react";
-import { monaco } from "../../components/arcLanguage";
+import { monaco } from "./arcLanguage";
 import type { Definition, FunctionEntry } from "../../types";
 import { modules } from "./snippets";
 /** Providers belong to one model; nested rule dialogs do not leak suggestions into each other. */

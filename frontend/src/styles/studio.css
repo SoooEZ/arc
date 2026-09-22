@@ -1,0 +1,215 @@
+/* Code studio and connected parameter workspace */
+.code-studio {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) 180px;
+  min-height: 0;
+  background: #fcfdfc;
+  border-top: 1px solid #e4eae6;
+}
+.studio-library {
+  padding: 18px 14px;
+  border-right: 1px solid #e4eae6;
+  background: #f7f9f7;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.studio-library-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: #3b5146;
+}
+.studio-tabs {
+  display: flex;
+  border-bottom: 1px solid #dde5df;
+  gap: 5px;
+}
+.studio-tabs button {
+  flex: 1;
+  padding: 10px 0;
+  text-transform: capitalize;
+  font-size: 11px;
+  color: #839187;
+  border-bottom: 2px solid transparent;
+}
+.studio-tabs button.active {
+  color: #28654c;
+  border-color: #28654c;
+  font-weight: 600;
+}
+.studio-hint,
+.source-binding p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #7a877f;
+  margin: 0;
+}
+.function-scope {
+  display: flex;
+  gap: 8px;
+}
+.function-scope button {
+  padding: 6px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  color: #7a877f;
+}
+.function-scope button.active {
+  background: #e5ede7;
+  color: #37634c;
+}
+.function-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 5px;
+  align-content: start;
+}
+.function-chips .MuiChip-root {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  border-color: #d9e1db;
+  background: #fff;
+  height: 25px;
+}
+.function-tooltip {
+  max-width: 320px;
+  padding: 7px;
+}
+.function-tooltip strong {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+.function-tooltip p {
+  line-height: 1.6;
+}
+.function-tooltip small {
+  opacity: 0.7;
+}
+.snippet-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 10px;
+  border: 1px solid #dfe6e1;
+  border-radius: 7px;
+  background: #fff;
+  text-align: left;
+  font-size: 12px;
+  color: #435b4b;
+}
+.snippet-card > span:nth-child(2) {
+  flex: 1;
+}
+.snippet-card small {
+  display: block;
+  font-size: 9px;
+  color: #89938b;
+  margin-top: 5px;
+}
+.snippet-card:hover {
+  border-color: #60927b;
+  background: #f0f6f1;
+}
+.studio-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.studio-editor > section {
+  flex: 1;
+  min-height: 240px;
+}
+.studio-filebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e4eae6;
+  padding: 8px 16px;
+  background: #fff;
+  gap: 8px;
+}
+.studio-filebar > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+.studio-filebar small {
+  font-family: Inter, sans-serif;
+  font-size: 9px;
+  color: #829086;
+}
+.studio-filebar > div {
+  display: flex;
+}
+.studio-filebar .MuiButton-root {
+  font-size: 10px;
+}
+.studio-problems {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-top: 1px solid #e4eae6;
+  background: #f5f8f5;
+  font-size: 10px;
+  color: #819187;
+  flex-wrap: wrap;
+  min-height: 38px;
+}
+.studio-problems strong {
+  color: #47715c;
+  font-size: 10px;
+}
+.studio-problems button {
+  font-size: 11px;
+  text-align: left;
+  color: #a5473c;
+}
+.studio-problems.has-errors {
+  background: #fff4ef;
+}
+.studio-outline {
+  padding: 20px 12px;
+  border-left: 1px solid #e4eae6;
+  overflow: auto;
+}
+.studio-outline h4 {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: #8c9a90;
+  margin: 0 0 8px;
+}
+.studio-outline > span {
+  font-size: 9px;
+  color: #8c9a90;
+}
+.studio-outline button {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  text-align: left;
+  font-size: 11px;
+  color: #526a5a;
+  width: 100%;
+  padding: 12px 4px;
+  border-bottom: 1px solid #edf0ec;
+}
+.studio-outline small {
+  display: block;
+  color: #93a096;
+  font-size: 9px;
+  margin-top: 4px;
+}
+.studio-outline p {
+  font-size: 10px;
+  color: #91a096;
+  line-height: 1.8;
+  margin-top: 24px;
+}

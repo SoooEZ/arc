@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { routeEdge, type Endpoint, type RoutingNode } from "../src/edgeRouting";
+import {
+  routeEdge,
+  type Endpoint,
+  type RoutingNode,
+} from "../src/features/editor/canvas/edgeRouting";
 import type { Definition, Rule } from "../src/types";
 
 const box = (
@@ -282,6 +286,9 @@ test("covered ports show a navigable warning and recover after Arrange graph; ro
   await page
     .getByRole("button", { name: "Arrange graph", exact: true })
     .click();
+  await expect(
+    page.getByRole("button", { name: "Arrange graph", exact: true }),
+  ).toBeEnabled();
   await expect(warning).toHaveCount(0);
   await expect(page.locator(".react-flow__edge-path")).toHaveCount(3);
   await expect.poll(() => collisions(page)).toEqual([]);
@@ -296,4 +303,66 @@ test("covered ports show a navigable warning and recover after Arrange graph; ro
   await page.mouse.click(position.x, position.y);
   await page.getByRole("button", { name: "Delete connection" }).click();
   await expect(page.locator("path#direct")).toHaveCount(0);
+});
+
+test("zooming as Arrange fits the viewport cannot leave the draft locked", async ({
+  page,
+}) => {
+  const saved = await fixture(page);
+  await page.goto("/#/rules/routing-fixture");
+  await expect(page.locator(".react-flow__edge-path")).toHaveCount(3);
+  const arrange = page.getByRole("button", {
+    name: "Arrange graph",
+    exact: true,
+  });
+  const interruption = page.locator(".react-flow__viewport").evaluate(
+    (viewport) =>
+      new Promise<{ fitted: string; zoomed: string }>((resolve) => {
+        const flow = viewport.closest(".react-flow")!;
+        const pane = flow.querySelector(".react-flow__pane")!;
+        const blocker = flow.querySelector<HTMLElement>(
+          '.react-flow__node[data-id="blocker"]',
+        )!;
+        const initialPosition = blocker.style.transform;
+        const observer = new MutationObserver(() => {
+          if (blocker.style.transform === initialPosition) return;
+          observer.disconnect();
+          const fitted = (viewport as HTMLElement).style.transform;
+          const bounds = pane.getBoundingClientRect();
+          // Interrupt the first rendered fit frame through React Flow's actual zoom handler.
+          // An animated fit that resolves only on transition end will never release its lock.
+          pane.dispatchEvent(
+            new WheelEvent("wheel", {
+              bubbles: true,
+              cancelable: true,
+              deltaY: 160,
+              clientX: bounds.x + bounds.width / 2,
+              clientY: bounds.y + bounds.height / 2,
+            }),
+          );
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+              resolve({
+                fitted,
+                zoomed: (viewport as HTMLElement).style.transform,
+              }),
+            ),
+          );
+        });
+        observer.observe(viewport, {
+          attributes: true,
+          attributeFilter: ["style"],
+        });
+      }),
+  );
+  await arrange.click();
+  const viewport = await interruption;
+  expect(viewport.zoomed).not.toBe(viewport.fitted);
+  await expect(arrange).toBeEnabled();
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(saved().draft.nodes.map((node) => node.position)).not.toEqual(
+    definition.nodes.map((node) => node.position),
+  );
+  expect(saved().draft.edges).toEqual(definition.edges);
 });

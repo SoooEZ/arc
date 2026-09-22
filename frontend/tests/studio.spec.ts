@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { Definition, Rule } from "../src/types";
 
 async function replaceCode(
   page: import("@playwright/test").Page,
@@ -8,6 +9,99 @@ async function replaceCode(
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.insertText(code);
 }
+
+test("saving from a published code editor cannot replace the current draft", async ({
+  page,
+  request,
+}) => {
+  const id = `studio-readonly-${Date.now()}`;
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      { id: "input", type: "INPUT", label: "Input", position: { x: 0, y: 0 } },
+      {
+        id: "out",
+        type: "OUTPUT",
+        label: "Published result",
+        expression: "10",
+        position: { x: 0, y: 200 },
+      },
+    ],
+    edges: [
+      { id: "edge", source: "input", target: "out", sourceHandle: "next" },
+    ],
+  };
+  const createdResponse = await request.post("/api/rules", {
+    data: { id, name: "Read-only code fixture", kind: "FORMULA", definition },
+  });
+  expect(createdResponse.ok()).toBeTruthy();
+  const created: Rule = await createdResponse.json();
+  const publishedResponse = await request.post(`/api/rules/${id}/publish`, {
+    data: { revision: created.revision },
+  });
+  expect(publishedResponse.ok()).toBeTruthy();
+  const published: Rule = await publishedResponse.json();
+  const currentDraft = {
+    ...definition,
+    nodes: definition.nodes.map((node) =>
+      node.id === "out" ? { ...node, expression: "20" } : node,
+    ),
+  };
+  const savedResponse = await request.put(`/api/rules/${id}`, {
+    data: {
+      name: created.name,
+      description: created.description,
+      revision: published.revision,
+      definition: currentDraft,
+    },
+  });
+  expect(savedResponse.ok()).toBeTruthy();
+  const saved: Rule = await savedResponse.json();
+  const mutations: string[] = [];
+  page.on("request", (outgoing) => {
+    if (
+      outgoing.url().includes(`/api/rules/${id}`) &&
+      ["PUT", "POST"].includes(outgoing.method())
+    )
+      mutations.push(`${outgoing.method()} ${outgoing.url()}`);
+  });
+
+  await page.goto(`/#/studio/${id}?version=1`);
+  await expect(page.getByText("Immutable published version")).toBeVisible();
+  await expect(page.locator(".view-lines")).toContainText("return 10;");
+  await expect(
+    page.getByRole("button", { name: "Save draft", exact: true }),
+  ).toHaveCount(0);
+  await page.locator(".monaco-editor").click({ position: { x: 200, y: 60 } });
+  await page.keyboard.press("ControlOrMeta+s");
+  // A subsequent completed command ensures the keyboard interaction has settled.
+  await page.getByRole("button", { name: "Build graph", exact: true }).click();
+  await expect(page.getByText("Code built. Graph is valid.")).toBeVisible();
+  expect(mutations).toEqual([]);
+  const after: Rule = await (await request.get(`/api/rules/${id}`)).json();
+  expect(after.revision).toBe(saved.revision);
+  expect(after.draft).toEqual(saved.draft);
+  expect(after.publishedVersion).toBe(1);
+
+  await page.getByRole("button", { name: "Edit draft", exact: true }).click();
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page.locator(".view-lines")).toContainText("return 20;");
+  await replaceCode(
+    page,
+    `schema 1;
+inputs {}
+node input INPUT "Input" { next -> out; }
+node out OUTPUT "Current result" { return 30; }`,
+  );
+  await page.keyboard.press("ControlOrMeta+s");
+  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  const editable: Rule = await (await request.get(`/api/rules/${id}`)).json();
+  expect(editable.revision).toBeGreaterThan(saved.revision);
+  expect(
+    editable.draft.nodes.find((node) => node.id === "out")?.expression,
+  ).toBe("30");
+});
 
 test("code studio builds, round-trips graph edits, inserts chips/modules, and publishes sourced rules", async ({
   page,

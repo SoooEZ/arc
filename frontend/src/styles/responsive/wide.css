@@ -1,0 +1,32 @@
+@media (min-width: 1600px) {
+  .library-page,
+  .api-page {
+    padding-top: 48px;
+  }
+  .rule-card {
+    padding: 25px 25px 0;
+  }
+  .rule-card-footer {
+    margin-left: -25px;
+    margin-right: -25px;
+  }
+  .mini-graph,
+  .custom-rule-preview {
+    height: 200px;
+  }
+  .library-page .page-heading {
+    margin-bottom: 39px;
+  }
+  .stats-row {
+    padding: 29px 0;
+  }
+  .inspector {
+    width: 325px;
+  }
+  .inspector-section {
+    padding: 24px;
+  }
+  .graph-toolbar {
+    padding: 0 22px;
+  }
+}

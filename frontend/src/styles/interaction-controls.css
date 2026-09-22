@@ -1,0 +1,71 @@
+.studio-tabs button,
+.function-scope button,
+.studio-outline button,
+.studio-problems button,
+.source-list button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.studio-tabs button {
+  border-bottom: 2px solid transparent;
+}
+.studio-tabs button.active {
+  border-bottom-color: #28654c;
+}
+.studio-tabs button:focus-visible,
+.function-scope button:focus-visible,
+.studio-outline button:focus-visible,
+.snippet-card:focus-visible,
+.source-list button:focus-visible {
+  outline: 2px solid #72a98c;
+  outline-offset: 2px;
+}
+
+.source-reads {
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e8de;
+}
+.source-reads > div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 10px;
+  padding: 4px 0;
+  color: #74866f;
+}
+.source-reads strong {
+  font-size: 9px;
+  color: #54734a;
+  margin-left: auto;
+}
+.source-reads small {
+  font-size: 9px;
+}
+
+.inspector-heading {
+  min-height: 56px;
+  padding: 20px;
+  border-bottom: 1px solid #e6ebe2;
+  color: #566a4b;
+  font-size: 12px;
+  font-weight: 600;
+}
+.value-binding {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.rule-settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-top: 12px !important;
+}
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}

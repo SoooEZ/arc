@@ -1,0 +1,18 @@
+@media (max-width: 1350px) {
+  .code-studio {
+    grid-template-columns: 215px minmax(0, 1fr);
+  }
+  .studio-outline {
+    display: none;
+  }
+  .studio-filebar small {
+    display: none;
+  }
+  .editor-actions {
+    gap: 5px;
+  }
+  .editor-actions .MuiButton-root {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+}

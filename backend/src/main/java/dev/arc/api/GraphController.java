@@ -1,6 +1,6 @@
 package dev.arc.api;
 
-import dev.arc.engine.Validator;
+import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
 import dev.arc.rule.RuleDefinitionService;
 import java.util.List;

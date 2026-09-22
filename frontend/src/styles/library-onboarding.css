@@ -1,0 +1,89 @@
+.getting-started {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 34px;
+  border: 1px solid #e2e7df;
+  background: #f1f5ee;
+  border-radius: 10px;
+  padding: 24px;
+}
+.getting-visual {
+  display: flex;
+  align-items: center;
+  padding: 8px 0 8px 5px;
+  color: #88a472;
+  flex-shrink: 0;
+}
+.getting-visual > svg {
+  padding: 8px;
+  border: 1px solid #d8e1cd;
+  border-radius: 9px;
+  background: #fff;
+  width: 48px;
+  height: 48px;
+}
+.connection-line {
+  width: 24px;
+  border-top: 1px dashed #bccbac;
+}
+.getting-visual > div {
+  height: 33px;
+  width: 33px;
+  border-radius: 7px;
+  background: #e9eedf;
+  display: grid;
+  place-items: center;
+  color: #8fa574;
+  font-size: 12px;
+}
+.getting-started .eyebrow {
+  font-size: 7px;
+  letter-spacing: 1.4px;
+  color: #8a9c7b;
+}
+.getting-started h3 {
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.3px;
+  margin: 6px 0;
+}
+.getting-started p {
+  font-size: 10px;
+  color: #8b9880;
+  line-height: 1.6;
+}
+.getting-started > .MuiButton-root {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #5e7d48;
+}
+.library-footer {
+  display: flex;
+  justify-content: space-between;
+  color: #a4ad9c;
+  font-size: 8px;
+  letter-spacing: 0.3px;
+  margin-top: 40px;
+  padding-top: 19px;
+  border-top: 1px solid #e6ebe2;
+}
+.empty-library {
+  grid-column: 1/-1;
+  text-align: center;
+  background: #fff;
+  border: 1px dashed #dbe4d5;
+  border-radius: 10px;
+  padding: 65px 20px;
+  color: #899780;
+}
+.empty-library h3 {
+  color: #4e6543;
+  font-size: 16px;
+  margin: 12px;
+}
+.empty-library p {
+  font-size: 12px;
+  margin-bottom: 14px;
+}

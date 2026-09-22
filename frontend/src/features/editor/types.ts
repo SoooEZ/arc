@@ -1,6 +1,13 @@
 import type { Rule } from "../../types";
 import type { GraphProblem } from "../../api/errors";
-import type { ReferenceTarget } from "../../components/ReferenceDialog";
+export interface ReferenceTarget {
+  ruleId: string;
+  version: number;
+  nodeId?: string;
+  mode?: "graph" | "code";
+  problems?: GraphProblem[];
+}
+
 export interface EditorProps {
   mode: "code" | "graph";
   rule: Rule;

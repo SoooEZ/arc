@@ -41,6 +41,8 @@ call("PUT", "/sources/" + source_id, {"name": source["name"], "revision": 1, "de
 call("PUT", "/sources/" + source_id, {"name": source["name"], "revision": 1, "definition": source2}, 409)
 assert call("POST", f"/sources/{source_id}/test", {"version": 1, "inputs": {"key": "US"}})["result"]["rate"] == 0.07
 assert call("POST", f"/sources/{source_id}/test", {"version": 2, "inputs": {"key": "US"}})["result"]["rate"] == 0.20
+assert call("POST", f"/sources/{source_id}/test", {"inputs": {"key": "US"}})["result"]["rate"] == 0.20
+assert call("POST", f"/sources/{PREFIX}-missing/test", {"inputs": {}}, 404)["message"] == "Source not found"
 script = '''schema 1;
 // source configuration remains pinned
 inputs {
@@ -59,6 +61,34 @@ rendered = call("POST", "/studio/render", definition)
 rebuilt = call("POST", "/studio/build", rendered)
 assert rebuilt["definition"] == definition
 call("POST", "/validate", definition)
+# A valid graph can render beyond the old 100,000-character parser bound while
+# both JSON requests remain below the independent 1 MiB HTTP body limit.
+large_graph = copy.deepcopy(definition)
+large_graph["inputs"] = []
+large_graph["notes"] = []
+large_graph["nodes"] = [copy.deepcopy(definition["nodes"][0])]
+large_graph["edges"] = []
+previous = "input"
+for index in range(60):
+    node_id = f"formula{index}"
+    node = copy.deepcopy(definition["nodes"][1])
+    node.update(id=node_id, type="FORMULA", label=f"Formula {index}",
+                expression=json.dumps("x" * 1900), output=f"value{index}")
+    large_graph["nodes"].append(node)
+    large_graph["edges"].append({"id": f"{previous}-{node_id}", "source": previous,
+                                 "target": node_id, "sourceHandle": "next"})
+    previous = node_id
+output = copy.deepcopy(definition["nodes"][1])
+output["expression"] = "value59"
+large_graph["nodes"].append(output)
+large_graph["edges"].append({"id": f"{previous}-output", "source": previous,
+                             "target": "output", "sourceHandle": "next"})
+call("POST", "/validate", large_graph)
+large_source = call("POST", "/studio/render", large_graph)
+assert len(large_source["source"]) > 100_000
+large_build = call("POST", "/studio/build", large_source)
+assert not large_build["diagnostics"]
+assert large_build["definition"] == large_graph
 rule_id = PREFIX + "-rule"
 rule = call("POST", "/rules", {"id": rule_id, "name": "Connected smoke rule", "kind": "FORMULA", "definition": definition}, 201)
 call("POST", f"/rules/{rule_id}/publish", {"revision": rule["revision"]})

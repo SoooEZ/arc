@@ -1,0 +1,193 @@
+.mini-graph {
+  height: 174px;
+  border: 1px solid #e9ede7;
+  background-image: radial-gradient(#dae2d5 0.6px, transparent 0.6px);
+  background-size: 12px 12px;
+  background-color: #fafcf9;
+  border-radius: 7px;
+  padding: 18px 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.mini-box {
+  font-size: 7px;
+  white-space: nowrap;
+  padding: 6px 9px;
+  border: 1px solid #dfe6da;
+  box-shadow: 0 2px 2px #1c351008;
+  background: #fff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #6a7a62;
+  min-width: 90px;
+  justify-content: center;
+  max-width: 140px;
+  overflow: hidden;
+}
+.mini-input > span {
+  height: 4px;
+  width: 4px;
+  border-radius: 50%;
+  background: #92aa86;
+}
+.mini-condition {
+  background: #fcfaf2;
+  border-color: #e7dfbe;
+  color: #9d8c50;
+}
+.mini-reuse {
+  background: #f2f1f9;
+  border-color: #dfd9ee;
+  color: #8c7dac;
+}
+.mini-stem {
+  height: 17px;
+  width: 1px;
+  background: #bfccb4;
+  flex-shrink: 0;
+}
+.mini-branch {
+  height: 30px;
+  width: 54%;
+  border: 1px solid #c9d4c0;
+  border-bottom: 0;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  margin-top: 12px;
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.mini-branch:before {
+  content: "";
+  position: absolute;
+  width: 1px;
+  background: #c9d4c0;
+  height: 12px;
+  bottom: 100%;
+  left: 50%;
+}
+.mini-branch span {
+  background: #fafcf9;
+  font-size: 6px;
+  color: #8c9b7f;
+  padding: 0 4px;
+  position: relative;
+  top: -5px;
+  height: 10px;
+  transform: translateX(-50%);
+}
+.mini-branch span:last-child {
+  transform: translateX(50%);
+  color: #b19b7c;
+}
+.mini-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  width: 100%;
+}
+.mini-row > .mini-box {
+  min-width: 0;
+  flex: 1;
+  padding: 5px;
+}
+.formula-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e1e6e2;
+  border-radius: 6px;
+  padding: 13px;
+  max-width: 100%;
+}
+.formula-preview > span {
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-style: italic;
+  color: #8793b6;
+}
+.formula-preview code {
+  font-size: 9px;
+  white-space: nowrap;
+  color: #697597;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.formula-caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 18px;
+  font-size: 7px;
+  color: #929c8c;
+}
+.formula-caption > span {
+  background: #eef2eb;
+  padding: 4px 7px;
+  border-radius: 4px;
+}
+.formula-caption strong {
+  font-weight: 400;
+  background: #e8eee3;
+  padding: 4px 7px;
+  border-radius: 4px;
+  color: #7c936e;
+}
+.mini-rule .mini-condition {
+  padding: 10px 16px;
+}
+.mini-rule .mini-row {
+  gap: 30px;
+  padding: 0 10px;
+}
+.mini-rule .mini-branch {
+  width: 50%;
+}
+.rule-card-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  border-top: 1px solid #edf0ea;
+  margin: 20px -20px 0;
+  padding: 15px 17px;
+  font-size: 8.5px;
+  color: #909b87;
+  white-space: nowrap;
+}
+.rule-card-footer > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #9ea795;
+}
+.tiny-divider {
+  display: inline-block;
+  background: currentColor;
+  opacity: 0.35;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  margin: 0 6px;
+  vertical-align: middle;
+}
+.custom-rule-preview {
+  height: 174px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: #f8faf6;
+  border: 1px dashed #dde5d7;
+  border-radius: 8px;
+  color: #9fae92;
+  gap: 15px;
+  font-size: 11px;
+}

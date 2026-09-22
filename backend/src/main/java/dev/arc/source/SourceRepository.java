@@ -10,6 +10,9 @@ public interface SourceRepository {
 
   DataSource get(String id, int version);
 
+  /** Current version selected by the source's persisted version pointer, or a 404 error. */
+  DataSource latest(String id);
+
   List<DataSource> versions(String id);
 
   DataSource create(String id, String name, SourceDefinition definition);

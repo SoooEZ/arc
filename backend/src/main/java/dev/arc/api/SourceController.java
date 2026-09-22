@@ -1,6 +1,7 @@
 package dev.arc.api;
 
 import dev.arc.model.DataSource;
+import dev.arc.source.SourceExecutionService;
 import dev.arc.source.SourceService;
 import java.util.List;
 import org.springframework.web.bind.annotation.*;
@@ -11,9 +12,11 @@ public class SourceController {
   public record TestResult(Object result) {}
 
   private final SourceService sources;
+  private final SourceExecutionService execution;
 
-  public SourceController(SourceService sources) {
+  public SourceController(SourceService sources, SourceExecutionService execution) {
     this.sources = sources;
+    this.execution = execution;
   }
 
   @GetMapping
@@ -42,7 +45,8 @@ public class SourceController {
   }
 
   @PostMapping("/{id}/test")
-  public TestResult test(@PathVariable String id, @RequestBody SourceService.Test request) {
-    return new TestResult(sources.test(id, request));
+  public TestResult test(
+      @PathVariable String id, @RequestBody SourceExecutionService.Test request) {
+    return new TestResult(execution.test(id, request));
   }
 }

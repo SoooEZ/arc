@@ -1,0 +1,50 @@
+@media (max-width: 600px) {
+  .code-studio {
+    display: flex;
+    flex-direction: column;
+    min-height: 650px;
+  }
+  .studio-library {
+    max-height: 220px;
+    border-bottom: 1px solid #dde5df;
+  }
+  .studio-editor {
+    flex: 1;
+  }
+  .studio-filebar {
+    padding: 6px;
+  }
+  .studio-filebar > span {
+    font-size: 9px;
+  }
+  .studio-problems {
+    font-size: 9px;
+  }
+  .source-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .sources-page {
+    padding: 18px;
+  }
+  .sources-heading {
+    align-items: start;
+    gap: 10px;
+  }
+  .sources-heading h1 {
+    font-size: 26px;
+  }
+  .source-detail {
+    padding: 16px;
+  }
+  .source-detail-heading {
+    align-items: start;
+  }
+  .source-detail-heading > div {
+    flex-direction: column;
+    align-items: start;
+  }
+  .source-explainer {
+    gap: 10px;
+    font-size: 9px;
+  }
+}

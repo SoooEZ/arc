@@ -2,6 +2,8 @@
 
 Applies to `backend/`. Read [root guidance](../AGENTS.md) and [module boundaries](../docs/maintaining.md). Use [arc-java](../.agents/skills/arc-java/SKILL.md) for implementation and [arc-maintainability](../.agents/skills/arc-maintainability/SKILL.md) for structural changes.
 
+Read the applicable [backend/serialization failures](../docs/review-lessons.md#backend-and-serialization-failures) and [contract guards](../docs/review-lessons.md#maintainability-lessons-and-contract-guards) before changing those paths. They record concrete arithmetic, literal, HTTP-policy, size-limit and ownership mistakes with existing regression coverage.
+
 ## Ownership
 
 - `api` translates HTTP; `rule` coordinates commands/checks/execution; `engine` evaluates portable definitions; `source` handles provider contracts; `persistence` implements repository ports. Follow the dependency map in the maintenance guide.

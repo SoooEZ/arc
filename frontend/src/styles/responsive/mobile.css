@@ -1,0 +1,322 @@
+@media (max-width: 760px) {
+  .sidebar {
+    width: 64px;
+    padding: 20px 9px 0;
+  }
+  .main-content {
+    margin-left: 64px;
+    width: calc(100% - 64px);
+  }
+  .brand {
+    padding: 0 7px;
+  }
+  .brand > span {
+    display: none;
+  }
+  .workspace-switch,
+  .nav-section-label,
+  .sidebar-bottom,
+  .sidebar-rules {
+    display: none;
+  }
+  .main-nav {
+    margin-top: 40px;
+    gap: 14px;
+  }
+  .main-nav button {
+    font-size: 0;
+    padding: 13px;
+    gap: 0;
+    width: 46px;
+    height: 43px;
+  }
+  .main-nav button > svg {
+    width: 19px;
+    height: 19px;
+  }
+  .main-nav .nav-count,
+  .main-nav .nav-tail {
+    display: none;
+  }
+  .topbar {
+    padding: 0 18px;
+    height: 55px;
+  }
+  .breadcrumbs {
+    gap: 8px;
+    font-size: 9px;
+  }
+  .breadcrumbs button {
+    font-size: 10px;
+  }
+  .breadcrumbs > span:first-child,
+  .breadcrumbs > svg:first-of-type {
+    display: none;
+  }
+  .topbar-right {
+    gap: 12px;
+  }
+  .open-access {
+    font-size: 8px;
+  }
+  .topbar-divider {
+    display: none;
+  }
+  .library-page,
+  .api-page {
+    padding: 26px 18px;
+  }
+  .page-heading {
+    margin-bottom: 26px;
+    gap: 15px;
+    align-items: flex-start;
+  }
+  .page-heading h1 {
+    font-size: 26px;
+  }
+  .page-heading p {
+    font-size: 10px;
+  }
+  .page-heading > .MuiButton-root {
+    font-size: 9px;
+    white-space: nowrap;
+    margin-top: 24px;
+    padding: 6px 9px;
+  }
+  .page-heading > .MuiButton-root .MuiButton-startIcon {
+    display: none;
+  }
+  .eyebrow {
+    font-size: 7px;
+    letter-spacing: 1px;
+  }
+  .stats-row {
+    padding: 15px 0;
+    margin-bottom: 25px;
+  }
+  .stat {
+    padding: 0 10px;
+    min-height: 64px;
+  }
+  .stat-icon {
+    display: none;
+  }
+  .stat > div > span {
+    font-size: 8px;
+  }
+  .stat strong {
+    font-size: 23px;
+  }
+  .stat small {
+    left: 10px;
+    font-size: 7px;
+  }
+  .rule-grid {
+    grid-template-columns: 1fr;
+  }
+  .rule-card {
+    padding: 20px 20px 0;
+  }
+  .rule-card-title h3 {
+    font-size: 15px;
+  }
+  .rule-card-footer {
+    margin-left: -20px;
+    margin-right: -20px;
+    font-size: 9px;
+    padding: 16px;
+  }
+  .mini-graph {
+    height: 170px;
+  }
+  .mini-box {
+    font-size: 7px;
+  }
+  .formula-preview code {
+    font-size: 10px;
+  }
+  .getting-started {
+    padding: 20px 18px;
+    display: block;
+  }
+  .getting-started > .MuiButton-root {
+    padding-left: 0;
+    margin-top: 10px;
+  }
+  .library-footer {
+    margin-top: 26px;
+    gap: 12px;
+    font-size: 7px;
+  }
+  .library-footer > span:last-child {
+    display: none;
+  }
+  .filter-tabs {
+    width: 100%;
+    gap: 0;
+    justify-content: space-between;
+  }
+  .filter-tabs button {
+    font-size: 9px;
+    padding: 7px 8px;
+  }
+  .editor-main {
+    height: auto;
+    min-height: 100vh;
+  }
+  .editor {
+    min-height: calc(100vh - 55px);
+  }
+  .editor-main .topbar {
+    padding: 0 15px;
+  }
+  .editor-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 15px;
+    gap: 15px;
+  }
+  .editor-name h1 {
+    max-width: unset;
+    font-size: 19px;
+  }
+  .editor-actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .editor-actions .MuiButton-root {
+    font-size: 10px;
+    padding: 6px 9px;
+  }
+  .editor-body {
+    flex-direction: column;
+  }
+  .graph-workspace {
+    height: 730px;
+    flex: auto;
+  }
+  .graph-toolbar {
+    height: 47px;
+    justify-content: center;
+  }
+  .graph-tools {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .flow-container {
+    min-height: 370px;
+  }
+  .inspector {
+    width: 100%;
+    height: 440px;
+    border-left: 0;
+    border-top: 1px solid #dfe6d8;
+  }
+  .inspector-section {
+    padding: 23px;
+  }
+  .inspector-node-title > div > span,
+  .muted-copy,
+  .inspector-section .MuiFormHelperText-root {
+    font-size: 10px;
+  }
+  .inspector-section .MuiInputBase-root {
+    font-size: 12px;
+  }
+  .inspector-section h4 {
+    font-size: 12px;
+  }
+  .inspector-footer {
+    font-size: 9px;
+  }
+  .api-intro-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .api-intro-cards > div {
+    padding: 20px;
+  }
+  .api-intro-cards h3 {
+    margin-top: 10px;
+  }
+  .api-notes {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .api-request {
+    padding: 20px 15px;
+  }
+  .api-console-heading {
+    padding: 15px;
+    font-size: 10px;
+  }
+  .api-console-heading > span {
+    font-size: 8px;
+  }
+  .api-response {
+    padding: 18px 15px;
+  }
+  .api-page .page-heading h1 {
+    font-size: 25px;
+  }
+  .api-reference-heading h2 {
+    font-size: 17px;
+  }
+  .api-intro-cards p,
+  .api-notes p {
+    font-size: 11px;
+  }
+  .test-panel {
+    height: 315px;
+  }
+  .test-panel-heading strong {
+    font-size: 9px;
+  }
+  .test-panel-content {
+    grid-template-columns: 43% 57%;
+  }
+  .test-panel-heading > div {
+    gap: 5px;
+  }
+  .test-badge {
+    display: none;
+  }
+  .test-input .MuiTab-root {
+    font-size: 8px;
+    min-width: 0;
+    padding: 0 9px;
+  }
+  .test-input .json-input .MuiInputBase-root {
+    padding: 10px;
+  }
+  .test-result > strong {
+    font-size: 15px;
+  }
+  .test-result > small {
+    width: 100%;
+    margin-left: 0;
+  }
+  .trace-list > button {
+    gap: 3px;
+    font-size: 7px;
+  }
+  .trace-list > button > code {
+    max-width: 40px;
+  }
+  .canvas-hint {
+    font-size: 7px;
+    bottom: 10px;
+    left: 50px;
+  }
+  .react-flow__minimap {
+    width: 100px !important;
+    height: 70px !important;
+  }
+  .react-flow__minimap svg {
+    width: 100px;
+    height: 70px;
+  }
+  .node-outline {
+    width: 190px;
+  }
+}

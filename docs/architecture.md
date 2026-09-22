@@ -103,7 +103,7 @@ Expressions are parsed into a small syntax tree, never delegated to a general-pu
 | Boolean logic | `&&`, `\|\|`, `!`, `true`, `false` |
 | Null checks | `optionalValue == null` |
 | Math functions | `min(a, b, ...)`, `max(a, b, ...)`, `abs(x)`, `floor(x)`, `ceil(x)` |
-| Rounding | `round(value, 2)` (HALF_UP; precision 0–12) |
+| Rounding | `round(value, 2)` (HALF_UP; precision −12–12) |
 | Conditional value | `if(condition, valueWhenTrue, valueWhenFalse)` |
 
 Numeric operations use Java `BigDecimal` with DECIMAL128 (34 significant digits). Decimal addition avoids binary floating-point drift. Nonterminating division is rounded with DECIMAL128; use explicit `round` for business-specific decimal places. Equality treats `1` and `1.0` as equal. Strings support equality and lexicographic ordering; `+` is numeric only. Boolean operators and `if` short-circuit.
@@ -115,10 +115,11 @@ Identifiers use letters, digits, and underscores, start with a letter or undersc
 - At most 50 inputs, 100 nodes, and 200 edges per graph.
 - At most 20 ordered cases per Switch and 50 fields per Transform; case/field expressions retain the normal expression limits.
 - Expressions at most 2,000 characters, 256 tokens, and 48 nested parse levels.
+- ARC Script source at most 1,048,576 characters for embedded parsing; HTTP requests must also fit the separate encoded-body limit below.
 - Strings at most 2,000 characters; numbers have bounded precision and scale.
 - At most 16 nested rule calls and 1,000 total execution steps.
 - Rule metadata and parameter bindings have explicit size limits.
-- Nginx caps request bodies at 1 MiB; Java also caps API request bodies independently.
+- Nginx caps encoded request bodies at 1 MiB (1,048,576 bytes); Java also caps API request bodies independently. JSON escaping and UTF-8 encoding count toward this transport limit.
 
 The service has no JWT requirement yet. Both reads and writes are intentionally open, and CORS allows any origin. Versioning and a restricted expression language are foundations for predictable execution; they do not substitute for the future production authentication, authorization, quota, and operational work.
 
@@ -139,6 +140,8 @@ HTTP requests use encoded query parameters, a per-request deadline, 1 MiB respon
 The expression engine keeps decimal arithmetic for core math. Apache POI supplies context-free Excel calculations; these use Excel floating-point semantics. A shared capability registry exposes callable functions and reference-only functions separately. This is an Excel/Dentaku-inspired calculation dialect, not a workbook engine or a drop-in Dentaku implementation. No cell references, workbook formulas, macros, arbitrary Ruby, or host-language calls are evaluated. Functions requiring workbook context or a missing adapter are shown as reference-only.
 
 Arrays and objects are input types. Arrays can be used as Excel ranges. `MAP`, `FILTER`, `ALL`, `ANY`, and `REDUCE` use explicitly scoped local identifiers. `PLUCK` and `GET` accept quoted dot paths. Object property access is available inside ordinary expressions (`customer.country`, `item.price`). Expressions remain bounded by source length, token/depth limits, numeric/string limits, collection size/depth limits, and an iteration budget.
+
+The parser and runtime are separate internal modules behind `engine.expression.Expressions.compile/evaluate`. A compiled expression can be reused, but each evaluation has its own scope and operation budget; nested collection scopes share that evaluation's budget. The private string-literal parser reuses Jackson's Unicode/escape decoding with ARC-compatible quote and escape options. HTTP and persistence JSON remain strict. [Library alternatives and compatibility requirements](reviews/2026-09-22-library-options.md) document why a general expression engine is not currently a drop-in replacement.
 
 ## Typed parameter mapping
 

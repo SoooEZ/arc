@@ -16,6 +16,11 @@ interface Options {
   notify: (message: string) => void;
   reportRuntimeError: (problem: GraphProblem | null) => void;
 }
+type VersionLoad =
+  | { status: "loading" }
+  | { status: "ready" }
+  | { status: "failed"; message: string };
+
 export function useRuleDocument({
   initial,
   mode,
@@ -39,7 +44,14 @@ export function useRuleDocument({
   const [busy, setBusy] = useState("");
   const running = useRef(false);
   const [error, setError] = useState("");
-  const [versionLoading, setVersionLoading] = useState(!!requestedVersion);
+  const [versionLoad, setVersionLoad] = useState<VersionLoad>({
+    status: requestedVersion ? "loading" : "ready",
+  });
+  const [versionAttempt, setVersionAttempt] = useState(0);
+  const versionLoading = versionLoad.status === "loading";
+  const versionError =
+    versionLoad.status === "failed" ? versionLoad.message : "";
+  const versionUnavailable = versionLoad.status !== "ready";
   const readOnly = !!requestedVersion;
   const dirty =
     !readOnly &&
@@ -67,7 +79,7 @@ export function useRuleDocument({
   );
   const runTask = useCallback(
     async (name: string, task: () => Promise<unknown>) => {
-      if (running.current) return;
+      if (running.current || versionUnavailable) return;
       running.current = true;
       setBusy(name);
       setError("");
@@ -80,7 +92,7 @@ export function useRuleDocument({
         setBusy("");
       }
     },
-    [fail],
+    [fail, versionUnavailable],
   );
   useEffect(() => {
     if (!requestedVersion) return;
@@ -88,17 +100,20 @@ export function useRuleDocument({
     ruleApi
       .version(initial.id, requestedVersion, { signal: controller.signal })
       .then((version) => {
-        if (!controller.signal.aborted)
-          dispatch({ type: "version/loaded", definition: version.definition });
+        if (controller.signal.aborted) return;
+        dispatch({ type: "version/loaded", definition: version.definition });
+        setVersionLoad({ status: "ready" });
       })
       .catch((failure) => {
-        if (!controller.signal.aborted) fail(failure);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setVersionLoading(false);
+        if (!controller.signal.aborted)
+          setVersionLoad({ status: "failed", message: errorMessage(failure) });
       });
     return () => controller.abort();
-  }, [initial.id, requestedVersion, fail]);
+  }, [initial.id, requestedVersion, versionAttempt]);
+  const retryVersion = () => {
+    setVersionLoad({ status: "loading" });
+    setVersionAttempt((attempt) => attempt + 1);
+  };
   const changeDefinition = useCallback(
     (change: DefinitionChange) => {
       if (readOnly || running.current) return;
@@ -136,7 +151,7 @@ export function useRuleDocument({
     return result.definition;
   }, [hasInvalidJson, sourceDirty, source, readOnly, rule.draft]);
   useEffect(() => {
-    if (mode !== "code" || source !== null || versionLoading) return;
+    if (mode !== "code" || source !== null || versionUnavailable) return;
     const controller = new AbortController();
     studioApi
       .render(rule.draft, { signal: controller.signal })
@@ -152,7 +167,7 @@ export function useRuleDocument({
         if (!controller.signal.aborted) fail(failure);
       });
     return () => controller.abort();
-  }, [mode, source, rule.draft, versionLoading, fail]);
+  }, [mode, source, rule.draft, versionUnavailable, fail]);
   const current = useRef({
     sourceDirty,
     buildCode,
@@ -195,8 +210,10 @@ export function useRuleDocument({
     onSaved(saved);
     return saved;
   };
-  const action = (type: "save" | "validate" | "publish") =>
-    runTask(type, async () => {
+  const action = (type: "save" | "validate" | "publish") => {
+    // Commands are also called by keyboard actions, outside the hidden toolbar.
+    if (readOnly && type !== "validate") return Promise.resolve();
+    return runTask(type, async () => {
       const candidate = { ...rule, draft: await buildCode() };
       if (type === "save") {
         await save(candidate);
@@ -219,6 +236,7 @@ export function useRuleDocument({
         `Version ${published.publishedVersion} published and ready to call`,
       );
     });
+  };
   const build = () =>
     runTask("build", async () => {
       await studioApi.validate(await buildCode());
@@ -237,6 +255,9 @@ export function useRuleDocument({
     error,
     setError,
     versionLoading,
+    versionError,
+    versionUnavailable,
+    retryVersion,
     buildCode,
     build,
     switchView,

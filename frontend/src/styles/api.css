@@ -1,0 +1,274 @@
+.api-page {
+  padding-bottom: 60px;
+}
+.api-page .page-heading h1 {
+  font-size: 31px;
+}
+.api-intro-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin: 35px 0;
+}
+.api-intro-cards > div {
+  border: 1px solid #e0e7d9;
+  background: #fff;
+  border-radius: 9px;
+  padding: 22px;
+  position: relative;
+  color: #7f9a66;
+}
+.api-intro-cards > div > span {
+  position: absolute;
+  right: 20px;
+  font-size: 10px;
+  color: #b6c2a6;
+}
+.api-intro-cards h3 {
+  font-size: 13px;
+  font-weight: 550;
+  color: #5c7747;
+  margin: 17px 0 9px;
+}
+.api-intro-cards p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #98ab83;
+}
+.api-console {
+  border: 1px solid #dce6d2;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.api-console-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 17px 22px;
+  border-bottom: 1px solid #e5ecd9;
+  color: #8ba471;
+}
+.api-console-heading strong {
+  font-size: 12px;
+  font-weight: 550;
+  color: #647f4d;
+}
+.api-console-heading > span {
+  margin-left: auto;
+  font-size: 9px;
+  color: #a3b48c;
+}
+.api-console-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 390px;
+}
+.api-request {
+  padding: 25px;
+  border-right: 1px solid #e7eedc;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.api-select-row {
+  display: flex;
+  gap: 12px;
+}
+.api-select-row > .MuiTextField-root:last-child {
+  width: 115px;
+  flex-shrink: 0;
+}
+.api-request .MuiInputBase-root {
+  font-size: 11px;
+}
+.api-request .MuiInputLabel-root {
+  font-size: 12px;
+}
+.endpoint {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #e0e9d6;
+  background: #f6f9f1;
+  padding: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.endpoint > strong {
+  font-size: 8px;
+  color: #7da859;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: #e8f2df;
+}
+.endpoint > code {
+  font-size: 9px;
+  color: #8fa978;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.field-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: #889f71;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: -8px;
+}
+.field-label > span {
+  font-size: 8px;
+  font-weight: 400;
+  color: #afc096;
+}
+.api-request .json-input {
+  border: 1px solid #e5edd9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.api-request > .MuiButton-root {
+  align-self: flex-start;
+  font-size: 10px;
+  min-height: 33px;
+}
+.parameter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.parameter-chips > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 5px;
+  background: #f4f8ed;
+  border-radius: 3px;
+}
+.parameter-chips code {
+  font-size: 8px;
+  color: #93ad75;
+}
+.parameter-chips small {
+  font-size: 7px;
+  color: #b0c496;
+}
+.api-response {
+  background: #f8faf5;
+  padding: 19px 22px;
+  min-width: 0;
+  max-height: 650px;
+  overflow: auto;
+}
+.code-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  min-height: 28px;
+  font-size: 10px;
+  color: #94ae77;
+}
+.code-panel-heading > .MuiButton-root {
+  font-size: 9px;
+  color: #a8bd8b;
+  min-height: 26px;
+}
+.api-response pre {
+  font-size: 10px;
+  line-height: 1.9;
+  color: #749953;
+  margin: 0;
+  max-height: 540px;
+  overflow: auto;
+}
+.text-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  color: #88ab65;
+  font-size: 9px;
+  padding: 12px 0;
+}
+.api-reference-heading {
+  margin: 44px 0 20px;
+}
+.api-reference-heading h2 {
+  font-size: 19px;
+  letter-spacing: -0.6px;
+  font-weight: 550;
+  color: #526f3b;
+  margin-bottom: 8px;
+}
+.api-reference-heading p {
+  font-size: 10px;
+  color: #a1b589;
+}
+.api-reference-heading code {
+  font-size: 10px;
+  color: #88a56b;
+}
+.endpoint-table {
+  border: 1px solid #e0e8d7;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.endpoint-table > div {
+  display: grid;
+  grid-template-columns: 46px 260px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 19px;
+  font-size: 10px;
+  color: #a1b58a;
+}
+.endpoint-table > div:not(:last-child) {
+  border-bottom: 1px solid #ebf0e3;
+}
+.endpoint-table code {
+  font-size: 9px;
+  color: #7f9e62;
+  overflow-wrap: anywhere;
+}
+.method {
+  font-size: 8px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  background: #edf3fa;
+  color: #8da8c4;
+  text-align: center;
+  font-weight: 550;
+}
+.method-post {
+  background: #eef5e7;
+  color: #93b577;
+}
+.method-put {
+  background: #faf4e6;
+  color: #b9a675;
+}
+.api-notes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+  margin-top: 30px;
+}
+.api-notes h3 {
+  font-size: 12px;
+  font-weight: 550;
+  color: #8ca771;
+  margin-bottom: 9px;
+}
+.api-notes p {
+  font-size: 10px;
+  color: #aabc93;
+  line-height: 1.9;
+}
+.api-notes code {
+  font-size: 9px;
+  color: #8fae71;
+}

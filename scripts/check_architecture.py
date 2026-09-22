@@ -20,12 +20,22 @@ ALLOWED_JAVA = {
     "persistence": {"persistence", "rule", "source", "engine", "model", "error"},
     "api": {"api", "rule", "source", "engine", "model", "error"},
 }
+ENGINE_DEPENDENCIES = {
+    "expression": {"expression", "Identifiers"},
+    "graph": {"graph"},
+    "validation": {"validation", "graph", "expression", "Identifiers", "InputTypes", "RuleResolver"},
+    "script": {"script", "expression", "validation"},
+    "execution": {"execution", "graph", "validation", "expression", "InputTypes", "RuleResolver", "SourceReader"},
+}
 PURE_FRONTEND = {
     "domain/": ("types", "domain/"),
     "features/editor/documentState.ts": ("types", "domain/"),
     "features/sources/model.ts": ("types", "domain/"),
     "features/sources/sourceDocument.ts": ("types", "domain/", "features/sources/model"),
+    "features/sources/sourceBindings.ts": ("types",),
     "features/studio/snippets.ts": ("types", "domain/"),
+    "features/editor/canvas/edgeRouting.ts": (),
+    "features/editor/canvas/graphGeometry.ts": ("domain/",),
 }
 errors = []
 
@@ -39,7 +49,8 @@ def matches_boundary(path, boundary):
 
 
 for path in sorted(JAVA.rglob("*.java")):
-    module = path.relative_to(JAVA).parts[0]
+    parts = path.relative_to(JAVA).parts
+    module = parts[0]
     if module not in ALLOWED_JAVA:
         continue  # Spring application composition root.
     imports = re.findall(r"^import\s+(?:static\s+)?([\w.*]+);", path.read_text(), re.M)
@@ -48,6 +59,16 @@ for path in sorted(JAVA.rglob("*.java")):
             target = dependency.split(".")[2]
             if target not in ALLOWED_JAVA[module]:
                 reject(path, dependency, f"{module} cannot depend on {target}")
+        if module == "engine" and len(parts) > 2 and dependency.startswith("dev.arc.engine."):
+            owner = parts[1]
+            target = dependency.split(".")[3]
+            if target not in ENGINE_DEPENDENCIES.get(owner, {owner}):
+                reject(path, dependency, f"engine.{owner} cannot depend on engine.{target}")
+        if module == "source" and len(parts) > 2 and dependency.startswith("dev.arc.source."):
+            owner = parts[1]
+            target = dependency.split(".")[3]
+            if target not in {owner, "SourceAdapter"}:
+                reject(path, dependency, "source providers depend on their contract, not application orchestration")
         if module != "persistence" and dependency.startswith(("java.sql.", "org.springframework.jdbc.")):
             reject(path, dependency, "SQL access belongs in persistence")
         if module in {"model", "error"} and not dependency.startswith(("java.", "dev.arc.")):
@@ -64,10 +85,17 @@ for path in sorted(FRONTEND.rglob("*.ts*")):
     ), None)
     pure = pure_imports is not None
     transport = relative.startswith("api/")
-    if not (pure or transport):
+    shared_ui = relative.startswith("components/")
+    if not (pure or transport or shared_ui):
         continue
     imports = re.findall(r'''(?:from\s+|import\s*\(?\s*)["']([^"']+)["']''', path.read_text())
     for dependency in imports:
+        if shared_ui:
+            if dependency.startswith("."):
+                target = (path.parent / dependency).resolve().relative_to(FRONTEND).as_posix()
+                if target.startswith(("features/", "app/", "api/")):
+                    reject(path, dependency, "shared controls cannot depend on feature or application orchestration")
+            continue
         if not dependency.startswith("."):
             reject(path, dependency, "pure domain and HTTP modules cannot import UI libraries")
             continue
@@ -83,4 +111,4 @@ for path in sorted(FRONTEND.rglob("*.ts*")):
 if errors:
     print("Architecture boundary violations:\n" + "\n".join(errors), file=sys.stderr)
     sys.exit(1)
-print("Architecture boundaries passed (Java packages, pure frontend state, HTTP clients).")
+print("Architecture boundaries passed (Java packages, pure frontend state, HTTP clients, shared controls).")

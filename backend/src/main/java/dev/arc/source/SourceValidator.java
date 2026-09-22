@@ -1,6 +1,7 @@
 package dev.arc.source;
 
-import dev.arc.engine.Validator;
+import dev.arc.engine.Identifiers;
+import dev.arc.engine.InputTypes;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.SourceDefinition;
@@ -25,13 +26,11 @@ public final class SourceValidator {
       throw ArcException.invalid("Provide up to 20 source parameters");
     Set<String> names = new HashSet<>();
     for (Input p : c.parameters()) {
-      if (p == null
-          || !Validator.identifier(p.name())
-          || !names.add(p.name())
-          || p.source() != null) throw ArcException.invalid("Invalid source parameter");
+      if (p == null || !Identifiers.isValid(p.name()) || !names.add(p.name()) || p.source() != null)
+        throw ArcException.invalid("Invalid source parameter");
       if (!Set.of("NUMBER", "STRING", "BOOLEAN").contains(p.type() == null ? "" : p.type()))
         throw ArcException.invalid("Source parameters must be scalar");
-      if (p.defaultValue() != null) Validator.checkType(p.name(), p.type(), p.defaultValue());
+      if (p.defaultValue() != null) InputTypes.check(p.name(), p.type(), p.defaultValue());
     }
     adapter.validate(c);
   }

@@ -1,8 +1,10 @@
 package dev.arc.rule;
 
-import dev.arc.engine.*;
-import dev.arc.engine.Parameters;
+import dev.arc.engine.MemoizingRuleResolver;
+import dev.arc.engine.RuleResolver;
 import dev.arc.engine.SourceReader;
+import dev.arc.engine.execution.Engine;
+import dev.arc.engine.execution.Parameters;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import java.util.List;

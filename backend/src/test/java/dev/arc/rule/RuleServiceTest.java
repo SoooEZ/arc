@@ -3,7 +3,7 @@ package dev.arc.rule;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import dev.arc.engine.Validator;
+import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Rule;
 import java.time.Instant;

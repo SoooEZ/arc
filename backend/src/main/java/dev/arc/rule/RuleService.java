@@ -1,6 +1,6 @@
 package dev.arc.rule;
 
-import dev.arc.engine.Validator;
+import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import java.util.List;

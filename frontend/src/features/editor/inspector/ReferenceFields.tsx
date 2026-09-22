@@ -1,7 +1,7 @@
 import { Alert, Button, MenuItem, TextField } from "@mui/material";
 import { ArrowUpRight, Info } from "lucide-react";
 import type { Version } from "../../../types";
-import ValueBinding from "../../../components/ValueBinding";
+import ValueBinding from "../../expressions/ValueBinding";
 import { ruleApi } from "../../../api/rules";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
 import type { NodeFieldsProps } from "./types";

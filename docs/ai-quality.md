@@ -9,6 +9,7 @@
 | [根目录 AGENTS.md](../AGENTS.md) | 项目契约、可读性原则、技能入口、检查范围和代码审查规则 |
 | [backend/AGENTS.md](../backend/AGENTS.md) | Java 职责边界、事务、版本、精度、数据源扩展规范 |
 | [frontend/AGENTS.md](../frontend/AGENTS.md) | React 状态归属、异步结果、组件组合、图形与代码同步规范 |
+| [Review 问题与预防规则](review-lessons.md) | 历次真实问题的触发条件、后续编码规则和回归测试入口 |
 | [.agents/skills/arc-java/SKILL.md](../.agents/skills/arc-java/SKILL.md) | 后端实现：定位业务责任、选择已有扩展接口、检查行为契约 |
 | [.agents/skills/arc-react/SKILL.md](../.agents/skills/arc-react/SKILL.md) | 前端实现：明确状态与生命周期、处理异步竞争、验证实际交互 |
 | [.agents/skills/arc-maintainability/SKILL.md](../.agents/skills/arc-maintainability/SKILL.md) | 重构：识别维护成本、选择最小有用边界、保留行为并说明收益 |
@@ -56,6 +57,8 @@ SOLID 在这里是一组可检查的设计条件。没有要求每个类都配�
 仅修改规范时，检查技能元数据、引用和示例即可；修改运行代码时，按变化范围执行对应测试。会写入数据的集成测试使用独立的 Compose 项目，避免把测试规则写进日常工作数据库。
 
 ## 维护这套规则
+
+历次 review 的问题已汇总到 [review-lessons.md](review-lessons.md)，并接入根目录及前后端 `AGENTS.md`。后续实现、重构和审查应先读取受影响部分及其回归测试：例如改异步保存时检查响应归属和新草稿保护，改字符串时检查每层解析器的转义，改计算时检查边界值、错误位置和已发布规则兼容性。文档记录如何避免已知错误，测试负责检测具体回归，两者都不能保证永远不再出现问题。
 
 来源与裁剪说明见 [AI 规则来源](ai-sources.md)。上游使用固定提交链接，升级时应查看具体差异并确认适用性，不自动用远程最新版覆盖本地规则。
 

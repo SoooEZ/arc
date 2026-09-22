@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { arrangeGraph } from "../src/graphLayout";
+import { arrangeGraph } from "../src/features/editor/canvas/graphLayout";
 import type { Definition, RuleNode } from "../src/types";
-import { branchHandleX, defaultNodeSize } from "../src/graphGeometry";
+import {
+  branchHandleX,
+  defaultNodeSize,
+} from "../src/features/editor/canvas/graphGeometry";
 
 function node(
   id: string,

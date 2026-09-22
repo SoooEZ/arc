@@ -1,0 +1,85 @@
+.MuiAlert-root {
+  font-size: 11px !important;
+}
+.MuiAlert-message {
+  overflow-wrap: anywhere;
+}
+.MuiMenuItem-root {
+  font-size: 12px !important;
+}
+/* Keep readable contrast across the quiet, neutral workspace. */
+.inspector-section .MuiInputBase-root {
+  color: #40533d;
+}
+.inspector-section .MuiInputLabel-root,
+.inspector-section .MuiFormHelperText-root,
+.inspector-node-title > div > span,
+.muted-copy,
+.inspector-note p,
+.variable-list span,
+.inspector-footer {
+  color: #778770;
+}
+.inspector-section h3,
+.inspector-section h4 {
+  color: #465b3f;
+}
+.variable-list code,
+.expression-preview code,
+.expression-toolkit code {
+  color: #627a56;
+}
+.test-output,
+.test-input,
+.api-page {
+  --muted: #74886a;
+}
+.trace-list > button,
+.trace-label,
+.test-empty p,
+.test-empty strong,
+.test-empty > span,
+.trace-list > button > code,
+.test-result > small {
+  color: #718963;
+}
+.json-input textarea,
+.api-response pre {
+  color: #486f42;
+}
+.api-intro-cards p,
+.api-notes p,
+.endpoint-table > div,
+.parameter-chips small,
+.field-label,
+.api-console-heading > span {
+  color: #77876f;
+}
+.api-notes h3,
+.api-reference-heading p,
+.api-reference-heading code,
+.endpoint-table code,
+.endpoint > code,
+.parameter-chips code,
+.code-panel-heading,
+.api-select-row .MuiInputLabel-root {
+  color: #657e56;
+}
+.rule-card > p,
+.rule-card-footer,
+.page-heading p,
+.getting-started p {
+  color: #7a8671;
+}
+.node-detail {
+  color: #7a8c6d;
+}
+.node-type-line {
+  color: #7d8a73;
+}
+.inspector-section .MuiInputBase-root.Mui-disabled {
+  background: #f9faf7;
+}
+.library-footer {
+  color: #8e9a83;
+}

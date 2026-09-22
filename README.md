@@ -305,6 +305,7 @@ The evaluator starts at Input and executes active nodes in a deterministic depen
 - [Graph schema, expression language, and architecture](docs/architecture.md)
 - [Module boundaries, design patterns, and extension guide](docs/maintaining.md)
 - [AI coding guidance, project Skills, and usage examples](docs/ai-quality.md)
+- [Review lessons, prevention rules, and regression coverage](docs/review-lessons.md)
 - [OpenAPI specification](docs/openapi.yaml)
 
 ## Development and verification

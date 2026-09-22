@@ -1,0 +1,189 @@
+/* Node diagnostics and contextual editors. */
+.node-expression-button {
+  margin-left: auto;
+  padding: 3px;
+  display: flex;
+  color: #728375;
+  border-radius: 4px;
+}
+.node-expression-button:hover {
+  background: #edf3ee;
+  color: #28654c;
+}
+.graph-node.node-error {
+  border-color: #c54d45;
+  box-shadow:
+    inset 0 0 0 1px #c54d45,
+    0 0 0 3px #c54d4515;
+}
+.node-error-message {
+  position: absolute;
+  top: -10px;
+  right: 8px;
+  padding: 2px 5px;
+  border: 1px solid #df9d98;
+  border-radius: 4px;
+  background: #fff2f1;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  color: #b83e38;
+  font-size: 9px;
+}
+.node-error-message svg {
+  flex-shrink: 0;
+}
+.node-error-message span {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.inspector-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.inspector-heading .MuiButton-root {
+  font-size: 9px;
+}
+.function-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.function-group {
+  border: 1px solid #dde5df;
+  border-radius: 7px;
+  background: #fff;
+}
+.function-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 12px 9px;
+  color: #43604c;
+  font-size: 11px;
+  text-align: left;
+}
+.function-group-heading > span {
+  margin-left: auto;
+  border-radius: 4px;
+  background: #edf2ee;
+  padding: 2px 5px;
+  color: #7b8a80;
+  font-size: 10px;
+}
+.function-group-heading .expanded {
+  transform: rotate(90deg);
+}
+.function-group .function-chips {
+  padding: 0 9px 12px;
+}
+.node-code-layout {
+  display: grid;
+  grid-template-columns: 245px minmax(0, 1fr);
+  height: 52vh;
+  min-height: 280px;
+  border: 1px solid #e1e8e2;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+.expression-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.expression-input > .MuiButton-root {
+  align-self: flex-start;
+}
+.expression-variable-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.node-mapping-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid #e1e8e2;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+.mapping-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.mapping-card-heading > strong {
+  flex: 1;
+}
+.node-switch {
+  border-color: #e3d9bd;
+}
+.node-icon.switch {
+  background: #fcf4e1;
+  color: #b69c59;
+}
+.node-transform {
+  border-color: #bddbdc;
+}
+.node-icon.transform {
+  background: #e7f4f3;
+  color: #538f91;
+}
+.handle-caption {
+  transform: translateX(-50%);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.handle-fallback {
+  color: #ac957a;
+}
+.node-expression-content > .MuiAlert-root {
+  margin-top: 8px;
+}
+.reference-dialog .MuiDialog-paper {
+  width: calc(100vw - 32px);
+  max-width: 1600px;
+  height: calc(100dvh - 32px);
+  max-height: none;
+  margin: 16px;
+  overflow: hidden;
+}
+.reference-navigation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e1e8e2;
+  flex-shrink: 0;
+}
+.reference-navigation > .MuiButton-root {
+  flex-shrink: 0;
+}
+.reference-breadcrumb {
+  flex: 1;
+  white-space: nowrap;
+  overflow: auto;
+  font-size: 12px;
+  color: #466450;
+}
+.reference-breadcrumb small {
+  color: #8c9b91;
+}
+.reference-dialog .editor {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+}
+.reference-dialog .editor-heading {
+  padding: 16px;
+}

@@ -1,0 +1,142 @@
+@media (max-width: 1050px) {
+  .sidebar {
+    width: 190px;
+  }
+  .main-content {
+    margin-left: 190px;
+    width: calc(100% - 190px);
+  }
+  .workspace-switch {
+    padding: 10px 6px;
+    gap: 6px;
+  }
+  .workspace-switch strong {
+    font-size: 10px;
+  }
+  .workspace-switch small {
+    font-size: 8px;
+  }
+  .main-nav button {
+    font-size: 10px;
+    gap: 8px;
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+  .main-nav button svg {
+    width: 16px;
+  }
+  .brand-beta {
+    display: none;
+  }
+  .build-note {
+    padding: 14px 10px;
+    margin: 15px 0;
+  }
+  .build-note strong {
+    font-size: 9px;
+  }
+  .rule-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stats-row {
+    padding: 20px 0;
+  }
+  .stat-icon {
+    padding: 7px;
+  }
+  .stat {
+    gap: 9px;
+    padding: 0 12px;
+  }
+  .stat small {
+    left: 52px;
+    font-size: 8px;
+  }
+  .stat > div > span {
+    font-size: 9px;
+  }
+  .stat strong {
+    font-size: 25px;
+  }
+  .page-heading h1 {
+    font-size: 28px;
+  }
+  .inspector {
+    width: 245px;
+  }
+  .editor-actions .MuiButton-startIcon {
+    display: none;
+  }
+  .editor-name h1 {
+    max-width: 160px;
+  }
+  .editor-heading {
+    gap: 9px;
+    padding: 15px 12px;
+  }
+  .editor-title .kind-icon {
+    display: none;
+  }
+  .graph-view-label {
+    display: none;
+  }
+  .graph-toolbar {
+    justify-content: flex-end;
+  }
+  .api-intro-cards {
+    gap: 12px;
+  }
+  .api-intro-cards > div {
+    padding: 17px;
+  }
+  .api-console-body {
+    grid-template-columns: 1fr;
+  }
+  .api-request {
+    border-right: 0;
+    border-bottom: 1px solid #e4ebdc;
+  }
+  .api-response {
+    min-height: 220px;
+  }
+  .api-notes {
+    gap: 15px;
+  }
+  .api-page .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .endpoint-table > div {
+    grid-template-columns: 40px 1fr;
+    gap: 8px;
+  }
+  .endpoint-table > div > span:last-child {
+    grid-column: 2;
+  }
+  .library-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .library-toolbar > .MuiTextField-root {
+    width: 100%;
+  }
+  .test-panel {
+    height: 340px;
+  }
+  .test-panel-content {
+    grid-template-columns: 45% 55%;
+  }
+  .test-result {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .test-output {
+    padding: 10px;
+  }
+  .test-panel-heading {
+    padding: 8px 10px;
+  }
+  .topbar {
+    padding: 0 25px;
+  }
+}

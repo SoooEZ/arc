@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Alert, Button, CircularProgress, Snackbar } from "@mui/material";
-import { ChevronRight, Radio } from "lucide-react";
-import Library from "./components/Library";
-import Editor from "./components/Editor";
-import ApiPage from "./components/ApiPage";
-import SourcesPage from "./components/SourcesPage";
+import WorkspaceHeader from "./app/WorkspaceHeader";
+import Library from "./features/library/LibraryPage";
+import Editor from "./features/editor/Editor";
+import ApiPage from "./features/execution/ApiPage";
+import SourcesPage from "./features/sources/SourcesPage";
 import Sidebar from "./app/Sidebar";
 import CreateRuleDialog from "./app/CreateRuleDialog";
 import { parseRoute } from "./app/routing";
@@ -31,37 +31,11 @@ export default function App() {
         newRule={newRule}
       />
       <main className={`main-content ${selected ? "editor-main" : ""}`}>
-        <header className="topbar">
-          <div className="breadcrumbs">
-            <span>Workspace</span>
-            <ChevronRight size={13} />
-            <button onClick={() => navigate("/library")}>
-              {route === "/playground"
-                ? "API playground"
-                : route === "/docs"
-                  ? "API reference"
-                  : route === "/sources"
-                    ? "Data sources"
-                    : route.startsWith("/studio/")
-                      ? "Code studio"
-                      : "Rule library"}
-            </button>
-            {selected && (
-              <>
-                <ChevronRight size={13} />
-                <strong>{selected.name}</strong>
-              </>
-            )}
-          </div>
-          <div className="topbar-right">
-            <span className="open-access">
-              <Radio size={13} />
-              Open API
-            </span>
-            <span className="topbar-divider" />
-            <span className="user-avatar">A</span>
-          </div>
-        </header>
+        <WorkspaceHeader
+          route={route}
+          ruleName={selected?.name}
+          navigate={navigate}
+        />
         {loading ? (
           <div className="center-state">
             <CircularProgress size={28} />

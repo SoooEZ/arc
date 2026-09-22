@@ -1,0 +1,201 @@
+.react-flow__node-arc {
+  width: 230px;
+}
+.graph-node {
+  position: relative;
+  width: 230px;
+  border: 1px solid #dbe2dc;
+  background: #fff;
+  box-shadow: 0 3px 8px #16281c06;
+  border-radius: 8px;
+  padding: 12px 15px 14px;
+  color: #44533f;
+}
+.graph-node > strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
+  margin: 6px 0;
+}
+.node-type-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8px;
+  color: #97a18f;
+  font-weight: 500;
+}
+.node-icon {
+  width: 25px;
+  height: 25px;
+  border-radius: 6px;
+  background: #f0f4ef;
+  color: #829276;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.node-type-line .node-icon {
+  width: 19px;
+  height: 19px;
+  border-radius: 4px;
+}
+.node-icon.formula {
+  background: #eef1fa;
+  color: #8392b5;
+}
+.node-icon.condition {
+  background: #fcf4e1;
+  color: #b69c59;
+}
+.node-icon.reference {
+  background: #f2eefa;
+  color: #a08abb;
+}
+.node-icon.output {
+  background: #eaf4ea;
+  color: #7b9e72;
+}
+.node-detail {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 8px;
+  color: #98a38f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+.node-input .node-detail {
+  font-family: inherit;
+  font-size: 9px;
+}
+.node-selected {
+  outline: 2px solid #85b598;
+  outline-offset: 3px;
+  border-color: #a6c7b0;
+  box-shadow: 0 0 0 6px #e0eee499;
+}
+.node-condition {
+  border-color: #e3d9bd;
+}
+.node-reference {
+  border-color: #ded5e9;
+}
+.node-output {
+  border-color: #d3e3d0;
+}
+.node-visited {
+  border-color: #70ab88;
+  box-shadow: 0 0 0 3px #dcece0a6;
+}
+.node-check {
+  color: #529770;
+  margin-left: auto;
+}
+.node-link-icon {
+  margin-left: auto;
+  color: #b5a3c7;
+}
+.react-flow__handle {
+  height: 7px !important;
+  width: 7px !important;
+  background: #a0b798 !important;
+  border: 1.5px solid white !important;
+}
+.react-flow__handle:hover {
+  height: 11px !important;
+  width: 11px !important;
+  background: #569e74 !important;
+}
+.handle-label {
+  position: absolute;
+  bottom: -16px;
+  font-size: 7px;
+  color: #7ca174;
+  background: #f8faf8;
+  padding: 0 4px;
+  pointer-events: none;
+}
+.handle-true {
+  left: 19%;
+}
+.handle-false {
+  right: 18%;
+  color: #ac957a;
+}
+.react-flow__controls {
+  left: 12px !important;
+  bottom: 27px !important;
+  border: 1px solid #dfe6dc !important;
+  border-radius: 6px !important;
+  overflow: hidden;
+  box-shadow: 0 2px 6px #23341609 !important;
+}
+.react-flow__controls-button {
+  border-bottom: 1px solid #e9eee7 !important;
+  color: #94a58a !important;
+  width: 27px !important;
+  height: 27px !important;
+}
+.react-flow__controls-button svg {
+  fill: #7f9370 !important;
+  width: 11px !important;
+}
+.react-flow__minimap {
+  border: 1px solid #e0e7dc;
+  border-radius: 7px;
+  overflow: hidden;
+  width: 135px !important;
+  height: 90px !important;
+  bottom: 22px !important;
+  right: 10px !important;
+  box-shadow: 0 2px 8px #17332505;
+}
+.react-flow__minimap svg {
+  width: 135px;
+  height: 90px;
+}
+.canvas-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 57px;
+  font-size: 8px;
+  color: #a3af99;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+}
+.keyboard-key {
+  display: inline-block;
+  border: 1px solid #dbe3d5;
+  background: #fff;
+  border-radius: 3px;
+  padding: 0 3px;
+  color: #8e9e80;
+  line-height: 1.4;
+}
+.editor-status {
+  height: 27px;
+  background: #fff;
+  border-top: 1px solid #e4eae0;
+  padding: 0 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8px;
+  color: #9ba98f;
+  flex-shrink: 0;
+}
+.editor-status > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.editor-status .status-dot {
+  height: 4px;
+  width: 4px;
+}

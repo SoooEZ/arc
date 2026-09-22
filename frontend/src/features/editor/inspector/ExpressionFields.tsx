@@ -1,7 +1,7 @@
 import { Autocomplete, MenuItem, TextField } from "@mui/material";
 import { ChevronRight } from "lucide-react";
-import ValueBinding from "../../../components/ValueBinding";
-import ExpressionField from "../../../components/ExpressionField";
+import ValueBinding from "../../expressions/ValueBinding";
+import ExpressionField from "../../expressions/ExpressionField";
 import { literalText, simpleComparison } from "../../../domain/expressions";
 import { useState } from "react";
 import type { NodeFieldsProps } from "./types";

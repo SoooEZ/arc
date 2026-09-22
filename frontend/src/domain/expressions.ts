@@ -1,21 +1,24 @@
-// Use ARC's escapes; plain text is never treated as executable source.
-export const quoteText = (text: string) =>
-  '"' +
-  text
-    .replaceAll("\\", "\\\\")
-    .replaceAll('"', '\\"')
-    .replaceAll("\n", "\\n")
-    .replaceAll("\r", "\\r")
-    .replaceAll("\t", "\\t") +
-  '"';
+// JSON escapes are part of ARC's string contract.
+export const quoteText = (text: string) => JSON.stringify(text);
 export function literalText(value: string): string | null {
   if (!/^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')$/s.test(value)) return null;
-  return value
+  // Normalize ARC's single quotes, raw characters and legacy unknown escapes.
+  // JSON.parse then owns Unicode validation and all standard escape decoding.
+  const body = value
     .slice(1, -1)
     .replace(
-      /\\(.)/gs,
-      (_, c: string) => ({ n: "\n", r: "\r", t: "\t" })[c] ?? c,
+      /\\(.)|([^\\])/gs,
+      (match, escaped: string | undefined, plain: string | undefined) => {
+        if (escaped !== undefined && 'u"\\/bfnrt'.includes(escaped))
+          return match;
+        return JSON.stringify(escaped ?? plain).slice(1, -1);
+      },
     );
+  try {
+    return JSON.parse(`"${body}"`) as string;
+  } catch {
+    return null;
+  }
 }
 
 export function simpleComparison(expression: string): string[] | null {

@@ -1,0 +1,83 @@
+.node-outline {
+  position: absolute;
+  top: 14px;
+  left: 15px;
+  background: #fffffffa;
+  border: 1px solid #dce5d4;
+  border-radius: 8px;
+  width: 215px;
+  box-shadow: 0 5px 20px #23371c10;
+  padding: 9px;
+  z-index: 5;
+}
+.node-outline > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 3px 7px;
+  color: #889d74;
+  font-size: 10px;
+}
+.node-outline button:not(.MuiIconButton-root) {
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 6px;
+  width: 100%;
+  font-size: 9px;
+  color: #97a885;
+  text-align: left;
+  border-radius: 4px;
+}
+.node-outline button.selected {
+  background: #edf4e5 !important;
+  color: #658c48 !important;
+}
+.node-outline button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node-outline small {
+  font-size: 7px;
+  color: #bcc9ac;
+}
+.edge-delete {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 15px;
+  background: #fff;
+  border: 1px solid #ebdbd3;
+  border-radius: 7px;
+  z-index: 5;
+}
+.version-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 21px;
+  flex-wrap: wrap;
+  background: #f2f7ed;
+  border-bottom: 1px solid #dfe8d5;
+  color: #93a880;
+  font-size: 10px;
+}
+.version-bar button:not(.MuiIconButton-root) {
+  border: 1px solid #dce6d1;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 10px;
+  padding: 4px 8px;
+  color: #849c6d;
+}
+.version-bar small {
+  font-size: 8px;
+  margin-left: 7px;
+  color: #a5b591;
+}
+.version-bar > .MuiIconButton-root {
+  margin-left: auto;
+}

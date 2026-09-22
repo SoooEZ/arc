@@ -1,0 +1,126 @@
+@media (max-width: 1250px) {
+  .sidebar {
+    width: 210px;
+    padding-left: 13px;
+    padding-right: 13px;
+  }
+  .main-content {
+    margin-left: 210px;
+    width: calc(100% - 210px);
+  }
+  .environment {
+    margin-left: -13px;
+    margin-right: -13px;
+    padding-left: 24px;
+  }
+  .library-page,
+  .api-page {
+    padding: 30px 25px;
+  }
+  .rule-grid {
+    gap: 12px;
+  }
+  .rule-card {
+    padding: 17px 14px 0;
+  }
+  .rule-card-footer {
+    margin-left: -14px;
+    margin-right: -14px;
+    padding: 14px 11px;
+    font-size: 8px;
+  }
+  .published-chip.MuiChip-root {
+    font-size: 8px;
+  }
+  .rule-card-title h3 {
+    font-size: 13px;
+  }
+  .mini-box {
+    font-size: 6px;
+  }
+  .formula-preview {
+    gap: 7px;
+    padding: 10px;
+  }
+  .formula-preview code {
+    font-size: 8px;
+  }
+  .stat {
+    padding: 0 17px;
+    gap: 10px;
+  }
+  .stat small {
+    left: 67px;
+  }
+  .inspector {
+    width: 260px;
+  }
+  .editor-heading {
+    padding: 18px 18px;
+  }
+  .editor-name h1 {
+    font-size: 17px;
+  }
+  .editor-actions {
+    gap: 6px;
+  }
+  .editor-actions .MuiButton-root {
+    font-size: 9px;
+    padding: 5px 9px;
+  }
+  .editor-title {
+    gap: 9px;
+  }
+  .graph-view-label > span {
+    display: none;
+  }
+  .graph-view-label strong {
+    font-size: 9px;
+  }
+  .graph-tools .MuiIconButton-root {
+    padding: 5px;
+  }
+  .graph-toolbar {
+    padding: 0 11px;
+  }
+  .graph-tools .MuiButton-root {
+    padding: 4px 7px;
+    min-width: 0;
+  }
+  .graph-tools .MuiButton-startIcon {
+    margin-right: 4px;
+  }
+  .inspector-section {
+    padding: 20px 15px;
+  }
+  .api-console-body {
+    grid-template-columns: 1fr 1fr;
+  }
+  .endpoint-table > div {
+    grid-template-columns: 44px 220px 1fr;
+    font-size: 9px;
+  }
+  .getting-started {
+    gap: 17px;
+  }
+  .getting-visual {
+    display: none;
+  }
+  .library-toolbar {
+    gap: 10px;
+  }
+  .filter-tabs {
+    gap: 2px;
+  }
+  .filter-tabs button {
+    padding: 8px 9px;
+    font-size: 10px;
+  }
+  .library-toolbar > .MuiTextField-root {
+    width: 180px;
+  }
+  .rule-card-top .kind-icon {
+    width: 33px;
+    height: 33px;
+  }
+}

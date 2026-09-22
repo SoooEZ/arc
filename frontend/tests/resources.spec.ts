@@ -1,5 +1,110 @@
 import { expect, test } from "@playwright/test";
-import type { Definition } from "../src/types";
+import type { Definition, Rule } from "../src/types";
+
+test("a failed published version cannot expose the draft and can be retried", async ({
+  page,
+  request,
+}) => {
+  const id = `version-failure-${Date.now()}`;
+  const createdResponse = await request.post("/api/rules", {
+    data: { id, name: "Version failure fixture", kind: "FORMULA" },
+  });
+  expect(createdResponse.ok()).toBeTruthy();
+  const created: Rule = await createdResponse.json();
+  const publishedResponse = await request.post(`/api/rules/${id}/publish`, {
+    data: { revision: created.revision },
+  });
+  expect(publishedResponse.ok()).toBeTruthy();
+  const published: Rule = await publishedResponse.json();
+  expect(
+    (
+      await request.put(`/api/rules/${id}`, {
+        data: {
+          name: created.name,
+          description: created.description,
+          revision: published.revision,
+          definition: {
+            ...created.draft,
+            nodes: created.draft.nodes.map((node) =>
+              node.type === "FORMULA"
+                ? { ...node, label: "Draft-only calculation", expression: "21" }
+                : node,
+            ),
+          },
+        },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  let failVersion = true;
+  await page.route(`**/api/rules/${id}/versions/1`, async (route) => {
+    if (failVersion)
+      await route.fulfill({
+        status: 503,
+        json: { message: "Version store unavailable" },
+      });
+    else await route.continue();
+  });
+  const graphRequests: string[] = [];
+  page.on("request", (outgoing) => {
+    if (
+      outgoing.method() === "POST" &&
+      /\/api\/(studio\/render|diagnostics|variables|preview|validate)$/.test(
+        outgoing.url(),
+      )
+    )
+      graphRequests.push(outgoing.url());
+  });
+
+  await page.goto(`/#/studio/${id}?version=1`);
+  await expect(page.getByRole("alert")).toContainText(
+    "Could not load version 1",
+  );
+  await expect(page.getByRole("alert")).toContainText(
+    "Version store unavailable",
+  );
+  await expect(page.locator(".monaco-editor")).toHaveCount(0);
+  await expect(page.locator(".react-flow__node")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Test rule", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Export definition", exact: true }),
+  ).toHaveCount(0);
+  expect(graphRequests).toEqual([]);
+
+  await page
+    .getByRole("button", { name: "Open current draft", exact: true })
+    .click();
+  await expect(
+    page.getByText("Draft-only calculation", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+  await expect(page.getByTestId("test-result")).toHaveText("21");
+
+  await page.goto(`/#/rules/${id}?version=1`);
+  await expect(page.getByRole("alert")).toContainText(
+    "Could not load version 1",
+  );
+  await expect(page.locator(".react-flow__node")).toHaveCount(0);
+  await expect(
+    page.getByText("Draft-only calculation", { exact: true }),
+  ).toHaveCount(0);
+  failVersion = false;
+  await page
+    .getByRole("button", { name: "Retry version", exact: true })
+    .click();
+  await expect(page.getByText("Immutable published version")).toBeVisible();
+  await expect(page.locator(".react-flow__node")).toHaveCount(
+    published.draft.nodes.length,
+  );
+  await expect(
+    page.getByText("Draft-only calculation", { exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+  await expect(page.getByTestId("test-result")).toHaveText("90");
+});
 
 test("moving a node reuses semantic reads and late diagnostics cannot mark a newer expression", async ({
   page,

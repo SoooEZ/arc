@@ -1,6 +1,6 @@
 import { Button, IconButton, TextField, Tooltip } from "@mui/material";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import ExpressionField from "../../../components/ExpressionField";
+import ExpressionField from "../../expressions/ExpressionField";
 import type { NodeFieldsProps } from "./types";
 
 export default function SwitchFields({

@@ -1,7 +1,7 @@
 import { Button, IconButton, TextField, Tooltip } from "@mui/material";
 import { Plus, Trash2 } from "lucide-react";
-import ExpressionField from "../../../components/ExpressionField";
-import ValueBinding from "../../../components/ValueBinding";
+import ExpressionField from "../../expressions/ExpressionField";
+import ValueBinding from "../../expressions/ValueBinding";
 import { quoteText } from "../../../domain/expressions";
 import type { NodeFieldsProps } from "./types";
 

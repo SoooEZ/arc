@@ -1,6 +1,9 @@
 package dev.arc.rule;
 
-import dev.arc.engine.*;
+import dev.arc.engine.MemoizingRuleResolver;
+import dev.arc.engine.RuleResolver;
+import dev.arc.engine.graph.GraphPlan;
+import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.source.SourceBindingValidator;
@@ -34,7 +37,7 @@ public class RuleDefinitionService {
 
   public Map<String, Set<String>> variables(Definition definition) {
     validator.shape(definition);
-    return new GraphPlan(definition).available;
+    return new GraphPlan(definition).available();
   }
 
   public List<Validator.Problem> diagnostics(Definition definition) {

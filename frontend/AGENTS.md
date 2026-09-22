@@ -2,6 +2,8 @@
 
 Applies to `frontend/`. Read [root guidance](../AGENTS.md) and [frontend boundaries](../docs/maintaining.md). Use [arc-react](../.agents/skills/arc-react/SKILL.md) for implementation and [arc-maintainability](../.agents/skills/arc-maintainability/SKILL.md) for structural changes.
 
+Read the applicable [frontend failures](../docs/review-lessons.md#frontend-failures) and [serialization failures](../docs/review-lessons.md#backend-and-serialization-failures) before changing those paths. They record concrete async, read-only, version, row-identity, mapping, animation and escaping mistakes with existing regression coverage.
+
 ## Ownership and state
 
 - ARC uses React, TypeScript, Vite, MUI, React Flow and Monaco. Select guidance appropriate to this client application; Next.js server components/actions and server caches are not part of its runtime.

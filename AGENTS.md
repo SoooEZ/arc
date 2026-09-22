@@ -6,6 +6,8 @@ ARC is a React/TypeScript/MUI editor and a Java/Spring Boot rule and calculation
 
 Read [the maintenance guide](docs/maintaining.md) for module ownership. Before changing backend or frontend code, also read that subtree's [backend guidance](backend/AGENTS.md) or [frontend guidance](frontend/AGENTS.md), including when the task starts at the repository root. Read [the graph contract](docs/architecture.md) when changing evaluation, scope, or serialization.
 
+Before implementation, refactoring or review, read the applicable [review lessons](docs/review-lessons.md) and inspect their linked regression tests. Use the documented trigger and preventive rule to guide the change; retain the observable assertions. When a new material regression is confirmed, update the relevant lesson and its test reference rather than adding duplicate generic advice.
+
 Choose only the skills relevant to the task:
 
 - Java implementation: [arc-java](.agents/skills/arc-java/SKILL.md).

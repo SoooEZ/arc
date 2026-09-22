@@ -1,0 +1,137 @@
+.editor-main {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.editor-main .topbar {
+  flex-shrink: 0;
+  padding: 0 25px;
+}
+.editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 21px 24px;
+  background: #fff;
+  border-bottom: 1px solid #e5eae3;
+  gap: 15px;
+  flex-shrink: 0;
+}
+.editor-title {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+.editor-title > div {
+  min-width: 0;
+}
+.editor-name {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.editor-name h1 {
+  font-size: 19px;
+  letter-spacing: -0.6px;
+  line-height: 1.4;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.editor-title > div > span {
+  display: block;
+  font-size: 9px;
+  color: #98a08f;
+  margin-top: 5px;
+  white-space: nowrap;
+}
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+.editor-actions .MuiButton-root {
+  font-size: 10px;
+  min-height: 33px;
+  padding: 6px 11px;
+}
+.editor-actions .MuiIconButton-root {
+  padding: 7px;
+  color: #a0a994;
+}
+.editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.graph-workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.graph-toolbar {
+  height: 56px;
+  background: #fff;
+  border-bottom: 1px solid #e5eae3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 17px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.graph-view-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a18a;
+  white-space: nowrap;
+}
+.graph-view-label strong {
+  font-size: 10px;
+  font-weight: 500;
+  color: #637857;
+}
+.graph-view-label > span {
+  font-size: 9px;
+  color: #9aa68e;
+  margin-left: 5px;
+}
+.graph-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.graph-tools .MuiButton-root {
+  font-size: 9px;
+  min-height: 28px;
+  padding: 4px 10px;
+}
+.graph-tools .MuiIconButton-root {
+  color: #9aaa8c;
+  padding: 6px;
+}
+.routing-warning {
+  border-radius: 0 !important;
+  flex-shrink: 0;
+  max-height: 128px;
+  overflow: auto;
+}
+.flow-container {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  background: #f8faf8;
+  isolation: isolate;
+}

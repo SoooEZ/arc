@@ -1,0 +1,26 @@
+.center-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 20px;
+  color: #7a8a76;
+}
+.dialog-intro {
+  font-size: 12px;
+  color: #899480;
+  margin: 0 0 24px;
+}
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-top: 4px;
+}
+.template-note {
+  align-self: flex-start;
+}
+.MuiDialogActions-root {
+  padding: 16px 24px !important;
+}
