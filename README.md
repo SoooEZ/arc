@@ -4,7 +4,7 @@
 
 The first release implements **R & C**: build formulas, conditions, and decision trees; publish stable versions; execute them from any application with typed inputs and a complete execution trace.
 
-Choose [Docker Compose](#run-with-docker-compose) to run the whole stack in containers, or [local development without Docker](#run-without-docker-local-development) to run PostgreSQL, Java, and React directly. Run the setup commands from the repository root unless a step says otherwise.
+Choose [Docker Compose](#run-with-docker-compose) to run the whole stack in containers, or [local development without Docker](#run-without-docker-local-development) to run PostgreSQL, Java, and React directly. After local setup, **`bin/dev` starts the frontend and backend together with Foreman**. Run the setup commands from the repository root unless a step says otherwise.
 
 ## Run with Docker Compose
 
@@ -42,7 +42,7 @@ Normal shutdown preserves saved rules and published versions. `docker compose do
 
 ## Run without Docker (local development)
 
-Prerequisites: **Java 21**, **Maven 3.9+**, **Node.js 24+** with npm, and **PostgreSQL 17**. Docker and Nginx are not required. The steps below cover a fresh local setup on **macOS with [Homebrew](https://brew.sh/)**. On other systems, install the same tools using your platform's package manager and substitute your local JDK path and PostgreSQL administrator account.
+Prerequisites: **Java 21**, **Maven 3.9+**, **Node.js 24+** with npm, **PostgreSQL 17**, and **Foreman** for the combined launcher. Docker and Nginx are not required. The steps below cover a fresh local setup on **macOS with [Homebrew](https://brew.sh/)**. On other systems, install the same tools using your platform's package manager and substitute your local JDK path and PostgreSQL administrator account.
 
 You create the PostgreSQL role and database once. **ARC creates its tables automatically when the backend starts**; there is no separate manual `CREATE TABLE` or SQL import step.
 
@@ -51,7 +51,7 @@ You create the PostgreSQL role and database once. **ARC creates its tables autom
 If Homebrew is not installed yet, follow [its installation instructions](https://brew.sh/) and complete the displayed shell setup first. Install the application tools:
 
 ```sh
-brew install openjdk@21 maven node@24 postgresql@17
+brew install openjdk@21 maven node@24 postgresql@17 foreman
 
 export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
 export PATH="$JAVA_HOME/bin:$(brew --prefix node@24)/bin:$(brew --prefix postgresql@17)/bin:$PATH"
@@ -61,6 +61,7 @@ mvn -v
 node --version
 npm --version
 psql --version
+foreman --version
 ```
 
 Check that both `java -version` and `mvn -v` report **Java 21**, Node reports **24 or newer**, and PostgreSQL reports **17**. Homebrew's [Java 21](https://formulae.brew.sh/formula/openjdk@21), [Node 24](https://formulae.brew.sh/formula/node@24), and [PostgreSQL 17](https://formulae.brew.sh/formula/postgresql@17) packages are keg-only, so the explicit paths select the intended versions. Exports apply to the current terminal; repeat them in a new terminal, or add these two export lines to your shell configuration (for example `~/.zshrc`). The backend and frontend commands below repeat the exports they need.
@@ -72,7 +73,7 @@ git clone https://github.com/SoooEZ/arc.git
 cd arc
 ```
 
-The first install and build need internet access to download Homebrew, Maven, and npm dependencies.
+The first install and build need internet access to download Homebrew, Maven, and npm dependencies. [Foreman](https://github.com/ddollar/foreman) is a development process manager; it does not add a Rails backend. The [Homebrew package](https://formulae.brew.sh/formula/foreman) supplies its Ruby runtime. If you already manage Ruby yourself, `gem install foreman` is an alternative.
 
 ### 2. Start PostgreSQL and create the database
 
@@ -102,7 +103,31 @@ psql -h localhost -p 5432 -U arc -d arc -W \
 
 Expected values: database `arc`, user `arc`, and `can_create_tables = t`. The role owns this fresh database, which gives it the necessary schema permissions in the default PostgreSQL 17 setup. Resolve connection or permission errors before starting Java; Flyway cannot create a missing PostgreSQL role or database.
 
-### 3. Start the Java backend (tables are created here)
+### 3. Start both apps with one command
+
+After completing the PostgreSQL setup above, run these **once** from the repository root:
+
+```sh
+npm --prefix frontend ci
+# First setup only; keep your existing .env.dev on subsequent runs
+cp .env.dev.example .env.dev
+```
+
+Edit `.env.dev` to set `DB_URL`, `DB_USER`, and `DB_PASSWORD` to the database and password from step 2. Keep the Java/Node PATH exports from step 1 active in this terminal. Then start both applications:
+
+```sh
+bin/dev
+```
+
+[bin/dev](bin/dev) runs the two processes in [Procfile.dev](Procfile.dev) through Foreman, with combined `api` / `web` logs. Open [http://localhost:3080](http://localhost:3080) after the backend reports that it has started. Vite may become ready before the API finishes its first build and migrations. Press **Ctrl+C once** to stop both processes; if either process exits, Foreman stops the other. PostgreSQL continues running separately.
+
+The launcher loads **`.env.dev`**, keeping native database settings separate from Compose's `.env`. Use literal `KEY=value` entries, without `export`, shell commands, or variable expansion. Values in the file take precedence over same-named shell variables. To choose another file, use `ARC_ENV_FILE=/path/to/config bin/dev`; see the [Foreman manual](https://ddollar.github.io/foreman/) for its environment-file format.
+
+Both ports must be available. To run alongside Docker, set different ports in `.env.dev`, for example `ARC_WEB_PORT=3081` and `ARC_API_PORT=8081`. The launcher sets the backend port and Vite's API proxy consistently. Use those ports in the verification commands below. The launcher does not install tools, start PostgreSQL, or create the database role/database; those are the one-time steps above. **Flyway creates the application tables on backend startup.**
+
+#### Alternative: start the Java backend separately
+
+For debugging one process at a time, you can still use separate terminals without Foreman. Skip this alternative when `bin/dev` is running.
 
 In **terminal A**, starting from the repository root:
 
@@ -132,7 +157,7 @@ Maven downloads Java dependencies, compiles the backend, and starts Spring Boot.
 
 ### 4. Verify tables and initial data
 
-With terminal A still running, open another terminal. Use the application's PostgreSQL password whenever prompted:
+With `bin/dev` (or the separate backend terminal) still running, open another terminal. Use the application's PostgreSQL password whenever prompted:
 
 ```sh
 export PATH="$(brew --prefix postgresql@17)/bin:$PATH"
@@ -158,7 +183,9 @@ psql -h localhost -p 5432 -U arc -d arc -W \
 
 On a fresh setup, expect health `UP`, the five tables above, successful migrations `1` and `2`, three rules at published version `1`, and `country-tax` version `1`. An existing workspace may contain additional rules, sources, and versions.
 
-### 5. Start the React frontend
+### 5. Alternative: start the React frontend separately
+
+Skip this step when using `bin/dev`; it already starts React.
 
 In **terminal B**, starting from the repository root:
 
@@ -169,27 +196,29 @@ npm ci
 npm run dev -- --port 3080 --strictPort
 ```
 
-Open [http://localhost:3080](http://localhost:3080). Vite proxies `/api` and `/actuator` to `http://localhost:8080`, so the frontend can call the native backend without Nginx. Both **3080** and **8080** must be available; stop the ARC Compose stack first if it is using those ports. If you change the backend port, update the proxy target in `frontend/vite.config.ts` too.
+Open [http://localhost:3080](http://localhost:3080). Vite proxies `/api` and `/actuator` to `http://localhost:8080`, so the frontend can call the native backend without Nginx. Both **3080** and **8080** must be available. For custom ports in separate terminals, start Java with `mvn spring-boot:run -Dspring-boot.run.arguments="--server.port=8081"` and Vite with `ARC_API_PORT=8081 npm run dev -- --port 3081 --strictPort`. The standalone commands do not load `.env.dev`.
 
 Use the [execution example below](#verify-either-setup) to check a complete HTTP calculation after startup.
 
 ### 6. Stop and restart
 
-Press **Ctrl+C** in each terminal to stop the frontend and backend. PostgreSQL continues running as a Homebrew service; stop it when desired with `brew services stop postgresql@17`.
+Press **Ctrl+C** in the `bin/dev` terminal to stop both applications, or in each terminal if you started them separately. PostgreSQL continues running as a Homebrew service; stop it when desired with `brew services stop postgresql@17`.
 
-For subsequent runs, start PostgreSQL if needed, then repeat the backend and frontend startup commands in separate terminals. Do not recreate the role, database, or tables. `npm ci` is needed for the first setup or after dependency/lockfile changes; an unchanged installation can go straight to `npm run dev -- --port 3080 --strictPort`.
+For subsequent runs, start PostgreSQL if needed, ensure the toolchain PATH is configured, then run **`bin/dev`**. Do not recreate the role, database, or tables. `npm --prefix frontend ci` is needed for the first setup or after dependency/lockfile changes.
 
 ### Troubleshooting native startup
 
 | Symptom | Check / fix |
 | --- | --- |
 | `java`, `mvn`, `node`, or `psql` is not found; Maven uses the wrong Java | Repeat the installation/PATH setup in the current terminal. Confirm `JAVA_HOME` and `mvn -v` show Java 21. |
+| `Missing foreman` | Run `brew install foreman`, or `gem install foreman` with a configured Ruby, and check that `foreman --version` works in this terminal. |
+| `Missing environment file` / frontend dependencies are missing | Copy `.env.dev.example` to `.env.dev`, set your database credentials, and run `npm --prefix frontend ci`. `bin/dev --help` lists these prerequisites. |
 | PostgreSQL reports `no response` / connection refused | Check `brew services list`, start `postgresql@17`, and run `pg_isready -h localhost -p 5432`. Verify that `DB_URL` points to the same server and port. |
 | Role/database `arc` already exists | Skip its creation on subsequent runs and verify the login with `psql`. Use the existing password and owner; do not drop the database to repeat setup. |
-| `password authentication failed` or database `arc` does not exist | Verify the role/database creation and password, then export matching `DB_USER`, `DB_PASSWORD`, and `DB_URL` in the Java terminal. |
+| `password authentication failed` or database `arc` does not exist | Verify the role/database creation and password, then set matching `DB_USER`, `DB_PASSWORD`, and `DB_URL` in `.env.dev` (or export them in the separate Java terminal). |
 | `permission denied for schema public` | Run the permission query in step 2. Have the database administrator grant the ARC role `USAGE, CREATE` on schema `public` in the ARC database; existing tables must also be owned by, or writable by, that role. |
 | Tables are missing or Flyway migration fails | Read the backend terminal's first database/Flyway error. Check that you connected to the intended database and that the role can create tables. Run the migration-history query after fixing the error and restarting. Do not manually import the migration SQL or remove migration history. |
-| Port 8080 or 3080 is occupied | On macOS, inspect it with `lsof -nP -iTCP:8080 -sTCP:LISTEN` or `lsof -nP -iTCP:3080 -sTCP:LISTEN`. Stop the conflicting app, or change the port and matching proxy configuration. |
+| Port 8080 or 3080 is occupied | On macOS, inspect it with `lsof -nP -iTCP:8080 -sTCP:LISTEN` or `lsof -nP -iTCP:3080 -sTCP:LISTEN`. Stop the conflicting app, or set different `ARC_API_PORT` / `ARC_WEB_PORT` values in `.env.dev`. Vite fails on an occupied port instead of silently selecting another. |
 | Frontend opens, but API requests fail | Check `http://localhost:8080/actuator/health` and `http://localhost:3080/actuator/health`. Start the backend, resolve its startup error, or correct the Vite proxy target. |
 
 **Existing data:** native PostgreSQL and the Compose database volume are separate databases. A fresh native database gets the example rules, not your Docker workspace. To retain custom rules, published versions, and data sources when switching, back up the original database with `pg_dump` and restore it into the destination database before starting ARC there. If Docker cannot start, its existing volume still needs to be recovered before that data can be migrated; keep the volume intact.

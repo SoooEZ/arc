@@ -1,12 +1,14 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const apiTarget = `http://localhost:${process.env.ARC_API_PORT || "8080"}`;
+
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api": "http://localhost:8080",
-      "/actuator": "http://localhost:8080",
+      "/api": apiTarget,
+      "/actuator": apiTarget,
     },
   },
   build: {

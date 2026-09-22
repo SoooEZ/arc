@@ -1,0 +1,2 @@
+api: exec mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.arguments="--server.port=${ARC_API_PORT:-8080}"
+web: cd frontend && exec node node_modules/vite/bin/vite.js --host 0.0.0.0 --port "${ARC_WEB_PORT:-3080}" --strictPort

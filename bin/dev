@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat <<'HELP'
+Usage: bin/dev
+
+Start the Java API and React/Vite together with Foreman. Ctrl+C stops both.
+Requires Java 21, Maven 3.9+, Node.js 24+, Foreman and a running PostgreSQL 17 database.
+
+First setup: follow README's local PostgreSQL setup, run npm --prefix frontend ci,
+copy .env.dev.example to .env.dev, then set your local database credentials there.
+Use ARC_ENV_FILE=/path/to/config to select another environment file.
+PostgreSQL remains managed separately; Flyway creates application tables on startup.
+HELP
+  exit 0
+fi
+
+if [[ $# -ne 0 ]]; then
+  printf '%s\n' 'Usage: bin/dev (or bin/dev --help)' >&2
+  exit 1
+fi
+
+for tool in foreman mvn node; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    printf 'Missing %s. Install the local development tools listed in README.\n' "$tool" >&2
+    if [[ "$tool" == "foreman" ]]; then
+      printf '%s\n' 'macOS: brew install foreman; with a configured Ruby: gem install foreman' >&2
+    fi
+    exit 1
+  fi
+done
+
+env_file="${ARC_ENV_FILE:-.env.dev}"
+if [[ ! -r "$env_file" ]]; then
+  printf 'Missing environment file: %s\n' "$env_file" >&2
+  printf '%s\n' 'Copy .env.dev.example to .env.dev and set your local database credentials.' >&2
+  exit 1
+fi
+
+if [[ ! -f frontend/node_modules/vite/bin/vite.js ]]; then
+  printf '%s\n' 'Frontend dependencies are missing. Run: npm --prefix frontend ci' >&2
+  exit 1
+fi
+
+# Let Foreman parse the environment and own process shutdown; never source the env file.
+exec foreman start --procfile Procfile.dev --env "$env_file" --timeout 15
