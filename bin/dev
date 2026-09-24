@@ -5,9 +5,10 @@ cd "$(dirname "$0")/.."
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat <<'HELP'
-Usage: bin/dev
+Usage: bin/dev [--check]
 
 Start the Java API and React/Vite together with Foreman. Ctrl+C stops both.
+Use --check to verify native startup prerequisites without starting either app.
 Requires Java 21, Maven 3.9+, Node.js 24+, Foreman and a running PostgreSQL 17 database.
 
 First setup: follow README's local PostgreSQL setup, run npm --prefix frontend ci,
@@ -18,8 +19,8 @@ HELP
   exit 0
 fi
 
-if [[ $# -ne 0 ]]; then
-  printf '%s\n' 'Usage: bin/dev (or bin/dev --help)' >&2
+if [[ $# -gt 1 || ( $# -eq 1 && "$1" != "--check" ) ]]; then
+  printf '%s\n' 'Usage: bin/dev [--check] (or bin/dev --help)' >&2
   exit 1
 fi
 
@@ -45,5 +46,10 @@ if [[ ! -f frontend/node_modules/vite/bin/vite.js ]]; then
   exit 1
 fi
 
-# Let Foreman parse the environment and own process shutdown; never source the env file.
+# Use Foreman's environment parser for both checks and startup; never source the env file.
+foreman run --env "$env_file" node scripts/check_dev.mjs
+if [[ "${1:-}" == "--check" ]]; then
+  exit 0
+fi
+
 exec foreman start --procfile Procfile.dev --env "$env_file" --timeout 15

@@ -113,13 +113,16 @@ npm --prefix frontend ci
 cp .env.dev.example .env.dev
 ```
 
-Edit `.env.dev` to set `DB_URL`, `DB_USER`, and `DB_PASSWORD` to the database and password from step 2. Keep the Java/Node PATH exports from step 1 active in this terminal. Then start both applications:
+Edit `.env.dev` to set `DB_URL`, `DB_USER`, and `DB_PASSWORD` to the database and password from step 2; replace the example password before running. Keep the Java/Node PATH exports from step 1 active in this terminal. Check this machine's setup, then start both applications:
 
 ```sh
+bin/dev --check
 bin/dev
 ```
 
-[bin/dev](bin/dev) runs the two processes in [Procfile.dev](Procfile.dev) through Foreman, with combined `api` / `web` logs. Open [http://localhost:3080](http://localhost:3080) after the backend reports that it has started. Vite may become ready before the API finishes its first build and migrations. Press **Ctrl+C once** to stop both processes; if either process exits, Foreman stops the other. PostgreSQL continues running separately.
+[bin/dev](bin/dev) checks the required tools, Maven's Java version, Node version, environment file, frontend dependencies, available API/web ports, and database TCP reachability before starting. `--check` performs only these checks; it starts neither application and does not validate database credentials or migrations. TCP probing supports a standard single-host `jdbc:postgresql://host:port/database` URL; other JDBC forms are left for the backend to validate with a notice.
+
+The launcher runs the two processes in [Procfile.dev](Procfile.dev) through Foreman, with combined `api` / `web` logs. The backend uses `mvn clean spring-boot:run` to remove obsolete compiled classes left by package moves or branch changes. Each launch therefore recompiles the backend. Open [http://localhost:3080](http://localhost:3080) after the backend reports that it has started. Vite may become ready before the API finishes its build and migrations. Press **Ctrl+C once** to stop both processes; if either process exits, Foreman stops the other. PostgreSQL continues running separately.
 
 The launcher loads **`.env.dev`**, keeping native database settings separate from Compose's `.env`. Use literal `KEY=value` entries, without `export`, shell commands, or variable expansion. Values in the file take precedence over same-named shell variables. To choose another file, use `ARC_ENV_FILE=/path/to/config bin/dev`; see the [Foreman manual](https://ddollar.github.io/foreman/) for its environment-file format.
 
@@ -138,10 +141,10 @@ export PATH="$JAVA_HOME/bin:$PATH"
 export DB_URL='jdbc:postgresql://localhost:5432/arc'
 export DB_USER='arc'
 export DB_PASSWORD='replace-with-the-password-you-chose'
-mvn spring-boot:run
+mvn clean spring-boot:run
 ```
 
-Keep this terminal running. The API listens on port **8080**. The root `.env` file is read by Docker Compose; it is **not automatically loaded** by `mvn spring-boot:run`. Export the `DB_*` variables in the backend's terminal as shown above. If you configure HTTP data sources, also export any needed `ARC_HTTP_ALLOWED_HOSTS` / `ARC_HTTP_PRIVATE_HOSTS` settings there; see [the studio guide](docs/studio.md).
+Keep this terminal running. The API listens on port **8080**. Neither `.env` nor `.env.dev` is automatically loaded by Maven. Export the `DB_*` variables in the backend's terminal as shown above. If you configure HTTP data sources, also export any needed `ARC_HTTP_ALLOWED_HOSTS` / `ARC_HTTP_PRIVATE_HOSTS` settings there; see [the studio guide](docs/studio.md).
 
 Maven downloads Java dependencies, compiles the backend, and starts Spring Boot. Its [Flyway integration](https://docs.spring.io/spring-boot/3.5/how-to/data-initialization.html#howto.data-initialization.migration-tool.flyway) runs the versioned SQL files in `backend/src/main/resources/db/migration` automatically. Both native startup and Docker Compose use this same initialization process:
 
@@ -196,7 +199,7 @@ npm ci
 npm run dev -- --port 3080 --strictPort
 ```
 
-Open [http://localhost:3080](http://localhost:3080). Vite proxies `/api` and `/actuator` to `http://localhost:8080`, so the frontend can call the native backend without Nginx. Both **3080** and **8080** must be available. For custom ports in separate terminals, start Java with `mvn spring-boot:run -Dspring-boot.run.arguments="--server.port=8081"` and Vite with `ARC_API_PORT=8081 npm run dev -- --port 3081 --strictPort`. The standalone commands do not load `.env.dev`.
+Open [http://localhost:3080](http://localhost:3080). Vite proxies `/api` and `/actuator` to `http://localhost:8080`, so the frontend can call the native backend without Nginx. Both **3080** and **8080** must be available. For custom ports in separate terminals, start Java with `mvn clean spring-boot:run -Dspring-boot.run.arguments="--server.port=8081"` and Vite with `ARC_API_PORT=8081 npm run dev -- --port 3081 --strictPort`. The standalone commands do not load `.env.dev`.
 
 Use the [execution example below](#verify-either-setup) to check a complete HTTP calculation after startup.
 
@@ -208,17 +211,20 @@ For subsequent runs, start PostgreSQL if needed, ensure the toolchain PATH is co
 
 ### Troubleshooting native startup
 
+Run `bin/dev --check` in the same terminal to diagnose launcher prerequisites without starting either application. After changing a machine's tools, credentials, or ports, repeat the check. A successful preflight does not guarantee database authentication, Flyway migration, or application startup; read the first backend error if startup still fails.
+
 | Symptom | Check / fix |
 | --- | --- |
 | `java`, `mvn`, `node`, or `psql` is not found; Maven uses the wrong Java | Repeat the installation/PATH setup in the current terminal. Confirm `JAVA_HOME` and `mvn -v` show Java 21. |
 | `Missing foreman` | Run `brew install foreman`, or `gem install foreman` with a configured Ruby, and check that `foreman --version` works in this terminal. |
 | `Missing environment file` / frontend dependencies are missing | Copy `.env.dev.example` to `.env.dev`, set your database credentials, and run `npm --prefix frontend ci`. `bin/dev --help` lists these prerequisites. |
+| `ConflictingBeanDefinitionException` after a package move or branch change | Stale `.class` files can keep old Spring components on the classpath. Stop the backend and run `mvn -f backend/pom.xml clean spring-boot:run` with your database variables exported, or use `bin/dev`, which cleans automatically. For an IDE launch, clean/rebuild its output too. If the conflict remains after a clean build, inspect the two classes named in the exception. |
 | PostgreSQL reports `no response` / connection refused | Check `brew services list`, start `postgresql@17`, and run `pg_isready -h localhost -p 5432`. Verify that `DB_URL` points to the same server and port. |
 | Role/database `arc` already exists | Skip its creation on subsequent runs and verify the login with `psql`. Use the existing password and owner; do not drop the database to repeat setup. |
 | `password authentication failed` or database `arc` does not exist | Verify the role/database creation and password, then set matching `DB_USER`, `DB_PASSWORD`, and `DB_URL` in `.env.dev` (or export them in the separate Java terminal). |
 | `permission denied for schema public` | Run the permission query in step 2. Have the database administrator grant the ARC role `USAGE, CREATE` on schema `public` in the ARC database; existing tables must also be owned by, or writable by, that role. |
 | Tables are missing or Flyway migration fails | Read the backend terminal's first database/Flyway error. Check that you connected to the intended database and that the role can create tables. Run the migration-history query after fixing the error and restarting. Do not manually import the migration SQL or remove migration history. |
-| Port 8080 or 3080 is occupied | On macOS, inspect it with `lsof -nP -iTCP:8080 -sTCP:LISTEN` or `lsof -nP -iTCP:3080 -sTCP:LISTEN`. Stop the conflicting app, or set different `ARC_API_PORT` / `ARC_WEB_PORT` values in `.env.dev`. Vite fails on an occupied port instead of silently selecting another. |
+| Port 8080 or 3080 is occupied | On macOS, inspect it with `lsof -nP -iTCP:8080 -sTCP:LISTEN` or `lsof -nP -iTCP:3080 -sTCP:LISTEN`. Stop the conflicting app, or set different `ARC_API_PORT` / `ARC_WEB_PORT` values in `.env.dev`; each must be an integer from 1 to 65535. Vite fails on an occupied port instead of silently selecting another. |
 | Frontend opens, but API requests fail | Check `http://localhost:8080/actuator/health` and `http://localhost:3080/actuator/health`. Start the backend, resolve its startup error, or correct the Vite proxy target. |
 
 **Existing data:** native PostgreSQL and the Compose database volume are separate databases. A fresh native database gets the example rules, not your Docker workspace. To retain custom rules, published versions, and data sources when switching, back up the original database with `pg_dump` and restore it into the destination database before starting ARC there. If Docker cannot start, its existing volume still needs to be recovered before that data can be migrated; keep the volume intact.
@@ -316,6 +322,9 @@ Use Java 21, Maven 3.9+, and Node.js 24+ for the checks below. Browser and live 
 # Check module dependency boundaries
 python3 scripts/check_architecture.py
 
+# Check native startup diagnostics (temporary sockets; no PostgreSQL or Foreman needed)
+node --test scripts/check_dev.test.mjs
+
 # Backend formatting check and tests for arithmetic, graphs, sources and references
 cd backend
 mvn clean verify
@@ -353,7 +362,7 @@ COMPOSE_PROJECT_NAME=arc-test ARC_WEB_PORT=3081 ARC_API_PORT=8081 docker compose
 
 The final command deletes only that test project's containers and database volume. Normal `docker compose down` preserves the development database.
 
-GitHub Actions runs module-boundary checks, Java and frontend formatting checks, unit tests, the frontend build, real PostgreSQL API checks, and Chromium end-to-end tests. To format code before committing, run `mvn -f backend/pom.xml spotless:apply` and `npm --prefix frontend run format`. See [the maintenance guide](docs/maintaining.md) for where to add providers, functions, nodes, and UI behavior.
+GitHub Actions runs module-boundary and native startup diagnostics checks, Java and frontend formatting checks, unit tests, the frontend build, real PostgreSQL API checks, and Chromium end-to-end tests. To format code before committing, run `mvn -f backend/pom.xml spotless:apply` and `npm --prefix frontend run format`. See [the maintenance guide](docs/maintaining.md) for where to add providers, functions, nodes, and UI behavior.
 
 ## Next phases
 

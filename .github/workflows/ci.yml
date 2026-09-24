@@ -24,6 +24,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Check module boundaries
         run: python3 scripts/check_architecture.py
+      - name: Check native startup diagnostics
+        run: node --test scripts/check_dev.test.mjs
       - name: Check Java formatting and tests
         working-directory: backend
         run: mvn -B clean verify
