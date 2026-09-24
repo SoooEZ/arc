@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -50,6 +50,7 @@ async function setup(t) {
   function run(overrides = {}) {
     return new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [checkScript], {
+        cwd: directory,
         env: { ...environment, ...overrides },
         stdio: ["ignore", "pipe", "pipe"],
         timeout: 15_000,
@@ -61,8 +62,107 @@ async function setup(t) {
       child.once("close", (code) => resolve({ code, output }));
     });
   }
-  return { environment, database, run };
+  return { directory, environment, database, run };
 }
+
+function git(directory, ...args) {
+  const result = spawnSync(
+    "git",
+    [
+      "-c",
+      "user.name=ARC test",
+      "-c",
+      "user.email=arc-test@example.invalid",
+      "-c",
+      "commit.gpgsign=false",
+      ...args,
+    ],
+    {
+      cwd: directory,
+      encoding: "utf8",
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+}
+
+test("historically deleted main and test sources are listed without removing local work", async (t) => {
+  const { directory, run } = await setup(t);
+  const obsolete = [
+    "backend/src/main/java/dev/arc/engine/Engine.java",
+    "backend/src/test/java/dev/arc/engine/EngineTest.java",
+  ];
+  git(directory, "init");
+  for (const file of obsolete) {
+    await mkdir(path.dirname(path.join(directory, file)), { recursive: true });
+    await writeFile(path.join(directory, file), "// old source\n");
+  }
+  git(directory, "add", "backend");
+  git(directory, "commit", "-m", "Original classes");
+  for (const file of obsolete) await rm(path.join(directory, file));
+  git(directory, "add", "-u");
+  git(directory, "commit", "-m", "Remove obsolete classes");
+  // Ignoring a stale source cannot keep Maven from compiling it.
+  await writeFile(path.join(directory, ".gitignore"), obsolete[0] + "\n");
+  for (const file of obsolete) {
+    await writeFile(
+      path.join(directory, file),
+      "// local changes must survive\n",
+    );
+  }
+  const newSource = "backend/src/main/java/dev/arc/NewSource.java";
+  await writeFile(
+    path.join(directory, newSource),
+    "// intentional new source\n",
+  );
+
+  const result = await run();
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /Previously deleted Java sources/);
+  assert.match(
+    result.output,
+    /Maven clean removes target, not Java source files/,
+  );
+  for (const file of obsolete) {
+    assert.ok(result.output.includes(file));
+    assert.equal(
+      await readFile(path.join(directory, file), "utf8"),
+      "// local changes must survive\n",
+    );
+  }
+  assert.ok(!result.output.includes(newSource));
+
+  for (const file of obsolete) await rm(path.join(directory, file));
+  const recovered = await run();
+  assert.equal(recovered.code, 0, recovered.output);
+  assert.equal(
+    await readFile(path.join(directory, newSource), "utf8"),
+    "// intentional new source\n",
+  );
+});
+
+test("an intentional tracked reintroduction of a former path is allowed", async (t) => {
+  const { directory, run } = await setup(t);
+  const file = "backend/src/main/java/Example.java";
+  await mkdir(path.dirname(path.join(directory, file)), { recursive: true });
+  git(directory, "init");
+  await writeFile(path.join(directory, file), "// original\n");
+  git(directory, "add", file);
+  git(directory, "commit", "-m", "Original source");
+  await rm(path.join(directory, file));
+  git(directory, "add", "-u");
+  git(directory, "commit", "-m", "Removed source");
+  await writeFile(path.join(directory, file), "// deliberate replacement\n");
+  git(directory, "add", file);
+  const result = await run();
+  assert.equal(result.code, 0, result.output);
+});
+
+test("an exported source directory without Git remains runnable", async (t) => {
+  const { run } = await setup(t);
+  const result = await run();
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.output, /Old Java source check skipped/);
+});
 
 test("reachable database and free ports pass without reserving application ports", async (t) => {
   const { environment, run } = await setup(t);

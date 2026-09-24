@@ -2,6 +2,56 @@ import { spawnSync } from "node:child_process";
 import net from "node:net";
 
 const failures = [];
+const sourceRoots = ["backend/src/main/java", "backend/src/test/java"];
+const extraSources = spawnSync(
+  "git",
+  ["ls-files", "--others", "-z", "--", ...sourceRoots],
+  {
+    encoding: "utf8",
+    timeout: 10_000,
+  },
+);
+if (extraSources.status === 0) {
+  // Include ignored files: javac compiles every source in these directories.
+  const candidates = extraSources.stdout
+    .split("\0")
+    .filter((file) => file.endsWith(".java"));
+  if (candidates.length) {
+    const history = spawnSync(
+      "git",
+      [
+        "log",
+        "--format=",
+        "--name-only",
+        "--diff-filter=D",
+        "--no-renames",
+        "-z",
+        "HEAD",
+        "--",
+        ...sourceRoots,
+      ],
+      { encoding: "utf8", timeout: 10_000 },
+    );
+    if (history.status === 0) {
+      const deleted = new Set(history.stdout.split("\0"));
+      const obsolete = candidates.filter((file) => deleted.has(file));
+      if (obsolete.length) {
+        failures.push(
+          `Previously deleted Java sources remain in this checkout:\n${obsolete.map((file) => `  ${file}`).join("\n")}\nBack up and review these files, then move obsolete copies outside backend/src. Maven clean removes target, not Java source files; old test sources also break spring-boot:run. No files were changed.`,
+        );
+      }
+    } else {
+      console.log(
+        "Old Java source check skipped: Git deletion history is unavailable.",
+      );
+    }
+  }
+} else {
+  console.log(
+    "Old Java source check skipped: this directory is not an accessible Git checkout.",
+  );
+}
+
 const nodeMajor = Number(process.versions.node.split(".")[0]);
 if (nodeMajor < 24) {
   failures.push(
