@@ -7,6 +7,7 @@ import {
 import {
   availableVariables,
   connectGraphNodes,
+  inputVariables,
   patchGraphNode,
   removeGraphNode,
   ruleSnapshot,
@@ -217,22 +218,40 @@ test("moving a card changes the saved draft but not semantic diagnostic identity
   ).not.toBe(semanticGraphKey(definition));
 });
 
-test("variable choices only include guaranteed upstream results and combine their labels", () => {
+test("variable choices only include guaranteed inputs and upstream results and combine their labels", () => {
   let definition = rule().draft;
-  expect(availableVariables(definition, "output", ["price"])).toContainEqual({
+  expect(
+    availableVariables(definition, "output", ["amount", "price"]),
+  ).toContainEqual({
     name: "price",
     type: "RESULT",
     label: "First calculation",
   });
   definition = connectGraphNodes(definition, "right", "output", "next", "join");
   expect(
-    availableVariables(definition, "output", ["price"]).find(
+    availableVariables(definition, "output", ["amount", "price"]).find(
       (value) => value.name === "price",
     )?.label,
   ).toBe("First calculation / Second calculation");
   expect(
-    availableVariables(definition, "output", []).map((value) => value.name),
+    availableVariables(definition, "output", ["amount"]).map(
+      (value) => value.name,
+    ),
   ).toEqual(["amount"]);
+  expect(availableVariables(definition, "output", [])).toEqual([]);
+});
+
+test("disconnected nodes and unresolved scope reads do not inherit graph inputs", () => {
+  const definition = rule().draft;
+  expect(availableVariables(definition, "right", [])).toEqual([]);
+  expect(availableVariables(definition, "right")).toEqual([]);
+  expect(availableVariables(definition, "output")).toEqual([]);
+  expect(availableVariables(definition, "input", ["amount"])).toEqual(
+    inputVariables(definition),
+  );
+  expect(inputVariables(definition)).toEqual([
+    { name: "amount", type: "NUMBER", label: "Input · number" },
+  ]);
 });
 
 test("string constants round-trip escapes and comparison parsing respects quoted operators", () => {

@@ -101,7 +101,9 @@ test("node expressions edit one node, group functions, and flag all invalid expr
     .locator(".function-chips")
     .getByRole("button", { name: "SUM", exact: true })
     .hover();
-  await expect(page.getByRole("tooltip")).toContainText("Aggregates");
+  await expect(page.getByRole("tooltip", { name: /^SUM\(/ })).toContainText(
+    "Aggregates",
+  );
   await replaceCode(
     page,
     'node calc FORMULA "Calculation" at (250, 180) { let total = 3 +; next -> out; }',

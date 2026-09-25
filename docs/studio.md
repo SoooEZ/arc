@@ -213,7 +213,11 @@ Source definitions contain `kind` (`LOOKUP` or `HTTP`), `parameters`, and `timeo
 
 ### Node expressions and connections
 
+Clicking a node opens its inspector, headed by the node's icon and name, with its type shown underneath. Edit **Node name** to update the heading and canvas label together. Variable choices follow connected upstream paths, including the path from Input. Connect a new Switch to Input or an upstream calculation before choosing its variables; disconnected nodes have none. **Functions & editor** shows the same available names for expressions.
+
 Right-click a canvas node and choose **Edit** to open its settings in a wider form dialog. **Apply to graph** applies the form changes to the draft; **Cancel** discards them. **Delete** removes the node and its connections. The Input node cannot be deleted, and both menu actions are disabled for read-only versions.
+
+Right-click a connection and choose **Delete** to remove that connection while keeping its endpoint nodes and all other connections. Changes stay in the draft until saved. Deletion is disabled in historical versions and while a document command is pending.
 
 Use the `</>` button on a canvas node, or **Node expression** in its inspector, to edit the whole node as ARC Script. A condition has a `when` expression; a Switch has `case ... when` or `select` with `case ... equals`; a formula has `let`; an output has `return`; a reused rule has `use`, `bind` and `as`. The Input node includes the rule’s parameters and source mappings. **Apply to graph** synchronizes the edit without saving or publishing. Syntax errors must be fixed before applying; other graph validation errors remain visible on the canvas while you finish the draft.
 

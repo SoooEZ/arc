@@ -67,12 +67,31 @@ export default function GraphCanvas({
   children,
 }: Props) {
   const [outline, setOutline] = useState(false);
-  const [nodeMenu, setNodeMenu] = useState<{
+  const [contextMenu, setContextMenu] = useState<{
+    kind: "node" | "edge";
     id: string;
     left: number;
     top: number;
   } | null>(null);
-  const menuNode = definition.nodes.find((node) => node.id === nodeMenu?.id);
+  const menuNode =
+    contextMenu?.kind === "node"
+      ? definition.nodes.find((node) => node.id === contextMenu.id)
+      : undefined;
+  const menuEdge =
+    contextMenu?.kind === "edge"
+      ? definition.edges.find((edge) => edge.id === contextMenu.id)
+      : undefined;
+  const removeEdge = (id: string) => {
+    if (readOnly || busy) return;
+    changeDefinition((current) => {
+      if (!current.edges.some((edge) => edge.id === id)) return current;
+      return {
+        ...current,
+        edges: current.edges.filter((edge) => edge.id !== id),
+      };
+    });
+    if (selectedEdge === id) setSelectedEdge(null);
+  };
   const {
     nodes,
     edges,
@@ -128,27 +147,37 @@ export default function GraphCanvas({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeClick={(_, n) => {
-              setNodeMenu(null);
+              setContextMenu(null);
               setSelected(n.id);
               setSelectedEdge(null);
             }}
             onNodeContextMenu={(event, node) => {
               event.preventDefault();
-              setNodeMenu({
+              setContextMenu({
+                kind: "node",
                 id: node.id,
                 left: event.clientX,
                 top: event.clientY,
               });
             }}
             onPaneClick={() => {
-              setNodeMenu(null);
+              setContextMenu(null);
               setSelectedEdge(null);
             }}
-            onPaneContextMenu={() => setNodeMenu(null)}
-            onMoveStart={() => setNodeMenu(null)}
+            onPaneContextMenu={() => setContextMenu(null)}
+            onMoveStart={() => setContextMenu(null)}
             onEdgeClick={(_, e) => {
-              setNodeMenu(null);
+              setContextMenu(null);
               setSelectedEdge(e.id);
+            }}
+            onEdgeContextMenu={(event, edge) => {
+              event.preventDefault();
+              setContextMenu({
+                kind: "edge",
+                id: edge.id,
+                left: event.clientX,
+                top: event.clientY,
+              });
             }}
             onConnect={connect}
             nodesDraggable={!readOnly && !busy}
@@ -186,34 +215,45 @@ export default function GraphCanvas({
           </ReactFlow>
         </RoutingContext.Provider>
         <Menu
-          open={!!nodeMenu && !!menuNode}
-          onClose={() => setNodeMenu(null)}
+          open={!!contextMenu && (!!menuNode || !!menuEdge)}
+          onClose={() => setContextMenu(null)}
           anchorReference="anchorPosition"
           anchorPosition={
-            nodeMenu ? { left: nodeMenu.left, top: nodeMenu.top } : undefined
+            contextMenu
+              ? { left: contextMenu.left, top: contextMenu.top }
+              : undefined
           }
-          slotProps={{ list: { "aria-label": "Node actions" } }}
+          slotProps={{
+            list: {
+              "aria-label":
+                contextMenu?.kind === "edge"
+                  ? "Connection actions"
+                  : "Node actions",
+            },
+          }}
         >
-          <MenuItem
-            disabled={readOnly || !!busy}
-            onClick={() => {
-              if (!menuNode || readOnly || busy) return;
-              setNodeMenu(null);
-              onEditNode(menuNode.id);
-            }}
-          >
-            <ListItemIcon>
-              <Pencil size={16} />
-            </ListItemIcon>
-            <ListItemText>Edit</ListItemText>
-          </MenuItem>
+          {menuNode && (
+            <MenuItem
+              disabled={readOnly || !!busy}
+              onClick={() => {
+                if (!menuNode || readOnly || busy) return;
+                setContextMenu(null);
+                onEditNode(menuNode.id);
+              }}
+            >
+              <ListItemIcon>
+                <Pencil size={16} />
+              </ListItemIcon>
+              <ListItemText>Edit</ListItemText>
+            </MenuItem>
+          )}
           <MenuItem
             disabled={readOnly || !!busy || menuNode?.type === "INPUT"}
             onClick={() => {
-              if (!menuNode || readOnly || busy || menuNode.type === "INPUT")
-                return;
-              setNodeMenu(null);
-              onDeleteNode(menuNode.id);
+              if (readOnly || busy || menuNode?.type === "INPUT") return;
+              setContextMenu(null);
+              if (menuEdge) removeEdge(menuEdge.id);
+              else if (menuNode) onDeleteNode(menuNode.id);
             }}
           >
             <ListItemIcon>
@@ -237,13 +277,7 @@ export default function GraphCanvas({
               color="error"
               startIcon={<Trash2 size={14} />}
               disabled={!!busy}
-              onClick={() => {
-                changeDefinition((d) => ({
-                  ...d,
-                  edges: d.edges.filter((e) => e.id !== selectedEdge),
-                }));
-                setSelectedEdge(null);
-              }}
+              onClick={() => removeEdge(selectedEdge)}
             >
               Delete connection
             </Button>

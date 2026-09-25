@@ -78,6 +78,46 @@
   display: block;
   margin-top: 2px;
 }
+.inspector-sidebar > .inspector-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 16px 19px;
+  flex-shrink: 0;
+}
+.inspector-heading .inspector-node-title {
+  min-width: 0;
+  margin: 0;
+}
+.inspector-heading .node-icon {
+  flex-shrink: 0;
+}
+.inspector-heading .inspector-node-title > div {
+  min-width: 0;
+}
+.inspector-heading h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #405638;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.inspector-heading .inspector-node-title > div > span {
+  font-size: 10px;
+  font-weight: 400;
+  color: #71816a;
+}
+.inspector-heading > .MuiButton-root {
+  align-self: flex-start;
+  margin-left: 38px;
+}
 .section-title {
   display: flex;
   align-items: center;

@@ -93,11 +93,28 @@ export default function Inspector({
     onInvalidJson,
     onOpenReference,
   };
+  const nodeTitle = (
+    <div className="inspector-node-title">
+      <span className={`node-icon ${node.type.toLowerCase()}`}>
+        <NodeIcon type={node.type} size={19} />
+      </span>
+      <div>
+        <h3 title={presentation === "sidebar" ? node.label : undefined}>
+          {presentation === "sidebar" ? node.label : nodeLabel[node.type]}
+        </h3>
+        <span>
+          {presentation === "sidebar"
+            ? nodeLabel[node.type]
+            : nodeDescriptions[node.type]}
+        </span>
+      </div>
+    </div>
+  );
   return (
     <aside className={`inspector inspector-${presentation}`}>
       {presentation === "sidebar" && (
         <div className="inspector-heading">
-          <span>Node settings</span>
+          {nodeTitle}
           {onExpression && (
             <Button
               size="small"
@@ -116,15 +133,7 @@ export default function Inspector({
           </Alert>
         ))}
         <div className="inspector-section">
-          <div className="inspector-node-title">
-            <span className={`node-icon ${node.type.toLowerCase()}`}>
-              <NodeIcon type={node.type} size={19} />
-            </span>
-            <div>
-              <h3>{nodeLabel[node.type]}</h3>
-              <span>{nodeDescriptions[node.type]}</span>
-            </div>
-          </div>
+          {presentation === "dialog" && nodeTitle}
           <TextField
             label="Node name"
             value={node.label}

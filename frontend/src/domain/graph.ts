@@ -151,7 +151,9 @@ export function availableVariables(
     pending.push(...(parents.get(id) || []));
   }
   const candidates = [
-    ...inputVariables(definition),
+    ...inputVariables(definition).filter((input) =>
+      available.includes(input.name),
+    ),
     ...definition.nodes
       .filter(
         (node) =>

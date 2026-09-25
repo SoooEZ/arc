@@ -128,7 +128,12 @@ export default function ValueBinding({
           value={value ?? ""}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value || undefined)}
-          helperText={helperText || "Inputs and results available at this node"}
+          helperText={
+            helperText ||
+            (choices.length
+              ? "Inputs and results available at this node"
+              : "No compatible upstream variables are available at this node.")
+          }
         >
           <MenuItem value="">Select a variable</MenuItem>
           {!!value && !choices.some((v) => v.name === value) && (
