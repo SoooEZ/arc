@@ -1,5 +1,6 @@
 package dev.arc.source.http;
 
+import dev.arc.engine.ExecutionDeadline;
 import dev.arc.error.ArcException;
 import dev.arc.model.SourceDefinition;
 import dev.arc.source.SourceAdapter;
@@ -30,5 +31,14 @@ public final class HttpSourceAdapter implements SourceAdapter {
   @Override
   public Object fetch(String id, SourceDefinition definition, Map<String, Object> inputs) {
     return http.fetch(definition, inputs);
+  }
+
+  @Override
+  public Object fetch(
+      String id,
+      SourceDefinition definition,
+      Map<String, Object> inputs,
+      ExecutionDeadline deadline) {
+    return http.fetch(definition, inputs, deadline);
   }
 }

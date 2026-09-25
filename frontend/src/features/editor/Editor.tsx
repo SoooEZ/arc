@@ -240,7 +240,6 @@ function EditorContent({
             {source !== null ? (
               <CodeStudio
                 rule={rule}
-                rules={rules}
                 definition={rule.draft}
                 source={source}
                 onChange={(source) =>

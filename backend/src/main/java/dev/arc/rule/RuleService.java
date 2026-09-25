@@ -28,6 +28,25 @@ public class RuleService {
     this.definitions = definitions;
   }
 
+  public CatalogPage<RuleSummary> catalog(
+      int offset, int limit, String search, String kind, boolean publishedOnly) {
+    pageBounds(offset, limit);
+    if (search.length() > 200) throw ArcException.invalid("Search is limited to 200 characters");
+    if (!Set.of("", "DECISION_TREE", "FORMULA", "RULE").contains(kind))
+      throw ArcException.invalid("Unknown rule kind");
+    return store.catalog(offset, limit, search, kind, publishedOnly);
+  }
+
+  public CatalogPage<RuleVersionSummary> versionSummaries(String id, int offset, int limit) {
+    pageBounds(offset, limit);
+    return store.versionSummaries(id, offset, limit);
+  }
+
+  private void pageBounds(int offset, int limit) {
+    if (offset < 0 || limit < 1 || limit > 100)
+      throw ArcException.invalid("Use offset >= 0 and limit from 1 to 100");
+  }
+
   public List<Rule> list() {
     return store.list();
   }

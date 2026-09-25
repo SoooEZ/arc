@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { Button, InputAdornment, TextField } from "@mui/material";
+import {
+  Alert,
+  CircularProgress,
+  Button,
+  InputAdornment,
+  TextField,
+} from "@mui/material";
 import {
   ArrowDown,
   ArrowRight,
@@ -10,35 +15,33 @@ import {
   Search,
   Workflow,
 } from "lucide-react";
-import type { Kind, Rule } from "../../types";
+import type { RuleSummary } from "../../types";
+import type { useRuleLibrary } from "../../app/useRuleLibrary";
+import CatalogPagination from "../../components/CatalogPagination";
 import RuleCard from "./RuleCard";
 
 export default function Library({
   rules,
+  library,
   onOpen,
   onCreate,
   onDocs,
 }: {
-  rules: Rule[];
-  onOpen: (r: Rule) => void;
+  rules: RuleSummary[];
+  library: ReturnType<typeof useRuleLibrary>;
+  onOpen: (r: RuleSummary) => void;
   onCreate: () => void;
   onDocs: () => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Kind | "ALL">("ALL");
+  const {
+    search: query,
+    setSearch: setQuery,
+    kind: filter,
+    setKind: setFilter,
+  } = library;
   const published = rules.filter((r) => r.publishedVersion).length;
-  const references = rules.reduce(
-    (sum, r) =>
-      sum + r.draft.nodes.filter((n) => n.type === "REFERENCE").length,
-    0,
-  );
-  const filtered = rules.filter(
-    (r) =>
-      (filter === "ALL" || r.kind === filter) &&
-      `${r.name} ${r.id} ${r.description}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
+  const references = rules.reduce((sum, r) => sum + r.referenceCount, 0);
+  const filtered = rules;
   return (
     <div className="library-page">
       <div className="page-heading">
@@ -64,22 +67,22 @@ export default function Library({
             <Layers3 size={19} />
           </span>
           <div>
-            <span>Total rules</span>
-            <strong>{rules.length.toString().padStart(2, "0")}</strong>
+            <span>Matching rules</span>
+            <strong>{library.total.toString().padStart(2, "0")}</strong>
           </div>
-          <small>Across your workspace</small>
+          <small>Matching current filters</small>
         </div>
         <div className="stat">
           <span className="stat-icon green">
             <Check size={19} />
           </span>
           <div>
-            <span>Published</span>
+            <span>Published on page</span>
             <strong>{published.toString().padStart(2, "0")}</strong>
           </div>
           <small>
             <span className="status-dot published" />
-            Ready to execute
+            On this page
           </small>
         </div>
         <div className="stat">
@@ -87,10 +90,10 @@ export default function Library({
             <Braces size={19} />
           </span>
           <div>
-            <span>Rule references</span>
+            <span>References on page</span>
             <strong>{references.toString().padStart(2, "0")}</strong>
           </div>
-          <small>Connected, reusable logic</small>
+          <small>On this page</small>
         </div>
       </div>
       <div className="library-toolbar">
@@ -109,7 +112,6 @@ export default function Library({
                     : type === "FORMULA"
                       ? "Formulas"
                       : "Conditions"}
-                {type === "ALL" && <span>{rules.length}</span>}
               </button>
             ),
           )}
@@ -139,13 +141,24 @@ export default function Library({
           Last updated <ArrowDown size={12} />
         </span>
       </div>
+      {library.loading && (
+        <CircularProgress size={20} aria-label="Loading rules" />
+      )}
+      {library.loadError && (
+        <Alert
+          severity="error"
+          action={<Button onClick={library.load}>Retry</Button>}
+        >
+          {library.loadError}
+        </Alert>
+      )}
       <div className="rule-grid">
         {[...filtered]
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
           .map((rule) => (
             <RuleCard key={rule.id} rule={rule} onOpen={onOpen} />
           ))}
-        {!filtered.length && (
+        {!library.loading && !library.loadError && !filtered.length && (
           <div className="empty-library">
             <Search size={28} />
             <h3>
@@ -173,6 +186,14 @@ export default function Library({
           </div>
         )}
       </div>
+      <CatalogPagination
+        label="Library rules"
+        offset={library.page.offset}
+        limit={library.page.limit}
+        total={library.total}
+        loading={library.loading}
+        onPage={library.page.setOffset}
+      />
       <div className="getting-started">
         <div className="getting-visual">
           <Workflow size={28} />

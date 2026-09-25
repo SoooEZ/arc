@@ -25,6 +25,24 @@ public class RuleController {
     return rules.list();
   }
 
+  @GetMapping("/rule-summaries")
+  public CatalogPage<RuleSummary> catalog(
+      @RequestParam(defaultValue = "0") int offset,
+      @RequestParam(defaultValue = "20") int limit,
+      @RequestParam(defaultValue = "") String search,
+      @RequestParam(defaultValue = "") String kind,
+      @RequestParam(defaultValue = "false") boolean publishedOnly) {
+    return rules.catalog(offset, limit, search, kind, publishedOnly);
+  }
+
+  @GetMapping("/rules/{id}/version-summaries")
+  public CatalogPage<RuleVersionSummary> versionSummaries(
+      @PathVariable String id,
+      @RequestParam(defaultValue = "0") int offset,
+      @RequestParam(defaultValue = "20") int limit) {
+    return rules.versionSummaries(id, offset, limit);
+  }
+
   @PostMapping("/rules")
   @ResponseStatus(HttpStatus.CREATED)
   public Rule create(@RequestBody Create request) {

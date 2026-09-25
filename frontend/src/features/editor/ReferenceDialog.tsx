@@ -4,7 +4,7 @@ import { ArrowLeft, X } from "lucide-react";
 import { ruleApi } from "../../api/rules";
 import type { GraphProblem } from "../../api/errors";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
-import type { Rule } from "../../types";
+import type { RuleSummary } from "../../types";
 import Editor from "./Editor";
 
 import type { ReferenceTarget } from "./types";
@@ -15,7 +15,7 @@ export default function ReferenceDialog({
   onClose,
 }: {
   target: ReferenceTarget;
-  rules: Rule[];
+  rules: RuleSummary[];
   problems: GraphProblem[];
   onClose: () => void;
 }) {

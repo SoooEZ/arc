@@ -3,7 +3,9 @@ package dev.arc.engine.execution;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.SourceReader;
+import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
@@ -57,6 +59,25 @@ class ParametersTest {
         .hasMessageContaining("must be number");
     assertThatThrownBy(() -> extractor.extract(Map.of("a", 1), "/missing"))
         .hasMessageContaining("pointer");
+  }
+
+  @Test
+  void anOverallDeadlineCannotBeHiddenByTheDefaultFallback() {
+    SourceReader expired =
+        (binding, inputs) -> {
+          throw new ArcException(504, "Rule execution deadline exceeded");
+        };
+    var parameters = List.of(rate("DEFAULT"), new Input("country", "STRING", true, "US"));
+    assertThatThrownBy(
+            () ->
+                new Parameters(expired)
+                    .resolve(
+                        parameters,
+                        Map.of(),
+                        Expressions::compile,
+                        ExecutionDeadline.start(30_000)))
+        .isInstanceOfSatisfying(
+            ArcException.class, error -> assertThat(error.status()).isEqualTo(504));
   }
 
   @Test

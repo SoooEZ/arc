@@ -8,6 +8,7 @@ interface ExecutionState {
   result: Execution | null;
   error: string;
   problem: GraphProblem | null;
+  requestDurationMs: number | null;
 }
 const idle = (key: string): ExecutionState => ({
   key,
@@ -15,6 +16,7 @@ const idle = (key: string): ExecutionState => ({
   result: null,
   error: "",
   problem: null,
+  requestDurationMs: null,
 });
 
 /** An execution belongs to exactly one graph/version and input buffer. */
@@ -40,14 +42,21 @@ export function useExecutionRequest(key: string) {
     setState({ ...idle(key), running: true });
     const isCurrent = () =>
       active.current === controller && currentKey.current === key;
+    const started = performance.now();
     try {
       const result = await execute(controller.signal);
-      if (isCurrent()) setState({ ...idle(key), result });
+      if (isCurrent())
+        setState({
+          ...idle(key),
+          result,
+          requestDurationMs: performance.now() - started,
+        });
     } catch (failure) {
       if (isCurrent())
         setState({
           ...idle(key),
           error: errorMessage(failure),
+          requestDurationMs: performance.now() - started,
           problem:
             failure instanceof ApiError
               ? { message: failure.message, locations: failure.locations }

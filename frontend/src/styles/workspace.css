@@ -144,6 +144,32 @@
   overflow-y: auto;
   min-height: 0;
 }
+.sidebar-catalog-search,
+.sidebar-pagination {
+  flex-shrink: 0;
+}
+.sidebar-catalog-search .MuiInputBase-root {
+  background: #1c3c31;
+  color: #e7f4e8;
+  font-size: 12px;
+}
+.sidebar-catalog-search .MuiInputLabel-root {
+  color: #a6beb0;
+}
+.sidebar-catalog-search .MuiOutlinedInput-notchedOutline {
+  border-color: #3c5747;
+}
+.sidebar-pagination {
+  color: #a6beb0;
+  font-size: 11px;
+  padding-top: 8px;
+}
+.sidebar-pagination .MuiButton-root {
+  color: #d0e5d6;
+}
+.sidebar-pagination .MuiButton-root.Mui-disabled {
+  color: #78968a;
+}
 .sidebar-rules button {
   display: flex;
   align-items: center;

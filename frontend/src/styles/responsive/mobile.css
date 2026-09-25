@@ -16,7 +16,9 @@
   .workspace-switch,
   .nav-section-label,
   .sidebar-bottom,
-  .sidebar-rules {
+  .sidebar-rules,
+  .sidebar .sidebar-catalog-search,
+  .sidebar-pagination {
     display: none;
   }
   .main-nav {

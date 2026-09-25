@@ -9,7 +9,8 @@ export default function ApiReference() {
       </div>
       <div className="endpoint-table">
         {[
-          ["GET", "/rules", "List all rules and their current drafts"],
+          ["GET", "/rule-summaries", "Search a bounded page of rule metadata"],
+          ["GET", "/rules", "Legacy full rule list, including drafts"],
           [
             "POST",
             "/rules",
@@ -31,7 +32,11 @@ export default function ApiReference() {
             "/rules/{id}/execute",
             "Execute a published rule with typed inputs",
           ],
-          ["GET", "/rules/{id}/versions", "Read all published versions"],
+          [
+            "GET",
+            "/rules/{id}/version-summaries",
+            "Page through published version metadata",
+          ],
           [
             "GET",
             "/rules/{id}/versions/{version}",
@@ -63,11 +68,22 @@ export default function ApiReference() {
           </p>
         </div>
         <div>
+          <h3>Execution controls</h3>
+          <p>
+            Set <code>trace: false</code> for a result without intermediate
+            values. Trace is enabled by default and limited to 256 KiB; check{" "}
+            <code>traceTruncated</code> before treating it as complete. Set{" "}
+            <code>timeoutMs</code> from 100 to 30,000 (default 30,000) to limit
+            the execution, including external reads.
+          </p>
+        </div>
+        <div>
           <h3>Clear failures</h3>
           <p>
             Invalid inputs and graphs return <code>422</code>. Missing resources
             return <code>404</code>. Stale revisions or unpublished rules return{" "}
-            <code>409</code>, with a readable error message.
+            <code>409</code>. Exhausting the execution deadline returns{" "}
+            <code>504</code>, with a readable error message.
           </p>
         </div>
         <div>

@@ -159,7 +159,25 @@ async function fixture(page: Page, draft = definition) {
   // Keep geometry tests isolated from the user's database, including Save draft.
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url()).pathname;
-    if (url === "/api/rules") return route.fulfill({ json: [rule] });
+    if (!url.startsWith("/api/")) return route.continue();
+    if (url === "/api/rule-summaries") {
+      const { draft, ...metadata } = rule;
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              ...metadata,
+              nodeCount: draft.nodes.length,
+              inputCount: draft.inputs.length,
+              referenceCount: 0,
+            },
+          ],
+          total: 1,
+          offset: 0,
+          limit: 20,
+        },
+      });
+    }
     if (url === "/api/rules/routing-fixture") {
       if (route.request().method() === "PUT") {
         rule = {

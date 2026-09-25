@@ -60,6 +60,17 @@ try:
         output = execute("order-pricing", {"customerTier": tier, "orderTotal": amount})
         assert output["result"] == result and output["trace"] and output["version"] == 1
     assert execute("apply-discount", {"amount": 0.3, "rate": 0.1})["result"] == 0.27
+    without_trace = request("POST", "/api/rules/order-pricing/execute", {
+        "version": 1, "inputs": {"orderTotal": 150, "customerTier": "premium"},
+        "trace": False, "timeoutMs": 5000})
+    assert without_trace["result"] == 120 and without_trace["trace"] == []
+    assert without_trace["traceEnabled"] is False and without_trace["traceTruncated"] is False
+    assert without_trace["executedSteps"] > 0 and without_trace["traceBytes"] == 2
+    timing = without_trace["timing"]
+    assert timing["totalMicros"] >= timing["preparationMicros"] >= 0
+    assert timing["totalMicros"] >= timing["executionMicros"] >= 0
+    for timeout in [99, 30001]:
+        request("POST", "/api/rules/order-pricing/execute", {"inputs": {}, "timeoutMs": timeout}, 422)
     execute("order-pricing", {"orderTotal": "bad", "customerTier": "premium"}, expected=422)
     execute("order-pricing", {}, expected=422)
     execute("order-pricing", {"orderTotal": 100, "customerTier": "premium", "typo": 1}, expected=422)
@@ -91,6 +102,37 @@ try:
     assert execute(parent["id"], {"amount": 100})["result"] == 180, "Pinned references must be immutable"
     assert len(request("GET", f"/api/rules/{child['id']}/versions")) == 2
     assert request("GET", f"/api/rules/{child['id']}/versions/1")["definition"]["nodes"][1]["expression"] == "amount * 0.9"
+    history = request("GET", f"/api/rules/{child['id']}/version-summaries?limit=1&offset=0")
+    assert history["total"] == 2 and history["items"][0]["version"] == 2
+    assert "definition" not in history["items"][0]
+    assert request("GET", f"/api/rules/{child['id']}/version-summaries?limit=1&offset=1")["items"][0]["version"] == 1
+    first = request("GET", f"/api/rule-summaries?search={PREFIX}&limit=1&offset=0")
+    second = request("GET", f"/api/rule-summaries?search={PREFIX}&limit=1&offset=1")
+    assert first["total"] == 2 and len(first["items"]) == 1
+    assert first["items"][0]["id"] != second["items"][0]["id"]
+    assert "draft" not in first["items"][0] and "nodeCount" in first["items"][0]
+    assert request("GET", f"/api/rule-summaries?search={PREFIX}&limit=1&offset=99")["items"] == []
+    request("GET", "/api/rule-summaries?limit=101", expected=422)
+    request("GET", "/api/rule-summaries?offset=-1", expected=422)
+
+    # A valid graph can repeat large intermediate values; only trace is bounded.
+    payload = ['x' * 100 for _ in range(100)]
+    large = {"schemaVersion": 1, "inputs": [{"name": "payload", "type": "ARRAY", "required": True}],
+             "nodes": [{"id": "input", "type": "INPUT", "label": "Input", "position": {"x": 0, "y": 0}}], "edges": []}
+    previous = "input"
+    for index in range(98):
+        node_id = f"value{index}"
+        large["nodes"].append({"id": node_id, "type": "FORMULA", "label": node_id,
+                               "expression": "payload", "output": node_id, "position": {"x": 0, "y": index}})
+        large["edges"].append({"id": f"e{index}", "source": previous, "target": node_id, "sourceHandle": "next"})
+        previous = node_id
+    large["nodes"].append({"id": "output", "type": "OUTPUT", "label": "Output", "expression": "payload", "position": {"x": 0, "y": 100}})
+    large["edges"].append({"id": "last", "source": previous, "target": "output", "sourceHandle": "next"})
+    bounded = request("POST", "/api/preview", {"definition": large, "inputs": {"payload": payload}})
+    assert bounded["result"] == payload and bounded["traceTruncated"] is True
+    assert bounded["executedSteps"] == 100 and 0 < len(bounded["trace"]) < 100
+    assert bounded["traceBytes"] == len(json.dumps(bounded["trace"], separators=(',', ':'), ensure_ascii=False).encode())
+    assert bounded["traceBytes"] <= 262144
     invalid = copy.deepcopy(child["draft"])
     invalid["nodes"][1]["expression"] = "unavailable + 1"
     request("POST", "/api/validate", invalid, 422)

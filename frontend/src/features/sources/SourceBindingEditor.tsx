@@ -1,10 +1,19 @@
+import { useEffect, useRef, useState } from "react";
+import { usePagedResource } from "../../hooks/usePagedResource";
+import CatalogPagination from "../../components/CatalogPagination";
+import { errorMessage } from "../../api/errors";
 import { Alert, Button, MenuItem, TextField } from "@mui/material";
 import { sourceApi } from "../../api/sources";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { bindSourceVersion } from "./sourceBindings";
 import ValueBinding from "../expressions/ValueBinding";
 import type { VariableOption } from "../../domain/graph";
-import type { Input, DataSource, SourceBinding } from "../../types";
+import type {
+  Input,
+  DataSource,
+  SourceSummary,
+  SourceBinding,
+} from "../../types";
 export default function SourceBindingEditor({
   input,
   onChange,
@@ -15,24 +24,60 @@ export default function SourceBindingEditor({
 }: {
   input: Input;
   variables: VariableOption[];
-  sources: DataSource[];
+  sources: SourceSummary[];
   sourceError: string;
   onChange: (source: SourceBinding | null) => void;
   readOnly: boolean;
 }) {
-  const versionsResource = useAsyncResource(
-    input.source?.id || "",
-    (signal) => sourceApi.sourceVersions(input.source!.id, { signal }),
-    [] as DataSource[],
-    0,
-    !!input.source,
-  );
-  const versions = versionsResource.data;
-  const error = sourceError || versionsResource.error;
   const source = input.source;
-  const config = versions.find(
-    (v) => v.version === source?.version,
-  )?.definition;
+  const versionsResource = usePagedResource(
+    source?.id || "",
+    (offset, limit, signal) =>
+      sourceApi.versionSummaries(source!.id, { offset, limit }, { signal }),
+    !!source,
+  );
+  const detail = useAsyncResource(
+    `${source?.id}:${source?.version}`,
+    (signal) => sourceApi.source(source!.id, source!.version, { signal }),
+    null as DataSource | null,
+    0,
+    !!source,
+  );
+  const [selectionError, setSelectionError] = useState("");
+  const pending = useRef<AbortController | null>(null);
+  const latest = useRef({ source, readOnly, onChange });
+  latest.current = { source, readOnly, onChange };
+  useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => {
+    pending.current?.abort();
+    setSelectionError("");
+  }, [source?.id, source?.version, readOnly]);
+  const chooseVersion = async (version: number) => {
+    if (!source || readOnly) return;
+    pending.current?.abort();
+    const controller = new AbortController();
+    pending.current = controller;
+    setSelectionError("");
+    try {
+      const selected = await sourceApi.source(source.id, version, {
+        signal: controller.signal,
+      });
+      const current = latest.current;
+      if (
+        !controller.signal.aborted &&
+        !current.readOnly &&
+        current.source?.id === source.id &&
+        current.source.version === source.version
+      )
+        current.onChange(bindSourceVersion(current.source, selected));
+    } catch (failure) {
+      if (!controller.signal.aborted) setSelectionError(errorMessage(failure));
+    }
+  };
+  const versions = versionsResource.data.items;
+  const error =
+    sourceError || versionsResource.error || detail.error || selectionError;
+  const config = detail.data?.definition;
   return (
     <div className="source-binding">
       <TextField
@@ -56,6 +101,11 @@ export default function SourceBindingEditor({
         }}
       >
         <MenuItem value="">Caller / default value</MenuItem>
+        {source && !sources.some((item) => item.id === source.id) && (
+          <MenuItem value={source.id}>
+            {detail.data?.name || source.id}
+          </MenuItem>
+        )}
         {sources.map((s) => (
           <MenuItem key={s.id} value={s.id}>
             {s.name}
@@ -70,23 +120,25 @@ export default function SourceBindingEditor({
             label="Source version"
             value={source.version}
             disabled={readOnly || versionsResource.loading}
-            onChange={(event) => {
-              const selected = versions.find(
-                (candidate) => candidate.version === Number(event.target.value),
-              );
-              if (selected) onChange(bindSourceVersion(source, selected));
-            }}
+            onChange={(event) => void chooseVersion(Number(event.target.value))}
           >
-            {versions.length ? (
-              versions.map((s) => (
-                <MenuItem value={s.version} key={s.version}>
-                  v{s.version}
-                </MenuItem>
-              ))
-            ) : (
+            {!versions.some((item) => item.version === source.version) && (
               <MenuItem value={source.version}>v{source.version}</MenuItem>
             )}
+            {versions.map((item) => (
+              <MenuItem value={item.version} key={item.version}>
+                v{item.version}
+              </MenuItem>
+            ))}
           </TextField>
+          <CatalogPagination
+            label="Source versions"
+            offset={versionsResource.offset}
+            limit={versionsResource.limit}
+            total={versionsResource.data.total}
+            loading={versionsResource.loading}
+            onPage={versionsResource.setOffset}
+          />
           {config?.parameters.map((p) => (
             <ValueBinding
               key={`${source.id}:${source.version}:${p.name}`}

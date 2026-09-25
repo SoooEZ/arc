@@ -43,6 +43,14 @@ assert call("POST", f"/sources/{source_id}/test", {"version": 1, "inputs": {"key
 assert call("POST", f"/sources/{source_id}/test", {"version": 2, "inputs": {"key": "US"}})["result"]["rate"] == 0.20
 assert call("POST", f"/sources/{source_id}/test", {"inputs": {"key": "US"}})["result"]["rate"] == 0.20
 assert call("POST", f"/sources/{PREFIX}-missing/test", {"inputs": {}}, 404)["message"] == "Source not found"
+catalog = call("GET", f"/source-summaries?search={source_id}&limit=1")
+assert catalog["total"] == 1 and catalog["items"][0]["id"] == source_id
+assert "definition" not in catalog["items"][0] and catalog["items"][0]["kind"] == "LOOKUP"
+versions = call("GET", f"/sources/{source_id}/version-summaries?limit=1")
+assert versions["total"] == 2 and versions["items"][0]["version"] == 2
+assert "definition" not in versions["items"][0]
+assert call("GET", f"/sources/{source_id}/version-summaries?limit=1&offset=1")["items"][0]["version"] == 1
+assert call("GET", f"/sources/{source_id}/versions/1")["definition"]["entries"]["US"]["rate"] == 0.07
 script = '''schema 1;
 // source configuration remains pinned
 inputs {

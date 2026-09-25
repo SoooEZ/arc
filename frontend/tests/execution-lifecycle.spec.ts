@@ -128,6 +128,122 @@ test("closing the preview panel prevents a late response from restoring the grap
   }
 });
 
+test("trace and timeout controls reach preview and changing options discards a pending trace", async ({
+  page,
+  request,
+}) => {
+  await openRule(page, request);
+  const pending = await holdPreview(page);
+  try {
+    await page.getByRole("button", { name: "Run test", exact: true }).click();
+    await expect.poll(pending.held).toBe(true);
+    await page.getByLabel("Include execution trace", { exact: true }).uncheck();
+    await page.getByLabel("Execution timeout", { exact: true }).click();
+    await page.getByRole("option", { name: "5 seconds", exact: true }).click();
+    const sent = page.waitForRequest(
+      (req) =>
+        req.url().endsWith("/api/preview") &&
+        req.postDataJSON().trace === false,
+    );
+    await page.getByRole("button", { name: "Run test", exact: true }).click();
+    expect((await sent).postDataJSON()).toMatchObject({
+      trace: false,
+      timeoutMs: 5000,
+    });
+    await expect(page.getByTestId("test-result")).toHaveText("20");
+    await expect(
+      page.getByText("Trace disabled.", { exact: false }),
+    ).toBeVisible();
+    await expect(page.locator(".trace-list button")).toHaveCount(0);
+    await expect(page.getByTestId("execution-timing")).toContainText("Request");
+    await expect(page.getByTestId("execution-timing")).toContainText(
+      "Preparation",
+    );
+    pending.release();
+    await expect.poll(pending.delivered).toBe(true);
+    await expect(page.locator(".node-visited")).toHaveCount(0);
+    await expect(
+      page.getByText("Trace disabled.", { exact: false }),
+    ).toBeVisible();
+    await page.getByRole("tab", { name: "cURL", exact: true }).click();
+    await expect(page.locator(".curl-preview pre")).toContainText(
+      '"trace": false',
+    );
+    await expect(page.locator(".curl-preview pre")).toContainText(
+      '"timeoutMs": 5000',
+    );
+  } finally {
+    pending.release();
+  }
+});
+
+test("a bounded trace explains incomplete graph highlights without hiding the complete result", async ({
+  page,
+  request,
+}) => {
+  await openRule(page, request);
+  await page.route("**/api/preview", async (route) => {
+    const response = await route.fetch();
+    const execution = await response.json();
+    await route.fulfill({
+      json: {
+        ...execution,
+        trace: execution.trace.slice(0, 1),
+        traceTruncated: true,
+      },
+    });
+  });
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+  await expect(page.getByTestId("test-result")).toHaveText("20");
+  await expect(
+    page.getByText("Trace size limit reached.", { exact: false }),
+  ).toContainText("first 1 of 3 executed steps");
+  await expect(page.locator(".trace-list button")).toHaveCount(1);
+});
+
+test("published playground loads version details on demand and sends displayed execution options", async ({
+  page,
+}) => {
+  const forbidden: string[] = [];
+  page.on("request", (req) => {
+    const path = new URL(req.url()).pathname;
+    if (path === "/api/rules" || /^\/api\/rules\/[^/]+\/versions$/.test(path))
+      forbidden.push(path);
+  });
+  await page.goto("/#/playground");
+  await page
+    .getByLabel("Find published rules", { exact: true })
+    .fill("order-pricing");
+  await page.getByRole("combobox", { name: "Rule", exact: true }).click();
+  await page
+    .getByRole("option", { name: "Order pricing", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Execute rule", exact: true }),
+  ).toBeEnabled();
+  await page.getByLabel("Include execution trace", { exact: true }).uncheck();
+  await expect(page.getByTestId("api-response")).toContainText(
+    '"trace": false',
+  );
+  const sent = page.waitForRequest(
+    (req) => req.url().endsWith("/execute") && req.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Execute rule", exact: true }).click();
+  expect((await sent).postDataJSON()).toMatchObject({
+    version: 1,
+    inputs: { orderTotal: 150, customerTier: "premium" },
+    trace: false,
+    timeoutMs: 30000,
+  });
+  await expect(page.getByTestId("api-response")).toContainText(
+    '"traceEnabled": false',
+  );
+  await expect(page.getByTestId("api-response")).toContainText('"trace": []');
+  await expect(page.getByTestId("api-response")).toContainText('"result": 120');
+  await expect(page.getByTestId("execution-timing")).toContainText("Request");
+  expect(forbidden).toEqual([]);
+});
+
 test("save commands disable all graph mutation actions until the submitted draft returns", async ({
   page,
   request,

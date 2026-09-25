@@ -9,6 +9,7 @@ import {
 import { Database, Globe2, Plus, Save, ArrowRight } from "lucide-react";
 import { createSourceDraft } from "./model";
 import { useSourceEditor } from "./useSourceEditor";
+import CatalogPagination from "../../components/CatalogPagination";
 import SourceConfigurationFields from "./SourceConfigurationFields";
 import SourceTestPanel from "./SourceTestPanel";
 
@@ -35,7 +36,7 @@ export default function SourcesPage({
         <Button
           variant="contained"
           startIcon={<Plus size={16} />}
-          onClick={() => editor.select(createSourceDraft())}
+          onClick={() => void editor.select(createSourceDraft())}
         >
           New source
         </Button>
@@ -51,6 +52,11 @@ export default function SourcesPage({
       </div>
       <div className="sources-layout">
         <aside className="source-list">
+          <TextField
+            label="Search data sources"
+            value={editor.search}
+            onChange={(event) => editor.setSearch(event.target.value)}
+          />
           {editor.loading && (
             <CircularProgress size={20} aria-label="Loading data sources" />
           )}
@@ -58,9 +64,9 @@ export default function SourcesPage({
             <button
               className={selected?.id === source.id ? "active" : ""}
               key={source.id}
-              onClick={() => editor.select(source)}
+              onClick={() => void editor.select(source)}
             >
-              {source.definition.kind === "HTTP" ? (
+              {source.kind === "HTTP" ? (
                 <Globe2 size={19} />
               ) : (
                 <Database size={19} />
@@ -73,6 +79,14 @@ export default function SourcesPage({
               </span>
             </button>
           ))}
+          <CatalogPagination
+            label="Data sources"
+            offset={editor.catalog.offset}
+            limit={editor.catalog.limit}
+            total={Math.max(editor.catalog.data.total, editor.sources.length)}
+            loading={editor.loading}
+            onPage={editor.catalog.setOffset}
+          />
           <p>
             Lookup tables work offline. HTTP sources read JSON APIs. Both use
             immutable configuration versions.
@@ -88,6 +102,9 @@ export default function SourcesPage({
             <Alert severity="error">
               Could not load source versions: {editor.versionsError}
             </Alert>
+          )}
+          {editor.detailLoading && (
+            <CircularProgress size={20} aria-label="Loading source" />
           )}
           {!document || !selected ? (
             <p>Select or create a data source.</p>
@@ -157,26 +174,43 @@ export default function SourcesPage({
                     value={document.viewedVersion}
                     disabled={saving || editor.versionsLoading}
                     onChange={(event) =>
-                      editor.inspectVersion(Number(event.target.value))
+                      void editor.inspectVersion(Number(event.target.value))
                     }
                   >
-                    {editor.versions.length ? (
-                      editor.versions.map((version) => (
-                        <MenuItem key={version.version} value={version.version}>
-                          v{version.version}
-                          {version.version === selected.version
-                            ? " · latest"
-                            : " · immutable"}
-                        </MenuItem>
-                      ))
-                    ) : (
-                      <MenuItem value={selected.version}>
-                        v{selected.version}
+                    {!editor.versions.some(
+                      (item) => item.version === document.viewedVersion,
+                    ) && (
+                      <MenuItem value={document.viewedVersion}>
+                        v{document.viewedVersion}
                       </MenuItem>
                     )}
+                    {editor.versions.map((version) => (
+                      <MenuItem key={version.version} value={version.version}>
+                        v{version.version}
+                        {version.version === selected.version
+                          ? " · latest"
+                          : " · immutable"}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 )}
               </div>
+              {!!selected.version && (
+                <CatalogPagination
+                  label="Source history"
+                  offset={editor.versionsPage.offset}
+                  limit={editor.versionsPage.limit}
+                  total={editor.versionsPage.data.total}
+                  loading={editor.versionsLoading}
+                  onPage={editor.versionsPage.setOffset}
+                />
+              )}
+              {editor.versionLoading && (
+                <CircularProgress
+                  size={20}
+                  aria-label="Loading source version"
+                />
+              )}
               {historical ? (
                 <>
                   <Alert severity="info">
@@ -201,7 +235,13 @@ export default function SourcesPage({
                 input={document.testInput}
                 result={document.result}
                 running={document.testing !== null}
-                disabled={saving || !selected.version || dirty}
+                disabled={
+                  saving ||
+                  !selected.version ||
+                  dirty ||
+                  editor.versionLoading ||
+                  (historical && !editor.displayConfig)
+                }
                 dirty={dirty}
                 onInput={editor.changeTestInput}
                 onRun={editor.run}

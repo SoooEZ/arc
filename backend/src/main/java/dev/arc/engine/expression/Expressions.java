@@ -1,5 +1,6 @@
 package dev.arc.engine.expression;
 
+import dev.arc.engine.ExecutionDeadline;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -34,7 +35,14 @@ public final class Expressions {
     }
 
     public Object evaluate(Map<String, Object> scope) {
-      return bounded(expression.eval(new ExpressionRuntime.Context(scope)));
+      return evaluate(scope, ExecutionDeadline.start(30_000));
+    }
+
+    public Object evaluate(Map<String, Object> scope, ExecutionDeadline deadline) {
+      deadline.check();
+      Object result = bounded(expression.eval(new ExpressionRuntime.Context(scope, deadline)));
+      deadline.check();
+      return result;
     }
   }
 

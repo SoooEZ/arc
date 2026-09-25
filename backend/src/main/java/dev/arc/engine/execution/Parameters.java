@@ -1,11 +1,13 @@
 package dev.arc.engine.execution;
 
+import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.InputTypes;
 import dev.arc.engine.SourceReader;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.*;
 import java.util.*;
+import java.util.function.Function;
 
 /** One resolver per execution. Caller values win; source dependencies resolve recursively. */
 public final class Parameters {
@@ -25,13 +27,23 @@ public final class Parameters {
   }
 
   public Map<String, Object> resolve(List<Input> parameters, Map<String, Object> supplied) {
+    return resolve(parameters, supplied, Expressions::compile, ExecutionDeadline.start(30_000));
+  }
+
+  public Map<String, Object> resolve(
+      List<Input> parameters,
+      Map<String, Object> supplied,
+      Function<String, Expressions.Compiled> expressions,
+      ExecutionDeadline deadline) {
+    deadline.check();
     if (supplied == null) throw ArcException.invalid("inputs must be an object");
     var byName = new LinkedHashMap<String, Input>();
     parameters.forEach(p -> byName.put(p.name(), p));
     for (String name : supplied.keySet())
       if (!byName.containsKey(name)) throw ArcException.invalid("Unknown input: " + name);
     var values = new LinkedHashMap<String, Object>();
-    for (Input p : parameters) resolveOne(p, byName, supplied, values, new HashSet<>());
+    for (Input p : parameters)
+      resolveOne(p, byName, supplied, values, new HashSet<>(), expressions, deadline);
     return values;
   }
 
@@ -40,7 +52,10 @@ public final class Parameters {
       Map<String, Input> byName,
       Map<String, Object> supplied,
       Map<String, Object> values,
-      Set<String> active) {
+      Set<String> active,
+      Function<String, Expressions.Compiled> expressions,
+      ExecutionDeadline deadline) {
+    deadline.check();
     if (values.containsKey(p.name())) return;
     if (!active.add(p.name()))
       throw ArcException.invalid("Circular source parameter dependency: " + p.name());
@@ -52,21 +67,23 @@ public final class Parameters {
       String status = "RESOLVED";
       var args = new LinkedHashMap<String, Object>();
       for (var e : b.bindings().entrySet()) {
-        var expr = Expressions.compile(e.getValue());
+        var expr = expressions.apply(e.getValue());
         for (String name : expr.variables()) {
           Input dependency = byName.get(name);
           if (dependency == null) throw ArcException.invalid("Unknown source dependency: " + name);
-          resolveOne(dependency, byName, supplied, values, active);
+          resolveOne(dependency, byName, supplied, values, active, expressions, deadline);
         }
-        args.put(e.getKey(), expr.evaluate(values));
+        args.put(e.getKey(), expr.evaluate(values, deadline));
       }
       if (++fetches > 50) throw ArcException.invalid("Execution exceeds 50 source reads");
       try {
-        value = sources.read(b, args);
+        value = sources.read(b, args, deadline);
         if (value == null && p.required())
           throw ArcException.invalid("Source returned null for required input");
         if (value != null) value = InputTypes.check(p.name(), p.type(), value);
       } catch (ArcException e) {
+        deadline.check();
+        if (e.status() == 504) throw e;
         if ("DEFAULT".equals(b.onError()) && p.defaultValue() != null) {
           value = p.defaultValue();
           status = "DEFAULT";

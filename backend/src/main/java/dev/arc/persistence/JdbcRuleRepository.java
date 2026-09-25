@@ -1,9 +1,7 @@
 package dev.arc.persistence;
 
 import dev.arc.error.ArcException;
-import dev.arc.model.Definition;
-import dev.arc.model.Rule;
-import dev.arc.model.RuleVersion;
+import dev.arc.model.*;
 import dev.arc.rule.RuleRepository;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,8 +35,84 @@ public class JdbcRuleRepository implements RuleRepository {
     return jdbc.query("SELECT * FROM rules ORDER BY updated_at DESC, id", mapper);
   }
 
+  public CatalogPage<RuleSummary> catalog(
+      int offset, int limit, String search, String kind, boolean publishedOnly) {
+    String filter =
+        " WHERE (? = '' OR strpos(lower(id || ' ' || name || ' ' || description), lower(?)) > 0)"
+            + " AND (? = '' OR kind = ?) AND (NOT ? OR published_version IS NOT NULL)";
+    Long total =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM rules" + filter,
+            Long.class,
+            search,
+            search,
+            kind,
+            kind,
+            publishedOnly);
+    var items =
+        jdbc.query(
+            """
+        SELECT id, name, description, kind, revision, published_version, created_at, updated_at,
+          jsonb_array_length(draft->'nodes') AS node_count,
+          jsonb_array_length(draft->'inputs') AS input_count,
+          jsonb_array_length(jsonb_path_query_array(draft, '$.nodes[*] ? (@.type == "REFERENCE")')) AS reference_count
+        FROM rules
+        """
+                + filter
+                + " ORDER BY updated_at DESC, id LIMIT ? OFFSET ?",
+            (rs, index) ->
+                new RuleSummary(
+                    rs.getString("id"),
+                    rs.getString("name"),
+                    rs.getString("description"),
+                    rs.getString("kind"),
+                    rs.getInt("revision"),
+                    rs.getObject("published_version", Integer.class),
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getTimestamp("updated_at").toInstant(),
+                    rs.getInt("node_count"),
+                    rs.getInt("input_count"),
+                    rs.getInt("reference_count")),
+            search,
+            search,
+            kind,
+            kind,
+            publishedOnly,
+            limit,
+            offset);
+    return new CatalogPage<>(items, total, offset, limit);
+  }
+
+  public CatalogPage<RuleVersionSummary> versionSummaries(String id, int offset, int limit) {
+    publishedVersion(id);
+    Long total =
+        jdbc.queryForObject("SELECT count(*) FROM rule_versions WHERE rule_id = ?", Long.class, id);
+    var items =
+        jdbc.query(
+            "SELECT rule_id, version, published_at FROM rule_versions WHERE rule_id = ? ORDER BY version DESC LIMIT ? OFFSET ?",
+            (rs, index) ->
+                new RuleVersionSummary(
+                    rs.getString("rule_id"),
+                    rs.getInt("version"),
+                    rs.getTimestamp("published_at").toInstant()),
+            id,
+            limit,
+            offset);
+    return new CatalogPage<>(items, total, offset, limit);
+  }
+
   public Rule get(String id) {
     return find(id, false);
+  }
+
+  public Integer publishedVersion(String id) {
+    var rows =
+        jdbc.query(
+            "SELECT published_version FROM rules WHERE id = ?",
+            (rs, index) -> rs.getObject("published_version", Integer.class),
+            id);
+    if (rows.isEmpty()) throw new ArcException(404, "Rule not found: " + id);
+    return rows.getFirst();
   }
 
   public Rule lock(String id) {

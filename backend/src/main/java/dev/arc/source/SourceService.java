@@ -1,8 +1,7 @@
 package dev.arc.source;
 
 import dev.arc.error.ArcException;
-import dev.arc.model.DataSource;
-import dev.arc.model.SourceDefinition;
+import dev.arc.model.*;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +19,22 @@ public class SourceService {
   public SourceService(SourceRepository repository, SourceValidator validator) {
     this.repository = repository;
     this.validator = validator;
+  }
+
+  public CatalogPage<SourceSummary> catalog(int offset, int limit, String search) {
+    pageBounds(offset, limit);
+    if (search.length() > 200) throw ArcException.invalid("Search is limited to 200 characters");
+    return repository.catalog(offset, limit, search);
+  }
+
+  public CatalogPage<SourceVersionSummary> versionSummaries(String id, int offset, int limit) {
+    pageBounds(offset, limit);
+    return repository.versionSummaries(id, offset, limit);
+  }
+
+  private void pageBounds(int offset, int limit) {
+    if (offset < 0 || limit < 1 || limit > 100)
+      throw ArcException.invalid("Use offset >= 0 and limit from 1 to 100");
   }
 
   public List<DataSource> list() {

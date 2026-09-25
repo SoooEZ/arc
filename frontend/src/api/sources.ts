@@ -1,10 +1,29 @@
-import type { DataSource, SourceConfig } from "../types";
+import type {
+  DataSource,
+  SourceConfig,
+  SourceSummary,
+  SourceVersionSummary,
+  Page,
+} from "../types";
 import { http, pathId, type RequestOptions } from "./http";
 export const sourceApi = {
-  sources: (options?: RequestOptions) =>
-    http.get<DataSource[]>("/sources", options),
-  sourceVersions: (id: string, options?: RequestOptions) =>
-    http.get<DataSource[]>(`/sources/${pathId(id)}/versions`, options),
+  catalog: (
+    query: { offset?: number; limit?: number; search?: string } = {},
+    options?: RequestOptions,
+  ) =>
+    http.get<Page<SourceSummary>>(
+      `/source-summaries?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`,
+      options,
+    ),
+  versionSummaries: (
+    id: string,
+    query: { offset?: number; limit?: number } = {},
+    options?: RequestOptions,
+  ) =>
+    http.get<Page<SourceVersionSummary>>(
+      `/sources/${pathId(id)}/version-summaries?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`,
+      options,
+    ),
   source: (id: string, version: number, options?: RequestOptions) =>
     http.get<DataSource>(`/sources/${pathId(id)}/versions/${version}`, options),
   createSource: (id: string, name: string, definition: SourceConfig) =>

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "@mui/material";
+import { Alert, TextField } from "@mui/material";
 import { Braces, GitBranch, Puzzle } from "lucide-react";
+import { usePagedResource } from "../../hooks/usePagedResource";
+import CatalogPagination from "../../components/CatalogPagination";
 import FunctionLibrary from "./FunctionLibrary";
 import { ruleApi } from "../../api/rules";
 import { errorMessage } from "../../api/errors";
-import type { Definition, FunctionEntry, Rule } from "../../types";
+import type { Definition, FunctionEntry, RuleSummary } from "../../types";
 import { modules, referenceSnippet } from "./snippets";
 
 type Pane = "functions" | "modules" | "reuse";
@@ -12,7 +14,6 @@ const panes: Pane[] = ["functions", "modules", "reuse"];
 
 export default function StudioLibrary({
   ruleId,
-  rules,
   definition,
   functions,
   catalogError,
@@ -20,14 +21,23 @@ export default function StudioLibrary({
   onInsert,
 }: {
   ruleId: string;
-  rules: Rule[];
   definition: Definition;
   functions: FunctionEntry[];
   catalogError: string;
   readOnly: boolean;
   onInsert: (snippet: string, atEnd?: boolean) => void;
 }) {
+  const [search, setSearch] = useState("");
   const [pane, setPane] = useState<Pane>("functions");
+  const catalog = usePagedResource(
+    search,
+    (offset, limit, signal) =>
+      ruleApi.catalog(
+        { offset, limit, search, publishedOnly: true },
+        { signal },
+      ),
+    pane === "reuse",
+  );
   const [error, setError] = useState("");
   const pending = useRef(new Set<AbortController>());
   const latest = useRef({ definition, readOnly, onInsert });
@@ -39,7 +49,7 @@ export default function StudioLibrary({
     [],
   );
 
-  const reuse = async (rule: Rule) => {
+  const reuse = async (rule: RuleSummary) => {
     if (readOnly || rule.publishedVersion === null) return;
     const request = new AbortController();
     pending.current.add(request);
@@ -118,7 +128,12 @@ export default function StudioLibrary({
             Insert a published rule or formula as a versioned module. Required
             input bindings are included.
           </p>
-          {rules
+          <TextField
+            label="Find reusable rule"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {catalog.data.items
             .filter((rule) => rule.publishedVersion && rule.id !== ruleId)
             .map((rule) => (
               <button
@@ -137,14 +152,22 @@ export default function StudioLibrary({
                 <span>+</span>
               </button>
             ))}
+          <CatalogPagination
+            label="Reusable rules"
+            offset={catalog.offset}
+            limit={catalog.limit}
+            total={catalog.data.total}
+            loading={catalog.loading}
+            onPage={catalog.setOffset}
+          />
         </>
       )}
-      {(error || catalogError) && (
+      {(error || catalogError || catalog.error) && (
         <Alert
           severity="error"
           onClose={error ? () => setError("") : undefined}
         >
-          {error || catalogError}
+          {error || catalogError || catalog.error}
         </Alert>
       )}
     </aside>

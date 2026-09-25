@@ -7,7 +7,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { Braces, Trash2 } from "lucide-react";
-import type { DataSource, Input, InputType } from "../../../types";
+import type { SourceSummary, Input, InputType } from "../../../types";
 import type { VariableOption } from "../../../domain/graph";
 import SourceBindingEditor from "../../sources/SourceBindingEditor";
 import InputDefaultValue from "./InputDefaultValue";
@@ -27,7 +27,7 @@ export default function InputParameterCard({
   index: number;
   readOnly: boolean;
   variables: VariableOption[];
-  sources: DataSource[];
+  sources: SourceSummary[];
   sourceError: string;
   onChange: (patch: Partial<Input>) => void;
   onRemove: () => void;

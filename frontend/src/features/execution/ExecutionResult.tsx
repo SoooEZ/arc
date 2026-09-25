@@ -1,13 +1,17 @@
-import { CheckCircle2, ChevronRight, Clock3 } from "lucide-react";
+import { CheckCircle2, ChevronRight } from "lucide-react";
+import { Alert } from "@mui/material";
 import { NodeIcon } from "../../components/Icons";
 import type { Execution } from "../../types";
+import ExecutionTiming from "./ExecutionTiming";
 
 export default function ExecutionResult({
   result,
   onNode,
+  requestDurationMs,
 }: {
   result: Execution;
   onNode: (id: string) => void;
+  requestDurationMs: number | null;
 }) {
   return (
     <>
@@ -19,11 +23,8 @@ export default function ExecutionResult({
         <strong data-testid="test-result">
           {JSON.stringify(result.result)}
         </strong>
-        <small>
-          <Clock3 size={12} />
-          {(result.durationMicros / 1000).toFixed(2)} ms
-        </small>
       </div>
+      <ExecutionTiming result={result} requestDurationMs={requestDurationMs} />
       {!!result.sources?.length && (
         <div className="source-reads">
           {result.sources.map((s, i) => (
@@ -39,8 +40,24 @@ export default function ExecutionResult({
           ))}
         </div>
       )}
+      {result.traceEnabled === false && (
+        <Alert severity="info">
+          Trace disabled. The result includes all executed calculations.
+        </Alert>
+      )}
+      {result.traceTruncated && (
+        <Alert severity="warning">
+          Trace size limit reached. Showing the first {result.trace.length} of{" "}
+          {result.executedSteps} executed steps. The final result is complete;
+          graph highlights show only the recorded steps.
+        </Alert>
+      )}
       <div className="trace-label">
-        EXECUTION TRACE <span>{result.trace.length} steps</span>
+        EXECUTION TRACE{" "}
+        <span>
+          {result.trace.length} recorded /{" "}
+          {result.executedSteps ?? result.trace.length} executed
+        </span>
       </div>
       <div className="trace-list">
         {result.trace.map((step, i) => (

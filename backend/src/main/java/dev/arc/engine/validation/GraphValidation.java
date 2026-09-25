@@ -1,6 +1,7 @@
 package dev.arc.engine.validation;
 
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
@@ -20,6 +21,10 @@ final class GraphValidation {
 
   /** Produces the same checked topology used by execution; callers need not plan twice. */
   public GraphPlan plan(Definition definition, RuleResolver resolver) {
+    return compile(definition, resolver).graph();
+  }
+
+  CompiledGraph compile(Definition definition, RuleResolver resolver) {
     try {
       return validateGraph(definition, resolver);
     } catch (ArcException e) {
@@ -33,27 +38,31 @@ final class GraphValidation {
     }
   }
 
-  private GraphPlan validateGraph(Definition definition, RuleResolver resolver) {
+  private CompiledGraph validateGraph(Definition definition, RuleResolver resolver) {
+    var expressions = new HashMap<String, Expressions.Compiled>();
     documentShape.validate(definition);
-    checkInputDependencies(definition);
+    checkInputDependencies(definition, expressions);
     checkConnections(definition);
     var plan = new GraphPlan(definition);
     checkReachability(definition, plan);
     for (Node node : plan.order()) {
       Set<String> scope = plan.available().get(node.id());
-      nodeValidation.validate(definition, node, scope, resolver);
+      nodeValidation.validate(definition, node, scope, resolver, expressions);
     }
-    return plan;
+    return new CompiledGraph(definition, plan, expressions);
   }
 
-  private void checkInputDependencies(Definition definition) {
+  private void checkInputDependencies(
+      Definition definition, Map<String, Expressions.Compiled> expressions) {
     var inputNames = definition.inputs().stream().map(Input::name).collect(Collectors.toSet());
     Map<String, Set<String>> dependencies = new HashMap<>();
     for (Input parameter : definition.inputs()) {
       var parameterDependencies = new HashSet<String>();
       if (parameter.source() != null)
         for (String expr : parameter.source().bindings().values()) {
-          var compiled = NodeValidation.expression(expr, inputNames, parameter.name() + " source");
+          var compiled =
+              NodeValidation.expression(
+                  expr, inputNames, parameter.name() + " source", expressions);
           parameterDependencies.addAll(compiled.variables());
         }
       dependencies.put(parameter.name(), parameterDependencies);

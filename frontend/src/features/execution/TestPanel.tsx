@@ -13,6 +13,7 @@ import type { ReferenceTarget } from "../editor/types";
 import type { Definition, Execution } from "../../types";
 import ExecutionError from "./ExecutionError";
 import ExecutionResult from "./ExecutionResult";
+import ExecutionOptionsFields from "./ExecutionOptionsFields";
 
 export default function TestPanel({
   definition,
@@ -37,9 +38,13 @@ export default function TestPanel({
     JSON.stringify(sampleInputs(definition), null, 2),
   );
   const [tab, setTab] = useState(0);
+  const [trace, setTrace] = useState(true);
+  const [timeoutMs, setTimeoutMs] = useState(30000);
   const inputElement = useRef<HTMLTextAreaElement>(null);
   const inputSchema = JSON.stringify(definition.inputs);
-  const execution = useExecutionRequest(JSON.stringify([definition, input]));
+  const execution = useExecutionRequest(
+    JSON.stringify([definition, input, trace, timeoutMs]),
+  );
   const { result, error, running, problem } = execution;
   useEffect(() => {
     setInput(JSON.stringify(sampleInputs(definition), null, 2));
@@ -50,7 +55,11 @@ export default function TestPanel({
   }, [result, problem, onResult, onError]);
   const run = () =>
     execution.run((signal) =>
-      studioApi.preview(definition, parseExecutionInputs(input), { signal }),
+      studioApi.preview(definition, parseExecutionInputs(input), {
+        signal,
+        trace,
+        timeoutMs,
+      }),
     );
   let parsed: Record<string, unknown> = {};
   try {
@@ -87,6 +96,12 @@ export default function TestPanel({
       </div>
       <div className="test-panel-content">
         <div className="test-input">
+          <ExecutionOptionsFields
+            trace={trace}
+            timeoutMs={timeoutMs}
+            onTrace={setTrace}
+            onTimeout={setTimeoutMs}
+          />
           <Tabs value={tab} onChange={(_, value) => setTab(value)}>
             <Tab label="Input JSON" />
             <Tab label="cURL" />
@@ -113,6 +128,7 @@ export default function TestPanel({
                   ruleId,
                   parsed,
                   publishedVersion,
+                  { trace, timeoutMs },
                 )}
               </pre>
               <small>
@@ -137,7 +153,11 @@ export default function TestPanel({
               }}
             />
           ) : result ? (
-            <ExecutionResult result={result} onNode={onNode} />
+            <ExecutionResult
+              result={result}
+              onNode={onNode}
+              requestDurationMs={execution.requestDurationMs}
+            />
           ) : (
             <div className="test-empty">
               <span>

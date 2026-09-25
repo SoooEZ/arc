@@ -1,4 +1,4 @@
-import type { Definition, Input } from "../types";
+import type { Definition, ExecutionOptions, Input } from "../types";
 
 function sampleValue(input: Input): unknown {
   if (input.defaultValue != null) return input.defaultValue;
@@ -39,9 +39,10 @@ export function curlExample(
   id: string,
   inputs: Record<string, unknown>,
   version?: number | null,
+  options: ExecutionOptions = {},
 ) {
   const body = JSON.stringify(
-    { inputs, ...(version ? { version } : {}) },
+    { inputs, ...(version ? { version } : {}), ...options },
     null,
     2,
   );

@@ -44,6 +44,12 @@ test("execution examples preserve falsy defaults and let sourced inputs resolve 
   expect(curlExample("https://arc.example", "rule", {}, 3)).toContain(
     '"version": 3',
   );
+  const configured = curlExample("https://arc.example", "rule", {}, 3, {
+    trace: false,
+    timeoutMs: 5000,
+  });
+  expect(configured).toContain('"trace": false');
+  expect(configured).toContain('"timeoutMs": 5000');
 });
 
 test("reference snippets map caller inputs, pin the fetched version, and omit defaulted or sourced arguments", () => {

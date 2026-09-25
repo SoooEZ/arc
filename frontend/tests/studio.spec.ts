@@ -143,6 +143,9 @@ test("code studio builds, round-trips graph edits, inserts chips/modules, and pu
   await expect(page.locator(".view-lines")).toContainText("Template decision");
   await page.getByRole("button", { name: "reuse", exact: true }).click();
   await page
+    .getByLabel("Find reusable rule", { exact: true })
+    .fill("Apply discount");
+  await page
     .locator(".snippet-card")
     .filter({ hasText: "Apply discount" })
     .click();

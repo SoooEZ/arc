@@ -21,11 +21,11 @@ ALLOWED_JAVA = {
     "api": {"api", "rule", "source", "engine", "model", "error"},
 }
 ENGINE_DEPENDENCIES = {
-    "expression": {"expression", "Identifiers"},
+    "expression": {"expression", "Identifiers", "ExecutionDeadline"},
     "graph": {"graph"},
     "validation": {"validation", "graph", "expression", "Identifiers", "InputTypes", "RuleResolver"},
     "script": {"script", "expression", "validation"},
-    "execution": {"execution", "graph", "validation", "expression", "InputTypes", "RuleResolver", "SourceReader"},
+    "execution": {"execution", "graph", "validation", "expression", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline"},
 }
 PURE_FRONTEND = {
     "domain/": ("types", "domain/"),

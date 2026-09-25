@@ -6,20 +6,6 @@ export interface SourceBuffers {
   secretHeaders: string;
 }
 
-/** Keep completed writes when an older library read arrives afterward. */
-export function mergeSourceLists(
-  current: DataSource[],
-  incoming: DataSource[],
-): DataSource[] {
-  const sources = new Map(current.map((source) => [source.id, source]));
-  for (const source of incoming) {
-    const existing = sources.get(source.id);
-    if (!existing || source.version > existing.version)
-      sources.set(source.id, source);
-  }
-  return [...sources.values()];
-}
-
 export function sourceBuffers(config: SourceConfig): SourceBuffers {
   return {
     parameters: JSON.stringify(config.parameters, null, 2),

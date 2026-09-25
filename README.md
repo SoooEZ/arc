@@ -2,7 +2,7 @@
 
 **Aggregation, Rule & Calculation** — a visual workspace and HTTP service for reusable business logic.
 
-The first release implements **R & C**: build formulas, conditions, and decision trees; publish stable versions; execute them from any application with typed inputs and a complete execution trace.
+The first release implements **R & C**: build formulas, conditions, and decision trees; publish stable versions; execute them from any application with typed inputs and an optional, bounded execution trace.
 
 Choose [Docker Compose](#run-with-docker-compose) to run the whole stack in containers, or [local development without Docker](#run-without-docker-local-development) to run PostgreSQL, Java, and React directly. After local setup, **`bin/dev` starts the frontend and backend together with Foreman**. Run the setup commands from the repository root unless a step says otherwise.
 
@@ -258,7 +258,7 @@ curl -X POST http://localhost:8080/api/rules/order-pricing/execute \
   -d '{"version":1,"inputs":{"orderTotal":150,"customerTier":"premium"}}'
 ```
 
-The result is `120`, alongside the executed version, timing, and each visited node (including nested rule calls). The same endpoints are proxied at `http://localhost:3080/api`.
+The result is `120`, alongside the executed version, phase timing, and a bounded trace of visited nodes (including nested rule calls). Set `"trace": false` to omit intermediate values, or `"timeoutMs": 5000` for a five-second execution deadline. Trace defaults on and reports `traceTruncated` if its 256 KiB budget is reached; the final result is unchanged. Preview and the API playground expose both controls and matching cURL examples. The same endpoints are proxied at `http://localhost:3080/api`.
 
 ## What you can do
 

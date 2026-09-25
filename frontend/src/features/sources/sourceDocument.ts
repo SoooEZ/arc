@@ -63,6 +63,7 @@ export function sourceIsDirty(document: SourceDocument): boolean {
 }
 
 export type SourceDocumentAction =
+  | { type: "close" }
   | { type: "select"; source: DataSource; selection: number }
   | { type: "metadata"; patch: Pick<Partial<DataSource>, "id" | "name"> }
   | { type: "configuration"; patch: Partial<SourceConfig> }
@@ -92,6 +93,7 @@ export function sourceDocumentReducer(
   document: SourceDocument | null,
   action: SourceDocumentAction,
 ): SourceDocument | null {
+  if (action.type === "close") return null;
   if (action.type === "select")
     return openSource(action.source, action.selection);
   if (!document) return null;

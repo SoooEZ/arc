@@ -1,7 +1,13 @@
 import { useEffect, useRef, type ComponentType } from "react";
 import { Alert, Button, TextField } from "@mui/material";
 import { Code2, Info, Trash2 } from "lucide-react";
-import type { Definition, NodeType, Rule, RuleNode } from "../../../types";
+import type {
+  Definition,
+  NodeType,
+  RuleSummary,
+  Rule,
+  RuleNode,
+} from "../../../types";
 import { nodeLabel } from "../../../types";
 import { NodeIcon } from "../../../components/Icons";
 import type { ReferenceTarget } from "../types";
@@ -37,7 +43,7 @@ const fieldsByType: Record<NodeType, ComponentType<NodeFieldsProps>> = {
 interface Props {
   rule: Rule;
   node: RuleNode;
-  rules: Rule[];
+  rules: RuleSummary[];
   readOnly: boolean;
   onNodeChange: (id: string, patch: Partial<RuleNode>) => void;
   onDelete: (id: string) => void;

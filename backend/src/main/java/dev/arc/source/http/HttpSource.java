@@ -2,9 +2,11 @@ package dev.arc.source.http;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import dev.arc.model.SourceDefinition;
+import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -13,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.*;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -22,9 +25,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
-public class HttpSource {
-  private static final ScheduledExecutorService DEADLINES =
-      Executors.newSingleThreadScheduledExecutor(
+public class HttpSource implements AutoCloseable {
+  private final ScheduledThreadPoolExecutor deadlines =
+      new ScheduledThreadPoolExecutor(
+          1,
           r -> {
             Thread t = new Thread(r, "arc-http-deadlines");
             t.setDaemon(true);
@@ -32,6 +36,7 @@ public class HttpSource {
           });
   private final ObjectMapper json;
   private final HttpDestinationPolicy destinations;
+  private final CloseableHttpClient client;
 
   public HttpSource(
       ObjectMapper json,
@@ -39,6 +44,23 @@ public class HttpSource {
       @Value("${arc.http.private-hosts:}") String privateHosts) {
     this.json = json;
     this.destinations = new HttpDestinationPolicy(allowed, privateHosts);
+    deadlines.setRemoveOnCancelPolicy(true);
+    var manager =
+        PoolingHttpClientConnectionManagerBuilder.create()
+            .setDnsResolver(destinations)
+            .setMaxConnTotal(100)
+            .setMaxConnPerRoute(20)
+            .build();
+    client =
+        HttpClients.custom()
+            .setConnectionManager(manager)
+            .disableRedirectHandling()
+            .disableAutomaticRetries()
+            .disableContentCompression()
+            .disableCookieManagement()
+            .disableAuthCaching()
+            .disableConnectionState()
+            .build();
   }
 
   public URI validate(SourceDefinition definition) {
@@ -50,6 +72,12 @@ public class HttpSource {
   }
 
   public Object fetch(SourceDefinition c, Map<String, Object> inputs) {
+    return fetch(c, inputs, ExecutionDeadline.start(ExecutionDeadline.DEFAULT_TIMEOUT_MS));
+  }
+
+  public Object fetch(
+      SourceDefinition c, Map<String, Object> inputs, ExecutionDeadline executionDeadline) {
+    executionDeadline.check();
     URI uri = validate(c);
     try {
       var builder = new URIBuilder(uri);
@@ -64,36 +92,39 @@ public class HttpSource {
             throw ArcException.invalid("Configured source secret is unavailable");
           request.setHeader(e.getKey(), secret);
         }
-      var manager =
-          PoolingHttpClientConnectionManagerBuilder.create().setDnsResolver(destinations).build();
+      long timeoutMs = Math.min(c.timeoutMs(), executionDeadline.remainingMillis());
       var config =
           RequestConfig.custom()
-              .setConnectTimeout(Timeout.ofMilliseconds(c.timeoutMs()))
-              .setResponseTimeout(Timeout.ofMilliseconds(c.timeoutMs()))
-              .setConnectionRequestTimeout(Timeout.ofMilliseconds(c.timeoutMs()))
+              .setConnectTimeout(Timeout.ofMilliseconds(timeoutMs))
+              .setResponseTimeout(Timeout.ofMilliseconds(timeoutMs))
+              .setConnectionRequestTimeout(Timeout.ofMilliseconds(timeoutMs))
+              .setAuthenticationEnabled(false)
               .build();
-      try (var client =
-          HttpClients.custom()
-              .setConnectionManager(manager)
-              .setDefaultRequestConfig(config)
-              .disableRedirectHandling()
-              .disableAutomaticRetries()
-              .disableContentCompression()
-              .build()) {
-        var deadline = DEADLINES.schedule(request::cancel, c.timeoutMs(), TimeUnit.MILLISECONDS);
-        try {
-          return client.execute(request, this::readResponse);
-        } finally {
-          deadline.cancel(false);
-        }
+      request.setConfig(config);
+      var cancellation = deadlines.schedule(request::cancel, timeoutMs, TimeUnit.MILLISECONDS);
+      try {
+        Object value = client.execute(request, this::readResponse);
+        executionDeadline.check();
+        return value;
+      } finally {
+        cancellation.cancel(false);
       }
     } catch (ArcException e) {
+      executionDeadline.check();
       throw e;
     } catch (Exception e) {
+      executionDeadline.check();
       throw ArcException.invalid(
           "HTTP source failed: destination unavailable, blocked, timed out, or response is not"
               + " valid JSON");
     }
+  }
+
+  @Override
+  @PreDestroy
+  public void close() throws IOException {
+    deadlines.shutdownNow();
+    client.close();
   }
 
   private Object readResponse(ClassicHttpResponse response) throws IOException {

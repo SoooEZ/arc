@@ -6,10 +6,12 @@ import dev.arc.engine.graph.GraphPlan;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
+import dev.arc.model.SourceDefinition;
 import dev.arc.source.SourceBindingValidator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiFunction;
 import org.springframework.stereotype.Service;
 
 /** Static graph checks and source contracts. Never fetches external parameter values. */
@@ -33,6 +35,13 @@ public class RuleDefinitionService {
   public void validate(Definition definition, RuleResolver resolver) {
     validator.validate(definition, resolver);
     sources.validate(definition, resolver);
+  }
+
+  public void validateSources(
+      Definition definition,
+      RuleResolver resolver,
+      BiFunction<String, Integer, SourceDefinition> lookup) {
+    sources.validate(definition, resolver, lookup);
   }
 
   public Map<String, Set<String>> variables(Definition definition) {

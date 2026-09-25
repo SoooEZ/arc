@@ -14,7 +14,6 @@ import StudioProblems from "./StudioProblems";
 
 interface Props {
   rule: Rule;
-  rules: Rule[];
   definition: Definition;
   source: string;
   onChange: (s: string) => void;
@@ -27,7 +26,6 @@ interface Props {
 }
 export default function CodeStudio({
   rule,
-  rules,
   definition,
   source,
   onChange,
@@ -97,7 +95,6 @@ export default function CodeStudio({
     <div className="code-studio">
       <StudioLibrary
         ruleId={rule.id}
-        rules={rules}
         definition={definition}
         functions={functions}
         catalogError={catalogError}

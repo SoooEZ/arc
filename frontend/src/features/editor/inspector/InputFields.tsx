@@ -1,9 +1,10 @@
-import { Button } from "@mui/material";
+import { useState } from "react";
+import { Button, TextField } from "@mui/material";
 import { Plus } from "lucide-react";
-import type { DataSource } from "../../../types";
 import { sourceApi } from "../../../api/sources";
 import { inputVariables } from "../../../domain/graph";
-import { useAsyncResource } from "../../../hooks/useAsyncResource";
+import { usePagedResource } from "../../../hooks/usePagedResource";
+import CatalogPagination from "../../../components/CatalogPagination";
 import InputParameterCard from "./InputParameterCard";
 import { useInputParameterRows } from "./useInputParameterRows";
 import type { NodeFieldsProps } from "./types";
@@ -20,10 +21,9 @@ export default function InputFields({
     onDefinitionChange,
   );
   // One catalog read serves every parameter card in this Input inspector.
-  const sources = useAsyncResource(
-    "source-catalog",
-    (signal) => sourceApi.sources({ signal }),
-    [] as DataSource[],
+  const [search, setSearch] = useState("");
+  const sources = usePagedResource(search, (offset, limit, signal) =>
+    sourceApi.catalog({ offset, limit, search }, { signal }),
   );
   return (
     <div className="inspector-section">
@@ -31,6 +31,19 @@ export default function InputFields({
         <h4>Input parameters</h4>
         <span>{rule.draft.inputs.length}</span>
       </div>
+      <TextField
+        label="Find value provider"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+      <CatalogPagination
+        label="Value providers"
+        offset={sources.offset}
+        limit={sources.limit}
+        total={sources.data.total}
+        loading={sources.loading}
+        onPage={sources.setOffset}
+      />
       {parameters.rows.map(({ input, index, id }) => (
         <InputParameterCard
           key={id}
@@ -41,7 +54,7 @@ export default function InputFields({
             (variable) =>
               variable.name !== input.name && variable.type !== "RESULT",
           )}
-          sources={sources.data}
+          sources={sources.data.items}
           sourceError={sources.error}
           onChange={(patch) => parameters.change(index, patch)}
           onRemove={() => parameters.remove(index)}

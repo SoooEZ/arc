@@ -1,4 +1,4 @@
-import type { Rule } from "../../types";
+import type { RuleSummary, Rule } from "../../types";
 import type { GraphProblem } from "../../api/errors";
 export interface ReferenceTarget {
   ruleId: string;
@@ -11,7 +11,7 @@ export interface ReferenceTarget {
 export interface EditorProps {
   mode: "code" | "graph";
   rule: Rule;
-  rules: Rule[];
+  rules: RuleSummary[];
   requestedVersion: number | null;
   requestedNode?: string | null;
   onSaved: (r: Rule) => void;

@@ -27,7 +27,11 @@ public class Validator {
   }
 
   public GraphPlan plan(Definition definition, RuleResolver resolver) {
-    return graphValidation.plan(definition, resolver);
+    return compile(definition, resolver).graph();
+  }
+
+  public CompiledGraph compile(Definition definition, RuleResolver resolver) {
+    return graphValidation.compile(definition, resolver);
   }
 
   public List<Problem> diagnostics(Definition definition, RuleResolver resolver) {

@@ -1,7 +1,36 @@
-import type { Execution, Kind, Rule, Version } from "../types";
+import type {
+  Execution,
+  ExecutionOptions,
+  Kind,
+  Rule,
+  Version,
+  Page,
+  RuleSummary,
+  VersionSummary,
+} from "../types";
 import { http, pathId, type RequestOptions } from "./http";
+export interface RuleCatalogQuery {
+  offset?: number;
+  limit?: number;
+  search?: string;
+  kind?: Kind | "";
+  publishedOnly?: boolean;
+}
 export const ruleApi = {
-  list: (options?: RequestOptions) => http.get<Rule[]>("/rules", options),
+  catalog: (query: RuleCatalogQuery = {}, options?: RequestOptions) =>
+    http.get<Page<RuleSummary>>(
+      `/rule-summaries?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`,
+      options,
+    ),
+  versionSummaries: (
+    id: string,
+    query: { offset?: number; limit?: number } = {},
+    options?: RequestOptions,
+  ) =>
+    http.get<Page<VersionSummary>>(
+      `/rules/${pathId(id)}/version-summaries?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`,
+      options,
+    ),
   get: (id: string, options?: RequestOptions) =>
     http.get<Rule>(`/rules/${pathId(id)}`, options),
   create: (id: string, name: string, description: string, kind: Kind) =>
@@ -19,15 +48,13 @@ export const ruleApi = {
     id: string,
     inputs: Record<string, unknown>,
     version?: number,
-    options?: RequestOptions,
+    options?: RequestOptions & ExecutionOptions,
   ) =>
     http.post<Execution>(
       `/rules/${pathId(id)}/execute`,
-      { inputs, version },
+      { inputs, version, trace: options?.trace, timeoutMs: options?.timeoutMs },
       options,
     ),
-  versions: (id: string, options?: RequestOptions) =>
-    http.get<Version[]>(`/rules/${pathId(id)}/versions`, options),
   version: (id: string, version: number, options?: RequestOptions) =>
     http.get<Version>(`/rules/${pathId(id)}/versions/${version}`, options),
 };

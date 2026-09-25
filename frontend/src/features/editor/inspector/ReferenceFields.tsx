@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { usePagedResource } from "../../../hooks/usePagedResource";
+import CatalogPagination from "../../../components/CatalogPagination";
 import { Alert, Button, MenuItem, TextField } from "@mui/material";
 import { ArrowUpRight, Info } from "lucide-react";
 import type { Version } from "../../../types";
@@ -13,24 +16,41 @@ export default function ReferenceFields({
   variables,
   onOpenReference,
 }: NodeFieldsProps) {
-  const { data: refVersions, error: refError } = useAsyncResource(
+  const [search, setSearch] = useState("");
+  const catalog = usePagedResource(search, (offset, limit, signal) =>
+    ruleApi.catalog({ offset, limit, search, publishedOnly: true }, { signal }),
+  );
+  const versions = usePagedResource(
     node.ruleId || "",
-    (signal) => ruleApi.versions(node.ruleId!, { signal }),
-    [] as Version[],
-    0,
+    (offset, limit, signal) =>
+      ruleApi.versionSummaries(node.ruleId!, { offset, limit }, { signal }),
     !!node.ruleId,
   );
-  const child = refVersions.find((version) => version.version === node.version);
+  const detail = useAsyncResource(
+    `${node.ruleId}:${node.version}`,
+    (signal) => ruleApi.version(node.ruleId!, node.version!, { signal }),
+    null as Version | null,
+    0,
+    !!node.ruleId && !!node.version,
+  );
+  const child = detail.data;
+  const refVersions = versions.data.items;
+  const refError = catalog.error || versions.error || detail.error;
   return (
     <div className="inspector-section">
       <h4>Rule reference</h4>
+      <TextField
+        label="Find published rule"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
       <TextField
         select
         label="Published rule"
         value={node.ruleId || ""}
         disabled={readOnly}
         onChange={(e) => {
-          const ref = rules.find((r) => r.id === e.target.value);
+          const ref = catalog.data.items.find((r) => r.id === e.target.value);
           patch({
             ruleId: e.target.value,
             version: ref?.publishedVersion || null,
@@ -41,16 +61,29 @@ export default function ReferenceFields({
         <MenuItem value="" disabled>
           Select a rule
         </MenuItem>
-        {rules
-          .filter((r) => r.publishedVersion)
-          .map((r) => (
-            <MenuItem key={r.id} value={r.id}>
-              {r.name}
+        {node.ruleId &&
+          !catalog.data.items.some((item) => item.id === node.ruleId) && (
+            <MenuItem value={node.ruleId}>
+              {rules.find((item) => item.id === node.ruleId)?.name ||
+                node.ruleId}
             </MenuItem>
-          ))}
+          )}
+        {catalog.data.items.map((r) => (
+          <MenuItem key={r.id} value={r.id}>
+            {r.name}
+          </MenuItem>
+        ))}
       </TextField>
+      <CatalogPagination
+        label="Published rules"
+        offset={catalog.offset}
+        limit={catalog.limit}
+        total={catalog.data.total}
+        loading={catalog.loading}
+        onPage={catalog.setOffset}
+      />
       {refError && <Alert severity="error">{refError}</Alert>}
-      {refVersions.length > 0 && (
+      {node.ruleId && (
         <TextField
           select
           label="Pinned version"
@@ -63,12 +96,26 @@ export default function ReferenceFields({
             })
           }
         >
+          {node.version &&
+            !refVersions.some((item) => item.version === node.version) && (
+              <MenuItem value={node.version}>Version {node.version}</MenuItem>
+            )}
           {refVersions.map((v) => (
             <MenuItem value={v.version} key={v.version}>
               Version {v.version}
             </MenuItem>
           ))}
         </TextField>
+      )}
+      {node.ruleId && (
+        <CatalogPagination
+          label="Pinned versions"
+          offset={versions.offset}
+          limit={versions.limit}
+          total={versions.data.total}
+          loading={versions.loading}
+          onPage={versions.setOffset}
+        />
       )}
       {node.ruleId && node.version && (
         <Button

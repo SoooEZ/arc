@@ -20,6 +20,15 @@ final class NodeValidation {
   }
 
   void validate(Definition definition, Node node, Set<String> scope, RuleResolver resolver) {
+    validate(definition, node, scope, resolver, new HashMap<>());
+  }
+
+  void validate(
+      Definition definition,
+      Node node,
+      Set<String> scope,
+      RuleResolver resolver,
+      Map<String, Expressions.Compiled> compiled) {
     try {
       if (node.type().equals("SWITCH"))
         require(
@@ -37,7 +46,7 @@ final class NodeValidation {
               referenceParameters.contains(expression.bindingName()),
               node.label() + ": unknown parameter " + expression.bindingName());
         }
-        expression(expression.source(), scope, expression.label());
+        expression(expression.source(), scope, expression.label(), compiled);
       }
 
       if (node.storesResult()) {
@@ -71,8 +80,16 @@ final class NodeValidation {
   }
 
   static Expressions.Compiled expression(String source, Set<String> scope, String label) {
+    return expression(source, scope, label, new HashMap<>());
+  }
+
+  static Expressions.Compiled expression(
+      String source,
+      Set<String> scope,
+      String label,
+      Map<String, Expressions.Compiled> expressions) {
     try {
-      var compiled = Expressions.compile(source);
+      var compiled = expressions.computeIfAbsent(source, Expressions::compile);
       var unknown = new TreeSet<>(compiled.variables());
       unknown.removeAll(scope);
       require(

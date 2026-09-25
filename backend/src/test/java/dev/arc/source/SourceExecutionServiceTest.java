@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.ExecutionDeadline;
 import dev.arc.error.ArcException;
 import dev.arc.model.DataSource;
+import dev.arc.model.Definition;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.SourceDefinition;
+import dev.arc.rule.RuleSamples;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
@@ -112,6 +115,71 @@ class SourceExecutionServiceTest {
             ArcException.class, error -> assertThat(error.status()).isEqualTo(404))
         .hasMessage("Source not found");
     verify(adapter, never()).fetch(any(), any(), any());
+  }
+
+  @Test
+  void validationAndExecutionSharePinnedConfigurationsButNeverProviderValues() {
+    DataSource source = source(1, true);
+    when(repository.get("memory", 1)).thenReturn(source);
+    when(adapter.fetch("memory", source.definition(), Map.of("key", new BigDecimal("12"))))
+        .thenReturn(10, 20);
+    doCallRealMethod().when(adapter).fetch(any(), any(), any(), any());
+    var binding = new SourceBinding("memory", 1, Map.of(), "", "FAIL");
+    var blank = RuleSamples.blank("FORMULA");
+    var definition =
+        new Definition(
+            1,
+            List.of(
+                new Input("first", "NUMBER", true, null, binding),
+                new Input("second", "NUMBER", true, null, binding)),
+            blank.nodes(),
+            blank.edges());
+    var session = execution.openSession();
+    new SourceBindingValidator(repository)
+        .validate(definition, (id, version) -> null, session::definition);
+
+    assertThat(session.read(binding, Map.of(), ExecutionDeadline.start(1000))).isEqualTo(10);
+    assertThat(session.read(binding, Map.of(), ExecutionDeadline.start(1000))).isEqualTo(20);
+    verify(repository).get("memory", 1);
+    verify(adapter, times(2))
+        .fetch("memory", source.definition(), Map.of("key", new BigDecimal("12")));
+  }
+
+  @Test
+  void configurationCacheSeparatesVersionsAndDoesNotSurviveTheRequest() {
+    when(repository.get("memory", 1)).thenReturn(source(1, true));
+    when(repository.get("memory", 2)).thenReturn(source(2, false));
+    var session = execution.openSession();
+
+    assertThat(session.definition("memory", 1).parameters().getFirst().required()).isTrue();
+    assertThat(session.definition("memory", 2).parameters().getFirst().required()).isFalse();
+    session.definition("memory", 1);
+    execution.openSession().definition("memory", 1);
+
+    verify(repository, times(2)).get("memory", 1);
+    verify(repository).get("memory", 2);
+    verify(adapter, never()).fetch(any(), any(), any());
+  }
+
+  @Test
+  void cachedLookupConfigurationIsAnImmutableSnapshotIncludingNestedNulls() {
+    var values = new java.util.ArrayList<Object>();
+    values.add(null);
+    values.add(1);
+    var entries = new HashMap<String, Object>();
+    entries.put("US", values);
+    var definition = new SourceDefinition("LOOKUP", null, List.of(), entries, Map.of(), 0);
+    when(repository.get("lookup", 1)).thenReturn(new DataSource("lookup", "Lookup", 1, definition));
+
+    var snapshot = execution.openSession().definition("lookup", 1);
+    values.add(2);
+    entries.clear();
+
+    assertThat(snapshot.entries().get("US")).isEqualTo(java.util.Arrays.asList(null, 1));
+    assertThatThrownBy(() -> snapshot.entries().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> ((List<?>) snapshot.entries().get("US")).clear())
+        .isInstanceOf(UnsupportedOperationException.class);
   }
 
   private DataSource source(int version, boolean required) {

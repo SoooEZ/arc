@@ -1,9 +1,9 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { sourceApi } from "../../api/sources";
 import { errorMessage } from "../../api/errors";
-import { useAsyncResource } from "../../hooks/useAsyncResource";
-import type { DataSource, SourceConfig } from "../../types";
-import { mergeSourceLists, sourceCandidate, type SourceBuffers } from "./model";
+import { usePagedResource } from "../../hooks/usePagedResource";
+import type { DataSource, SourceConfig, SourceSummary } from "../../types";
+import { sourceCandidate, type SourceBuffers } from "./model";
 import { sourceDocumentReducer, sourceIsDirty } from "./sourceDocument";
 
 export function useSourceEditor({
@@ -13,69 +13,175 @@ export function useSourceEditor({
   onDirty: (dirty: boolean) => void;
   notify: (message: string) => void;
 }) {
-  const [sources, setSources] = useState<DataSource[]>([]);
+  const [search, setSearch] = useState("");
+  const [catalogRevision, setCatalogRevision] = useState(0);
+  const catalog = usePagedResource(
+    JSON.stringify([search, catalogRevision]),
+    (offset, limit, signal) =>
+      sourceApi.catalog({ offset, limit, search }, { signal }),
+  );
+  const [overrides, setOverrides] = useState<SourceSummary[]>([]);
   const [document, dispatch] = useReducer(sourceDocumentReducer, null);
   const [listError, setListError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [versionLoading, setVersionLoading] = useState(false);
+  const [inspectedConfig, setInspectedConfig] = useState<
+    SourceConfig | undefined
+  >();
   const selection = useRef(0);
+  const loadingSourceId = useRef<string | null>(null);
+  const savedDuringSelection = useRef<DataSource | null>(null);
+  // Save acknowledgements can arrive while the selected detail request is awaiting IO.
+  const completedSelectionSave = (): DataSource | null =>
+    savedDuringSelection.current;
+  const selectionRequest = useRef<AbortController | null>(null);
+  const versionRequest = useRef<AbortController | null>(null);
   const requestSequence = useRef(0);
   const [savingIds, setSavingIds] = useState<string[]>([]);
   const mounted = useRef(true);
+  const latest = useRef(document);
+  latest.current = document;
   const dirty = document !== null && sourceIsDirty(document);
   const historical =
     document !== null && document.viewedVersion !== document.source.version;
   const saving = document !== null && savingIds.includes(document.source.id);
   const selected = document?.source;
-  const versions = useAsyncResource(
+  const versions = usePagedResource(
     JSON.stringify([selected?.id, selected?.version]),
-    (signal) => sourceApi.sourceVersions(selected!.id, { signal }),
-    [] as DataSource[],
-    0,
+    (offset, limit, signal) =>
+      sourceApi.versionSummaries(selected!.id, { offset, limit }, { signal }),
     !!selected?.version,
   );
+  const matchingOverrides = overrides.filter((item) =>
+    `${item.id} ${item.name}`.toLowerCase().includes(search.toLowerCase()),
+  );
+  const sources = catalog.data.items.map((item) => {
+    const saved = overrides.find((candidate) => candidate.id === item.id);
+    return saved && saved.version > item.version ? saved : item;
+  });
+  if (catalog.offset === 0) {
+    for (const item of matchingOverrides.slice().reverse())
+      if (!sources.some((row) => row.id === item.id)) sources.unshift(item);
+  }
+  const boundedSources = sources.slice(0, catalog.limit);
+
+  useEffect(() => {
+    if (catalog.loading || catalog.error) return;
+    setOverrides((current) => {
+      const remaining = current.filter(
+        (saved) =>
+          !catalog.data.items.some(
+            (item) => item.id === saved.id && item.version >= saved.version,
+          ),
+      );
+      return remaining.length === current.length ? current : remaining;
+    });
+  }, [catalog.data, catalog.loading, catalog.error]);
 
   useEffect(() => {
     mounted.current = true;
-    const controller = new AbortController();
-    sourceApi
-      .sources({ signal: controller.signal })
-      .then((rows) => {
-        if (controller.signal.aborted) return;
-        setSources((current) => mergeSourceLists(current, rows));
-        // A new source can be started before the initial list arrives.
-        if (selection.current === 0 && rows.length) {
-          dispatch({
-            type: "select",
-            source: rows[0],
-            selection: ++selection.current,
-          });
-        }
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) setListError(errorMessage(error));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
     return () => {
       mounted.current = false;
-      controller.abort();
+      selectionRequest.current?.abort();
+      versionRequest.current?.abort();
     };
   }, []);
   useEffect(() => {
     onDirty(dirty);
   }, [dirty, onDirty]);
 
-  const select = (source: DataSource) => {
+  const select = async (source: SourceSummary | DataSource) => {
     if (dirty && !window.confirm("Discard unsaved source changes?")) return;
-    dispatch({ type: "select", source, selection: ++selection.current });
+    const currentSelection = ++selection.current;
+    selectionRequest.current?.abort();
+    versionRequest.current?.abort();
+    setVersionLoading(false);
+    setListError("");
+    setInspectedConfig(undefined);
+    loadingSourceId.current = null;
+    savedDuringSelection.current = null;
+    if ("definition" in source) {
+      setDetailLoading(false);
+      dispatch({ type: "select", source, selection: currentSelection });
+      return;
+    }
+    dispatch({ type: "close" });
+    setDetailLoading(true);
+    loadingSourceId.current = source.id;
+    const controller = new AbortController();
+    selectionRequest.current = controller;
+    try {
+      const loaded = await sourceApi.source(source.id, source.version, {
+        signal: controller.signal,
+      });
+      if (
+        !controller.signal.aborted &&
+        currentSelection === selection.current
+      ) {
+        const saved = completedSelectionSave();
+        dispatch({
+          type: "select",
+          source:
+            saved?.id === source.id && saved.version > loaded.version
+              ? saved
+              : loaded,
+          selection: currentSelection,
+        });
+      }
+    } catch (failure) {
+      if (!controller.signal.aborted) setListError(errorMessage(failure));
+    } finally {
+      if (!controller.signal.aborted) {
+        setDetailLoading(false);
+        loadingSourceId.current = null;
+        savedDuringSelection.current = null;
+      }
+    }
   };
-  const inspectVersion = (version: number) => {
-    const source = versions.data.find(
-      (candidate) => candidate.version === version,
-    );
-    if (source)
-      dispatch({ type: "version", version, configuration: source.definition });
+  useEffect(() => {
+    if (selection.current === 0 && catalog.data.items.length)
+      void select(catalog.data.items[0]);
+    // Initial selection is one-time; page/search changes must not replace the open document.
+  }, [catalog.data]);
+
+  const inspectVersion = async (version: number) => {
+    if (!document) return;
+    versionRequest.current?.abort();
+    const controller = new AbortController();
+    versionRequest.current = controller;
+    const currentSelection = document.selection;
+    dispatch({
+      type: "version",
+      version,
+      configuration: document.source.definition,
+    });
+    setInspectedConfig(undefined);
+    setListError("");
+    if (version === document.source.version) {
+      setVersionLoading(false);
+      return;
+    }
+    setVersionLoading(true);
+    try {
+      const loaded = await sourceApi.source(document.source.id, version, {
+        signal: controller.signal,
+      });
+      if (
+        !controller.signal.aborted &&
+        latest.current?.selection === currentSelection
+      ) {
+        setInspectedConfig(loaded.definition);
+        dispatch({
+          type: "version",
+          version,
+          configuration: loaded.definition,
+        });
+      }
+    } catch (failure) {
+      if (!controller.signal.aborted) setListError(errorMessage(failure));
+    } finally {
+      if (!controller.signal.aborted) setVersionLoading(false);
+    }
   };
   const save = async () => {
     if (!document || historical || saving) return;
@@ -94,7 +200,21 @@ export function useSourceEditor({
           );
       if (!mounted.current) return;
       // Refresh the library even when another source is being edited.
-      setSources((rows) => mergeSourceLists([saved], rows));
+      if (loadingSourceId.current === saved.id)
+        savedDuringSelection.current = saved;
+      const summary = {
+        id: saved.id,
+        name: saved.name,
+        version: saved.version,
+        kind: saved.definition.kind,
+      };
+      setOverrides((rows) =>
+        [summary, ...rows.filter((item) => item.id !== saved.id)].slice(
+          0,
+          catalog.limit,
+        ),
+      );
+      setCatalogRevision((value) => value + 1);
       dispatch({
         type: "save/success",
         request,
@@ -121,6 +241,8 @@ export function useSourceEditor({
     if (
       !document ||
       !document.source.version ||
+      versionLoading ||
+      (historical && !inspectedConfig) ||
       dirty ||
       saving ||
       document.testing !== null
@@ -149,20 +271,25 @@ export function useSourceEditor({
     }
   };
   const displayConfig = historical
-    ? versions.data.find((source) => source.version === document?.viewedVersion)
-        ?.definition
+    ? inspectedConfig
     : document?.source.definition;
 
   return {
-    sources,
+    sources: boundedSources,
+    catalog,
+    search,
+    setSearch,
+    detailLoading,
+    versionLoading,
     document,
-    loading,
+    loading: catalog.loading,
     dirty,
     historical,
     saving,
-    versions: versions.data,
+    versions: versions.data.items,
+    versionsPage: versions,
     versionsLoading: versions.loading,
-    error: document?.error || listError,
+    error: document?.error || listError || catalog.error,
     versionsError: versions.error,
     displayConfig,
     select,

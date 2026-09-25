@@ -1,4 +1,10 @@
-import type { Build, Definition, Execution, FunctionEntry } from "../types";
+import type {
+  Build,
+  Definition,
+  Execution,
+  ExecutionOptions,
+  FunctionEntry,
+} from "../types";
 import type { GraphProblem } from "./errors";
 import { http, type RequestOptions } from "./http";
 export const studioApi = {
@@ -17,8 +23,18 @@ export const studioApi = {
   preview: (
     definition: Definition,
     inputs: Record<string, unknown>,
-    options?: RequestOptions,
-  ) => http.post<Execution>("/preview", { definition, inputs }, options),
+    options?: RequestOptions & ExecutionOptions,
+  ) =>
+    http.post<Execution>(
+      "/preview",
+      {
+        definition,
+        inputs,
+        trace: options?.trace,
+        timeoutMs: options?.timeoutMs,
+      },
+      options,
+    ),
   functions: (options?: RequestOptions) =>
     http.get<FunctionEntry[]>("/functions", options),
   render: (definition: Definition, options?: RequestOptions) =>

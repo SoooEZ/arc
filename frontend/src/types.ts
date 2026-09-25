@@ -61,6 +61,33 @@ export interface Rule {
   createdAt: string;
   updatedAt: string;
 }
+export interface Page<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+export interface RuleSummary extends Omit<Rule, "draft"> {
+  nodeCount: number;
+  inputCount: number;
+  referenceCount: number;
+}
+export interface VersionSummary {
+  ruleId: string;
+  version: number;
+  publishedAt: string;
+}
+export interface SourceSummary {
+  id: string;
+  name: string;
+  version: number;
+  kind: SourceConfig["kind"];
+}
+export interface SourceVersionSummary {
+  id: string;
+  version: number;
+  createdAt: string;
+}
 export interface Version {
   ruleId: string;
   version: number;
@@ -83,6 +110,15 @@ export interface Execution {
   result: unknown;
   trace: Step[];
   durationMicros: number;
+  traceEnabled?: boolean;
+  traceTruncated?: boolean;
+  executedSteps?: number;
+  traceBytes?: number;
+  timing?: {
+    preparationMicros: number;
+    executionMicros: number;
+    totalMicros: number;
+  };
   sources?: {
     input: string;
     sourceId: string;
@@ -90,6 +126,10 @@ export interface Execution {
     status: string;
     durationMicros: number;
   }[];
+}
+export interface ExecutionOptions {
+  trace?: boolean;
+  timeoutMs?: number;
 }
 export const kindLabel: Record<Kind, string> = {
   DECISION_TREE: "Decision tree",

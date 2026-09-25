@@ -56,6 +56,13 @@ test("library, graph preview, reference navigation, and published API execution"
   await page
     .getByRole("button", { name: "API playground", exact: true })
     .click();
+  await page
+    .getByLabel("Find published rules", { exact: true })
+    .fill("order-pricing");
+  await page.getByRole("combobox", { name: "Rule", exact: true }).click();
+  await page
+    .getByRole("option", { name: "Order pricing", exact: true })
+    .click();
   await page.getByRole("button", { name: "Execute rule", exact: true }).click();
   await expect(page.getByTestId("api-response")).toContainText('"result": 120');
   expect(errors).toEqual([]);
@@ -112,6 +119,9 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
   await page.getByRole("button", { name: "Edit draft", exact: true }).click();
   await page.getByRole("button", { name: "Add node", exact: true }).click();
   await page.getByRole("menuitem", { name: "Reuse rule", exact: true }).click();
+  await page
+    .getByLabel("Find published rule", { exact: true })
+    .fill("Apply discount");
   await page.getByLabel("Published rule", { exact: true }).click();
   await page
     .getByRole("option", { name: "Apply discount", exact: true })
@@ -182,6 +192,13 @@ test("mobile library and API reference stay within the viewport", async ({
   await expect(
     page.getByRole("heading", { name: "Rule library" }),
   ).toBeVisible();
+  await expect(page.getByLabel("Find sidebar rule")).toBeHidden();
+  await expect(
+    page.getByRole("navigation", {
+      name: "Sidebar rules pages",
+      includeHidden: true,
+    }),
+  ).toBeHidden();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

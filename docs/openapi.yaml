@@ -7,6 +7,92 @@ servers:
   - url: http://localhost:8080/api
   - url: http://localhost:3080/api
 paths:
+  /rule-summaries:
+    parameters:
+      - {$ref: '#/components/parameters/Offset'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {name: search, in: query, schema: {type: string, maxLength: 200}}
+      - {name: kind, in: query, schema: {type: string, enum: [DECISION_TREE, FORMULA, RULE]}}
+      - {name: publishedOnly, in: query, schema: {type: boolean, default: false}}
+    get:
+      operationId: listRuleSummaries
+      responses:
+        '200':
+          description: Bounded page of metadata without graph or source definitions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/PageMetadata'}
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/RuleSummary'}
+        default: {$ref: '#/components/responses/Error'}
+  /source-summaries:
+    parameters:
+      - {$ref: '#/components/parameters/Offset'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {name: search, in: query, schema: {type: string, maxLength: 200}}
+    get:
+      operationId: listSourceSummaries
+      responses:
+        '200':
+          description: Bounded page of metadata without graph or source definitions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/PageMetadata'}
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/SourceSummary'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/version-summaries:
+    parameters:
+      - {$ref: '#/components/parameters/RuleId'}
+      - {$ref: '#/components/parameters/Offset'}
+      - {$ref: '#/components/parameters/Limit'}
+    get:
+      operationId: listRuleVersionSummaries
+      responses:
+        '200':
+          description: Bounded page of metadata without graph or source definitions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/PageMetadata'}
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/VersionSummary'}
+        default: {$ref: '#/components/responses/Error'}
+  /sources/{id}/version-summaries:
+    parameters:
+      - {$ref: '#/components/parameters/RuleId'}
+      - {$ref: '#/components/parameters/Offset'}
+      - {$ref: '#/components/parameters/Limit'}
+    get:
+      operationId: listSourceVersionSummaries
+      responses:
+        '200':
+          description: Bounded page of metadata without graph or source definitions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/PageMetadata'}
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/SourceVersionSummary'}
+        default: {$ref: '#/components/responses/Error'}
   /rules:
     get:
       operationId: listRules
@@ -106,6 +192,8 @@ paths:
               properties:
                 inputs: {type: object, additionalProperties: true}
                 version: {type: integer, minimum: 1, description: Omit for latest published version}
+                trace: {type: boolean, nullable: true, default: true, description: Include a bounded execution trace; null uses the default}
+                timeoutMs: {type: integer, nullable: true, minimum: 100, maximum: 30000, default: 30000, description: Shared execution deadline in milliseconds; null uses the default}
             example:
               inputs: {orderTotal: 150, customerTier: premium}
               version: 1
@@ -189,6 +277,8 @@ paths:
               type: object
               required: [definition, inputs]
               properties:
+                trace: {type: boolean, nullable: true, default: true, description: Include a bounded execution trace; null uses the default}
+                timeoutMs: {type: integer, nullable: true, minimum: 100, maximum: 30000, default: 30000, description: Shared execution deadline in milliseconds; null uses the default}
                 definition: {$ref: '#/components/schemas/Definition'}
                 inputs: {type: object, additionalProperties: true}
       responses:
@@ -367,6 +457,14 @@ paths:
               schema: {type: object, properties: {result: {nullable: true}}}
 components:
   parameters:
+    Offset:
+      name: offset
+      in: query
+      schema: {type: integer, minimum: 0, default: 0}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 20}
     RuleId:
       name: id
       in: path
@@ -374,7 +472,7 @@ components:
       schema: {type: string}
   responses:
     Error:
-      description: 400 malformed request; 404 missing resource; 409 revision conflict, duplicate ID, or unpublished rule; 413 oversized request; 422 invalid graph/input/calculation; 500 server error
+      description: 400 malformed request; 404 missing resource; 409 revision conflict, duplicate ID, or unpublished rule; 413 oversized request; 422 invalid graph/input/calculation; 500 server error; 504 execution deadline exceeded
       content:
         application/json:
           schema:
@@ -393,7 +491,7 @@ components:
                     nodeId: {type: string}
                     label: {type: string}
     Execution:
-      description: Output value or output object and complete execution trace
+      description: Complete result, optional bounded trace, and preparation/execution timing
       content:
         application/json:
           schema:
@@ -402,7 +500,17 @@ components:
               ruleId: {type: string}
               version: {type: integer, nullable: true}
               result: {nullable: true, description: A single reached Output value or an object keyed by node ID when multiple Outputs are reached}
-              durationMicros: {type: integer, format: int64}
+              durationMicros: {type: integer, format: int64, description: Engine duration excluding preparation and response serialization}
+              traceEnabled: {type: boolean}
+              traceTruncated: {type: boolean, description: True when the 256 KiB trace budget stopped recording complete steps}
+              executedSteps: {type: integer, minimum: 0, maximum: 1000}
+              traceBytes: {type: integer, minimum: 2, maximum: 262144, description: UTF-8 JSON bytes of the retained trace array}
+              timing:
+                type: object
+                properties:
+                  preparationMicros: {type: integer, format: int64}
+                  executionMicros: {type: integer, format: int64}
+                  totalMicros: {type: integer, format: int64, description: Server preparation and execution, excluding HTTP serialization and transfer}
               sources:
                 type: array
                 items:
@@ -427,6 +535,46 @@ components:
                     branch: {type: string, nullable: true, enum: [next, 'true', 'false', null]}
                     depth: {type: integer}
   schemas:
+    PageMetadata:
+      type: object
+      required: [items, total, offset, limit]
+      properties:
+        total: {type: integer, format: int64, minimum: 0}
+        offset: {type: integer, minimum: 0}
+        limit: {type: integer, minimum: 1, maximum: 100}
+    RuleSummary:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        description: {type: string}
+        kind: {type: string, enum: [DECISION_TREE, FORMULA, RULE]}
+        revision: {type: integer}
+        publishedVersion: {type: integer, nullable: true}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        nodeCount: {type: integer}
+        inputCount: {type: integer}
+        referenceCount: {type: integer}
+    VersionSummary:
+      type: object
+      properties:
+        ruleId: {type: string}
+        version: {type: integer}
+        publishedAt: {type: string, format: date-time}
+    SourceSummary:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        version: {type: integer}
+        kind: {type: string, enum: [HTTP, LOOKUP]}
+    SourceVersionSummary:
+      type: object
+      properties:
+        id: {type: string}
+        version: {type: integer}
+        createdAt: {type: string, format: date-time}
     Rule:
       type: object
       properties:

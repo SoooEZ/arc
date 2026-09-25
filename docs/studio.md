@@ -157,3 +157,11 @@ Use the `</>` button on a canvas node, or **Node expression** in its inspector, 
 An edge is a connection: `next -> "output";` sends execution to that node; `true ->` and `false ->` select a condition branch; `case:premium ->` and `default ->` select Switch exits. The optional `edge "connection-id"` suffix preserves the connection’s identity during code/graph round trips; it is not a calculation. Several statements can connect one exit to multiple targets.
 
 The function library groups entries by purpose (math, text, logic, statistics, dates, finance and others). Expand a group, or search to reveal matching functions. Referenced rules open their pinned versions in a single modal with **Back** and **Close all**.
+
+## Catalog and execution controls
+
+The library, rule/source selectors and version histories use bounded summary pages with search or Previous/Next controls. Opening a selected item fetches its full definition; published versions remain read-only, and changing selection cancels obsolete detail reads. See [the paginated API contracts](api.md#create-and-edit).
+
+Preview and the published API playground offer **Include execution trace** and **Execution timeout**. These choices are included in the generated cURL request. Trace defaults on and is capped at 256 KiB; a warning identifies partial traces and graph highlights, while the computed result stays complete. Turning trace off returns no intermediate steps and preserves all execution limits. Changing options invalidates any pending result.
+
+Results display browser request time and server preparation/execution times separately. The server timeout defaults to 30 seconds and is shared across nested rules and source reads; deadline exhaustion returns `504`, including when a source has a default fallback. A shorter per-source timeout still follows that source's configured failure policy.

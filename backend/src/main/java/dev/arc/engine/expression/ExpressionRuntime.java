@@ -2,6 +2,7 @@ package dev.arc.engine.expression;
 
 import static dev.arc.engine.expression.Expressions.*;
 
+import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.expression.Expressions.Expr;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
@@ -15,12 +16,14 @@ final class ExpressionRuntime {
   static final class Context {
     private final Map<String, Object> variables;
     private final Budget budget;
+    private final ExecutionDeadline deadline;
 
-    Context(Map<String, Object> variables) {
-      this(variables, new Budget());
+    Context(Map<String, Object> variables, ExecutionDeadline deadline) {
+      this(variables, new Budget(), deadline);
     }
 
-    private Context(Map<String, Object> variables, Budget budget) {
+    private Context(Map<String, Object> variables, Budget budget, ExecutionDeadline deadline) {
+      this.deadline = deadline;
       this.variables = variables;
       this.budget = budget;
     }
@@ -34,10 +37,11 @@ final class ExpressionRuntime {
       var local = new HashMap<>(variables);
       local.put(itemName, item);
       if (accumulatorName != null) local.put(accumulatorName, total);
-      return new Context(local, budget);
+      return new Context(local, budget, deadline);
     }
 
     void tick() {
+      deadline.check();
       if (++budget.operations > 10_000)
         throw ArcException.invalid("Expression exceeds 10,000 operations");
     }
@@ -116,6 +120,7 @@ final class ExpressionRuntime {
         args.getFirst().eval(context);
         return false;
       } catch (ArcException e) {
+        deadlineCheck(context, e);
         boolean na = e.getMessage().contains("#N/A");
         return name.equals("ISERROR") || name.equals("ISNA") && na || name.equals("ISERR") && !na;
       }
@@ -124,6 +129,7 @@ final class ExpressionRuntime {
       try {
         return args.get(0).eval(context);
       } catch (ArcException e) {
+        deadlineCheck(context, e);
         return args.get(1).eval(context);
       }
     }
@@ -137,6 +143,11 @@ final class ExpressionRuntime {
       throw ArcException.invalid("SWITCH has no matching case or default");
     }
     return bounded(Functions.call(name, args.stream().map(a -> a.eval(context)).toList()));
+  }
+
+  private static void deadlineCheck(Context context, ArcException error) {
+    context.deadline.check();
+    if (error.status() == 504) throw error;
   }
 
   static Object collection(

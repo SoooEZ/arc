@@ -19,16 +19,49 @@ function source(id: string, name: string): DataSource {
 const first = source("source-a", "Source A");
 const second = source("source-b", "Source B");
 
+const summaries = (rows: DataSource[]) => ({
+  items: rows.map(({ id, name, version, definition }) => ({
+    id,
+    name,
+    version,
+    kind: definition.kind,
+  })),
+  total: rows.length,
+  offset: 0,
+  limit: 20,
+});
 async function mockWorkspace(page: Page) {
-  await page.route("**/api/rules", (route) => route.fulfill({ json: [] }));
-  await page.route("**/api/sources", (route) =>
-    route.fulfill({ json: [first, second] }),
+  await page.route("**/api/rule-summaries?*", (route) =>
+    route.fulfill({ json: { items: [], total: 0, offset: 0, limit: 20 } }),
   );
-  await page.route("**/api/sources/*/versions", (route) => {
+  await page.route("**/api/source-summaries?*", (route) =>
+    route.fulfill({ json: summaries([first, second]) }),
+  );
+  await page.route("**/api/sources/*/version-summaries?*", (route) => {
     const selected = route.request().url().includes("source-a")
       ? first
       : second;
-    return route.fulfill({ json: [selected, { ...selected, version: 1 }] });
+    return route.fulfill({
+      json: {
+        items: [selected, { ...selected, version: 1 }].map(
+          ({ id, version }) => ({
+            id,
+            version,
+            createdAt: "2026-09-24T00:00:00Z",
+          }),
+        ),
+        total: 2,
+        offset: 0,
+        limit: 20,
+      },
+    });
+  });
+  await page.route("**/api/sources/*/versions/*", (route) => {
+    const url = new URL(route.request().url());
+    const selected = url.pathname.includes("source-a") ? first : second;
+    return route.fulfill({
+      json: { ...selected, version: Number(url.pathname.split("/").at(-1)) },
+    });
   });
 }
 
@@ -68,7 +101,7 @@ test("saving A preserves the selection and edits of B when A completes", async (
     await page.getByRole("button", { name: "Save new version" }).click();
     await expect.poll(() => held).toBe(true);
     await page
-      .locator(".source-list button")
+      .locator(".source-list > button")
       .filter({ hasText: "Source B" })
       .click();
     await page.getByLabel("Name", { exact: true }).fill("Unsaved B");
@@ -76,7 +109,7 @@ test("saving A preserves the selection and edits of B when A completes", async (
     gate.release();
     await expect.poll(() => delivered).toBe(true);
     await expect(
-      page.locator(".source-list button").filter({ hasText: "Saved A" }),
+      page.locator(".source-list > button").filter({ hasText: "Saved A" }),
     ).toContainText("v3");
     await expect(page.getByLabel("Source ID")).toHaveValue("source-b");
     await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
@@ -114,7 +147,7 @@ for (const change of ["source", "version", "input"] as const) {
       await expect.poll(() => held).toBe(true);
       if (change === "source")
         await page
-          .locator(".source-list button")
+          .locator(".source-list > button")
           .filter({ hasText: "Source B" })
           .click();
       if (change === "version") {
@@ -148,10 +181,10 @@ test("a delayed initial source list cannot overwrite a newly started source", as
   await mockWorkspace(page);
   const gate = deferredResponse();
   let held = false;
-  await page.route("**/api/sources", async (route) => {
+  await page.route("**/api/source-summaries?*", async (route) => {
     held = true;
     await gate.promise;
-    await route.fulfill({ json: [first, second] });
+    await route.fulfill({ json: summaries([first, second]) });
   });
   try {
     await page.goto("/#/sources");
@@ -160,7 +193,7 @@ test("a delayed initial source list cannot overwrite a newly started source", as
     await page.getByLabel("Source ID").fill("new-draft");
     await page.getByLabel("Name", { exact: true }).fill("New draft");
     gate.release();
-    await expect(page.locator(".source-list button")).toHaveCount(2);
+    await expect(page.locator(".source-list > button")).toHaveCount(2);
     await expect(page.getByLabel("Source ID")).toHaveValue("new-draft");
     await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
       "New draft",
@@ -196,11 +229,11 @@ test("a failed save finishes after leaving and reopening the same source", async
     await page.getByRole("button", { name: "Save new version" }).click();
     await expect.poll(() => held).toBe(true);
     await page
-      .locator(".source-list button")
+      .locator(".source-list > button")
       .filter({ hasText: "Source B" })
       .click();
     await page
-      .locator(".source-list button")
+      .locator(".source-list > button")
       .filter({ hasText: "Source A" })
       .click();
     await expect(page.getByLabel("Name", { exact: true })).toBeDisabled();
@@ -242,7 +275,7 @@ test("a failed source test cannot mark another selected source", async ({
     await page.getByRole("button", { name: "Fetch sample" }).click();
     await expect.poll(() => held).toBe(true);
     await page
-      .locator(".source-list button")
+      .locator(".source-list > button")
       .filter({ hasText: "Source B" })
       .click();
     gate.release();
@@ -270,21 +303,27 @@ test("an old source list retains a source created while that list was loading", 
   await mockWorkspace(page);
   const gate = deferredResponse();
   let held = false;
-  await page.route("**/api/sources", async (route) => {
-    if (route.request().method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        json: { ...route.request().postDataJSON(), version: 1 },
-      });
-      return;
-    }
+  await page.route("**/api/sources", (route) =>
+    route.fulfill({
+      status: 201,
+      json: { ...route.request().postDataJSON(), version: 1 },
+    }),
+  );
+  await page.route("**/api/source-summaries?*", async (route) => {
     held = true;
     await gate.promise;
-    await route.fulfill({ json: [first, second] });
+    await route.fulfill({ json: summaries([first, second]) });
   });
-  await page.route("**/api/sources/created/versions", (route) =>
+  await page.route("**/api/sources/created/version-summaries?*", (route) =>
     route.fulfill({
-      json: [{ ...source("created", "Created during load"), version: 1 }],
+      json: {
+        items: [
+          { id: "created", version: 1, createdAt: "2026-09-24T00:00:00Z" },
+        ],
+        total: 1,
+        offset: 0,
+        limit: 20,
+      },
     }),
   );
   try {
@@ -294,16 +333,149 @@ test("an old source list retains a source created while that list was loading", 
     await page.getByLabel("Source ID").fill("created");
     await page.getByLabel("Name", { exact: true }).fill("Created during load");
     await page.getByRole("button", { name: "Create source" }).click();
-    await expect(page.locator(".source-list button")).toHaveCount(1);
+    await expect(page.locator(".source-list > button")).toHaveCount(1);
     gate.release();
-    await expect(page.locator(".source-list button")).toHaveCount(3);
+    await expect(page.locator(".source-list > button")).toHaveCount(3);
     await expect(
       page
-        .locator(".source-list button")
+        .locator(".source-list > button")
         .filter({ hasText: "Created during load" }),
     ).toBeVisible();
     await expect(page.getByLabel("Source ID")).toHaveValue("created");
   } finally {
     gate.release();
   }
+});
+
+test("a late selected source detail cannot replace another source's edits", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  const gate = deferredResponse();
+  let held = false;
+  await page.route("**/api/sources/source-a/versions/2", async (route) => {
+    held = true;
+    await gate.promise;
+    await route.fulfill({ json: first });
+  });
+  try {
+    await page.goto("/#/sources");
+    await expect.poll(() => held).toBe(true);
+    await page
+      .locator(".source-list > button")
+      .filter({ hasText: "Source B" })
+      .click();
+    await page.getByLabel("Name", { exact: true }).fill("Newer B edit");
+    gate.release();
+    await expect(page.getByLabel("Source ID")).toHaveValue("source-b");
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
+      "Newer B edit",
+    );
+  } finally {
+    gate.release();
+  }
+});
+
+test("source catalog pages keep the open editor and fetch only a chosen configuration", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  const rows = Array.from({ length: 25 }, (_, index) =>
+    source(`table-${index}`, `Table ${index}`),
+  );
+  await page.route("**/api/source-summaries?*", (route) => {
+    const url = new URL(route.request().url());
+    const offset = Number(url.searchParams.get("offset") || 0);
+    const search = url.searchParams.get("search") || "";
+    const matching = rows.filter((row) => row.name.includes(search));
+    return route.fulfill({
+      json: {
+        ...summaries(matching.slice(offset, offset + 20)),
+        total: matching.length,
+        offset,
+      },
+    });
+  });
+  await page.route("**/api/sources/table-*/versions/*", (route) => {
+    const id = new URL(route.request().url()).pathname.split("/")[3];
+    return route.fulfill({ json: rows.find((row) => row.id === id) });
+  });
+  const details: string[] = [];
+  page.on("request", (request) => {
+    if (/\/api\/sources\/table-\d+\/versions\/\d+$/.test(request.url()))
+      details.push(request.url());
+  });
+  await page.goto("/#/sources");
+  await expect(page.locator(".source-list > button")).toHaveCount(20);
+  await expect(page.getByLabel("Source ID")).toHaveValue("table-0");
+  expect(details).toHaveLength(1);
+  await page
+    .getByRole("navigation", { name: "Data sources pages" })
+    .getByRole("button", { name: "Next" })
+    .click();
+  await expect(page.locator(".source-list > button")).toHaveCount(5);
+  await expect(page.getByLabel("Source ID")).toHaveValue("table-0");
+  expect(details).toHaveLength(1);
+  await page
+    .locator(".source-list > button")
+    .filter({ hasText: "Table 24" })
+    .click();
+  await expect(page.getByLabel("Source ID")).toHaveValue("table-24");
+  expect(details).toHaveLength(2);
+  await page.getByLabel("Search data sources").fill("Table 3");
+  await expect(page.locator(".source-list > button")).toHaveCount(1);
+  await expect(page.getByLabel("Source ID")).toHaveValue("table-24");
+  expect(details).toHaveLength(2);
+});
+
+test("source history pages load only the inspected version definition", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  const current = { ...first, version: 45 };
+  await page.route("**/api/source-summaries?*", (route) =>
+    route.fulfill({ json: summaries([current]) }),
+  );
+  await page.route("**/api/sources/source-a/version-summaries?*", (route) => {
+    const offset = Number(
+      new URL(route.request().url()).searchParams.get("offset") || 0,
+    );
+    return route.fulfill({
+      json: {
+        items: Array.from({ length: 45 }, (_, index) => ({
+          id: current.id,
+          version: 45 - index,
+          createdAt: "2026-09-24T00:00:00Z",
+        })).slice(offset, offset + 20),
+        total: 45,
+        offset,
+        limit: 20,
+      },
+    });
+  });
+  const details: number[] = [];
+  await page.route("**/api/sources/source-a/versions/*", (route) => {
+    const version = Number(
+      new URL(route.request().url()).pathname.split("/").at(-1),
+    );
+    details.push(version);
+    return route.fulfill({
+      json: {
+        ...current,
+        version,
+        definition: { ...current.definition, entries: { US: version } },
+      },
+    });
+  });
+  await page.goto("/#/sources");
+  await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
+  expect(details).toEqual([45]);
+  await page
+    .getByRole("navigation", { name: "Source history pages" })
+    .getByRole("button", { name: "Next" })
+    .click();
+  await page.getByRole("combobox", { name: "Inspect version" }).click();
+  await page.getByRole("option", { name: "v25 · immutable" }).click();
+  await expect(page.locator(".source-json")).toContainText('"US": 25');
+  expect(details).toEqual([45, 25]);
 });

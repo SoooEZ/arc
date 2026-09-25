@@ -1,8 +1,7 @@
 package dev.arc.persistence;
 
 import dev.arc.error.ArcException;
-import dev.arc.model.DataSource;
-import dev.arc.model.SourceDefinition;
+import dev.arc.model.*;
 import dev.arc.source.SourceRepository;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,6 +36,55 @@ public class JdbcSourceRepository implements SourceRepository {
         ORDER BY s.updated_at DESC
         """,
         mapper);
+  }
+
+  @Override
+  public CatalogPage<SourceSummary> catalog(int offset, int limit, String search) {
+    String filter = " WHERE (? = '' OR strpos(lower(s.id || ' ' || s.name), lower(?)) > 0)";
+    Long total =
+        db.queryForObject(
+            "SELECT count(*) FROM data_sources s" + filter, Long.class, search, search);
+    var items =
+        db.query(
+            """
+        SELECT s.id, s.name, s.version, v.definition->>'kind' AS kind
+        FROM data_sources s JOIN data_source_versions v ON v.source_id = s.id AND v.version = s.version
+        """
+                + filter
+                + " ORDER BY s.updated_at DESC, s.id LIMIT ? OFFSET ?",
+            (rs, index) ->
+                new SourceSummary(
+                    rs.getString("id"),
+                    rs.getString("name"),
+                    rs.getInt("version"),
+                    rs.getString("kind")),
+            search,
+            search,
+            limit,
+            offset);
+    return new CatalogPage<>(items, total, offset, limit);
+  }
+
+  @Override
+  public CatalogPage<SourceVersionSummary> versionSummaries(String id, int offset, int limit) {
+    var exists =
+        db.queryForObject("SELECT count(*) FROM data_sources WHERE id = ?", Long.class, id);
+    if (exists == 0) throw new ArcException(404, "Source not found");
+    Long total =
+        db.queryForObject(
+            "SELECT count(*) FROM data_source_versions WHERE source_id = ?", Long.class, id);
+    var items =
+        db.query(
+            "SELECT source_id, version, created_at FROM data_source_versions WHERE source_id = ? ORDER BY version DESC LIMIT ? OFFSET ?",
+            (rs, index) ->
+                new SourceVersionSummary(
+                    rs.getString("source_id"),
+                    rs.getInt("version"),
+                    rs.getTimestamp("created_at").toInstant()),
+            id,
+            limit,
+            offset);
+    return new CatalogPage<>(items, total, offset, limit);
   }
 
   @Override

@@ -10,8 +10,17 @@ import CreateRuleDialog from "./app/CreateRuleDialog";
 import { parseRoute } from "./app/routing";
 import { useWorkspaceNavigation } from "./app/useWorkspaceNavigation";
 import { useRuleLibrary } from "./app/useRuleLibrary";
+import { useAsyncResource } from "./hooks/useAsyncResource";
+import { ruleApi } from "./api/rules";
+import type { Rule } from "./types";
 export default function App() {
-  const { rules, loading, loadError, load, upsert } = useRuleLibrary();
+  const library = useRuleLibrary();
+  const { rules, loading } = library;
+  const [savedRule, setSavedRule] = useState<Rule | null>(null);
+  const upsert = (rule: Rule) => {
+    setSavedRule(rule);
+    library.upsert(rule);
+  };
   const { route, navigate, setDirty } = useWorkspaceNavigation();
   const [notice, setNotice] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -19,11 +28,24 @@ export default function App() {
   const parsed = parseRoute(route),
     selectedId = parsed.ruleId,
     requestedVersion = parsed.version;
-  const selected = rules.find((rule) => rule.id === selectedId);
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const detail = useAsyncResource(
+    `${selectedId}:${detailAttempt}`,
+    (signal) => ruleApi.get(selectedId!, { signal }),
+    null as Rule | null,
+    0,
+    !!selectedId,
+  );
+  const selected =
+    savedRule?.id === selectedId &&
+    (!detail.data || savedRule.revision >= detail.data.revision)
+      ? savedRule
+      : detail.data;
   return (
     <div className="app-shell">
       <Sidebar
         rules={rules}
+        library={library}
         route={route}
         selectedId={selectedId}
         loading={loading}
@@ -36,15 +58,17 @@ export default function App() {
           ruleName={selected?.name}
           navigate={navigate}
         />
-        {loading ? (
+        {selectedId && !selected && detail.loading ? (
           <div className="center-state">
             <CircularProgress size={28} />
-            <p>Loading your workspace…</p>
+            <p>Loading rule…</p>
           </div>
-        ) : loadError ? (
+        ) : selectedId && detail.error ? (
           <div className="center-state">
-            <Alert severity="error">Could not reach ARC: {loadError}</Alert>
-            <Button onClick={load}>Retry connection</Button>
+            <Alert severity="error">Could not load rule: {detail.error}</Alert>
+            <Button onClick={() => setDetailAttempt((value) => value + 1)}>
+              Retry rule
+            </Button>
           </div>
         ) : selected ? (
           <Editor
@@ -77,6 +101,7 @@ export default function App() {
         ) : (
           <Library
             rules={rules}
+            library={library}
             onOpen={(r) => navigate(`/rules/${r.id}`)}
             onCreate={newRule}
             onDocs={() => navigate("/docs")}

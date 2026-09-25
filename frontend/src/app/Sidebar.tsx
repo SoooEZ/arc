@@ -9,10 +9,14 @@ import {
   Terminal,
   Workflow,
 } from "lucide-react";
-import type { Rule } from "../types";
+import type { RuleSummary } from "../types";
+import { TextField } from "@mui/material";
+import CatalogPagination from "../components/CatalogPagination";
+import type { useRuleLibrary } from "./useRuleLibrary";
 import { ArcMark, KindIcon } from "../components/Icons";
 interface Props {
-  rules: Rule[];
+  rules: RuleSummary[];
+  library: ReturnType<typeof useRuleLibrary>;
   route: string;
   selectedId: string | null;
   loading: boolean;
@@ -21,6 +25,7 @@ interface Props {
 }
 export default function Sidebar({
   rules,
+  library,
   route,
   selectedId,
   loading,
@@ -53,7 +58,7 @@ export default function Sidebar({
           onClick={() => navigate("/library")}
         >
           <Layers3 size={18} />
-          Rule library<span className="nav-count">{rules.length}</span>
+          Rule library<span className="nav-count">{library.total}</span>
         </button>
         <button
           className={route === "/playground" ? "active" : ""}
@@ -73,9 +78,11 @@ export default function Sidebar({
         <button
           className={route.startsWith("/studio/") ? "active" : ""}
           onClick={() =>
-            rules.length
-              ? navigate(`/studio/${selectedId || rules[0].id}`)
-              : newRule()
+            selectedId
+              ? navigate(`/studio/${selectedId}`)
+              : rules.length
+                ? navigate(`/studio/${rules[0].id}`)
+                : newRule()
           }
         >
           <Terminal size={18} />
@@ -95,6 +102,13 @@ export default function Sidebar({
           <Plus size={16} />
         </button>
       </div>
+      <TextField
+        className="sidebar-catalog-search"
+        size="small"
+        label="Find sidebar rule"
+        value={library.search}
+        onChange={(event) => library.setSearch(event.target.value)}
+      />
       <div className="sidebar-rules">
         {rules.map((rule) => (
           <button
@@ -113,6 +127,16 @@ export default function Sidebar({
         {!loading && !rules.length && (
           <div className="sidebar-empty">Your first rule starts here.</div>
         )}
+      </div>
+      <div className="sidebar-pagination">
+        <CatalogPagination
+          label="Sidebar rules"
+          offset={library.page.offset}
+          limit={library.page.limit}
+          total={library.total}
+          loading={loading}
+          onPage={library.page.setOffset}
+        />
       </div>
       <div className="sidebar-bottom">
         <div className="build-note">
