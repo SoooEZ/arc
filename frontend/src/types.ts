@@ -21,6 +21,7 @@ export interface RuleNode {
   label: string;
   position: { x: number; y: number };
   expression?: string | null;
+  selector?: string | null;
   output?: string | null;
   ruleId?: string | null;
   version?: number | null;

@@ -6,6 +6,7 @@ import {
   LogOut,
   Network,
   ListTree,
+  Split,
   WandSparkles,
 } from "lucide-react";
 import type { Kind, NodeType } from "../types";
@@ -29,7 +30,7 @@ export function NodeIcon({
   const Icon = {
     INPUT: LogIn,
     FORMULA: Calculator,
-    CONDITION: GitBranch,
+    CONDITION: Split,
     SWITCH: ListTree,
     TRANSFORM: WandSparkles,
     REFERENCE: Braces,

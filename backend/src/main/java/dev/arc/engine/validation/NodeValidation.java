@@ -121,6 +121,8 @@ final class NodeValidation {
     var expressions = new ArrayList<NodeExpression>();
     if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(node.type()))
       expressions.add(new NodeExpression(node.expression(), node.label()));
+    if (node.type().equals("SWITCH") && node.selector() != null)
+      expressions.add(new NodeExpression(node.selector(), node.label() + " / Selector"));
     // Draft shape permits unused bindings. Syntax diagnostics retain them, while
     // executable validation uses bindings only for Reference nodes.
     if (node.bindings() != null)

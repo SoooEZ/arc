@@ -57,6 +57,12 @@ export const modules: StudioModule[] = [
       '\nnode "${1:switch}" SWITCH "${2:Choose a branch}" {\n  case "premium" "Premium" when ${3:amount >= 100};\n  case "standard" "Standard" when ${4:amount >= 50};\n  case:premium -> "${5:premium}";\n  case:standard -> "${6:standard}";\n  default -> "${7:fallback}";\n}\n',
   },
   {
+    name: "Switch values",
+    placement: "end",
+    snippet:
+      '\nnode "${1:switch}" SWITCH "${2:Match a value}" {\n  select ${3:tier};\n  case "premium" "Premium" equals ${4:"premium"};\n  case "standard" "Standard" equals ${5:"standard"};\n  case:premium -> "${6:premium}";\n  case:standard -> "${7:standard}";\n  default -> "${8:fallback}";\n}\n',
+  },
+  {
     name: "Transform data",
     placement: "end",
     snippet:

@@ -88,6 +88,7 @@ final class ExecutionPlans {
     long weight = 1024L + definition.nodes().size() * 2048L + definition.edges().size() * 128L;
     for (Node node : definition.nodes()) {
       weight += text(node.expression()) * 32 + text(node.label()) + text(node.id());
+      weight += text(node.selector()) * 32;
       if (node.bindings() != null)
         for (var entry : node.bindings().entrySet())
           weight += text(entry.getKey()) + text(entry.getValue()) * 32;
@@ -171,7 +172,8 @@ final class ExecutionPlans {
               node.version(),
               copy(node.bindings()),
               list(node.cases()),
-              list(node.fields())));
+              list(node.fields()),
+              node.selector()));
     }
     return new Definition(
         definition.schemaVersion(),

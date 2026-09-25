@@ -247,3 +247,36 @@
   font-size: 9px;
   color: #96aa81;
 }
+.node-edit-dialog .MuiDialog-paper {
+  height: min(820px, calc(100% - 64px));
+}
+.node-edit-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.node-edit-description {
+  margin: 0 0 16px;
+  color: #647a56;
+  font-size: 13px;
+}
+.inspector.inspector-dialog {
+  width: 100%;
+  flex: 1;
+  border: 1px solid #e2e8de;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.inspector-dialog .inspector-section {
+  padding: 24px;
+}
+.inspector-dialog .inspector-section .MuiInputBase-root,
+.inspector-dialog .inspector-section .MuiInputLabel-root {
+  font-size: 13px;
+}
+.inspector-dialog .inspector-section h4,
+.inspector-dialog .inspector-node-title > div > span,
+.inspector-dialog .inspector-section .MuiFormHelperText-root,
+.inspector-dialog .input-schema-card .MuiFormControlLabel-label {
+  font-size: 11px;
+}

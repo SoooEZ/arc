@@ -45,11 +45,12 @@ interface Props {
   node: RuleNode;
   rules: RuleSummary[];
   readOnly: boolean;
+  presentation?: "sidebar" | "dialog";
   onNodeChange: (id: string, patch: Partial<RuleNode>) => void;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
   onDefinitionChange: (fn: (d: Definition) => Definition) => void;
   onInvalidJson: (key: string, invalid: boolean) => void;
-  onExpression: (id: string) => void;
+  onExpression?: (id: string) => void;
   onOpenReference: (target: ReferenceTarget) => void;
   errors: string[];
 }
@@ -58,6 +59,7 @@ export default function Inspector({
   node,
   rules,
   readOnly,
+  presentation = "sidebar",
   onNodeChange,
   onDelete,
   onDefinitionChange,
@@ -92,17 +94,21 @@ export default function Inspector({
     onOpenReference,
   };
   return (
-    <aside className="inspector">
-      <div className="inspector-heading">
-        <span>Node settings</span>
-        <Button
-          size="small"
-          startIcon={<Code2 size={13} />}
-          onClick={() => onExpression(node.id)}
-        >
-          Node expression
-        </Button>
-      </div>
+    <aside className={`inspector inspector-${presentation}`}>
+      {presentation === "sidebar" && (
+        <div className="inspector-heading">
+          <span>Node settings</span>
+          {onExpression && (
+            <Button
+              size="small"
+              startIcon={<Code2 size={13} />}
+              onClick={() => onExpression(node.id)}
+            >
+              Node expression
+            </Button>
+          )}
+        </div>
+      )}
       <div className="inspector-scroll" ref={scroll}>
         {errors.map((error, i) => (
           <Alert key={i} severity="error">
@@ -128,7 +134,7 @@ export default function Inspector({
         </div>
         <Fields key={node.id} {...fieldProps} />
         {node.type !== "INPUT" && <ResultFields {...fieldProps} />}
-        {!readOnly && node.type !== "INPUT" && (
+        {!readOnly && onDelete && node.type !== "INPUT" && (
           <div className="inspector-section">
             <Button
               size="small"
@@ -141,12 +147,14 @@ export default function Inspector({
           </div>
         )}
       </div>
-      <div className="inspector-footer">
-        <Info size={13} />
-        {readOnly
-          ? "Published versions are read-only"
-          : "Changes are saved when you save the draft"}
-      </div>
+      {presentation === "sidebar" && (
+        <div className="inspector-footer">
+          <Info size={13} />
+          {readOnly
+            ? "Published versions are read-only"
+            : "Changes are saved when you save the draft"}
+        </div>
+      )}
     </aside>
   );
 }

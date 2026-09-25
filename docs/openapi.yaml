@@ -629,6 +629,16 @@ components:
                   x: {type: number}
                   y: {type: number}
               expression: {type: string, maxLength: 2000, nullable: true}
+              selector:
+                type: string
+                maxLength: 2000
+                nullable: true
+                description: >-
+                  SWITCH only. Absent or null preserves ordered boolean predicates.
+                  When present, evaluates once to a boolean, number or string and
+                  matches reached case expressions by same-type equality; numeric
+                  values 1 and 1.0 compare equal. Null, arrays and objects produce
+                  a 422 execution error with the Switch node location.
               output: {type: string, nullable: true}
               ruleId: {type: string, nullable: true}
               version: {type: integer, minimum: 1, nullable: true}
@@ -636,7 +646,13 @@ components:
                 type: array
                 nullable: true
                 maxItems: 20
-                description: SWITCH only; ordered first-match boolean cases, with stable case-sensitive IDs
+                description: >-
+                  SWITCH only; ordered first-match cases with stable case-sensitive
+                  IDs. Without selector, expressions must return booleans. With
+                  selector, each reached expression must return a boolean, number
+                  or string for same-type equality matching; null, arrays and
+                  objects produce a 422 execution error. Evaluation stops at the
+                  first match; no match activates default. Handles remain case:<id>.
                 items:
                   type: object
                   required: [id, label, expression]

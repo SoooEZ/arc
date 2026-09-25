@@ -73,7 +73,9 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
           : n.type === "REFERENCE"
             ? `${n.ruleId || "Select a rule"}${n.version ? ` · v${n.version}` : ""}`
             : n.type === "SWITCH"
-              ? `${n.cases?.length ?? 0} cases · first match + default`
+              ? n.selector != null
+                ? `Match ${n.selector} · ${n.cases?.length ?? 0} cases + default`
+                : `${n.cases?.length ?? 0} cases · first match + default`
               : n.type === "TRANSFORM" && n.fields?.length
                 ? `${n.fields.length} fields → ${n.output || "data"}`
                 : n.expression || "Add an expression"}

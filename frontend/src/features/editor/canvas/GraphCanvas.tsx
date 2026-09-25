@@ -1,5 +1,12 @@
 import { useState, type ReactNode } from "react";
-import { Alert, Button } from "@mui/material";
+import {
+  Alert,
+  Button,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+} from "@mui/material";
 import {
   Background,
   BackgroundVariant,
@@ -7,7 +14,7 @@ import {
   MiniMap,
   ReactFlow,
 } from "@xyflow/react";
-import { Code2, Trash2 } from "lucide-react";
+import { Code2, Pencil, Trash2 } from "lucide-react";
 import type { Definition, NodeType, RuleNode } from "../../../types";
 import GraphNode from "./GraphNode";
 import RoutedEdge, { RoutedConnectionLine, RoutingContext } from "./RoutedEdge";
@@ -33,6 +40,8 @@ interface Props {
   exportJson: () => void;
   action: (type: "validate") => Promise<void>;
   onAddNode: (type: NodeType) => void;
+  onEditNode: (id: string) => void;
+  onDeleteNode: (id: string) => void;
   hasTrace: boolean;
   children?: ReactNode;
 }
@@ -52,10 +61,18 @@ export default function GraphCanvas({
   exportJson,
   action,
   onAddNode,
+  onEditNode,
+  onDeleteNode,
   hasTrace,
   children,
 }: Props) {
   const [outline, setOutline] = useState(false);
+  const [nodeMenu, setNodeMenu] = useState<{
+    id: string;
+    left: number;
+    top: number;
+  } | null>(null);
+  const menuNode = definition.nodes.find((node) => node.id === nodeMenu?.id);
   const {
     nodes,
     edges,
@@ -111,11 +128,28 @@ export default function GraphCanvas({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeClick={(_, n) => {
+              setNodeMenu(null);
               setSelected(n.id);
               setSelectedEdge(null);
             }}
-            onPaneClick={() => setSelectedEdge(null)}
-            onEdgeClick={(_, e) => setSelectedEdge(e.id)}
+            onNodeContextMenu={(event, node) => {
+              event.preventDefault();
+              setNodeMenu({
+                id: node.id,
+                left: event.clientX,
+                top: event.clientY,
+              });
+            }}
+            onPaneClick={() => {
+              setNodeMenu(null);
+              setSelectedEdge(null);
+            }}
+            onPaneContextMenu={() => setNodeMenu(null)}
+            onMoveStart={() => setNodeMenu(null)}
+            onEdgeClick={(_, e) => {
+              setNodeMenu(null);
+              setSelectedEdge(e.id);
+            }}
             onConnect={connect}
             nodesDraggable={!readOnly && !busy}
             nodesConnectable={!readOnly && !busy}
@@ -151,6 +185,43 @@ export default function GraphCanvas({
             />
           </ReactFlow>
         </RoutingContext.Provider>
+        <Menu
+          open={!!nodeMenu && !!menuNode}
+          onClose={() => setNodeMenu(null)}
+          anchorReference="anchorPosition"
+          anchorPosition={
+            nodeMenu ? { left: nodeMenu.left, top: nodeMenu.top } : undefined
+          }
+          slotProps={{ list: { "aria-label": "Node actions" } }}
+        >
+          <MenuItem
+            disabled={readOnly || !!busy}
+            onClick={() => {
+              if (!menuNode || readOnly || busy) return;
+              setNodeMenu(null);
+              onEditNode(menuNode.id);
+            }}
+          >
+            <ListItemIcon>
+              <Pencil size={16} />
+            </ListItemIcon>
+            <ListItemText>Edit</ListItemText>
+          </MenuItem>
+          <MenuItem
+            disabled={readOnly || !!busy || menuNode?.type === "INPUT"}
+            onClick={() => {
+              if (!menuNode || readOnly || busy || menuNode.type === "INPUT")
+                return;
+              setNodeMenu(null);
+              onDeleteNode(menuNode.id);
+            }}
+          >
+            <ListItemIcon>
+              <Trash2 size={16} />
+            </ListItemIcon>
+            <ListItemText>Delete</ListItemText>
+          </MenuItem>
+        </Menu>
         {outline && (
           <GraphOutline
             nodes={definition.nodes}

@@ -3,6 +3,7 @@ import { literalText } from "./expressions";
 
 export type BindingMode = "variable" | "constant" | "expression" | "default";
 export type ConstantType = "NUMBER" | "STRING" | "BOOLEAN" | "ARRAY" | "NULL";
+export type BindingType = InputType | "ANY" | "SCALAR";
 
 export const constantDefaults: Record<ConstantType, string> = {
   NUMBER: "0",
@@ -26,7 +27,7 @@ export function inferConstantType(value: string): ConstantType | null {
   return null;
 }
 
-export function isBindingConstant(value: string, type: InputType | "ANY") {
+export function isBindingConstant(value: string, type: BindingType) {
   if (type === "ANY" && inferConstantType(value) !== null) return true;
   if (literalText(value.trim()) !== null) return true;
   return /^(true|false|-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)$/i.test(value);

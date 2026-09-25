@@ -70,6 +70,12 @@ final class DefinitionShape {
           "Expression exceeds 2,000 characters");
       require(node.cases() == null || node.type().equals("SWITCH"), "Cases belong to Switch nodes");
       require(
+          node.selector() == null || node.type().equals("SWITCH"),
+          "Selectors belong to Switch nodes");
+      require(
+          node.selector() == null || node.selector().length() <= 2000,
+          "Selector expression exceeds 2,000 characters");
+      require(
           node.fields() == null || node.type().equals("TRANSFORM"),
           "Fields belong to Transform nodes");
       validateCases(node);

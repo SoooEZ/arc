@@ -22,7 +22,7 @@ public record Definition(
 
   public record Position(double x, double y) {}
 
-  /** Case identity stays stable when its label, predicate or priority changes. */
+  /** Case identity stays stable when its label, expression or priority changes. */
   public record BranchCase(String id, String label, String expression) {}
 
   public record Field(String name, String expression) {}
@@ -38,7 +38,35 @@ public record Definition(
       Integer version,
       Map<String, String> bindings,
       List<BranchCase> cases,
-      List<Field> fields) {
+      List<Field> fields,
+      String selector) {
+    public Node(
+        String id,
+        String type,
+        String label,
+        Position position,
+        String expression,
+        String output,
+        String ruleId,
+        Integer version,
+        Map<String, String> bindings,
+        List<BranchCase> cases,
+        List<Field> fields) {
+      this(
+          id,
+          type,
+          label,
+          position,
+          expression,
+          output,
+          ruleId,
+          version,
+          bindings,
+          cases,
+          fields,
+          null);
+    }
+
     public Node(
         String id,
         String type,

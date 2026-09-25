@@ -18,6 +18,7 @@ import { exportDefinition } from "./exportDefinition";
 import type { EditorProps, ReferenceTarget } from "./types";
 const CodeStudio = lazy(() => import("../studio/CodeStudio"));
 const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
+const NodeEditDialog = lazy(() => import("./NodeEditDialog"));
 export default function Editor(props: EditorProps) {
   return (
     <ReactFlowProvider>
@@ -87,6 +88,7 @@ function EditorContent({
   );
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const [nodeCode, setNodeCode] = useState<string | null>(null);
+  const [nodeEdit, setNodeEdit] = useState<string | null>(null);
   const [nodeCodeProblems, setNodeCodeProblems] = useState<string[]>([]);
   const [referenceTarget, setReferenceTarget] =
     useState<ReferenceTarget | null>(null);
@@ -122,6 +124,7 @@ function EditorContent({
     definition: rule.draft,
     measurements,
     readOnly,
+    busy,
     changeDefinition,
     dispatch,
     selectNode: setSelected,
@@ -158,6 +161,16 @@ function EditorContent({
     };
     if (onOpenReference) onOpenReference(next, selected);
     else setReferenceTarget(next);
+  };
+  const openNodeEditor = (id: string) => {
+    if (readOnly || busy) return;
+    if (hasInvalidJson) {
+      setError(
+        "Fix the invalid JSON default before opening another node editor",
+      );
+      return;
+    }
+    setNodeEdit(id);
   };
   const testPanel = testOpen && (
     <TestPanel
@@ -280,6 +293,8 @@ function EditorContent({
             }
             action={action}
             onAddNode={addNode}
+            onEditNode={openNodeEditor}
+            onDeleteNode={removeNode}
             hasTrace={!!trace}
           >
             {testPanel}
@@ -291,7 +306,7 @@ function EditorContent({
               rule.draft.nodes[0]
             }
             rules={rules}
-            readOnly={readOnly || !!busy}
+            readOnly={readOnly || !!busy || !!nodeEdit}
             onNodeChange={patchNode}
             onDelete={removeNode}
             onDefinitionChange={changeDefinition}
@@ -309,6 +324,20 @@ function EditorContent({
           problems={allProblems}
           onClose={() => setReferenceTarget(null)}
         />
+      )}
+      {nodeEdit && rule.draft.nodes.some((node) => node.id === nodeEdit) && (
+        <Suspense fallback={null}>
+          <NodeEditDialog
+            key={nodeEdit}
+            rule={rule}
+            nodeId={nodeEdit}
+            rules={rules}
+            readOnly={readOnly || !!busy}
+            onApply={changeDefinition}
+            onClose={() => setNodeEdit(null)}
+            onOpenReference={openReference}
+          />
+        </Suspense>
       )}
       {nodeCode && rule.draft.nodes.some((n) => n.id === nodeCode) && (
         <Suspense fallback={null}>

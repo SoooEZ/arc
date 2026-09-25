@@ -30,7 +30,7 @@ monaco.languages.setMonarchTokensProvider("arc", {
       [/\/\/.*$/, "comment"],
       [/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/, "string"],
       [
-        /\b(schema|inputs|node|at|let|when|case|field|return|use|version|bind|as|next|edge|source|required|optional|default)\b/,
+        /\b(schema|inputs|node|at|let|when|select|case|equals|field|return|use|version|bind|as|next|edge|source|required|optional|default)\b/,
         "keyword",
       ],
       [

@@ -75,13 +75,14 @@ final class ArcScriptRenderer {
               .append(node.expression() == null ? "0" : node.expression())
               .append(";\n");
       case "SWITCH" -> {
+        if (node.selector() != null) out.append("  select ").append(node.selector()).append(";\n");
         if (node.cases() != null)
           for (BranchCase option : node.cases())
             out.append("  case ")
                 .append(write(option.id()))
                 .append(' ')
                 .append(write(option.label()))
-                .append(" when ")
+                .append(node.selector() == null ? " when " : " equals ")
                 .append(option.expression())
                 .append(";\n");
       }

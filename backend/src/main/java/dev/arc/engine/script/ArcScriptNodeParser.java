@@ -34,7 +34,7 @@ final class ArcScriptNodeParser {
               + ")?",
           Pattern.CASE_INSENSITIVE);
   private static final Pattern CASE =
-      Pattern.compile("case\\s+" + ID + "\\s+" + ID + "\\s+when\\s+(.+)", Pattern.DOTALL);
+      Pattern.compile("case\\s+" + ID + "\\s+" + ID + "\\s+(when|equals)\\s+(.+)", Pattern.DOTALL);
   private static final Pattern FIELD =
       Pattern.compile("field\\s+" + ID + "\\s*=\\s*(.+)", Pattern.DOTALL);
   private static final Pattern ASSIGNMENT =
@@ -52,6 +52,9 @@ final class ArcScriptNodeParser {
   private final List<Field> fields = new ArrayList<>();
   private final Set<String> assigned = new HashSet<>();
   private String expression;
+  private String selector;
+  private Boolean valueCases;
+  private Statement firstCase;
   private String output;
   private String ruleId;
   private Integer version;
@@ -78,6 +81,12 @@ final class ArcScriptNodeParser {
       if (edge.matches()) edges.add(parseEdge(edge, statement));
       else parseDeclaration(statement);
     }
+    if (valueCases != null && valueCases != (selector != null))
+      throw error(
+          valueCases
+              ? "Value cases require select expression;"
+              : "Use equals for cases when select is configured",
+          firstCase);
     return new Node(
         id,
         type,
@@ -89,7 +98,8 @@ final class ArcScriptNodeParser {
         version,
         type.equals("REFERENCE") ? bindings : null,
         type.equals("SWITCH") ? cases : null,
-        type.equals("TRANSFORM") && !fields.isEmpty() ? fields : null);
+        type.equals("TRANSFORM") && !fields.isEmpty() ? fields : null,
+        selector);
   }
 
   private Edge parseEdge(Matcher match, Statement statement) {
@@ -117,6 +127,9 @@ final class ArcScriptNodeParser {
       expression = checkedExpression(assignment.expression(), statement);
     } else if (text.startsWith("case ") && type.equals("SWITCH")) {
       parseCase(statement);
+    } else if (text.startsWith("select ") && type.equals("SWITCH")) {
+      unique("selector", statement);
+      selector = checkedExpression(text.substring(7).trim(), statement);
     } else if (text.startsWith("field ") && type.equals("TRANSFORM")) {
       parseField(statement);
     } else if (text.startsWith("when ") && type.equals("CONDITION")) {
@@ -139,11 +152,19 @@ final class ArcScriptNodeParser {
 
   private void parseCase(Statement statement) {
     Matcher match = CASE.matcher(statement.text());
-    if (!match.matches()) throw error("Use: case id \"Label\" when expression;", statement);
+    if (!match.matches())
+      throw error(
+          "Use: case id \"Label\" when predicate; or case id \"Label\" equals value;", statement);
     String caseId = syntax.unquote(match.group(1), statement);
     unique("case:" + caseId, statement);
-    String predicate = checkedExpression(match.group(3), statement);
-    cases.add(new BranchCase(caseId, syntax.unquote(match.group(2), statement), predicate.trim()));
+    boolean valueCase = match.group(3).equals("equals");
+    if (valueCases != null && valueCases != valueCase)
+      throw error("Cannot mix when and equals cases", statement);
+    valueCases = valueCase;
+    if (firstCase == null) firstCase = statement;
+    String caseExpression = checkedExpression(match.group(4), statement);
+    cases.add(
+        new BranchCase(caseId, syntax.unquote(match.group(2), statement), caseExpression.trim()));
   }
 
   private void parseField(Statement statement) {

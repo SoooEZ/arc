@@ -8,11 +8,72 @@ Open **Code studio** in the sidebar, or **Code editor** inside a rule. The graph
 - Outline: jump to a node declaration. Node positions and IDs survive code/graph changes.
 - Comments use `//` and are retained at the top of canonical code.
 
-Graph view uses the same functions. Select a Condition, Formula, Output, parameter mapping or Transform field and choose **Functions & editor** beside its expression. The dialog offers the grouped catalog, hover help, click-to-insert snippets, upstream-variable chips, completion and Tab indentation/placeholders. Apply changes that expression in the shared draft; Cancel preserves it. Syntax and unavailable-variable checks run as you edit; Test rule checks runtime values and types. Read-only versions allow inspection without applying edits.
+Graph view uses the same functions. Select a Condition, Switch, Formula, Output, parameter mapping or Transform field and choose **Functions & editor** beside its expression. The dialog offers the grouped catalog, hover help, click-to-insert snippets, upstream-variable chips, completion and Tab indentation/placeholders. Apply changes that expression in the shared draft; Cancel preserves it. Syntax and unavailable-variable checks run as you edit; Test rule checks runtime values and types. Read-only versions allow inspection without applying edits.
 
 Condition remains a True/False node. Use **Add node → Switch** for multiple branches or **Add node → Transform** for data shaping. Formula expressions can nest functions and process objects/arrays; they are not restricted to arithmetic. They still use ARC's bounded expression language, rather than arbitrary JavaScript or host code.
 
 ## Switch and data transformation
+
+Select a Switch and choose its **Switch mode**. Both modes check cases from top to bottom and follow only the first match. Reordering cases changes their priority while preserving connections. **Default** runs when no case matches. Every exit needs a target; an exit may also connect to several downstream nodes under the existing fan-out rules.
+
+### Conditions and ranges
+
+**Conditions · first true case** gives every case a boolean condition. For a range, put `amount < 50` first and `amount < 100` second. The second case is reached only after the first fails, so `amount >= 50` is implicit. Default covers `amount >= 100`.
+
+Paste this complete script into a rule's code editor, build, and test. The default amount `75` returns `2`; amounts below `50` return `1`, and amounts of `100` or more return `3`.
+
+```arc
+schema 1;
+inputs {
+  amount: NUMBER required default 75;
+}
+node input INPUT "Input" { next -> choose; }
+node choose SWITCH "Amount range" {
+  case below50 "Below 50" when amount < 50;
+  case below100 "50 to below 100" when amount < 100;
+  case:below50 -> output1;
+  case:below100 -> output2;
+  default -> output3;
+}
+node output1 OUTPUT "Output 1" { return 1; }
+node output2 OUTPUT "Output 2" { return 2; }
+node output3 OUTPUT "Output 3" { return 3; }
+```
+
+### Match a value
+
+**Match a value** adds **Value to match**. Select an upstream variable, a typed constant or an expression, then configure each case's value using the same controls. Boolean, number and string values are supported. Types stay distinct: `1`, `"1"` and `true` do not match each other; decimal numbers `1` and `1.0` do match. String constants are entered as ordinary text in the form; ARC Script requires quotes.
+
+In code, `select` declares the value to match and `equals` declares each case value. This complete example returns `2` for the default tier `"standard"`, `1` for `"premium"`, and `3` for any other string:
+
+```arc
+schema 1;
+inputs {
+  tier: STRING required default "standard";
+}
+node input INPUT "Input" { next -> choose; }
+node choose SWITCH "Customer tier" {
+  select tier;
+  case premium "Premium" equals "premium";
+  case standard "Standard" equals "standard";
+  case:premium -> output1;
+  case:standard -> output2;
+  default -> output3;
+}
+node output1 OUTPUT "Output 1" { return 1; }
+node output2 OUTPUT "Output 2" { return 2; }
+node output3 OUTPUT "Output 3" { return 3; }
+```
+
+The selector runs once. Cases are evaluated in order and stop at the first match, so later expressions do not run. A selector or reached case that returns null, an array or an object produces a `422` execution error at the Switch node. Without `select`, cases continue to use boolean `when` conditions. Do not mix `when` and `equals` cases in one node. `select` can appear before or after the cases without changing their meaning; the order of the cases sets priority. The **Switch cases** and **Switch values** modules insert templates for each mode.
+
+### Default return
+
+If Default is connected directly to one Output with no other incoming connection, **Default return value** edits that Output inline. If Default is unconnected, **Add default return** creates and connects an Output, then shows its return value controls. The value can be a variable, typed constant or expression.
+
+If Default already leads to another kind of node, multiple targets or a shared Output, the form shows those destinations. Edit the destination node to change its behavior; the inline control preserves existing routing and shared results. In code, Default continues to use `default -> output3;` and the destination Output's `return` expression.
+
+### Transform before branching
 
 This example cleans an incoming object, converts a decimal string, and selects the first matching pricing branch:
 
@@ -40,7 +101,7 @@ node standard OUTPUT "Standard price" { return normalized.amount * 0.9; }
 node regular OUTPUT "Regular price" { return normalized.amount; }
 ```
 
-The default inputs return `120`. Switch checks cases top to bottom; only the first true case runs, otherwise Default runs. Reordering cases changes priority but preserves their stable connections. Every exit needs a target. A selected exit may connect to several downstream nodes under the existing fan-out rules.
+The default inputs return `120` through the first matching pricing branch.
 
 In Transform, add named fields and choose upstream values, typed constants or expressions. Field names are literal keys, including names containing dots. Fields share the incoming scope, so one field cannot reference another field being created. Access the resulting object in later nodes as `normalized.amount` or `GET(normalized, "amount")`. Use **Edit as one expression** to edit an object/array expression; the field mappings stay intact until a valid expression is applied. Whole-expression mode is also available in code:
 
@@ -152,7 +213,9 @@ Source definitions contain `kind` (`LOOKUP` or `HTTP`), `parameters`, and `timeo
 
 ### Node expressions and connections
 
-Use the `</>` button on a canvas node, or **Node expression** in its inspector, to edit the whole node. A condition has a `when` expression; a formula has `let`; an output has `return`; a reused rule has `use`, `bind` and `as`. The Input node includes the rule’s parameters and source mappings. **Apply to graph** synchronizes the edit without saving or publishing. Syntax errors must be fixed before applying; other graph validation errors remain visible on the canvas while you finish the draft.
+Right-click a canvas node and choose **Edit** to open its settings in a wider form dialog. **Apply to graph** applies the form changes to the draft; **Cancel** discards them. **Delete** removes the node and its connections. The Input node cannot be deleted, and both menu actions are disabled for read-only versions.
+
+Use the `</>` button on a canvas node, or **Node expression** in its inspector, to edit the whole node as ARC Script. A condition has a `when` expression; a Switch has `case ... when` or `select` with `case ... equals`; a formula has `let`; an output has `return`; a reused rule has `use`, `bind` and `as`. The Input node includes the rule’s parameters and source mappings. **Apply to graph** synchronizes the edit without saving or publishing. Syntax errors must be fixed before applying; other graph validation errors remain visible on the canvas while you finish the draft.
 
 An edge is a connection: `next -> "output";` sends execution to that node; `true ->` and `false ->` select a condition branch; `case:premium ->` and `default ->` select Switch exits. The optional `edge "connection-id"` suffix preserves the connection’s identity during code/graph round trips; it is not a calculation. Several statements can connect one exit to multiple targets.
 

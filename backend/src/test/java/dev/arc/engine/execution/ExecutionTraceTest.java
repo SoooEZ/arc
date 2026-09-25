@@ -60,7 +60,9 @@ class ExecutionTraceTest {
 
   @Test
   void deadlineFailuresKeepTheirStatusThroughSwitchTransformAndFallbackExpressions() {
-    for (String type : List.of("SWITCH", "TRANSFORM", "FORMULA")) {
+    for (String scenario :
+        List.of("SWITCH", "SWITCH_SELECTOR", "SWITCH_VALUE", "TRANSFORM", "FORMULA")) {
+      String type = scenario.startsWith("SWITCH") ? "SWITCH" : scenario;
       var deadline = ExecutionDeadline.start(100);
       Map<String, Object> payload =
           new HashMap<>(Map.of("value", true)) {
@@ -87,8 +89,17 @@ class ExecutionTraceTest {
                     null,
                     null,
                     null,
-                    List.of(new BranchCase("active", "Active", "payload.value")),
-                    null);
+                    List.of(
+                        new BranchCase(
+                            "active",
+                            "Active",
+                            scenario.equals("SWITCH_SELECTOR") ? "true" : "payload.value")),
+                    null,
+                    switch (scenario) {
+                      case "SWITCH_SELECTOR" -> "payload.value";
+                      case "SWITCH_VALUE" -> "true";
+                      default -> null;
+                    });
             case "TRANSFORM" ->
                 new Node(
                     "action",

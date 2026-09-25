@@ -129,9 +129,10 @@ final class GraphExecution {
         yield new Outcome(value, Boolean.toString(value));
       }
       case "SWITCH" -> {
+        Object selector = node.selector() == null ? null : selector(node, scope, compiled);
         String branch = "default";
         for (BranchCase option : node.cases()) {
-          if (matches(option, scope, compiled)) {
+          if (matches(option, selector, scope, compiled)) {
             branch = "case:" + option.id();
             break;
           }
@@ -179,13 +180,32 @@ final class GraphExecution {
         depth + 1);
   }
 
-  private boolean matches(BranchCase option, Map<String, Object> scope, CompiledGraph compiled) {
+  private Object selector(Node node, Map<String, Object> scope, CompiledGraph compiled) {
     try {
-      return Expressions.bool(compiled.expression(option.expression()).evaluate(scope, deadline));
+      return switchValue(compiled.expression(node.selector()).evaluate(scope, deadline));
+    } catch (ArcException error) {
+      if (error.status() == 504) throw error;
+      throw ArcException.invalid("Selector: " + error.getMessage());
+    }
+  }
+
+  private boolean matches(
+      BranchCase option, Object selector, Map<String, Object> scope, CompiledGraph compiled) {
+    try {
+      Object value = compiled.expression(option.expression()).evaluate(scope, deadline);
+      return selector == null
+          ? Expressions.bool(value)
+          : Expressions.equal(selector, switchValue(value));
     } catch (ArcException error) {
       if (error.status() == 504) throw error;
       throw ArcException.invalid("Case " + option.label() + ": " + error.getMessage());
     }
+  }
+
+  private Object switchValue(Object value) {
+    if (!(value instanceof Boolean || value instanceof Number || value instanceof String))
+      throw ArcException.invalid("Expected a boolean, number or string");
+    return value;
   }
 
   private void checkStepBudget() {

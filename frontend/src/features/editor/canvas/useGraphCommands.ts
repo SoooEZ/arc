@@ -14,6 +14,7 @@ interface Options {
   definition: Definition;
   measurements: Record<string, { width: number; height: number }>;
   readOnly: boolean;
+  busy: string;
   changeDefinition: (change: DefinitionChange) => void;
   dispatch: Dispatch<DocumentAction>;
   selectNode: (id: string) => void;
@@ -25,6 +26,7 @@ export function useGraphCommands({
   definition,
   measurements,
   readOnly,
+  busy,
   changeDefinition,
   dispatch,
   selectNode,
@@ -36,6 +38,7 @@ export function useGraphCommands({
     changeDefinition((current) => patchGraphNode(current, id, patch));
 
   const addNode = (type: NodeType) => {
+    if (readOnly || busy) return;
     const position = flow.screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
@@ -52,6 +55,8 @@ export function useGraphCommands({
   };
 
   const removeNode = (id: string) => {
+    const node = definition.nodes.find((candidate) => candidate.id === id);
+    if (readOnly || busy || !node || node.type === "INPUT") return;
     changeDefinition((current) => removeGraphNode(current, id));
     const next =
       definition.nodes.find((node) => node.type === "INPUT") ||
