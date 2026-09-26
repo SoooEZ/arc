@@ -33,7 +33,13 @@ export default function ExpressionFields({
             ? "Output As"
             : "Expression"
       }
-      variables={variables}
+      help={
+        node.type === "CONDITION"
+          ? "Choose a comparison or write an expression that returns true or false to select the next branch."
+          : node.type === "OUTPUT"
+            ? "Choose the value returned when execution reaches this Output, using a variable, constant or expression."
+            : "Calculate a value using available inputs, upstream results, functions and pinned Formula calls."
+      }
       actions={
         node.type === "CONDITION" &&
         condition && (

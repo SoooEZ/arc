@@ -161,7 +161,7 @@ test("formula picker preserves pins after publication and ignores late insertion
   await page.goto(`/#/rules/${caller}?node=calc`);
   await page
     .getByRole("button", {
-      name: "Functions & editor · Expression",
+      name: "Open in Editor · Expression",
       exact: true,
     })
     .click();
@@ -222,7 +222,7 @@ test("formula picker preserves pins after publication and ignores late insertion
   ).toBe(110);
   await page
     .getByRole("button", {
-      name: "Functions & editor · Expression",
+      name: "Open in Editor · Expression",
       exact: true,
     })
     .click();

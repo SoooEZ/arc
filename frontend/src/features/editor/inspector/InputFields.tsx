@@ -18,7 +18,11 @@ export default function InputFields({
     onDefinitionChange,
   );
   return (
-    <InspectorSection title="Input parameters" count={rule.draft.inputs.length}>
+    <InspectorSection
+      title="Input parameters"
+      help="Define the names and types of data this rule accepts. Each parameter can require a value or use a default or data source."
+      count={rule.draft.inputs.length}
+    >
       {parameters.rows.map(({ input, index, id }) => (
         <InputParameterCard
           key={id}

@@ -2,6 +2,7 @@ import {
   expect,
   test,
   type APIRequestContext,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
@@ -53,6 +54,38 @@ async function replaceCode(page: Page, code: string) {
     .click({ position: { x: 220, y: 50 } });
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.insertText(code);
+}
+
+async function expectGroupedGraphActions(
+  card: Locator,
+  statusSelector: string,
+) {
+  const actions = card.locator(".node-header-actions");
+  await expect(actions).toHaveCSS("display", "flex");
+  await expect(actions.locator(statusSelector)).toBeVisible();
+  const geometry = await card.evaluate((element, selector) => {
+    const header = element
+      .querySelector(".node-type-line")!
+      .getBoundingClientRect();
+    const actions = element
+      .querySelector(".node-header-actions")!
+      .getBoundingClientRect();
+    const expression = element
+      .querySelector(".node-expression-button")!
+      .getBoundingClientRect();
+    const status = element.querySelector(selector)!.getBoundingClientRect();
+    return {
+      rightGap: header.right - actions.right,
+      iconGap: status.left - expression.right,
+      centerDifference: Math.abs(
+        status.y + status.height / 2 - expression.y - expression.height / 2,
+      ),
+    };
+  }, statusSelector);
+  expect(geometry.rightGap).toBeCloseTo(0, 1);
+  expect(geometry.iconGap).toBeGreaterThanOrEqual(0);
+  expect(geometry.iconGap).toBeLessThanOrEqual(6);
+  expect(geometry.centerDifference).toBeLessThan(1);
 }
 
 test("node expressions edit one node, group functions, and flag all invalid expressions live", async ({
@@ -140,6 +173,7 @@ test("node expressions edit one node, group functions, and flag all invalid expr
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("7");
+  await expectGroupedGraphActions(calc, ".node-check");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
   const saved = await (await request.get(`/api/rules/${id}`)).json();
@@ -190,6 +224,10 @@ test("references navigate within one modal with back and close all while preserv
   };
   await create(request, parent, definition);
   await page.goto(`/#/rules/${parent}?node=reuse`);
+  await expectGroupedGraphActions(
+    page.locator('.react-flow__node[data-id="reuse"] .graph-node'),
+    ".node-link-icon",
+  );
   await page
     .getByLabel("Node name", { exact: true })
     .fill("Parent unsaved edit");

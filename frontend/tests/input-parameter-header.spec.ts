@@ -1,13 +1,11 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 
-async function createRule(request: APIRequestContext) {
+async function createRule(request: APIRequestContext, name = "amount") {
   const id = `input-parameter-header-${Date.now()}`;
   const definition: Definition = {
     schemaVersion: 1,
-    inputs: [
-      { name: "amount", type: "NUMBER", required: true, defaultValue: 12 },
-    ],
+    inputs: [{ name, type: "NUMBER", required: true, defaultValue: 12 }],
     nodes: [
       {
         id: "input",
@@ -30,7 +28,7 @@ async function createRule(request: APIRequestContext) {
   const response = await request.post("/api/rules", {
     data: { id, name: id, kind: "FORMULA", definition },
   });
-  expect(response.ok()).toBeTruthy();
+  expect(response.ok(), await response.text()).toBeTruthy();
   return (await response.json()) as Rule;
 }
 
@@ -46,7 +44,9 @@ test("input headers edit Required/Optional and card counts follow added and remo
   const parameter = sidebar.locator(".input-schema-card").first();
   const title = parameter.locator(".input-card-title");
   await expect(node.locator(".node-detail")).toHaveText("1 input parameter");
-  await expect(title.getByText("Parameter 1", { exact: true })).toBeVisible();
+  await expect(title.getByText("amount", { exact: true })).toBeVisible();
+  await expect(title.locator(":scope > svg")).toHaveCount(0);
+  await expect(title.locator("strong")).toHaveCSS("font-weight", "700");
   await expect(title.getByLabel("Required", { exact: true })).toBeChecked();
   await expect(parameter.locator(".MuiFormControlLabel-root")).toHaveCount(1);
   await title.getByLabel("Required", { exact: true }).uncheck();
@@ -73,7 +73,7 @@ test("input headers edit Required/Optional and card counts follow added and remo
     .getByRole("button", { name: "Remove amount", exact: true })
     .click();
   await expect(node.locator(".node-detail")).toHaveText("1 input parameter");
-  await expect(title.getByText("Parameter 1", { exact: true })).toBeVisible();
+  await expect(title.getByText("input2", { exact: true })).toBeVisible();
   await expect(title.getByLabel("Required", { exact: true })).toBeChecked();
   await sidebar
     .getByRole("button", { name: "Remove input2", exact: true })
@@ -86,7 +86,8 @@ test("parameter headers fit narrow layouts and preserve published read-only cont
   page,
   request,
 }) => {
-  const rule = await createRule(request);
+  const name = "very_long_parameter_name_that_stays_inside_a_narrow_card";
+  const rule = await createRule(request, name);
   expect(
     (
       await request.post(`/api/rules/${rule.id}/publish`, {
@@ -100,14 +101,12 @@ test("parameter headers fit narrow layouts and preserve published read-only cont
   await expect(header.getByLabel("Required", { exact: true })).toBeChecked();
   await expect(header.getByLabel("Required", { exact: true })).toBeDisabled();
   await expect(
-    header.getByRole("button", { name: "Remove amount", exact: true }),
+    header.getByRole("button", { name: `Remove ${name}`, exact: true }),
   ).toBeDisabled();
   for (const width of [1024, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await header.scrollIntoViewIfNeeded();
-    await expect(
-      header.getByText("Parameter 1", { exact: true }),
-    ).toBeVisible();
+    await expect(header.getByText(name, { exact: true })).toBeVisible();
     await expect(header.getByLabel("Required", { exact: true })).toBeVisible();
     expect(
       await header.evaluate(
@@ -115,7 +114,7 @@ test("parameter headers fit narrow layouts and preserve published read-only cont
       ),
     ).toBeTruthy();
     const parameter = await header
-      .getByText("Parameter 1", { exact: true })
+      .getByText(name, { exact: true })
       .boundingBox();
     const toggle = await header.locator(".input-required-toggle").boundingBox();
     expect(toggle!.x).toBeGreaterThanOrEqual(parameter!.x + parameter!.width);

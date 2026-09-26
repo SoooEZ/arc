@@ -237,7 +237,7 @@ test("expanded expression colors leave string, comment and property text unclass
   await page.goto(`/#/rules/${id}?node=choose`);
   await page
     .getByRole("button", {
-      name: "Functions & editor · Case 1 condition",
+      name: "Open in Editor · Case 1 condition",
       exact: true,
     })
     .click();

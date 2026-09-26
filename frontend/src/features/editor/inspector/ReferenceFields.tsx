@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PagedAutocomplete from "../../../components/PagedAutocomplete";
 import { Alert, IconButton, Tooltip } from "@mui/material";
-import { ArrowUpRight, Braces, Info } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import type { RuleSummary, Version, VersionSummary } from "../../../types";
 import ValueBinding from "../../expressions/ValueBinding";
 import { ruleApi } from "../../../api/rules";
@@ -51,6 +51,7 @@ export default function ReferenceFields({
     <>
       <InspectorSection
         title="Select Rule"
+        help="Choose a published rule and version. This reference stays on the selected version, even when that rule is updated."
         actions={
           <>
             <Tooltip
@@ -74,18 +75,9 @@ export default function ReferenceFields({
                       });
                   }}
                 >
-                  <ArrowUpRight size={16} />
+                  <ExternalLink size={16} />
                 </IconButton>
               </span>
-            </Tooltip>
-            <Tooltip title="This reference stays on the selected version, even when that rule is updated.">
-              <IconButton
-                className="inspector-reference-action"
-                size="small"
-                aria-label="About pinned versions"
-              >
-                <Info size={16} />
-              </IconButton>
             </Tooltip>
           </>
         }
@@ -147,7 +139,10 @@ export default function ReferenceFields({
         )}
       </InspectorSection>
       {child && (
-        <InspectorSection title="Parameters for Rule" variables={variables}>
+        <InspectorSection
+          title="Parameters for Rule"
+          help="Supply values for the selected version’s parameters. Each card shows its required status and type; values may come from variables, constants, expressions or the referenced rule’s defaults."
+        >
           <p className="muted-copy">
             Pass a variable, a value, or an expression into each input.
           </p>
@@ -159,7 +154,6 @@ export default function ReferenceFields({
               key={`${node.id}:${node.ruleId}:${node.version}:${input.name}`}
             >
               <div className="reference-parameter-heading">
-                <Braces size={14} />
                 <strong>{input.name}</strong>
                 <span>{input.required ? "Required" : "Optional"}</span>
               </div>

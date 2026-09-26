@@ -102,10 +102,15 @@ export function useFormulaSupport(
                 documentation: entry.inputs
                   .map(formulaParameterDescription)
                   .join("\n\n"),
-                insertText: formulaSnippet(
-                  entry,
-                  latestVariables.current.map((variable) => variable.name),
-                ),
+                get insertText() {
+                  // Monaco keeps old suggestions selectable while a scope-
+                  // triggered refresh loads. Resolve argument placeholders
+                  // from the authoritative scope when the item is accepted.
+                  return formulaSnippet(
+                    entry,
+                    latestVariables.current.map((variable) => variable.name),
+                  );
+                },
                 insertTextRules:
                   monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                 range,

@@ -8,6 +8,7 @@
 @import "./editor.css";
 @import "./graph-canvas.css";
 @import "./inspector.css";
+@import "./expressions.css";
 @import "./editor-navigation.css";
 @import "./execution.css";
 @import "./api.css";

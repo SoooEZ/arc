@@ -125,6 +125,40 @@
   border-color: #60927b;
   background: #f0f6f1;
 }
+.published-formula-results {
+  display: flex;
+  flex: 1 0 140px;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 140px;
+  max-height: 480px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 2px;
+}
+.published-formula-item {
+  flex-shrink: 0;
+}
+.published-formula-item .snippet-card {
+  width: 100%;
+}
+.published-formula-item .snippet-card > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.published-formula-item .snippet-card > span:nth-child(2) {
+  flex: 0;
+}
+.published-formula-results > .MuiAlert-root,
+.published-formula-results > .MuiButton-root {
+  flex-shrink: 0;
+}
+.published-formula-results:focus-visible {
+  outline: 2px solid #60927b;
+  outline-offset: 2px;
+}
 .studio-editor {
   display: flex;
   flex-direction: column;

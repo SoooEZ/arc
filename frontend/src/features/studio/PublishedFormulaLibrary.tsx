@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, TextField, Tooltip } from "@mui/material";
+import { Alert, Button, TextField, Tooltip } from "@mui/material";
 import { ruleApi } from "../../api/rules";
 import { errorMessage } from "../../api/errors";
-import { usePagedResource } from "../../hooks/usePagedResource";
-import CatalogPagination from "../../components/CatalogPagination";
+import { useAutocompletePages } from "../../hooks/useAutocompletePages";
 import type { RuleSummary } from "../../types";
 
 export default function PublishedFormulaLibrary({
@@ -17,18 +16,27 @@ export default function PublishedFormulaLibrary({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const pending = useRef<AbortController | null>(null);
-  const catalog = usePagedResource(search, (offset, limit, signal) =>
-    ruleApi.catalog(
-      { offset, limit, search, kind: "FORMULA", publishedOnly: true },
-      { signal },
-    ),
+  const list = useRef<HTMLDivElement>(null);
+  const catalog = useAutocompletePages(
+    "published-formulas",
+    search,
+    true,
+    (query, offset, limit, signal) =>
+      ruleApi.catalog(
+        { offset, limit, search: query, kind: "FORMULA", publishedOnly: true },
+        { signal },
+      ),
+    (rule) => rule.id,
   );
+  useEffect(() => {
+    list.current?.scrollTo({ top: 0 });
+  }, [search.trim()]);
   useEffect(() => {
     pending.current?.abort();
     setBusy("");
     setError("");
     return () => pending.current?.abort();
-  }, [search, catalog.offset, readOnly]);
+  }, [search, readOnly]);
   const insert = async (rule: RuleSummary) => {
     if (readOnly) return;
     pending.current?.abort();
@@ -55,39 +63,67 @@ export default function PublishedFormulaLibrary({
         Insert a formula call pinned to its published version. Tab moves between
         arguments.
       </p>
-      {catalog.data.items.map((rule) => (
-        <Tooltip
-          key={rule.id}
-          describeChild
-          title={`${rule.id} · version ${rule.publishedVersion} · ${rule.inputCount} parameters`}
-        >
-          <button
-            className="snippet-card"
-            disabled={readOnly || busy === rule.id}
-            onClick={() => void insert(rule)}
+      <div
+        ref={list}
+        className="published-formula-results"
+        role="region"
+        aria-label="Published formulas"
+        aria-busy={catalog.loading}
+        tabIndex={0}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          const remaining =
+            element.scrollHeight - element.scrollTop - element.clientHeight;
+          if (remaining < 96 && !catalog.error) catalog.next();
+        }}
+      >
+        {catalog.items.map((rule) => (
+          <Tooltip
+            key={rule.id}
+            describeChild
+            title={`${rule.id} · version ${rule.publishedVersion} · ${rule.inputCount} ${rule.inputCount === 1 ? "parameter" : "parameters"}`}
           >
-            <span>
-              {rule.name}
-              <small>
-                @{rule.id}:{rule.publishedVersion}
-                {busy === rule.id ? " · loading…" : ""}
-              </small>
+            <span className="published-formula-item">
+              <button
+                className="snippet-card"
+                disabled={readOnly || busy === rule.id}
+                onClick={() => void insert(rule)}
+              >
+                <span>
+                  {rule.name}
+                  <small>
+                    @{rule.id}:{rule.publishedVersion}
+                    {busy === rule.id ? " · loading…" : ""}
+                  </small>
+                </span>
+                <span aria-hidden="true">+</span>
+              </button>
             </span>
-            <span>+</span>
-          </button>
-        </Tooltip>
-      ))}
-      <CatalogPagination
-        label="Published formulas"
-        offset={catalog.offset}
-        limit={catalog.limit}
-        total={catalog.data.total}
-        loading={catalog.loading}
-        onPage={catalog.setOffset}
-      />
-      {(error || catalog.error) && (
-        <Alert severity="error">{error || catalog.error}</Alert>
-      )}
+          </Tooltip>
+        ))}
+        <p className="studio-hint" role="status">
+          {catalog.loading
+            ? "Loading formulas…"
+            : catalog.items.length
+              ? `${catalog.items.length} of ${catalog.total} ${catalog.total === 1 ? "formula" : "formulas"}`
+              : !catalog.error && "No matching published formulas."}
+        </p>
+        {catalog.error ? (
+          <Alert
+            severity="error"
+            action={<Button onClick={catalog.next}>Retry</Button>}
+          >
+            {catalog.error}
+          </Alert>
+        ) : (
+          catalog.nextOffset < catalog.total && (
+            <Button disabled={catalog.loading} onClick={catalog.next}>
+              Load more formulas
+            </Button>
+          )
+        )}
+      </div>
+      {error && <Alert severity="error">{error}</Alert>}
     </>
   );
 }

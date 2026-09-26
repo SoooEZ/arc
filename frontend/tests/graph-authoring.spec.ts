@@ -61,7 +61,7 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   await page.goto(`/#/rules/${id}`);
   await page
     .getByRole("button", {
-      name: "Functions & editor · Condition",
+      name: "Open in Editor · Condition",
       exact: true,
     })
     .click();
@@ -88,7 +88,7 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   await focusNode(page, "Calculation");
   await page
     .getByRole("button", {
-      name: "Functions & editor · Expression",
+      name: "Open in Editor · Expression",
       exact: true,
     })
     .click();
@@ -109,7 +109,7 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   await expect(page.getByTestId("test-result")).toHaveText("37.5");
   await page
     .getByRole("button", {
-      name: "Functions & editor · Expression",
+      name: "Open in Editor · Expression",
       exact: true,
     })
     .click();
@@ -338,7 +338,7 @@ test("late expression checks cannot override newer text or reenable Apply", asyn
   await page.getByRole("option", { name: "Expression", exact: true }).click();
   await page
     .getByRole("button", {
-      name: "Functions & editor · Return value",
+      name: "Open in Editor · Return value",
       exact: true,
     })
     .click();

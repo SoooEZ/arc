@@ -41,7 +41,7 @@ test("an old unprefixed draft reports the required spelling and becomes executab
   await page.goto(`/#/rules/${id}?node=calc`);
   await page
     .getByRole("button", {
-      name: "Functions & editor · Expression",
+      name: "Open in Editor · Expression",
       exact: true,
     })
     .click();

@@ -27,6 +27,19 @@
   color: #97a18f;
   font-weight: 500;
 }
+.node-header-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-left: auto;
+}
+.node-header-actions .node-expression-button {
+  margin-left: 0;
+}
+.node-header-actions > svg {
+  flex-shrink: 0;
+}
 .node-icon {
   width: 25px;
   height: 25px;
@@ -93,10 +106,8 @@
 }
 .node-check {
   color: #529770;
-  margin-left: auto;
 }
 .node-link-icon {
-  margin-left: auto;
   color: #b5a3c7;
 }
 .react-flow__handle {

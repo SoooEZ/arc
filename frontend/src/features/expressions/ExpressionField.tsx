@@ -1,7 +1,8 @@
 import { lazy, Suspense, useState } from "react";
 import { Button, CircularProgress } from "@mui/material";
-import { Braces } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import type { VariableOption } from "../../domain/graph";
+import AvailableVariables from "./AvailableVariables";
 
 const ExpressionDialog = lazy(() => import("./ExpressionDialog"));
 const InlineExpressionEditor = lazy(() => import("./InlineExpressionEditor"));
@@ -15,7 +16,7 @@ export default function ExpressionField({
   disabled,
   helperText,
   hideInput = false,
-  buttonLabel = "Functions & editor",
+  buttonLabel = "Open in Editor",
 }: {
   label?: string;
   value: string;
@@ -29,6 +30,11 @@ export default function ExpressionField({
   const [open, setOpen] = useState(false);
   return (
     <div className="expression-input">
+      {!hideInput && (
+        <div className="expression-variables-toolbar">
+          <AvailableVariables title={label} variables={variables} />
+        </div>
+      )}
       {!hideInput && (
         <Suspense
           fallback={
@@ -50,7 +56,7 @@ export default function ExpressionField({
       )}
       <Button
         size="small"
-        startIcon={<Braces size={14} />}
+        startIcon={<ExternalLink size={14} />}
         onClick={() => setOpen(true)}
         aria-label={`${buttonLabel} · ${label}`}
       >

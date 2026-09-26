@@ -1,15 +1,19 @@
 import { useId, type ReactNode } from "react";
-import { Accordion, AccordionDetails, AccordionSummary } from "@mui/material";
-import { ChevronDown } from "lucide-react";
-import type { VariableOption } from "../../../domain/graph";
-import InspectorVariables from "./InspectorVariables";
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
+import { ChevronDown, Info } from "lucide-react";
 
 interface HeadingProps {
   id: string;
   "aria-controls": string;
   title: string;
+  help: string;
   count?: number;
-  variables?: VariableOption[];
   actions?: ReactNode;
 }
 
@@ -19,8 +23,8 @@ function SectionHeading({
   id,
   "aria-controls": controls,
   title,
+  help,
   count,
-  variables,
   actions,
 }: HeadingProps) {
   return (
@@ -35,22 +39,26 @@ function SectionHeading({
           <span className="inspector-section-count">{count}</span>
         )}
       </AccordionSummary>
-      {(actions || variables) && (
-        <div className="inspector-section-actions">
-          {actions}
-          {variables && (
-            <InspectorVariables title={title} variables={variables} />
-          )}
-        </div>
-      )}
+      <div className="inspector-section-actions">
+        {actions}
+        <Tooltip title={help}>
+          <IconButton
+            className="inspector-section-help"
+            size="small"
+            aria-label={`${title} help`}
+          >
+            <Info size={16} />
+          </IconButton>
+        </Tooltip>
+      </div>
     </div>
   );
 }
 
 export default function InspectorSection({
   title,
+  help,
   count,
-  variables,
   actions,
   children,
   testId,
@@ -79,8 +87,8 @@ export default function InspectorSection({
         id={`${id}-heading`}
         aria-controls={`${id}-content`}
         title={title}
+        help={help}
         count={count}
-        variables={variables}
         actions={actions}
       />
       <AccordionDetails>{children}</AccordionDetails>

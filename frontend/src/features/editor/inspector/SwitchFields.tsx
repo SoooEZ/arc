@@ -26,7 +26,10 @@ export default function SwitchFields(props: NodeFieldsProps) {
   };
   return (
     <>
-      <InspectorSection title="Switch cases" variables={variables}>
+      <InspectorSection
+        title="Switch cases"
+        help="Cases are checked in order. Match a selector value or use conditions that return true or false; the first match selects the branch."
+      >
         <TextField
           select
           label="Switch mode"

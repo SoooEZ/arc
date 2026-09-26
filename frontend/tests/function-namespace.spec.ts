@@ -161,7 +161,7 @@ test("nested function library snippets and module defaults retain literal dollar
   await page.goto(`/#/rules/${rule.id}?node=calculate`);
   await page
     .getByRole("button", {
-      name: "Functions & editor · Expression",
+      name: "Open in Editor · Expression",
       exact: true,
     })
     .click();

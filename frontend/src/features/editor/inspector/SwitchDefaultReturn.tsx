@@ -28,7 +28,7 @@ export default function SwitchDefaultReturn({
   return (
     <InspectorSection
       title="Default · no case matches"
-      variables={variables}
+      help="Default runs when no case matches. Connect it to another node or configure a dedicated Output to return a fallback value."
       testId="switch-default-return"
     >
       <p className="muted-copy">Default runs when every case fails to match.</p>

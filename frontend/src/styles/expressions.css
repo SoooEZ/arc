@@ -1,0 +1,99 @@
+.expression-variables-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+.expression-variables-toolbar .expression-variables-button {
+  min-width: 0;
+  min-height: 28px;
+  padding: 3px 0;
+  color: #667b70;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+}
+.expression-variables-toolbar .expression-variables-button:hover,
+.expression-variables-toolbar .expression-variables-button:focus-visible,
+.expression-variables-toolbar
+  .expression-variables-button[aria-expanded="true"] {
+  color: #17674f;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.expression-variable-popover,
+.MuiTooltip-tooltip.expression-variable-tooltip {
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 14px 16px;
+  border: 1px solid #dfe8e2;
+  border-radius: 10px;
+  background: #fff;
+  color: #25382e;
+  box-shadow: 0 8px 30px rgb(22 47 32 / 14%);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.expression-variable-tooltip .MuiTooltip-arrow {
+  color: #fff;
+}
+.expression-variable-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.expression-variable-empty,
+.expression-variable-hint {
+  margin: 10px 0 0;
+  color: #64756b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.expression-variable-hint {
+  padding-top: 10px;
+  border-top: 1px solid #edf1ed;
+}
+.expression-variable-list.variable-list {
+  gap: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(360px, 55vh);
+  overflow-y: auto;
+}
+.expression-variable-list > li {
+  padding: 9px 0;
+}
+.expression-variable-list > li + li {
+  border-top: 1px solid #edf1ed;
+}
+.expression-variable-list > li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.expression-variable-list.variable-list code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.expression-variable-list code[data-kind="input"] {
+  color: #205fa6;
+}
+.expression-variable-list code[data-kind="result"] {
+  color: #7b3f98;
+}
+.expression-variable-list.variable-list span {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #63746a;
+  background: #f2f5f2;
+}
+.expression-variable-list small {
+  display: block;
+  margin-top: 3px;
+  color: #687b6f;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}

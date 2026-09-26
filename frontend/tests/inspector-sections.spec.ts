@@ -88,10 +88,27 @@ test("inspector accordions start expanded and variable help previews, pins and d
     name: "Available variables · Expression",
     exact: true,
   });
+  await expect(variables).toHaveText("Available variables");
+  await expect(
+    sidebar
+      .locator(".inspector-section-heading")
+      .getByRole("button", { name: /^Available variables/ }),
+  ).toHaveCount(0);
+  const normalColor = await variables.evaluate(
+    (element) => getComputedStyle(element).color,
+  );
+  const variableBounds = (await variables.boundingBox())!;
+  const editorBounds = (await sidebar
+    .locator(".inline-expression-editor")
+    .boundingBox())!;
+  expect(variableBounds.y + variableBounds.height).toBeLessThanOrEqual(
+    editorBounds.y,
+  );
   await variables.hover();
+  await expect(variables).not.toHaveCSS("color", normalColor);
   const preview = page
     .getByRole("tooltip")
-    .filter({ hasText: "Click the icon to keep open." });
+    .filter({ hasText: "Click to keep this list open." });
   await expect(preview.locator(".variable-list code")).toHaveText(["amount"]);
   await expect(preview).toContainText("number");
   await expect(preview).toContainText("Inputs");
@@ -99,7 +116,8 @@ test("inspector accordions start expanded and variable help previews, pins and d
   expect(await geometry()).toEqual(before);
   await page.mouse.move(10, 10);
   await expect(preview).not.toBeVisible();
-  await variables.click();
+  await variables.focus();
+  await page.keyboard.press("Enter");
   const overlay = page.getByRole("dialog", {
     name: "Available variables · Expression",
     exact: true,
@@ -139,14 +157,21 @@ test("inspector accordions start expanded and variable help previews, pins and d
   await expect(
     sidebar.getByRole("button", { name: "Output As", exact: true }),
   ).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    sidebar.getByRole("button", { name: /^Available variables/ }),
+  ).toHaveCount(0);
+  await sidebar
+    .getByRole("combobox", { name: "Return value · value source", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Expression", exact: true }).click();
   await sidebar
     .getByRole("button", {
-      name: "Available variables · Output As",
+      name: "Available variables · Return value",
       exact: true,
     })
     .click();
   const outputVariables = page.getByRole("dialog", {
-    name: "Available variables · Output As",
+    name: "Available variables · Return value",
     exact: true,
   });
   await expect(outputVariables.locator(".variable-list code")).toHaveText([

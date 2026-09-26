@@ -1,20 +1,17 @@
 import { useId, useState } from "react";
-import { IconButton, Popover, Tooltip } from "@mui/material";
-import { Braces, X } from "lucide-react";
-import {
-  variableOptionLabel,
-  type VariableOption,
-} from "../../../domain/graph";
+import { Button, IconButton, Popover, Tooltip } from "@mui/material";
+import { X } from "lucide-react";
+import { variableOptionLabel, type VariableOption } from "../../domain/graph";
 
 function VariableList({ variables }: { variables: VariableOption[] }) {
   if (!variables.length)
     return (
-      <p className="inspector-variable-empty">
+      <p className="expression-variable-empty">
         No upstream variables are available at this node.
       </p>
     );
   return (
-    <ul className="variable-list inspector-variable-list">
+    <ul className="variable-list expression-variable-list">
       {variables.map((variable) => (
         <Tooltip key={variable.name} title={variableOptionLabel(variable)}>
           <li>
@@ -32,7 +29,7 @@ function VariableList({ variables }: { variables: VariableOption[] }) {
   );
 }
 
-export default function InspectorVariables({
+export default function AvailableVariables({
   title,
   variables,
 }: {
@@ -63,18 +60,18 @@ export default function InspectorVariables({
             <div>
               <strong>Available variables</strong>
               <VariableList variables={variables} />
-              <p className="inspector-variable-hint">
-                Click the icon to keep open.
+              <p className="expression-variable-hint">
+                Click to keep this list open.
               </p>
             </div>
           )
         }
-        placement="left-start"
+        placement="bottom-end"
         describeChild
-        slotProps={{ tooltip: { className: "inspector-variable-tooltip" } }}
+        slotProps={{ tooltip: { className: "expression-variable-tooltip" } }}
       >
-        <IconButton
-          className="inspector-variables-button"
+        <Button
+          className="expression-variables-button"
           size="small"
           aria-label={label}
           aria-haspopup="dialog"
@@ -85,8 +82,8 @@ export default function InspectorVariables({
             setAnchor(event.currentTarget);
           }}
         >
-          <Braces size={16} />
-        </IconButton>
+          Available variables
+        </Button>
       </Tooltip>
       <Popover
         id={id}
@@ -97,13 +94,13 @@ export default function InspectorVariables({
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{
           paper: {
-            className: "inspector-variable-popover",
+            className: "expression-variable-popover",
             role: "dialog",
             "aria-label": label,
           },
         }}
       >
-        <div className="inspector-variable-heading">
+        <div className="expression-variable-heading">
           <strong>Available variables</strong>
           <IconButton
             size="small"

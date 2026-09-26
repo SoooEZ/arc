@@ -96,37 +96,39 @@ export default function Inspector({
             inputRef={nameInputRef}
             onRename={(label) => patch({ label })}
           />
-          {onExpression && (
-            <Tooltip title="Node expression">
-              <IconButton
-                size="small"
-                aria-label="Node expression"
-                onClick={() => onExpression(node.id)}
-              >
-                <Code2 size={17} />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Tooltip
-            title={onDelete && node.type !== "INPUT" ? "Delete node" : ""}
-          >
-            <span className="inspector-delete-slot">
-              {onDelete && node.type !== "INPUT" && (
+          <div className="inspector-heading-actions">
+            <InspectorProblems key={node.id} errors={errors} />
+            {onExpression && (
+              <Tooltip title="Node expression">
                 <IconButton
                   size="small"
-                  color="error"
-                  aria-label="Delete node"
-                  disabled={readOnly}
-                  onClick={() => {
-                    if (!readOnly) onDelete(node.id);
-                  }}
+                  aria-label="Node expression"
+                  onClick={() => onExpression(node.id)}
                 >
-                  <Trash2 size={16} />
+                  <Code2 size={17} />
                 </IconButton>
-              )}
-            </span>
-          </Tooltip>
-          <InspectorProblems key={node.id} errors={errors} />
+              </Tooltip>
+            )}
+            <Tooltip
+              title={onDelete && node.type !== "INPUT" ? "Delete node" : ""}
+            >
+              <span className="inspector-delete-slot">
+                {onDelete && node.type !== "INPUT" && (
+                  <IconButton
+                    size="small"
+                    color="error"
+                    aria-label="Delete node"
+                    disabled={readOnly}
+                    onClick={() => {
+                      if (!readOnly) onDelete(node.id);
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </IconButton>
+                )}
+              </span>
+            </Tooltip>
+          </div>
         </div>
       )}
       <div className="inspector-scroll" ref={scroll}>

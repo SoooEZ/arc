@@ -9,7 +9,10 @@ export default function ResultFields({
 }: NodeFieldsProps) {
   if (!["FORMULA", "REFERENCE", "TRANSFORM"].includes(node.type)) return null;
   return (
-    <InspectorSection title="Output As">
+    <InspectorSection
+      title="Output As"
+      help="Name this node’s result so connected downstream nodes can use it in variables and expressions."
+    >
       <TextField
         label="Result variable"
         value={node.output || ""}

@@ -15,7 +15,10 @@ export default function TransformFields({
   const fields = node.fields ?? [];
   const fieldMode = node.expression == null;
   return (
-    <InspectorSection title="Transform data" variables={variables}>
+    <InspectorSection
+      title="Transform data"
+      help="Build an object from named fields or use an expression to reshape, filter or map incoming data."
+    >
       <p className="muted-copy">
         Build a new object from upstream data. Rename fields, clean text,
         convert types and map arrays without changing the inputs.

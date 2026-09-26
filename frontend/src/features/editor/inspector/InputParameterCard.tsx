@@ -6,7 +6,7 @@ import {
   TextField,
   Tooltip,
 } from "@mui/material";
-import { Braces, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { Input, InputType } from "../../../types";
 import type { VariableOption } from "../../../domain/graph";
@@ -42,8 +42,7 @@ export default function InputParameterCard({
   return (
     <div className="input-schema-card">
       <div className="input-card-title">
-        <Braces size={14} />
-        <span>Parameter {index + 1}</span>
+        <strong>{input.name || `Parameter ${index + 1}`}</strong>
         <FormControlLabel
           className="input-required-toggle"
           control={

@@ -62,14 +62,22 @@ async function create(request: APIRequestContext, draft: Definition) {
 }
 
 async function expectVariables(page: Page, names: string[]) {
+  const source = page.getByRole("combobox", {
+    name: "Case 1 value · value source",
+    exact: true,
+  });
+  if ((await source.textContent()) !== "Expression") {
+    await source.click();
+    await page.getByRole("option", { name: "Expression", exact: true }).click();
+  }
   await page
     .getByRole("button", {
-      name: "Available variables · Switch cases",
+      name: "Available variables · Case 1 value",
       exact: true,
     })
     .click();
   const overlay = page.getByRole("dialog", {
-    name: "Available variables · Switch cases",
+    name: "Available variables · Case 1 value",
     exact: true,
   });
   await expect(overlay).toBeVisible();
@@ -314,14 +322,21 @@ test("variable menus and expression tooltips show declared types and live produc
       exact: true,
     })
     .click();
+  await expect(
+    inspector.getByRole("button", { name: /^Available variables/ }),
+  ).toHaveCount(0);
+  await inspector
+    .getByRole("combobox", { name: "Return value · value source", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Expression", exact: true }).click();
   await inspector
     .getByRole("button", {
-      name: "Available variables · Output As",
+      name: "Available variables · Return value",
       exact: true,
     })
     .click();
   const variables = page.getByRole("dialog", {
-    name: "Available variables · Output As",
+    name: "Available variables · Return value",
     exact: true,
   });
   await variables
@@ -335,12 +350,8 @@ test("variable menus and expression tooltips show declared types and live produc
     .getByRole("button", { name: "Close available variables", exact: true })
     .click();
   await inspector
-    .getByRole("combobox", { name: "Return value · value source", exact: true })
-    .click();
-  await page.getByRole("option", { name: "Expression", exact: true }).click();
-  await inspector
     .getByRole("button", {
-      name: "Functions & editor · Return value",
+      name: "Open in Editor · Return value",
       exact: true,
     })
     .click();

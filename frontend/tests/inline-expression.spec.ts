@@ -139,6 +139,59 @@ test("typed equality retains both visible characters through save, reload and ex
   await expect(page.getByTestId("test-result")).toHaveText("1");
 });
 
+test("focusing an expression preserves the label notch and field geometry", async ({
+  page,
+  request,
+}) => {
+  const rule = await create(request);
+  await page.goto(`/#/rules/${rule.id}?node=choose`);
+  const editor = page.getByLabel("Case 1 condition", { exact: true });
+  await expect(editorLines(editor)).toHaveText("hello.a == 1");
+  const field = page.locator(".inline-expression-editor").filter({
+    has: page.locator("legend", { hasText: "Case 1 condition" }),
+  });
+  await field.scrollIntoViewIfNeeded();
+  const before = await field.boundingBox();
+  const labelBefore = await field.locator("legend").boundingBox();
+  await editor.focus();
+  await expect(editor).toBeFocused();
+  await expect(field).toHaveCSS("border-top-color", "rgb(27, 122, 96)");
+  // A continuous outer shadow ignores the native legend notch and draws a
+  // horizontal line through the label; the fieldset border respects it.
+  await expect(field).toHaveCSS("box-shadow", "none");
+  expect(await field.boundingBox()).toEqual(before);
+  expect(await field.locator("legend").boundingBox()).toEqual(labelBefore);
+  const focusedImage = await field.screenshot({
+    path: test.info().outputPath("focused-expression-label.png"),
+  });
+  const crossesLabelNotch = await page.evaluate(
+    async ({ image, x, y }) => {
+      const bitmap = new Image();
+      bitmap.src = `data:image/png;base64,${image}`;
+      await bitmap.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d")!;
+      context.drawImage(bitmap, 0, 0);
+      // The label's left padding is blank. A green pixel here means the
+      // focus line crosses the notch instead of stopping at the label.
+      const pixels = context.getImageData(x, y - 2, 1, 5).data;
+      for (let offset = 0; offset < pixels.length; offset += 4) {
+        if (pixels[offset] < 100 && pixels[offset + 1] > pixels[offset] + 30)
+          return true;
+      }
+      return false;
+    },
+    {
+      image: focusedImage.toString("base64"),
+      x: Math.round(labelBefore!.x - before!.x + 1),
+      y: Math.floor(labelBefore!.height / 2),
+    },
+  );
+  expect(crossesLabelNotch).toBe(false);
+});
+
 test("inline completion accepts scoped variables and function snippets with Tab without crossing models", async ({
   page,
   request,
@@ -232,6 +285,28 @@ test("published inline expressions reject keyboard changes and keep both equalit
   await expect(
     page.getByRole("button", { name: "Save draft", exact: true }),
   ).toHaveCount(0);
+  const openEditor = page.getByRole("button", {
+    name: "Open in Editor · Case 1 condition",
+    exact: true,
+  });
+  await expect(openEditor).toBeEnabled();
+  await openEditor.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Expression editor · Case 1 condition",
+    exact: true,
+  });
+  const expandedEditor = dialog.getByLabel("Expression code editor", {
+    exact: true,
+  });
+  await expect(editorLines(expandedEditor)).toHaveText("hello.a == 1");
+  await expandedEditor.focus();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.insertText("false");
+  await expect(editorLines(expandedEditor)).toHaveText("hello.a == 1");
+  await expect(
+    dialog.getByRole("button", { name: "Apply expression", exact: true }),
+  ).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
   const after: Rule = await (await request.get(`/api/rules/${rule.id}`)).json();
   expect(after.revision).toBe(published.revision);
 });

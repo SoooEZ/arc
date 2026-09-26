@@ -1,5 +1,33 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Locator,
+} from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+
+async function expectHeaderActions(header: Locator) {
+  const actions = header.locator(".inspector-heading-actions");
+  await expect(actions).toHaveCSS("display", "flex");
+  const geometry = await header.evaluate((element) => {
+    const bounds = (selector: string) =>
+      element.querySelector(selector)!.getBoundingClientRect();
+    const expression = bounds('[aria-label="Node expression"]');
+    const deletion = bounds(".inspector-delete-slot");
+    const errors = bounds(".inspector-error-slot");
+    const actions = bounds(".inspector-heading-actions");
+    return {
+      gap: deletion.left - expression.right,
+      errorGap: expression.left - errors.right,
+      rightInset: element.getBoundingClientRect().right - actions.right,
+      padding: Number.parseFloat(getComputedStyle(element).paddingRight),
+    };
+  });
+  expect(geometry.gap).toBeGreaterThanOrEqual(0);
+  expect(geometry.gap).toBeLessThanOrEqual(4);
+  expect(geometry.errorGap).toBeGreaterThanOrEqual(0);
+  expect(geometry.rightInset).toBeCloseTo(geometry.padding, 1);
+}
 
 async function createRule(request: APIRequestContext, label: string) {
   const id = `inspector-header-${Date.now()}`;
@@ -88,6 +116,7 @@ test("the sidebar header follows node selection and name edits, retaining the ex
     exact: true,
   });
   await expect(deleteNode).toBeEnabled();
+  await expectHeaderActions(header);
   await expect(
     sidebar
       .locator(".inspector-scroll")
@@ -186,6 +215,7 @@ test("long names fit the sidebar header on narrow screens and remain inspectable
     await expect(
       header.getByRole("button", { name: "Node expression", exact: true }),
     ).toBeVisible();
+    await expectHeaderActions(header);
     const centers = await header.locator(":scope > *").evaluateAll((elements) =>
       elements.map((element) => {
         const bounds = element.getBoundingClientRect();
@@ -244,19 +274,20 @@ test("node errors use one stable header slot and an overlay that can be pinned a
   ).toHaveCount(0);
   const geometry = () =>
     sidebar.evaluate((element) =>
-      [".inspector-heading", ".inspector-node-name", ".inspector-scroll"].map(
-        (selector) => {
-          const bounds = element
-            .querySelector(selector)!
-            .getBoundingClientRect();
-          return {
-            x: bounds.x,
-            y: bounds.y,
-            width: bounds.width,
-            height: bounds.height,
-          };
-        },
-      ),
+      [
+        ".inspector-heading",
+        ".inspector-node-name",
+        ".inspector-heading-actions",
+        ".inspector-scroll",
+      ].map((selector) => {
+        const bounds = element.querySelector(selector)!.getBoundingClientRect();
+        return {
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+        };
+      }),
     );
   const before = await geometry();
   await name.fill("Show errors");

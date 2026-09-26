@@ -115,7 +115,7 @@ test("reference header actions stay separate from collapse and parameter cards d
     name: "Select Rule",
     exact: true,
   });
-  const info = heading.getByRole("button", { name: "About pinned versions" });
+  const info = heading.getByRole("button", { name: "Select Rule help" });
   const open = heading.getByRole("button", { name: "Open referenced rule" });
   await expect(section).toHaveAttribute("aria-expanded", "true");
   await expect(heading.locator("button button")).toHaveCount(0);
@@ -123,7 +123,7 @@ test("reference header actions stay separate from collapse and parameter cards d
   await info.hover();
   await expect(
     page.getByRole("tooltip", {
-      name: "This reference stays on the selected version, even when that rule is updated.",
+      name: "Choose a published rule and version. This reference stays on the selected version, even when that rule is updated.",
     }),
   ).toBeVisible();
   await info.click();
@@ -145,6 +145,17 @@ test("reference header actions stay separate from collapse and parameter cards d
   await expect(rate).toContainText("Optional");
   await expect(rate).toContainText("Type: number");
   await expect(rate).toContainText("Default: 0.2");
+  await expect(
+    amount.locator(".reference-parameter-heading > svg"),
+  ).toHaveCount(0);
+  for (const header of await inspector
+    .locator(".inspector-section-heading")
+    .all()) {
+    await expect(header.getByRole("button", { name: / help$/ })).toHaveCount(1);
+    await expect(
+      header.getByRole("button", { name: /^Available variables/ }),
+    ).toHaveCount(0);
+  }
   await expect(
     inspector.getByRole("button", { name: "Output As", exact: true }),
   ).toBeVisible();

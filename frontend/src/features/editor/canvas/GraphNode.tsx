@@ -48,23 +48,25 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
           <NodeIcon type={n.type} size={14} />
         </span>
         <span>{nodeLabel[n.type]}</span>
-        <Tooltip title="View or edit the whole node expression">
-          <button
-            className="node-expression-button nodrag nopan"
-            aria-label={`Node expression · ${n.label}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              data.onExpression();
-            }}
-          >
-            <Code2 size={13} />
-          </button>
-        </Tooltip>
-        {data.visited ? (
-          <Check size={13} className="node-check" />
-        ) : n.type === "REFERENCE" ? (
-          <ExternalLink size={12} className="node-link-icon" />
-        ) : null}
+        <div className="node-header-actions">
+          <Tooltip title="View or edit the whole node expression">
+            <button
+              className="node-expression-button nodrag nopan"
+              aria-label={`Node expression · ${n.label}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onExpression();
+              }}
+            >
+              <Code2 size={13} />
+            </button>
+          </Tooltip>
+          {data.visited ? (
+            <Check size={13} className="node-check" />
+          ) : n.type === "REFERENCE" ? (
+            <ExternalLink size={12} className="node-link-icon" />
+          ) : null}
+        </div>
       </div>
       <strong>{n.label}</strong>
       <div className="node-detail">

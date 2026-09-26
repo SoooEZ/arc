@@ -329,3 +329,84 @@ test("editing an inferred Output expression retains its editor through empty tex
     `@${callee}:1(amount)`,
   );
 });
+
+test("Formula completion uses scope that arrives after suggestions appeared", async ({
+  page,
+  request,
+}) => {
+  const { caller, callee } = await fixtures(request);
+  await page.goto(`/#/rules/${caller}?node=out`);
+  const expression = page.getByLabel("Return value", { exact: true });
+  await expect(editorLines(expression)).toHaveText("amount + price");
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let releaseCatalog!: () => void;
+  const pendingCatalog = new Promise<void>((resolve) => {
+    releaseCatalog = resolve;
+  });
+  let scopeReleased = false;
+  await page.route("**/api/rule-summaries?**", async (route) => {
+    const url = new URL(route.request().url());
+    if (scopeReleased && url.searchParams.get("kind") === "FORMULA")
+      await pendingCatalog;
+    await route.continue();
+  });
+  let requested = false;
+  await page.route("**/api/variables", async (route) => {
+    const draft = route.request().postDataJSON() as Definition;
+    if (
+      draft.nodes.find((node) => node.id === "out")?.expression === `@${callee}`
+    ) {
+      requested = true;
+      await pending;
+    }
+    await route.continue();
+  });
+  try {
+    await setEditorText(page, expression, "");
+    await page.keyboard.type(`@${callee}`);
+    const suggestion = page
+      .locator(".suggest-widget.visible")
+      .getByRole("option", { name: new RegExp(`@${callee}:1`) });
+    await expect(suggestion).toBeVisible();
+    await expect.poll(() => requested).toBe(true);
+    const variables = page.getByRole("button", {
+      name: "Available variables · Return value",
+      exact: true,
+    });
+    await variables.hover();
+    const tooltip = page
+      .getByRole("tooltip")
+      .filter({ hasText: "Click to keep this list open." });
+    await expect(tooltip).toContainText(
+      "No upstream variables are available at this node.",
+    );
+    scopeReleased = true;
+    release();
+    await expect(tooltip.locator(".variable-list code")).toHaveText([
+      "amount",
+      "items",
+      "customer",
+      "price",
+    ]);
+    await page.mouse.move(10, 10);
+    await expect(expression).toBeFocused();
+    await expect(suggestion).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(editorLines(expression)).toHaveText(`@${callee}:1(amount)`);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await expect(page.getByText("All changes saved")).toBeVisible();
+    const saved: Rule = await (
+      await request.get(`/api/rules/${caller}`)
+    ).json();
+    expect(
+      saved.draft.nodes.find((node) => node.id === "out")?.expression,
+    ).toBe(`@${callee}:1(amount)`);
+  } finally {
+    release();
+    releaseCatalog();
+  }
+});
