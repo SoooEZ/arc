@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { arcEditorOptions, useArcEditor } from "../studio/useArcEditor";
-import { useArcLanguageSupport } from "../studio/useArcLanguageSupport";
+import {
+  completionWord,
+  isStringOrComment,
+  useArcLanguageSupport,
+} from "../studio/useArcLanguageSupport";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { studioApi } from "../../api/studio";
 import type { VariableOption } from "../../domain/graph";
 import type { FunctionEntry } from "../../types";
-import { monaco } from "../studio/arcLanguage";
 
 /** The caller owns the expression, including incomplete syntax while typing. */
 export default function InlineExpressionEditor({
@@ -56,25 +59,20 @@ export default function InlineExpressionEditor({
       !position
     )
       return;
-    const word = model.getWordUntilPosition(position).word;
+    const word = completionWord(model, position).word;
     if (!word) return;
-    const tokens = monaco.editor.tokenize(
-      model.getLineContent(position.lineNumber),
-      "arc",
-    )[0];
-    let token: monaco.Token | undefined;
-    for (const entry of tokens ?? []) {
-      if (entry.offset >= position.column - 1) break;
-      token = entry;
-    }
-    if (token?.type.startsWith("string") || token?.type.startsWith("comment"))
-      return;
+    if (isStringOrComment(model, position)) return;
+    const functionPrefix = word.startsWith("$") ? word : "$" + word;
     const hasMatch =
-      variables.some(
-        (variable) => variable.name !== word && variable.name.startsWith(word),
-      ) ||
+      (!word.startsWith("$") &&
+        variables.some(
+          (variable) =>
+            variable.name !== word && variable.name.startsWith(word),
+        )) ||
       functions.some(
-        (entry) => entry.supported && entry.name.startsWith(word.toUpperCase()),
+        (entry) =>
+          entry.supported &&
+          entry.name.startsWith(functionPrefix.toUpperCase()),
       );
     // Scope and catalog reads can finish after Monaco's initial suggestion
     // request. Refresh only the focused, still-matching prefix with fresh data.

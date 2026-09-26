@@ -7,8 +7,14 @@ import {
   Tooltip,
 } from "@mui/material";
 import { Braces, Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { Input, InputType } from "../../../types";
 import type { VariableOption } from "../../../domain/graph";
+import {
+  acceptsParameterNameEdit,
+  parameterNameError,
+  parameterNameGuidance,
+} from "../../../domain/identifiers";
 import SourceBindingEditor from "../../sources/SourceBindingEditor";
 import InputDefaultValue from "./InputDefaultValue";
 
@@ -29,6 +35,10 @@ export default function InputParameterCard({
   onRemove: () => void;
   onValidity: (valid: boolean) => void;
 }) {
+  const [rejectedNameEdit, setRejectedNameEdit] = useState(false);
+  const nameError = rejectedNameEdit
+    ? parameterNameGuidance
+    : parameterNameError(input.name);
   return (
     <div className="input-schema-card">
       <div className="input-card-title">
@@ -63,7 +73,22 @@ export default function InputParameterCard({
         label="Parameter name"
         value={input.name}
         disabled={readOnly}
-        onChange={(event) => onChange({ name: event.target.value })}
+        error={!!nameError}
+        helperText={nameError || parameterNameGuidance}
+        onChange={(event) => {
+          if (readOnly) return;
+          const name = event.target.value;
+          const accepted = acceptsParameterNameEdit(name);
+          setRejectedNameEdit(!accepted);
+          if (accepted) onChange({ name });
+        }}
+        onPaste={(event) => {
+          // Single-line inputs strip tabs/newlines before onChange; reject the original paste.
+          if (/[\s$]/u.test(event.clipboardData.getData("text"))) {
+            event.preventDefault();
+            setRejectedNameEdit(true);
+          }
+        }}
       />
       <TextField
         select

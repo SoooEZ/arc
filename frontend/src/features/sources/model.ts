@@ -1,4 +1,5 @@
 import type { DataSource, Input, SourceConfig } from "../../types";
+import { parameterNameError } from "../../domain/identifiers";
 
 export interface SourceBuffers {
   parameters: string;
@@ -18,15 +19,36 @@ export function sourceCandidate(
   source: DataSource,
   buffers: SourceBuffers,
 ): DataSource {
+  const parameters: unknown = JSON.parse(buffers.parameters);
+  const namesError = sourceParameterNamesError(parameters);
+  if (namesError) throw new Error(namesError);
   return {
     ...source,
     definition: {
       ...source.definition,
-      parameters: JSON.parse(buffers.parameters),
+      parameters: parameters as Input[],
       entries: JSON.parse(buffers.entries),
       secretHeaders: JSON.parse(buffers.secretHeaders),
     },
   };
+}
+
+export function sourceParameterNamesError(parameters: unknown): string | null {
+  if (!Array.isArray(parameters))
+    return "Source parameters must be a JSON array.";
+  for (const [index, parameter] of parameters.entries()) {
+    const error = parameterNameError(parameter?.name);
+    if (error) return `Parameter ${index + 1}: ${error}`;
+  }
+  return null;
+}
+
+export function sourceParameterBufferError(text: string): string | null {
+  try {
+    return sourceParameterNamesError(JSON.parse(text));
+  } catch {
+    return "Enter valid JSON before saving source parameters.";
+  }
 }
 
 function sampleValue(parameter: Input): unknown {

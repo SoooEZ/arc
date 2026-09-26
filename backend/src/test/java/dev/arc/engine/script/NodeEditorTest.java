@@ -83,6 +83,54 @@ node out OUTPUT "Output" { return rate; }
     assertThat(built.definition().inputs().get(1).source()).isEqualTo(d.inputs().get(1).source());
   }
 
+  @Test
+  void emptyTransformsGeneratePrefixedFunctionsWithoutRewritingExistingExpressions() {
+    var draft =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                new Definition.Node(
+                    "input",
+                    "INPUT",
+                    "Input",
+                    new Definition.Position(0, 0),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null),
+                node("transform", "TRANSFORM", null, "data"),
+                new Definition.Node(
+                    "out",
+                    "OUTPUT",
+                    "Output",
+                    new Definition.Position(600, 0),
+                    "data",
+                    null,
+                    null,
+                    null,
+                    null)),
+            List.of(
+                new Definition.Edge("start", "input", "transform", "next"),
+                new Definition.Edge("done", "transform", "out", "next")));
+    String fragment = script.renderNode(draft, "transform");
+    assertThat(fragment).contains("let data = $OBJECT();");
+    var built = script.buildNode(draft, "transform", fragment);
+    assertThat(built.diagnostics()).isEmpty();
+    assertThat(built.definition().nodes().get(1).expression()).isEqualTo("$OBJECT()");
+    String canonical = script.render(built.definition());
+    assertThat(script.build(canonical).definition()).isEqualTo(built.definition());
+    assertThat(script.render(script.build(canonical).definition())).isEqualTo(canonical);
+    validator.validate(built.definition(), noRefs);
+
+    var legacy = script.buildNode(draft, "transform", fragment.replace("$OBJECT()", "OBJECT()"));
+    assertThat(legacy.diagnostics()).isEmpty();
+    assertThat(script.renderNode(legacy.definition(), "transform"))
+        .contains("let data = OBJECT();")
+        .doesNotContain("$OBJECT()");
+  }
+
   private Definition.Node node(String id, String type, String expression, String output) {
     return new Definition.Node(id, type, id, null, expression, output, null, null, null);
   }

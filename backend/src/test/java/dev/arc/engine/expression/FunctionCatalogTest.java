@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** Full editor/arity contract captured before catalog responsibilities were separated. */
+/** Full editor/arity contract, including the intentional dollar function namespace. */
 class FunctionCatalogTest {
   private record Arity(String name, List<List<Integer>> accepted) {}
 
@@ -27,7 +27,7 @@ class FunctionCatalogTest {
     List<Arity> expected = fixture("arity.json", new TypeReference<>() {});
     assertThat(expected.stream().map(Arity::name).toList())
         .containsExactlyElementsOf(
-            Functions.catalog().stream().map(Functions.Entry::name).toList());
+            Functions.catalog().stream().map(entry -> entry.name().substring(1)).toList());
     for (Arity function : expected) {
       var expectedCounts = new ArrayList<Integer>();
       for (List<Integer> range : function.accepted()) {
@@ -41,6 +41,25 @@ class FunctionCatalogTest {
       }
       assertThat(actualCounts).as(function.name()).containsExactlyElementsOf(expectedCounts);
     }
+  }
+
+  @Test
+  void functionSnippetsEscapeLiteralDollarsAndRetainEditableArguments() {
+    assertThat(Functions.catalog())
+        .allSatisfy(
+            entry -> {
+              assertThat(entry.name()).startsWith("$");
+              assertThat(entry.signature()).startsWith(entry.name() + "(");
+              assertThat(entry.snippet()).startsWith("\\" + entry.name() + "(");
+            });
+    assertThat(Functions.catalog())
+        .filteredOn(entry -> entry.name().equals("$MERGE"))
+        .extracting(Functions.Entry::snippet)
+        .containsExactly("\\$MERGE(${1:customer}, \\$OBJECT(\"${2:status}\", ${3:\"active\"}))");
+    assertThat(Functions.catalog())
+        .filteredOn(entry -> entry.name().equals("$YEAR"))
+        .extracting(Functions.Entry::snippet)
+        .containsExactly("\\$YEAR(${1:\\$DATE(2026, 9, 16)})");
   }
 
   @Test

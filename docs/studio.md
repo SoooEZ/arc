@@ -8,7 +8,7 @@ Open **Code studio** in the sidebar, or **Code editor** inside a rule. The graph
 - Outline: jump to a node declaration. Node positions and IDs survive code/graph changes.
 - Comments use `//` and are retained at the top of canonical code.
 
-Graph view uses the same functions. Expression fields in Condition, Switch, Formula, Output, parameter mappings and Transform use inline code editors. Typing suggests available upstream variables and supported functions; **Tab** accepts a suggestion, moves between inserted function arguments, or indents when no suggestion is active. **Ctrl/⌘ Space** opens suggestions manually. Operators display their individual characters, including both signs in `==`.
+Graph view uses the same functions. Expression fields in Condition, Switch, Formula, Output, parameter mappings and Transform use inline code editors. Functions use a `$` prefix: `$ROUND(amount, 2)`. Variables have no prefix, so `$SUM(SUM)` calls the function with an input named `SUM`. Typing `$` suggests functions; ordinary identifiers suggest available upstream variables and supported functions. **Tab** accepts a suggestion, moves between inserted function arguments, or indents when no suggestion is active. **Ctrl/⌘ Space** opens suggestions manually. Operators display their individual characters, including both signs in `==`.
 
 Choose **Functions & editor** for a larger editor with the grouped catalog, hover help, click-to-insert snippets and upstream-variable chips. Apply changes that expression in the shared draft; Cancel preserves it. Syntax and unavailable-variable checks run as you edit in the dialog; Test rule checks runtime values and types. Read-only versions allow inspection without applying edits. The preview panel's **Input JSON** and the published API playground also use code editors with Tab/Shift+Tab indentation and bracket matching. Incomplete JSON stays editable; running checks the current buffer. Monaco's **Ctrl+M** (**Ctrl+Shift+M** on macOS) toggle lets Tab move focus out of the editor when needed.
 
@@ -85,9 +85,9 @@ inputs {
 }
 node input INPUT "Inputs" { next -> normalize; }
 node normalize TRANSFORM "Normalize customer" {
-  field "displayName" = UPPER(TRIM(customer.name));
-  field "amount" = TO_NUMBER(customer.amount);
-  field "country" = COALESCE(customer.country, "US");
+  field "displayName" = $UPPER($TRIM(customer.name));
+  field "amount" = $TO_NUMBER(customer.amount);
+  field "country" = $COALESCE(customer.country, "US");
   as normalized;
   next -> choose;
 }
@@ -105,12 +105,12 @@ node regular OUTPUT "Regular price" { return normalized.amount; }
 
 The default inputs return `120` through the first matching pricing branch.
 
-In Transform, add named fields and choose upstream values, typed constants or expressions. Field names are literal keys, including names containing dots. Fields share the incoming scope, so one field cannot reference another field being created. Access the resulting object in later nodes as `normalized.amount` or `GET(normalized, "amount")`. Use **Edit as one expression** to edit an object/array expression; the field mappings stay intact until a valid expression is applied. Whole-expression mode is also available in code:
+In Transform, add named fields and choose upstream values, typed constants or expressions. Field names are literal keys, including names containing dots. Fields share the incoming scope, so one field cannot reference another field being created. Access the resulting object in later nodes as `normalized.amount` or `$GET(normalized, "amount")`. Use **Edit as one expression** to edit an object/array expression; the field mappings stay intact until a valid expression is applied. Whole-expression mode is also available in code:
 
 ```arc
 node normalize TRANSFORM "Normalize items" {
-  let normalized = MAP(FILTER(items, item, item.active), item,
-    OBJECT("sku", item.sku, "price", ROUND(TO_NUMBER(item.price), 2)));
+  let normalized = $MAP($FILTER(items, item, item.active), item,
+    $OBJECT("sku", item.sku, "price", $ROUND($TO_NUMBER(item.price), 2)));
   next -> output;
 }
 ```
@@ -119,14 +119,14 @@ This fragment requires an upstream `items` array and an `output` node. A transfo
 
 | Function | Behavior |
 | --- | --- |
-| `OBJECT("key", value, ...)` | Builds an object; duplicate keys are rejected; `OBJECT()` returns an empty object. |
-| `MERGE(object, ...)` | Shallow merge into a new object; later fields replace earlier values. |
-| `COALESCE(value, ..., fallback)` | First non-null value; short-circuits and retains `0`, `false` and empty text. |
-| `TO_NUMBER(value)` | Decimal conversion from numeric text; retains precision and rejects invalid text. |
-| `TO_STRING(value)` | Converts scalar values to text; rejects arrays/objects. |
-| `TO_BOOLEAN(value)` | Accepts booleans or case-insensitive, trimmed `true`/`false` text. |
+| `$OBJECT("key", value, ...)` | Builds an object; duplicate keys are rejected; `$OBJECT()` returns an empty object. |
+| `$MERGE(object, ...)` | Shallow merge into a new object; later fields replace earlier values. |
+| `$COALESCE(value, ..., fallback)` | First non-null value; short-circuits and retains `0`, `false` and empty text. |
+| `$TO_NUMBER(value)` | Decimal conversion from numeric text; retains precision and rejects invalid text. |
+| `$TO_STRING(value)` | Converts scalar values to text; rejects arrays/objects. |
+| `$TO_BOOLEAN(value)` | Accepts booleans or case-insensitive, trimmed `true`/`false` text. |
 
-All three conversions preserve null. Use `COALESCE` for null defaults or `IFERROR` when invalid values should fall back. Existing `TRIM`, `UPPER`, `LOWER`, `SUBSTITUTE`, `GET`, `MAP`, `FILTER`, `PLUCK`, `REDUCE` and aggregates compose with these functions. Each expression remains limited to 2,000 characters and 256 tokens; split larger calculations into connected Formula/Transform nodes or reusable rules.
+All three conversions preserve null. Use `$COALESCE` for null defaults or `$IFERROR` when invalid values should fall back. Existing `$TRIM`, `$UPPER`, `$LOWER`, `$SUBSTITUTE`, `$GET`, `$MAP`, `$FILTER`, `$PLUCK`, `$REDUCE` and aggregates compose with these functions. Each expression remains limited to 2,000 characters and 256 tokens; split larger calculations into connected Formula/Transform nodes or reusable rules.
 
 ## Example
 
@@ -149,7 +149,7 @@ node eligibility CONDITION "Minimum amount" {
   false -> rejected;
 }
 node calculate FORMULA "Add tax" {
-  let total = ROUND(amount * (1 + taxRate), 2);
+  let total = $ROUND(amount * (1 + taxRate), 2);
   next -> output;
 }
 node output OUTPUT "Total" {
@@ -164,25 +164,29 @@ The included `country-tax` lookup returns `{ "rate": 0.07, "currency": "USD" }` 
 
 ## Formula examples
 
+New catalog insertions, modules and examples use `$FUNCTION(...)`. Existing expressions without the prefix remain executable, including saved drafts, published versions and pinned source bindings. Opening or executing a historical version does not rewrite its stored expressions. Quoted strings containing `$` retain their literal text.
+
+Input and source parameter names use 1–64 letters, digits or underscores, starting with a letter or underscore. Spaces and `$` are not allowed; `true`, `false`, `null`, `and` and `or` are reserved regardless of case. The input-name field rejects prohibited characters, and source-parameter JSON reports invalid names before saving. Node display names, object keys and string values are separate from parameter identifiers.
+
 ```text
-SUM([0.1, 0.2], 0.3)
-IF(amount >= 100, ROUND(amount * 0.9, 2), amount)
-IFERROR(amount / count, 0)
-SWITCH(tier, "premium", 0.2, "standard", 0.1, 0)
-UPPER(LEFT(customer.name, 3))
-VLOOKUP(2, [[1, 10], [2, 20]], 2, false)
-SUM(MAP(items, item, item.price * item.quantity))
-FILTER(items, item, item.price > 10)
-ALL(items, item, item.price > 0)
-ANY(items, item, item.discounted)
-PLUCK(items, "price", 0)
-GET(customer, "address.country", "US")
-REDUCE(items, item, acc, 0, acc + item.price)
+$SUM([0.1, 0.2], 0.3)
+$IF(amount >= 100, $ROUND(amount * 0.9, 2), amount)
+$IFERROR(amount / count, 0)
+$SWITCH(tier, "premium", 0.2, "standard", 0.1, 0)
+$UPPER($LEFT(customer.name, 3))
+$VLOOKUP(2, [[1, 10], [2, 20]], 2, false)
+$SUM($MAP(items, item, item.price * item.quantity))
+$FILTER(items, item, item.price > 10)
+$ALL(items, item, item.price > 0)
+$ANY(items, item, item.discounted)
+$PLUCK(items, "price", 0)
+$GET(customer, "address.country", "US")
+$REDUCE(items, item, acc, 0, acc + item.price)
 ```
 
-Function names are case insensitive. Variable names are case sensitive. Arithmetic supports `+ - * / % ^`; comparisons support `== = != <> < <= > >=`; boolean operators support `&& || !` and uppercase infix `AND OR`. The exponent operator accepts integers from -100 to 100. Strings use single or double quotes. Arrays use brackets. Core aggregates require numeric elements. Core `FLOOR`/`CEIL` take one argument; `ROUND`, `ROUNDDOWN`, `ROUNDUP` accept -12…12 places. Empty or missing object paths return null (`GET`/`PLUCK` accept a fallback).
+Function names are case insensitive. Variable names are case sensitive. Arithmetic supports `+ - * / % ^`; comparisons support `== = != <> < <= > >=`; boolean operators support `&& || !` and uppercase infix `AND OR`. The exponent operator accepts integers from -100 to 100. Strings use single or double quotes. Arrays use brackets. Core aggregates require numeric elements. Core `$FLOOR`/`$CEIL` take one argument; `$ROUND`, `$ROUNDDOWN`, `$ROUNDUP` accept -12…12 places. Empty or missing object paths return null (`$GET`/`$PLUCK` accept a fallback).
 
-`COMBIN` limits n to 10,000; `FIXED`/`DOLLAR`/`TRUNC` limit decimal places to -100…100 to bound work and output allocation.
+`$COMBIN` limits n to 10,000; `$FIXED`/`$DOLLAR`/`$TRUNC` limit decimal places to -100…100 to bound work and output allocation.
 
 The catalog lists functions known to the bundled Excel engine, with **Available** versus **Reference only** status. It does not claim all Microsoft 365 functions or complete Dentaku compatibility. Complex Excel calculations use Apache POI's Excel numeric semantics; core arithmetic/aggregates use decimal math. Rectangular matrix results are returned as nested arrays. Functions depending on workbook state are not supported. Consult the runtime catalog for the exact supported signatures.
 

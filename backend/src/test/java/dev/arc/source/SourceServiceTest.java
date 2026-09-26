@@ -38,4 +38,29 @@ class SourceServiceTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Duplicate source adapter");
   }
+
+  @Test
+  void sourceParameterNamesRejectWhitespaceAndDollarBeforeStorage() {
+    var repository = mock(SourceRepository.class);
+    var adapter = mock(SourceAdapter.class);
+    when(adapter.kind()).thenReturn("MEMORY");
+    var service =
+        new SourceService(repository, new SourceValidator(new SourceAdapters(List.of(adapter))));
+    for (String name : List.of("unit price", "price\t", "price\u00a0", "$ROUND", "round$")) {
+      var definition =
+          new SourceDefinition(
+              "MEMORY", null, List.of(new Input(name, "NUMBER", true, null)), null, null, 0);
+      assertThatThrownBy(
+              () -> service.create(new SourceService.Create("memory", "Memory", definition)))
+          .as(name)
+          .hasMessage("Invalid source parameter");
+    }
+    verifyNoInteractions(repository);
+    verify(adapter, never()).validate(any());
+    var valid =
+        new SourceDefinition(
+            "MEMORY", null, List.of(new Input("ROUND", "NUMBER", true, null)), null, null, 0);
+    service.create(new SourceService.Create("memory", "Memory", valid));
+    verify(repository).create("memory", "Memory", valid);
+  }
 }

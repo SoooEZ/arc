@@ -89,6 +89,41 @@ class ArcScriptContractTest {
   }
 
   @Test
+  void prefixedFunctionsRoundTripWithoutRewritingLegacyCallsOrQuotedDollars() {
+    String source =
+        """
+        inputs { ROUND: NUMBER required; }
+        node start INPUT "Start" { next -> calc; }
+        node calc FORMULA "Calculate" {
+          let value = $ROUND(ROUND, 2) + ROUND(1, 0);
+          next -> done;
+        }
+        node done OUTPUT "Done" {
+          return $OBJECT("$ROUND(1) and ROUND(1)", $IF(value > 0, value, 0));
+        }
+        """;
+    var built = script.build(source);
+    assertThat(built.diagnostics()).isEmpty();
+    assertThat(built.source())
+        .contains("$ROUND(ROUND, 2) + ROUND(1, 0)", "\"$ROUND(1) and ROUND(1)\"");
+    assertThat(script.build(built.source()).definition()).isEqualTo(built.definition());
+    assertThat(
+            script
+                .buildNode(
+                    built.definition(), "calc", script.renderNode(built.definition(), "calc"))
+                .definition())
+        .isEqualTo(built.definition());
+    assertThat(script.checkExpression(built.definition().nodes().get(1).expression()).variables())
+        .containsExactly("ROUND");
+    new Validator()
+        .validate(
+            built.definition(),
+            (id, version) -> {
+              throw new AssertionError("Unexpected reference");
+            });
+  }
+
+  @Test
   void largeValidGraphsRemainEditableThroughTheirRenderedCode() throws Exception {
     var nodes = new ArrayList<Node>();
     var edges = new ArrayList<Edge>();

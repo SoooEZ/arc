@@ -77,8 +77,8 @@ export default function ExpressionDialog({
       </DialogTitle>
       <DialogContent className="node-expression-content">
         <p className="muted-copy">
-          Use nested functions and upstream variables. Tab moves between
-          function arguments; Ctrl/⌘ Space opens suggestions.
+          Functions start with $. Use upstream variables as arguments. Tab moves
+          between arguments; Ctrl/⌘ Space opens suggestions.
         </p>
         <div className="expression-variable-chips">
           {variables.map((variable) => (

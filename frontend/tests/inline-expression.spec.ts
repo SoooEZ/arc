@@ -7,12 +7,17 @@ import {
 import type { Definition, Rule } from "../src/types";
 import { editorLines, editorSurface, setEditorText } from "./helpers/editor";
 
-async function create(request: APIRequestContext, expression = "hello.a == 1") {
+async function create(
+  request: APIRequestContext,
+  expression = "hello.a == 1",
+  additionalInputs: Definition["inputs"] = [],
+) {
   const id = `inline-expression-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
       { name: "hello", type: "OBJECT", required: true, defaultValue: { a: 1 } },
+      ...additionalInputs,
     ],
     nodes: [
       {
@@ -138,7 +143,9 @@ test("inline completion accepts scoped variables and function snippets with Tab 
   page,
   request,
 }) => {
-  const rule = await create(request);
+  const rule = await create(request, "hello.a == 1", [
+    { name: "prism", type: "NUMBER", required: true, defaultValue: 0 },
+  ]);
   await page.goto(`/#/rules/${rule.id}?node=choose`);
   const first = page.getByLabel("Case 1 condition", { exact: true });
   const second = page.getByLabel("Case 2 condition", { exact: true });
@@ -153,12 +160,12 @@ test("inline completion accepts scoped variables and function snippets with Tab 
   await expect(editorLines(first)).toHaveText("hello");
   await expect(editorLines(second)).toHaveText("hello.a == 2");
   await setEditorText(page, first, "");
-  await page.keyboard.type("ROUND");
+  await page.keyboard.type("$ROUND");
   await expect(
-    suggestions.getByRole("option", { name: "ROUND, Function", exact: true }),
+    suggestions.getByRole("option", { name: "$ROUND, Function", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Tab");
-  await expect(editorLines(first)).toHaveText("ROUND(amount, 2)");
+  await expect(editorLines(first)).toHaveText("$ROUND(amount, 2)");
   await page.keyboard.insertText("hello.a");
   await page.keyboard.press("Tab");
   await page.keyboard.insertText("0");
@@ -166,12 +173,12 @@ test("inline completion accepts scoped variables and function snippets with Tab 
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.press("ArrowRight");
   await page.keyboard.insertText(" > 0");
-  await expect(editorLines(first)).toHaveText("ROUND(hello.a, 0) > 0");
+  await expect(editorLines(first)).toHaveText("$ROUND(hello.a, 0) > 0");
   await page
     .getByRole("button", { name: "Move case 2 up", exact: true })
     .click();
   await expect(editorLines(first)).toHaveText("hello.a == 2");
-  await expect(editorLines(second)).toHaveText("ROUND(hello.a, 0) > 0");
+  await expect(editorLines(second)).toHaveText("$ROUND(hello.a, 0) > 0");
   await setEditorText(page, first, "");
   await page.keyboard.type("pri");
   await expect(suggestions.getByText("price", { exact: true })).toBeVisible();
@@ -181,19 +188,19 @@ test("inline completion accepts scoped variables and function snippets with Tab 
   const formula = page.getByLabel("Expression", { exact: true });
   await setEditorText(page, formula, "");
   await page.keyboard.type("pri");
-  await expect(suggestions).toBeVisible();
+  await expect(suggestions.getByText("prism", { exact: true })).toBeVisible();
   await expect(suggestions.getByText("price", { exact: true })).toHaveCount(0);
   await setEditorText(page, formula, "hello.a * 2");
   await focusNode(page, "Choose amount");
   await expect(editorLines(first)).toHaveText("price == 2");
-  await expect(editorLines(second)).toHaveText("ROUND(hello.a, 0) > 0");
+  await expect(editorLines(second)).toHaveText("$ROUND(hello.a, 0) > 0");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
   const saved: Rule = await (await request.get(`/api/rules/${rule.id}`)).json();
   expect(saved.draft.nodes.find((node) => node.id === "choose")?.cases).toEqual(
     [
       { id: "two", label: "Two", expression: "price == 2" },
-      { id: "one", label: "One", expression: "ROUND(hello.a, 0) > 0" },
+      { id: "one", label: "One", expression: "$ROUND(hello.a, 0) > 0" },
     ],
   );
 });

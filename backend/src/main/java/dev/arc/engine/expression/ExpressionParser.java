@@ -24,7 +24,7 @@ final class ExpressionParser {
           .build();
   private static final Pattern TOKEN =
       Pattern.compile(
-          "\\s*(?:(\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|\\.\\d+)|([A-Za-z_][A-Za-z_0-9.]*)|(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')|(&&|\\|\\||==|!=|<>|<=|>=|[=^\\[\\]+*/%<>()!,\\-]))");
+          "\\s*(?:(\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|\\.\\d+)|(\\$?[A-Za-z_][A-Za-z_0-9.]*)|(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')|(&&|\\|\\||==|!=|<>|<=|>=|[=^\\[\\]+*/%<>()!,\\-]))");
 
   private static int priority(String op) {
     return switch (op) {
@@ -132,9 +132,11 @@ final class ExpressionParser {
     if (token.equalsIgnoreCase("true") && !peek().equals("(")) return context -> true;
     if (token.equalsIgnoreCase("false") && !peek().equals("(")) return context -> false;
     if (token.equalsIgnoreCase("null")) return context -> null;
-    if (!token.matches("[A-Za-z_][A-Za-z_0-9.]*"))
+    if (!token.matches("\\$?[A-Za-z_][A-Za-z_0-9.]*"))
       throw ArcException.invalid("Unexpected token: " + token);
     if (peek().equals("(")) return functionCall(token);
+    if (token.startsWith("$"))
+      throw ArcException.invalid("Function name must be followed by '(': " + token);
     return variable(token);
   }
 
@@ -151,7 +153,8 @@ final class ExpressionParser {
 
   private Expr functionCall(String token) {
     expect("(");
-    String name = token.toUpperCase(Locale.ROOT);
+    // Legacy calls remain executable in stored drafts, pinned versions and source mappings.
+    String name = (token.startsWith("$") ? token.substring(1) : token).toUpperCase(Locale.ROOT);
     if (Set.of("MAP", "FILTER", "ALL", "ANY", "REDUCE").contains(name)) return collectionCall(name);
     List<Expr> arguments = arguments(")");
     Functions.arity(name, arguments.size());

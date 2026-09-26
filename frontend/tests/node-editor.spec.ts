@@ -99,9 +99,9 @@ test("node expressions edit one node, group functions, and flag all invalid expr
   await dialog.getByPlaceholder("Search functions…").fill("SUM");
   await dialog
     .locator(".function-chips")
-    .getByRole("button", { name: "SUM", exact: true })
+    .getByRole("button", { name: "$SUM", exact: true })
     .hover();
-  await expect(page.getByRole("tooltip", { name: /^SUM\(/ })).toContainText(
+  await expect(page.getByRole("tooltip", { name: /^\$SUM\(/ })).toContainText(
     "Aggregates",
   );
   await replaceCode(

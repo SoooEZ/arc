@@ -29,8 +29,10 @@ def call(method, path, body=None, status=200):
 
 functions = call("GET", "/functions")
 assert len([f for f in functions if f["supported"]]) >= 150
-assert any(f["name"] == "MAP" and f["supported"] for f in functions)
-assert any(f["name"] == "INDIRECT" and not f["supported"] for f in functions)
+assert all(f["name"].startswith("$") and f["signature"].startswith(f["name"] + "(") for f in functions)
+assert all(f["snippet"].startswith("\\" + f["name"] + "(") for f in functions)
+assert any(f["name"] == "$MAP" and f["supported"] for f in functions)
+assert any(f["name"] == "$INDIRECT" and not f["supported"] for f in functions)
 source_id = PREFIX + "-table"
 config = {"kind": "LOOKUP", "parameters": [{"name": "key", "type": "STRING", "required": True}],
           "entries": {"US": {"rate": 0.07}}, "timeoutMs": 3000}
@@ -60,7 +62,7 @@ inputs {
   source rate = {"id":"SOURCE_ID","version":1,"bindings":{"key":"country"},"pointer":"/rate","onError":"DEFAULT"};
 }
 node input INPUT "Inputs" { next -> output; }
-node output OUTPUT "Result" { return ROUND(amount * (1 + rate), 2); }
+node output OUTPUT "Result" { return $ROUND(amount * (1 + rate), 2); }
 '''.replace("SOURCE_ID", source_id)
 build = call("POST", "/studio/build", {"source": script})
 assert not build["diagnostics"]
@@ -107,7 +109,7 @@ assert fallback["result"] == 101 and fallback["sources"][0]["status"] == "DEFAUL
 override = call("POST", f"/rules/{rule_id}/execute", {"inputs": {"country": "XX", "rate": 0.3}})
 assert override["result"] == 130 and not override["sources"]
 call("POST", f"/rules/{rule_id}/execute", {"inputs": {"rate": "bad"}}, 422)
-invalid = call("POST", "/studio/build", {"source": script.replace("ROUND(amount * (1 + rate), 2)", "1 +")})
+invalid = call("POST", "/studio/build", {"source": script.replace("$ROUND(amount * (1 + rate), 2)", "1 +")})
 assert invalid["definition"] is None and invalid["diagnostics"][0]["line"] > 1
 missing = copy.deepcopy(definition)
 missing["inputs"][2]["source"]["id"] = "no-such-source"
@@ -123,6 +125,48 @@ call("POST", "/preview", {"definition": wrong_pointer, "inputs": {}}, 422)
 http_id = PREFIX + "-http"
 call("POST", "/sources", {"id": http_id, "name": "Blocked internal fixture", "definition": {"kind": "HTTP", "url": "http://127.0.0.1:8080/api/rules", "parameters": [], "timeoutMs": 500}})
 call("POST", f"/sources/{http_id}/test", {"inputs": {}}, 422)
-print(f"PASS: {checks} studio/source HTTP checks, version pins, fallbacks, caller overrides, diagnostics, and HTTP destination policy.")
+
+# Functions and inputs can share a basename. Existing immutable versions keep
+# their original syntax while new authoring uses the explicit function namespace.
+namespace_script = '''schema 1;
+inputs {
+  SUM: NUMBER required default 3;
+  ROUND: NUMBER required default 1.234;
+}
+node input INPUT "Inputs" { next -> output; }
+node output OUTPUT "Result" { return $SUM(SUM, $ROUND(ROUND, 2)); }
+'''
+namespace_build = call("POST", "/studio/build", {"source": namespace_script})
+assert not namespace_build["diagnostics"]
+namespace_definition = namespace_build["definition"]
+expression = namespace_definition["nodes"][1]["expression"]
+assert expression == "$SUM(SUM, $ROUND(ROUND, 2))"
+dependencies = call("POST", "/studio/expression/check", {"expression": expression})
+assert dependencies["valid"] and set(dependencies["variables"]) == {"SUM", "ROUND"}
+legacy_definition = copy.deepcopy(namespace_definition)
+legacy_definition["nodes"][1]["expression"] = "SUM(SUM, ROUND(ROUND, 2))"
+namespace_id = PREFIX + "-namespace"
+namespace_rule = call("POST", "/rules", {"id": namespace_id, "name": "Function namespace", "kind": "FORMULA", "definition": legacy_definition}, 201)
+namespace_rule = call("POST", f"/rules/{namespace_id}/publish", {"revision": namespace_rule["revision"]})
+namespace_rule = call("PUT", f"/rules/{namespace_id}", {
+    "name": namespace_rule["name"], "description": namespace_rule["description"],
+    "revision": namespace_rule["revision"], "definition": namespace_definition})
+call("POST", f"/rules/{namespace_id}/publish", {"revision": namespace_rule["revision"]})
+for version in [1, 2]:
+    assert call("POST", f"/rules/{namespace_id}/execute", {"version": version, "inputs": {}})["result"] == 4.23
+assert call("GET", f"/rules/{namespace_id}/versions/1")["definition"] == legacy_definition
+namespace_rendered = call("POST", "/studio/render", namespace_definition)
+assert "$SUM(SUM, $ROUND(ROUND, 2))" in namespace_rendered["source"]
+assert call("POST", "/studio/build", namespace_rendered)["definition"] == namespace_definition
+
+for index, invalid_name in enumerate(["bad name", "$SUM", "bad\tname"]):
+    invalid_definition = copy.deepcopy(namespace_definition)
+    invalid_definition["inputs"][0]["name"] = invalid_name
+    call("POST", "/rules", {"id": PREFIX + f"-invalid-name-{index}", "name": "Invalid name", "kind": "FORMULA", "definition": invalid_definition}, 422)
+    invalid_config = {"kind": "HTTP", "url": "https://example.com/data", "timeoutMs": 500,
+                      "parameters": [{"name": invalid_name, "type": "STRING", "required": True}]}
+    call("POST", "/sources", {"id": PREFIX + f"-invalid-source-name-{index}", "name": "Invalid source name", "definition": invalid_config}, 422)
+
+print(f"PASS: {checks} studio/source HTTP checks, function namespaces, identifier validation, version pins, fallbacks, caller overrides, diagnostics, and HTTP destination policy.")
 print(f"Created rule fixture: {rule_id}")
 print(f"Created source fixtures: {source_id}, {http_id}")

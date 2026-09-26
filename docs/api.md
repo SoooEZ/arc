@@ -63,7 +63,7 @@ Data sources use the same page envelope and bounds: `GET /source-summaries?offse
     "inputs": [{"name":"amount","type":"NUMBER","required":true,"defaultValue":null}],
     "nodes": [
       {"id":"input","type":"INPUT","label":"Inputs","position":{"x":280,"y":0}},
-      {"id":"result","type":"OUTPUT","label":"Total with tax","position":{"x":280,"y":160},"expression":"round(amount * 1.08, 2)"}
+      {"id":"result","type":"OUTPUT","label":"Total with tax","position":{"x":280,"y":160},"expression":"$round(amount * 1.08, 2)"}
     ],
     "edges": [{"id":"input-result","source":"input","target":"result","sourceHandle":"next"}]
   }

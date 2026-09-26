@@ -66,13 +66,13 @@ export const modules: StudioModule[] = [
     name: "Transform data",
     placement: "end",
     snippet:
-      '\nnode "${1:transform}" TRANSFORM "${2:Normalize data}" {\n  field "${3:name}" = ${4:UPPER(TRIM(customer.name))};\n  field "${5:amount}" = ${6:TO_NUMBER(customer.amount)};\n  as ${7:normalized};\n  next -> "${8:output}";\n}\n',
+      '\nnode "${1:transform}" TRANSFORM "${2:Normalize data}" {\n  field "${3:name}" = ${4:\\$UPPER(\\$TRIM(customer.name))};\n  field "${5:amount}" = ${6:\\$TO_NUMBER(customer.amount)};\n  as ${7:normalized};\n  next -> "${8:output}";\n}\n',
   },
   {
     name: "Formula",
     placement: "end",
     snippet:
-      '\nnode "${1:calculate}" FORMULA "${2:Calculate}" {\n  let ${3:total} = ${4:ROUND(amount * 1.2, 2)};\n  next -> "${5:output}";\n}\n',
+      '\nnode "${1:calculate}" FORMULA "${2:Calculate}" {\n  let ${3:total} = ${4:\\$ROUND(amount * 1.2, 2)};\n  next -> "${5:output}";\n}\n',
   },
   {
     name: "Decision branch",

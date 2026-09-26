@@ -98,7 +98,7 @@ export default function TransformFields({
             buttonLabel="Edit as one expression"
             disabled={readOnly}
             variables={variables}
-            value={`OBJECT(${fields.map((field) => `${quoteText(field.name)}, ${field.expression || "null"}`).join(", ")})`}
+            value={`$OBJECT(${fields.map((field) => `${quoteText(field.name)}, ${field.expression || "null"}`).join(", ")})`}
             onChange={(expression) =>
               patch({
                 fields: null,
@@ -115,7 +115,7 @@ export default function TransformFields({
             variables={variables}
             disabled={readOnly}
             onChange={(expression) => patch({ expression })}
-            helperText="Use OBJECT, MERGE, MAP, FILTER or nested functions to return any value."
+            helperText="Use $OBJECT, $MERGE, $MAP, $FILTER or nested functions to return any value."
           />
           <p className="muted-copy">
             For field mapping, add a separate Transform node. This expression

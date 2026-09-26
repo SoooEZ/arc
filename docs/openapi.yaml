@@ -289,7 +289,7 @@ paths:
       operationId: listFunctions
       responses:
         '200':
-          description: Runtime function catalog, including explicit supported flags and insertion snippets
+          description: Runtime function catalog with dollar-prefixed names and signatures, explicit supported flags, and Monaco insertion snippets
           content:
             application/json:
               schema: {type: array, items: {$ref: '#/components/schemas/Function'}}
@@ -711,7 +711,7 @@ components:
             type: object
             required: [name, type, required]
             properties:
-              name: {type: string}
+              name: {type: string, pattern: '^[A-Za-z_][A-Za-z_0-9]{0,63}$', description: No whitespace or dollar sign; true/false/null/and/or are reserved regardless of case}
               type: {type: string, enum: [NUMBER, STRING, BOOLEAN]}
               required: {type: boolean}
               defaultValue: {nullable: true}
@@ -728,10 +728,12 @@ components:
     Function:
       type: object
       properties:
-        name: {type: string}
+        name: {type: string, pattern: '^\$[A-Z_][A-Z_0-9.]*$', example: '$ROUND'}
         category: {type: string}
         signature: {type: string}
         description: {type: string}
-        snippet: {type: string}
+        snippet:
+          type: string
+          description: Monaco snippet syntax; literal function dollars are escaped as \$ while argument placeholders remain active
         supported: {type: boolean}
         origin: {type: string}

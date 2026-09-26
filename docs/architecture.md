@@ -22,7 +22,7 @@ References always contain a rule ID and positive integer version. Publishing nev
   ],
   "nodes": [
     {"id": "input", "type": "INPUT", "label": "Inputs", "position": {"x": 280, "y": 0}},
-    {"id": "calculate", "type": "FORMULA", "label": "Apply tax", "position": {"x": 280, "y": 160}, "expression": "round(amount * 1.08, 2)", "output": "total"},
+    {"id": "calculate", "type": "FORMULA", "label": "Apply tax", "position": {"x": 280, "y": 160}, "expression": "$round(amount * 1.08, 2)", "output": "total"},
     {"id": "result", "type": "OUTPUT", "label": "Return total", "position": {"x": 280, "y": 320}, "expression": "total"}
   ],
   "edges": [
@@ -65,7 +65,7 @@ Every case and default must be connected for validation/publication. Each select
 
 ARC Script uses `case id "Label" when predicate;` without a selector. Value matching adds `select expression;` and uses `case id "Label" equals expression;`. A node cannot mix `when` and `equals` cases. The `select` declaration may appear before or after its cases; case declaration order always sets priority. Canonical rendering places `select` first. Both modes retain `case:<id>` and `default` connection handles. See [the Switch examples](studio.md#switch-and-data-transformation) for complete scripts.
 
-Transform creates a new value without mutating inputs. Field mappings produce an object with literal field names; each expression reads the same incoming scope, not sibling field results. Use another node for dependent calculations. Whole-expression mode can return any supported value, including arrays through `MAP`/`FILTER`. `fields` and `expression` cannot both be populated. Transformation rules are ordinary versioned graphs and can be reused through Reference nodes. The new optional node properties extend schema 1; existing nodes and stored versions keep their original behavior.
+Transform creates a new value without mutating inputs. Field mappings produce an object with literal field names; each expression reads the same incoming scope, not sibling field results. Use another node for dependent calculations. Whole-expression mode can return any supported value, including arrays through `$MAP`/`$FILTER`. `fields` and `expression` cannot both be populated. Transformation rules are ordinary versioned graphs and can be reused through Reference nodes. The new optional node properties extend schema 1; existing nodes and stored versions keep their original behavior.
 
 ## Canvas layout
 
@@ -102,6 +102,8 @@ An execution has isolated per-node variable scopes, a depth guard, an independen
 
 Expressions are parsed into a small syntax tree, never delegated to a general-purpose scripting engine.
 
+Function calls use the `$` namespace, for example `$ROUND(amount, 2)` or `$SUM(SUM)`. Functions are case insensitive; variables are case sensitive and cannot contain `$` or whitespace. The parser also accepts legacy unprefixed calls so existing drafts and immutable published versions keep their behavior. Catalog insertions and newly generated examples use the prefix; stored expressions and quoted strings are not rewritten.
+
 | Feature | Examples |
 | --- | --- |
 | Decimal arithmetic | `amount * (1 - rate)`, `a + b`, `a / b`, `a % b` |
@@ -110,9 +112,9 @@ Expressions are parsed into a small syntax tree, never delegated to a general-pu
 | Comparisons | `==`, `!=`, `<`, `<=`, `>`, `>=` |
 | Boolean logic | `&&`, `\|\|`, `!`, `true`, `false` |
 | Null checks | `optionalValue == null` |
-| Math functions | `min(a, b, ...)`, `max(a, b, ...)`, `abs(x)`, `floor(x)`, `ceil(x)` |
-| Rounding | `round(value, 2)` (HALF_UP; precision −12–12) |
-| Conditional value | `if(condition, valueWhenTrue, valueWhenFalse)` |
+| Math functions | `$min(a, b, ...)`, `$max(a, b, ...)`, `$abs(x)`, `$floor(x)`, `$ceil(x)` |
+| Rounding | `$round(value, 2)` (HALF_UP; precision −12–12) |
+| Conditional value | `$if(condition, valueWhenTrue, valueWhenFalse)` |
 
 Numeric operations use Java `BigDecimal` with DECIMAL128 (34 significant digits). Decimal addition avoids binary floating-point drift. Nonterminating division is rounded with DECIMAL128; use explicit `round` for business-specific decimal places. Equality treats `1` and `1.0` as equal. Strings support equality and lexicographic ordering; `+` is numeric only. Boolean operators and `if` short-circuit.
 
@@ -147,7 +149,7 @@ HTTP requests use encoded query parameters, a per-call deadline limited by the r
 
 The expression engine keeps decimal arithmetic for core math. Apache POI supplies context-free Excel calculations; these use Excel floating-point semantics. A shared capability registry exposes callable functions and reference-only functions separately. This is an Excel/Dentaku-inspired calculation dialect, not a workbook engine or a drop-in Dentaku implementation. No cell references, workbook formulas, macros, arbitrary Ruby, or host-language calls are evaluated. Functions requiring workbook context or a missing adapter are shown as reference-only.
 
-Arrays and objects are input types. Arrays can be used as Excel ranges. `MAP`, `FILTER`, `ALL`, `ANY`, and `REDUCE` use explicitly scoped local identifiers. `PLUCK` and `GET` accept quoted dot paths. Object property access is available inside ordinary expressions (`customer.country`, `item.price`). Expressions remain bounded by source length, token/depth limits, numeric/string limits, collection size/depth limits, and an iteration budget.
+Arrays and objects are input types. Arrays can be used as Excel ranges. `$MAP`, `$FILTER`, `$ALL`, `$ANY`, and `$REDUCE` use explicitly scoped local identifiers. `$PLUCK` and `$GET` accept quoted dot paths. Object property access is available inside ordinary expressions (`customer.country`, `item.price`). Expressions remain bounded by source length, token/depth limits, numeric/string limits, collection size/depth limits, and an iteration budget.
 
 The parser and runtime are separate internal modules behind `engine.expression.Expressions.compile/evaluate`. A compiled expression can be reused, but each evaluation has its own scope and operation budget; nested collection scopes share that evaluation's budget. The private string-literal parser reuses Jackson's Unicode/escape decoding with ARC-compatible quote and escape options. HTTP and persistence JSON remain strict. [Library alternatives and compatibility requirements](reviews/2026-09-22-library-options.md) document why a general expression engine is not currently a drop-in replacement.
 

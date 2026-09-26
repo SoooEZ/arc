@@ -69,7 +69,7 @@ public class RuleSamples implements ApplicationRunner {
                     "Apply discount",
                     280,
                     160,
-                    "round(amount * (1 - rate), 2)",
+                    "$ROUND(amount * (1 - rate), 2)",
                     "discounted"),
                 node("result", "OUTPUT", "Discounted amount", 280, 320, "discounted", null)),
             List.of(edge("input", "discount", "next"), edge("discount", "result", "next")));

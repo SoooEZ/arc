@@ -49,7 +49,19 @@ final class FunctionCatalog {
       all.put(name, ExcelFunctionHelp.describe(entry));
     }
     CUSTOM.forEach((name, spec) -> all.put(name, spec.entry()));
-    return List.copyOf(all.values());
+    return all.values().stream().map(FunctionCatalog::editorEntry).toList();
+  }
+
+  private static Entry editorEntry(Entry entry) {
+    // Literal function dollars must survive Monaco's snippet parser; argument tab stops stay live.
+    return new Entry(
+        "$" + entry.name(),
+        entry.category(),
+        "$" + entry.signature(),
+        entry.description(),
+        "\\$" + entry.snippet(),
+        entry.supported(),
+        entry.origin());
   }
 
   private static Entry excelEntry(String name) {

@@ -22,7 +22,7 @@ final class BuiltinFunctionCatalog {
         100,
         "Data transformation",
         "OBJECT(\"key\", value, ...)",
-        "Builds an object from key/value pairs, including nested objects and arrays. Keys must be unique; OBJECT() returns an empty object.",
+        "Builds an object from key/value pairs, including nested objects and arrays. Keys must be unique; $OBJECT() returns an empty object.",
         "OBJECT(\"${1:name}\", ${2:value})");
     add(
         specs,
@@ -32,7 +32,7 @@ final class BuiltinFunctionCatalog {
         "Data transformation",
         "MERGE(object, ...)",
         "Creates a shallow merged object. Later objects replace matching fields; inputs stay unchanged.",
-        "MERGE(${1:customer}, OBJECT(\"${2:status}\", ${3:\"active\"}))");
+        "MERGE(${1:customer}, \\$OBJECT(\"${2:status}\", ${3:\"active\"}))");
     add(
         specs,
         "COALESCE",
@@ -125,7 +125,7 @@ final class BuiltinFunctionCatalog {
           1,
           "Math",
           n + "(number)",
-          "Decimal numeric operation; FLOOR and CEIL round to an integer.",
+          "Decimal numeric operation; $FLOOR and $CEIL round to an integer.",
           n + "(${1:amount})");
     for (String n : List.of("ROUND", "ROUNDDOWN", "ROUNDUP"))
       add(
@@ -135,7 +135,7 @@ final class BuiltinFunctionCatalog {
           2,
           "Math",
           n + "(number, digits = 0)",
-          "Rounds to -12…12 decimal places. ROUND uses half up; DOWN toward zero; UP away from"
+          "Rounds to -12…12 decimal places. $ROUND uses half up; $ROUNDDOWN toward zero; $ROUNDUP away from"
               + " zero.",
           n + "(${1:amount}, ${2:2})");
     for (String n : List.of("MAP", "FILTER", "ALL", "ANY"))

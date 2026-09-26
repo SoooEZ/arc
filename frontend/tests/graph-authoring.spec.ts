@@ -70,13 +70,13 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   await dialog.getByPlaceholder("Search functions…").fill("SUM");
   const sum = dialog
     .locator(".function-chips")
-    .getByRole("button", { name: "SUM", exact: true });
+    .getByRole("button", { name: "$SUM", exact: true });
   await sum.hover();
   await expect(page.getByRole("tooltip")).toContainText("Aggregates");
   await replaceExpression(page, dialog, " ");
   await page.keyboard.press("ControlOrMeta+a");
   await sum.click();
-  await expect(dialog.locator(".view-lines")).toContainText("SUM(values)");
+  await expect(dialog.locator(".view-lines")).toContainText("$SUM(values)");
   await replaceExpression(page, dialog, "SUM(items) >= 20");
   await expect(
     dialog.getByRole("button", { name: "Apply expression" }),
@@ -289,7 +289,7 @@ test("Transform mappings can become a whole array expression without losing the 
     .click();
   const dialog = page.getByRole("dialog", { name: /Expression editor/ });
   await expect(dialog.locator(".view-lines")).toContainText(
-    'OBJECT("items", items)',
+    '$OBJECT("items", items)',
   );
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByLabel("Field 1 name", { exact: true })).toHaveValue(

@@ -35,6 +35,24 @@ class EngineTest {
   }
 
   @Test
+  void prefixedFunctionsCanUseAnInputWithTheSameNameAcrossGraphNodes() {
+    var definition =
+        new Definition(
+            1,
+            List.of(new Input("ROUND", "NUMBER", true, null)),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("calculate", "FORMULA", "$ROUND(ROUND, 2)", "rounded"),
+                node("result", "OUTPUT", "$IF(rounded > 1, rounded, 0)", null)),
+            List.of(edge("input", "calculate", "next"), edge("calculate", "result", "next")));
+    var result = run(definition, Map.of("ROUND", new BigDecimal("1.235")));
+    assertThat(result.result()).isEqualTo(new BigDecimal("1.24"));
+    assertThat(result.trace())
+        .extracting(Engine.Step::nodeId)
+        .containsExactly("input", "calculate", "result");
+  }
+
+  @Test
   void conditionsChooseBothBranchesAndUseDefaults() {
     assertThat(run(RuleSamples.blank("RULE"), Map.of("amount", 100)).result()).isEqualTo(true);
     var result = run(RuleSamples.blank("RULE"), Map.of("amount", 99));

@@ -2,6 +2,42 @@ import { useEffect, type RefObject } from "react";
 import { monaco } from "./arcLanguage";
 import type { Definition, FunctionEntry } from "../../types";
 import { modules } from "./snippets";
+
+/** Trigger characters also fire inside strings, independently of quickSuggestions. */
+export function isStringOrComment(
+  model: monaco.editor.ITextModel,
+  position: monaco.Position,
+) {
+  const tokens = monaco.editor.tokenize(
+    model.getLineContent(position.lineNumber),
+    "arc",
+  )[0];
+  let token: monaco.Token | undefined;
+  for (const entry of tokens ?? []) {
+    if (entry.offset >= position.column - 1) break;
+    token = entry;
+  }
+  return token?.type.startsWith("string") || token?.type.startsWith("comment");
+}
+
+/** Include the namespace marker even before the function name is entered. */
+export function completionWord(
+  model: monaco.editor.ITextModel,
+  position: monaco.Position,
+) {
+  const word = model.getWordUntilPosition(position);
+  if (
+    !word.word.startsWith("$") &&
+    model.getLineContent(position.lineNumber)[word.startColumn - 2] === "$"
+  )
+    return {
+      ...word,
+      word: "$" + word.word,
+      startColumn: word.startColumn - 1,
+    };
+  return word;
+}
+
 /** Providers belong to one model; nested rule dialogs do not leak suggestions into each other. */
 export function useArcLanguageSupport(
   editor: RefObject<monaco.editor.IStandaloneCodeEditor | null>,
@@ -11,9 +47,23 @@ export function useArcLanguageSupport(
 ) {
   useEffect(() => {
     const completions = monaco.languages.registerCompletionItemProvider("arc", {
+      triggerCharacters: ["$"],
       provideCompletionItems: (model, position) => {
         if (model !== editor.current?.getModel()) return { suggestions: [] };
-        const w = model.getWordUntilPosition(position);
+        if (isStringOrComment(model, position)) return { suggestions: [] };
+        const w = completionWord(model, position);
+        const functionOnly = w.word.startsWith("$");
+        const functionPrefix = functionOnly ? w.word.toUpperCase() : "$";
+        let variables: string[] = [];
+        if (!functionOnly)
+          variables = Array.isArray(definition)
+            ? definition
+            : [
+                ...definition.inputs.map((input) => input.name),
+                ...definition.nodes.flatMap((node) =>
+                  node.output ? [node.output] : [],
+                ),
+              ];
         const range = {
           startLineNumber: position.lineNumber,
           endLineNumber: position.lineNumber,
@@ -21,9 +71,12 @@ export function useArcLanguageSupport(
           endColumn: w.endColumn,
         };
         return {
+          // Monaco's fuzzy ranking treats '$RO' as a close match for '$OR'.
+          // Recompute the actual namespace prefix as the user types instead.
+          incomplete: functionOnly,
           suggestions: [
             ...functions
-              .filter((f) => f.supported)
+              .filter((f) => f.supported && f.name.startsWith(functionPrefix))
               .map((f) => ({
                 label: f.name,
                 kind: monaco.languages.CompletionItemKind.Function,
@@ -34,7 +87,7 @@ export function useArcLanguageSupport(
                   monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                 range,
               })),
-            ...(includeModules ? modules : []).map((m) => ({
+            ...(includeModules && !functionOnly ? modules : []).map((m) => ({
               label: m.name,
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertText: m.snippet,
@@ -42,15 +95,7 @@ export function useArcLanguageSupport(
                 monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               range,
             })),
-            ...(Array.isArray(definition)
-              ? definition
-              : [
-                  ...definition.inputs.map((i) => i.name),
-                  ...definition.nodes.flatMap((n) =>
-                    n.output ? [n.output] : [],
-                  ),
-                ]
-            ).map((name) => ({
+            ...variables.map((name) => ({
               label: name,
               kind: monaco.languages.CompletionItemKind.Variable,
               insertText: name,
@@ -63,8 +108,18 @@ export function useArcLanguageSupport(
     const hover = monaco.languages.registerHoverProvider("arc", {
       provideHover: (model, position) => {
         if (model !== editor.current?.getModel()) return null;
+        if (isStringOrComment(model, position)) return null;
         const w = model.getWordAtPosition(position);
-        const f = functions.find((f) => f.name === w?.word.toUpperCase());
+        if (!w) return null;
+        const explicitFunction = w.word.startsWith("$");
+        const afterWord = model
+          .getLineContent(position.lineNumber)
+          .slice(w.endColumn - 1);
+        // Bare names still execute for compatibility, but a variable named
+        // ROUND must not display function help unless it is actually called.
+        if (!explicitFunction && !/^\s*\(/.test(afterWord)) return null;
+        const name = explicitFunction ? w.word : "$" + w.word;
+        const f = functions.find((f) => f.name === name.toUpperCase());
         return f
           ? {
               contents: [

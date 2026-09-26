@@ -117,6 +117,22 @@ class ValidatorTest {
   }
 
   @Test
+  void inputNamesRejectWhitespaceAndDollarWithoutReservingFunctionNames() {
+    var base = RuleSamples.blank("FORMULA");
+    for (String name : List.of("unit price", "price\t", "price\u00a0", "$ROUND", "round$")) {
+      var definition =
+          new Definition(
+              1, List.of(new Input(name, "NUMBER", true, null)), base.nodes(), base.edges());
+      assertThatThrownBy(() -> validator.shape(definition))
+          .as(name)
+          .hasMessageContaining("identifiers");
+    }
+    validator.shape(
+        new Definition(
+            1, List.of(new Input("ROUND", "NUMBER", true, null)), base.nodes(), base.edges()));
+  }
+
+  @Test
   void referencesMustExistAndBindRequiredInputs() {
     var ref =
         new Node(

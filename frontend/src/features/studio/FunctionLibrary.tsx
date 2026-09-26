@@ -62,8 +62,8 @@ export default function FunctionLibrary({
         </button>
       </div>
       <p className="studio-hint">
-        Expand a category. Hover for usage; click to insert. Arrays act as Excel
-        ranges.
+        Functions start with $. Hover for usage; click to insert. Arrays act as
+        Excel ranges.
       </p>
       <div className="function-groups">
         {categories.map((c) => {

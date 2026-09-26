@@ -171,7 +171,7 @@ final class ExcelFunctionHelp {
           "Date & time",
           n + "(serialDate)",
           "Extracts a calendar component from an Excel serial date.",
-          n + "(${1:DATE(2026, 9, 16)})");
+          n + "(${1:\\$DATE(2026, 9, 16)})");
     add(
         help,
         "PMT",

@@ -108,7 +108,7 @@ node output OUTPUT "Return" { return final; }
     assertThat(eval("VLOOKUP(2, [[1, 10], [2, 20]], 2, false)")).isEqualTo(new BigDecimal("2E+1"));
     assertThat(Functions.catalog().stream().filter(Functions.Entry::supported).count())
         .isGreaterThan(150);
-    assertThat(Functions.catalog()).anyMatch(f -> f.name().equals("INDIRECT") && !f.supported());
+    assertThat(Functions.catalog()).anyMatch(f -> f.name().equals("$INDIRECT") && !f.supported());
   }
 
   @Test

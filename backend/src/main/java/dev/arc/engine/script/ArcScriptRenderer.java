@@ -99,7 +99,7 @@ final class ArcScriptRenderer {
           out.append("  let ")
               .append(node.output() == null ? "data" : node.output())
               .append(" = ")
-              .append(node.expression() == null ? "OBJECT()" : node.expression())
+              .append(node.expression() == null ? "$OBJECT()" : node.expression())
               .append(";\n");
         }
       }

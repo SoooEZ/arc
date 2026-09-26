@@ -7,6 +7,7 @@ self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco });
 monaco.languages.register({ id: "arc" });
 monaco.languages.setLanguageConfiguration("arc", {
+  wordPattern: /\$?[A-Za-z_][\w.]*/g,
   comments: { lineComment: "//" },
   brackets: [
     ["{", "}"],
@@ -38,6 +39,7 @@ monaco.languages.setMonarchTokensProvider("arc", {
         "type",
       ],
       [/\b(true|false|null)\b/, "constant"],
+      [/\$[A-Za-z_][\w.]*/, "function"],
       [/[A-Za-z_][\w.]*(?=\s*\()/, "function"],
       [/\d+(\.\d+)?/, "number"],
       [/[{}()[\]]/, "@brackets"],

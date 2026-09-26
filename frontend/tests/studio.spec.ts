@@ -126,14 +126,14 @@ test("code studio builds, round-trips graph edits, inserts chips/modules, and pu
   await page.getByPlaceholder("Search functions…").fill("SUM");
   const sum = page
     .locator(".function-chips")
-    .getByRole("button", { name: "SUM", exact: true });
+    .getByRole("button", { name: "$SUM", exact: true });
   await sum.hover();
   await expect(page.getByRole("tooltip")).toContainText("Aggregates");
   await page.locator(".monaco-editor").click({ position: { x: 200, y: 60 } });
   await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.press("Enter");
   await sum.click();
-  await expect(page.locator(".view-lines")).toContainText("SUM(values)");
+  await expect(page.locator(".view-lines")).toContainText("$SUM(values)");
   await page.getByRole("button", { name: "modules", exact: true }).click();
   await page
     .getByRole("button", { name: "Decision branch +", exact: true })
