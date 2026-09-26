@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { Alert, Button, CircularProgress } from "@mui/material";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { GraphProblem } from "../../api/errors";
@@ -87,6 +87,7 @@ function EditorContent({
       initial.draft.nodes[0].id,
   );
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  const nodeNameInput = useRef<HTMLInputElement>(null);
   const [nodeCode, setNodeCode] = useState<string | null>(null);
   const [nodeEdit, setNodeEdit] = useState<string | null>(null);
   const [nodeCodeProblems, setNodeCodeProblems] = useState<string[]>([]);
@@ -171,6 +172,21 @@ function EditorContent({
       return;
     }
     setNodeEdit(id);
+  };
+  const renameNode = (id: string) => {
+    if (readOnly || busy) return;
+    if (hasInvalidJson && id !== selected) {
+      setError("Fix the invalid JSON default before renaming another node");
+      return;
+    }
+    setSelected(id);
+    setSelectedEdge(null);
+    requestAnimationFrame(() => {
+      const input = nodeNameInput.current;
+      if (!input || input.disabled) return;
+      input.focus();
+      input.select();
+    });
   };
   const testPanel = testOpen && (
     <TestPanel
@@ -294,6 +310,7 @@ function EditorContent({
             action={action}
             onAddNode={addNode}
             onEditNode={openNodeEditor}
+            onRenameNode={renameNode}
             onDeleteNode={removeNode}
             hasTrace={!!trace}
           >
@@ -307,6 +324,7 @@ function EditorContent({
             }
             rules={rules}
             readOnly={readOnly || !!busy || !!nodeEdit}
+            nameInputRef={nodeNameInput}
             onNodeChange={patchNode}
             onDelete={removeNode}
             onDefinitionChange={changeDefinition}

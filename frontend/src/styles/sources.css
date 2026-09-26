@@ -136,3 +136,60 @@
 .source-test > .MuiButton-root {
   align-self: start;
 }
+.source-manager-dialog .MuiDialog-paper {
+  height: min(900px, calc(100dvh - 48px));
+}
+.source-manager-dialog .sources-page {
+  max-width: none;
+  padding: 8px 4px;
+}
+.source-manager-dialog .sources-heading h1 {
+  font-size: 26px;
+}
+.source-manager-dialog .sources-layout {
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+.source-manager-dialog .source-list nav button {
+  width: auto;
+  padding: 6px 8px;
+  margin: 0;
+}
+.source-manager-dialog .source-detail-heading > div {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.source-manager-dialog .source-detail-heading h2 {
+  overflow-wrap: anywhere;
+}
+.source-manager-dialog .source-detail-heading > .MuiButton-root {
+  flex-shrink: 0;
+}
+.source-manager-dialog .MuiDialogActions-root {
+  gap: 16px;
+}
+.source-manager-dialog .MuiDialogActions-root [role="status"] {
+  color: #657869;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .source-manager-dialog .MuiDialog-paper {
+    width: calc(100% - 24px);
+    max-width: none;
+    margin: 12px;
+    height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  .source-manager-dialog .sources-layout {
+    grid-template-columns: 1fr;
+  }
+  .source-manager-dialog .source-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .source-manager-dialog .source-detail-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .source-manager-dialog .source-detail-heading > .MuiButton-root {
+    align-self: flex-start;
+  }
+}

@@ -1,4 +1,4 @@
-import type { Definition, NodeType, Rule, RuleNode } from "../types";
+import type { Definition, InputType, NodeType, Rule, RuleNode } from "../types";
 import { nodeLabel } from "../types";
 import { sourcePorts } from "./nodePorts";
 export type DefinitionChange = (definition: Definition) => Definition;
@@ -121,14 +121,19 @@ export function createGraphNode(
 }
 export interface VariableOption {
   name: string;
-  type: string;
+  type: InputType | "RESULT";
+  /** Display names of the producing nodes, combined for alternative branches. */
   label: string;
 }
+export function variableOptionLabel(option: VariableOption): string {
+  return `${option.name} (${option.type.toLowerCase()}) - ${option.label}`;
+}
 export function inputVariables(definition: Definition): VariableOption[] {
+  const inputNode = definition.nodes.find((node) => node.type === "INPUT");
   return definition.inputs.map((input) => ({
     name: input.name,
     type: input.type,
-    label: `Input · ${input.type.toLowerCase()}`,
+    label: inputNode?.label ?? nodeLabel.INPUT,
   }));
 }
 export function availableVariables(
@@ -161,7 +166,7 @@ export function availableVariables(
           upstream.has(node.id) &&
           available.includes(node.output),
       )
-      .map((node) => ({
+      .map((node): VariableOption => ({
         name: node.output!,
         type: "RESULT",
         label: node.label,

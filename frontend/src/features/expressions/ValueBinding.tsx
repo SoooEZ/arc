@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MenuItem, TextField } from "@mui/material";
 
-import type { VariableOption } from "../../domain/graph";
+import { variableOptionLabel, type VariableOption } from "../../domain/graph";
 import {
   constantDefaults,
   inferBindingMode,
@@ -143,7 +143,7 @@ export default function ValueBinding({
           )}
           {choices.map((v) => (
             <MenuItem key={v.name} value={v.name}>
-              {v.name} · {v.label}
+              {variableOptionLabel(v)}
             </MenuItem>
           ))}
         </TextField>

@@ -198,9 +198,13 @@ test("connected parameter dropdowns, unquoted string constants and reference mod
     page.getByLabel("amount * · value source", { exact: true }),
   ).toHaveText("Upstream variable");
   await page.getByLabel("amount *", { exact: true }).click();
-  await expect(page.getByRole("option", { name: /base · base/ })).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: "base (result) - base", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("option", { name: /future/ })).toHaveCount(0);
-  await page.getByRole("option", { name: /base · base/ }).click();
+  await page
+    .getByRole("option", { name: "base (result) - base", exact: true })
+    .click();
   await select(page, "name * · value source", "Constant");
   const text = 'A "quoted" \\ path';
   await page.getByLabel("name *", { exact: true }).fill(text);

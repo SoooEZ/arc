@@ -213,9 +213,11 @@ Source definitions contain `kind` (`LOOKUP` or `HTTP`), `parameters`, and `timeo
 
 ### Node expressions and connections
 
-Clicking a node opens its inspector, headed by the node's icon and name, with its type shown underneath. Edit **Node name** to update the heading and canvas label together. Variable choices follow connected upstream paths, including the path from Input. Connect a new Switch to Input or an upstream calculation before choosing its variables; disconnected nodes have none. **Functions & editor** shows the same available names for expressions.
+Clicking a node opens its inspector. The header keeps the node icon, inline **Node name** field and `</>` action in one row, with the node type below its icon. Editing the name updates the canvas label immediately. The header also offers a **Delete node** icon with a hover label; Input cannot be deleted. Variable choices follow connected upstream paths, including the path from Input. Connect a new Switch to Input or an upstream calculation before choosing its variables; disconnected nodes have none. **Functions & editor** shows the same available names for expressions. Variable dropdowns display `name (type) - node name`; computed outputs with no declared type use `result`.
 
-Right-click a canvas node and choose **Edit** to open its settings in a wider form dialog. **Apply to graph** applies the form changes to the draft; **Cancel** discards them. **Delete** removes the node and its connections. The Input node cannot be deleted, and both menu actions are disabled for read-only versions.
+Right-click a canvas node and choose **Edit** to open its settings in a wider form dialog. **Apply to graph** applies the form changes to the draft; **Cancel** discards them. **Delete** removes the node and its connections. Choose **Rename** to focus and select the name in the inspector header. The Input node can be renamed but cannot be deleted. Mutating menu actions are disabled for read-only versions.
+
+Node errors are grouped behind one header icon. Hover to inspect all messages, or click to keep the list open until you close it. The list floats over the editor so diagnostics do not move the form.
 
 Right-click a connection and choose **Delete** to remove that connection while keeping its endpoint nodes and all other connections. Changes stay in the draft until saved. Deletion is disabled in historical versions and while a document command is pending.
 

@@ -286,6 +286,7 @@ export function useSourceEditor({
     dirty,
     historical,
     saving,
+    pending: savingIds.length > 0 || document?.testing != null,
     versions: versions.data.items,
     versionsPage: versions,
     versionsLoading: versions.loading,

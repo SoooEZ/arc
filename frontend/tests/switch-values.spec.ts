@@ -105,7 +105,12 @@ for (const scenario of [
       "Value to match · value source",
       "Upstream variable",
     );
-    await select(page, page, "Value to match", /value · Input/);
+    await select(
+      page,
+      page,
+      "Value to match",
+      `value (${scenario.type.toLowerCase()}) - Inputs`,
+    );
     const option = page.getByTestId("switch-case-one");
     await select(page, option, "Constant type", scenario.type.toLowerCase());
     if (scenario.type === "BOOLEAN")

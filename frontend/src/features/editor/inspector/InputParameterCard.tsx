@@ -7,7 +7,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { Braces, Trash2 } from "lucide-react";
-import type { SourceSummary, Input, InputType } from "../../../types";
+import type { Input, InputType } from "../../../types";
 import type { VariableOption } from "../../../domain/graph";
 import SourceBindingEditor from "../../sources/SourceBindingEditor";
 import InputDefaultValue from "./InputDefaultValue";
@@ -17,8 +17,6 @@ export default function InputParameterCard({
   index,
   readOnly,
   variables,
-  sources,
-  sourceError,
   onChange,
   onRemove,
   onValidity,
@@ -27,8 +25,6 @@ export default function InputParameterCard({
   index: number;
   readOnly: boolean;
   variables: VariableOption[];
-  sources: SourceSummary[];
-  sourceError: string;
   onChange: (patch: Partial<Input>) => void;
   onRemove: () => void;
   onValidity: (valid: boolean) => void;
@@ -38,6 +34,18 @@ export default function InputParameterCard({
       <div className="input-card-title">
         <Braces size={14} />
         <span>Parameter {index + 1}</span>
+        <FormControlLabel
+          className="input-required-toggle"
+          control={
+            <Switch
+              size="small"
+              checked={input.required}
+              disabled={readOnly}
+              onChange={(_, required) => onChange({ required })}
+            />
+          }
+          label={input.required ? "Required" : "Optional"}
+        />
         <Tooltip title="Remove parameter">
           <span>
             <IconButton
@@ -87,21 +95,8 @@ export default function InputParameterCard({
       <SourceBindingEditor
         input={input}
         variables={variables}
-        sources={sources}
-        sourceError={sourceError}
         readOnly={readOnly}
         onChange={(source) => onChange({ source })}
-      />
-      <FormControlLabel
-        control={
-          <Switch
-            size="small"
-            checked={input.required}
-            disabled={readOnly}
-            onChange={(_, required) => onChange({ required })}
-          />
-        }
-        label="Required"
       />
     </div>
   );

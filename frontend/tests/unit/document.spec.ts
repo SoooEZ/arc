@@ -12,6 +12,7 @@ import {
   removeGraphNode,
   ruleSnapshot,
   semanticGraphKey,
+  variableOptionLabel,
 } from "../../src/domain/graph";
 import {
   literalText,
@@ -250,8 +251,34 @@ test("disconnected nodes and unresolved scope reads do not inherit graph inputs"
     inputVariables(definition),
   );
   expect(inputVariables(definition)).toEqual([
-    { name: "amount", type: "NUMBER", label: "Input · number" },
+    { name: "amount", type: "NUMBER", label: "Input" },
   ]);
+});
+
+test("variable labels follow producer renames while merged results keep their identity and unknown type", () => {
+  const definition = connectGraphNodes(
+    rule().draft,
+    "right",
+    "output",
+    "next",
+    "join",
+  );
+  const scope = ["amount", "price"];
+  const before = availableVariables(definition, "output", scope);
+  const renamed = patchGraphNode(
+    patchGraphNode(definition, "input", { label: "Customer inputs" }),
+    "left",
+    { label: "Compute price" },
+  );
+  const options = availableVariables(renamed, "output", scope);
+  expect(options.map(({ name, type }) => ({ name, type }))).toEqual(
+    before.map(({ name, type }) => ({ name, type })),
+  );
+  expect(options.map(variableOptionLabel)).toEqual([
+    "amount (number) - Customer inputs",
+    "price (result) - Compute price / Second calculation",
+  ]);
+  expect(inputVariables(renamed)[0].label).toBe("Customer inputs");
 });
 
 test("string constants round-trip escapes and comparison parsing respects quoted operators", () => {

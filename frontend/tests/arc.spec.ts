@@ -151,13 +151,39 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
     );
     await expect(from).toBeVisible();
     await expect(to).toBeVisible();
-    // Wait for the animated fit-to-view before dragging between measured handles.
+    // Arrange completes before React Flow paints its fitted viewport. Both
+    // handles must be inside the canvas before starting a connection gesture.
     await expect
-      .poll(async () =>
-        page.locator(".react-flow__viewport").getAttribute("style"),
-      )
-      .toContain("transform");
-    await from.dragTo(to);
+      .poll(async () => {
+        const canvas = await page.locator(".flow-container").boundingBox();
+        const handles = await Promise.all([
+          from.boundingBox(),
+          to.boundingBox(),
+        ]);
+        return (
+          !!canvas &&
+          handles.every(
+            (handle) =>
+              !!handle &&
+              handle.x > canvas.x &&
+              handle.y > canvas.y &&
+              handle.x + handle.width < canvas.x + canvas.width &&
+              handle.y + handle.height < canvas.y + canvas.height,
+          )
+        );
+      })
+      .toBe(true);
+    const start = (await from.boundingBox())!;
+    const end = (await to.boundingBox())!;
+    await page.mouse.move(
+      start.x + start.width / 2,
+      start.y + start.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, {
+      steps: 12,
+    });
+    await page.mouse.up();
     await expect(
       page.locator(
         `.react-flow__edge[aria-label="Edge from ${source} to ${target}"]`,
@@ -172,7 +198,7 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
     .getByRole("button", { name: /Return total/ })
     .click();
   await page.getByLabel("Return value", { exact: true }).click();
-  await page.getByRole("option", { name: /finalPrice ·/ }).click();
+  await page.getByRole("option", { name: /^finalPrice \(result\) - / }).click();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(
     page.getByText("Version 2 published and ready to call"),

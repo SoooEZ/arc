@@ -1,4 +1,5 @@
-import { TextField } from "@mui/material";
+import { TextField, Tooltip } from "@mui/material";
+import { variableOptionLabel } from "../../../domain/graph";
 import type { NodeFieldsProps } from "./types";
 export default function ResultFields({
   node,
@@ -26,11 +27,13 @@ export default function ResultFields({
           Inputs and results from preceding nodes can be used in expressions.
         </p>
         <div className="variable-list">
-          {variables.map((v, i) => (
-            <div key={`${v.name}-${i}`}>
-              <code>{v.name}</code>
-              <span>{v.type.toLowerCase()}</span>
-            </div>
+          {variables.map((v) => (
+            <Tooltip key={v.name} title={variableOptionLabel(v)}>
+              <div>
+                <code>{v.name}</code>
+                <span>{v.type.toLowerCase()}</span>
+              </div>
+            </Tooltip>
           ))}
         </div>
       </div>

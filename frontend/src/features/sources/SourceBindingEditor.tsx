@@ -1,48 +1,59 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { usePagedResource } from "../../hooks/usePagedResource";
 import CatalogPagination from "../../components/CatalogPagination";
 import { errorMessage } from "../../api/errors";
-import { Alert, Button, MenuItem, TextField } from "@mui/material";
+import {
+  Alert,
+  Button,
+  CircularProgress,
+  MenuItem,
+  TextField,
+} from "@mui/material";
 import { sourceApi } from "../../api/sources";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { bindSourceVersion } from "./sourceBindings";
 import ValueBinding from "../expressions/ValueBinding";
+import SourceProviderSelect from "./SourceProviderSelect";
 import type { VariableOption } from "../../domain/graph";
-import type {
-  Input,
-  DataSource,
-  SourceSummary,
-  SourceBinding,
-} from "../../types";
+import type { Input, DataSource, SourceBinding } from "../../types";
+const SourceManagerDialog = lazy(() => import("./SourceManagerDialog"));
 export default function SourceBindingEditor({
   input,
   onChange,
   readOnly,
   variables,
-  sources,
-  sourceError,
 }: {
   input: Input;
   variables: VariableOption[];
-  sources: SourceSummary[];
-  sourceError: string;
   onChange: (source: SourceBinding | null) => void;
   readOnly: boolean;
 }) {
   const source = input.source;
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [catalogRevision, setCatalogRevision] = useState(0);
   const versionsResource = usePagedResource(
-    source?.id || "",
+    JSON.stringify([source?.id, catalogRevision]),
     (offset, limit, signal) =>
       sourceApi.versionSummaries(source!.id, { offset, limit }, { signal }),
     !!source,
   );
   const detail = useAsyncResource(
-    `${source?.id}:${source?.version}`,
+    JSON.stringify([source?.id, source?.version, catalogRevision]),
     (signal) => sourceApi.source(source!.id, source!.version, { signal }),
     null as DataSource | null,
     0,
     !!source,
   );
+  const lastLabel = useRef<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    if (detail.data)
+      lastLabel.current = { id: detail.data.id, name: detail.data.name };
+  }, [detail.data]);
+  const sourceName =
+    detail.data?.name ||
+    (lastLabel.current?.id === source?.id
+      ? lastLabel.current?.name
+      : source?.id);
   const [selectionError, setSelectionError] = useState("");
   const pending = useRef<AbortController | null>(null);
   const latest = useRef({ source, readOnly, onChange });
@@ -75,23 +86,30 @@ export default function SourceBindingEditor({
     }
   };
   const versions = versionsResource.data.items;
-  const error =
-    sourceError || versionsResource.error || detail.error || selectionError;
+  const error = versionsResource.error || detail.error || selectionError;
   const config = detail.data?.definition;
   return (
     <div className="source-binding">
-      <TextField
-        select
-        label="Value provider"
-        value={source?.id || ""}
-        disabled={readOnly}
-        onChange={(e) => {
-          const s = sources.find((x) => x.id === e.target.value);
+      <SourceProviderSelect
+        selected={
+          source
+            ? {
+                id: source.id,
+                version: source.version,
+                name: sourceName || source.id,
+                kind: detail.data?.definition.kind || "LOOKUP",
+              }
+            : null
+        }
+        revision={catalogRevision}
+        readOnly={readOnly}
+        onChange={(selected) => {
+          if (readOnly || selected?.id === source?.id) return;
           onChange(
-            s
+            selected
               ? {
-                  id: s.id,
-                  version: s.version,
+                  id: selected.id,
+                  version: selected.version,
                   bindings: {},
                   pointer: "",
                   onError: "FAIL",
@@ -99,19 +117,7 @@ export default function SourceBindingEditor({
               : null,
           );
         }}
-      >
-        <MenuItem value="">Caller / default value</MenuItem>
-        {source && !sources.some((item) => item.id === source.id) && (
-          <MenuItem value={source.id}>
-            {detail.data?.name || source.id}
-          </MenuItem>
-        )}
-        {sources.map((s) => (
-          <MenuItem key={s.id} value={s.id}>
-            {s.name}
-          </MenuItem>
-        ))}
-      </TextField>
+      />
       {source && (
         <>
           <p>Fetch only when the caller omits this parameter.</p>
@@ -181,9 +187,23 @@ export default function SourceBindingEditor({
         </>
       )}
       {error && <Alert severity="error">{error}</Alert>}
-      <Button size="small" href="#/sources">
-        Manage data sources ↗
+      <Button size="small" onClick={() => setManagerOpen(true)}>
+        Manage data sources
       </Button>
+      {managerOpen && (
+        <Suspense
+          fallback={
+            <CircularProgress size={18} aria-label="Loading source manager" />
+          }
+        >
+          <SourceManagerDialog
+            onClose={() => {
+              setManagerOpen(false);
+              setCatalogRevision((value) => value + 1);
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

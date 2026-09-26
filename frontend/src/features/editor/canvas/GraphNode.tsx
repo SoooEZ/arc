@@ -69,7 +69,7 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
       <strong>{n.label}</strong>
       <div className="node-detail">
         {n.type === "INPUT"
-          ? `${data.inputCount} input parameters`
+          ? `${data.inputCount} input parameter${data.inputCount === 1 ? "" : "s"}`
           : n.type === "REFERENCE"
             ? `${n.ruleId || "Select a rule"}${n.version ? ` · v${n.version}` : ""}`
             : n.type === "SWITCH"

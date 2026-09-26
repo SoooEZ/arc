@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   Alert,
   Button,
@@ -16,13 +17,18 @@ import SourceTestPanel from "./SourceTestPanel";
 export default function SourcesPage({
   onDirty,
   notify,
+  onBusy,
 }: {
   onDirty: (dirty: boolean) => void;
   notify: (message: string) => void;
+  onBusy?: (busy: boolean) => void;
 }) {
   const editor = useSourceEditor({ onDirty, notify });
   const { document, saving, historical, dirty } = editor;
   const selected = document?.source;
+  useEffect(() => {
+    onBusy?.(editor.pending);
+  }, [editor.pending, onBusy]);
   return (
     <div className="sources-page">
       <div className="page-eyebrow">CONNECTED INPUTS</div>

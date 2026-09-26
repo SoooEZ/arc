@@ -97,7 +97,7 @@ test("Switch upstream choices follow its incoming connections and preserve an un
     .getByRole("combobox", { name: "Value to match", exact: true })
     .click();
   await expect(
-    page.getByRole("option", { name: /amount · Input/ }),
+    page.getByRole("option", { name: "amount (number) - Inputs", exact: true }),
   ).toHaveCount(0);
   await page.keyboard.press("Escape");
 
@@ -127,7 +127,9 @@ test("Switch upstream choices follow its incoming connections and preserve an un
   await inspector
     .getByRole("combobox", { name: "Value to match", exact: true })
     .click();
-  await page.getByRole("option", { name: /amount · Input/ }).click();
+  await page
+    .getByRole("option", { name: "amount (number) - Inputs", exact: true })
+    .click();
   await expect(page.locator(".MuiMenu-root")).toHaveCount(0);
   await expect(
     inspector.getByRole("combobox", { name: "Value to match", exact: true }),
@@ -202,4 +204,127 @@ test("pending and failed variable reads do not invent input choices or erase the
   } finally {
     release();
   }
+});
+
+test("variable menus and expression tooltips show declared types and live producer names", async ({
+  page,
+  request,
+}) => {
+  const draft: Definition = {
+    schemaVersion: 1,
+    inputs: [
+      {
+        name: "hello",
+        type: "OBJECT",
+        required: true,
+        defaultValue: { score: 7 },
+      },
+    ],
+    nodes: [
+      {
+        id: "input",
+        type: "INPUT",
+        label: "Inputs",
+        position: { x: 200, y: 0 },
+      },
+      {
+        id: "calc",
+        type: "FORMULA",
+        label: "Compute score",
+        expression: 'GET(hello, "score", 0)',
+        output: "score",
+        position: { x: 200, y: 180 },
+      },
+      {
+        id: "result",
+        type: "OUTPUT",
+        label: "Result",
+        expression: "score",
+        position: { x: 200, y: 360 },
+      },
+    ],
+    edges: [
+      { id: "start", source: "input", target: "calc", sourceHandle: "next" },
+      { id: "finish", source: "calc", target: "result", sourceHandle: "next" },
+    ],
+  };
+  const id = await create(request, draft);
+  await page.goto(`/#/rules/${id}?node=result`);
+  const inspector = page.locator(".inspector-sidebar");
+  const variable = inspector.getByRole("combobox", {
+    name: "Return value",
+    exact: true,
+  });
+  await variable.click();
+  await expect(
+    page.getByRole("option", { name: "hello (object) - Inputs", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", {
+      name: "score (result) - Compute score",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  for (const [nodeId, label] of [
+    ["input", "Customer data"],
+    ["calc", "Normalize score"],
+  ]) {
+    await page
+      .locator(`.react-flow__node[data-id="${nodeId}"] .graph-node`)
+      .click();
+    await inspector.getByLabel("Node name", { exact: true }).fill(label);
+  }
+  await page.locator('.react-flow__node[data-id="result"] .graph-node').click();
+  await variable.click();
+  await expect(
+    page.getByRole("option", {
+      name: "score (result) - Normalize score",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("option", {
+      name: "hello (object) - Customer data",
+      exact: true,
+    })
+    .click();
+  await inspector
+    .locator(".variable-list code")
+    .filter({ hasText: /^hello$/ })
+    .hover();
+  await expect(page.getByRole("tooltip")).toHaveText(
+    "hello (object) - Customer data",
+  );
+  await inspector
+    .getByRole("combobox", { name: "Return value · value source", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Expression", exact: true }).click();
+  await inspector
+    .getByRole("button", {
+      name: "Functions & editor · Return value",
+      exact: true,
+    })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Expression editor · Return value",
+    exact: true,
+  });
+  await dialog
+    .getByRole("button", {
+      name: "score (result) - Normalize score",
+      exact: true,
+    })
+    .hover();
+  await expect(page.getByRole("tooltip")).toHaveText(
+    "score (result) - Normalize score",
+  );
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  const saved = (await (await request.get(`/api/rules/${id}`)).json())
+    .draft as Definition;
+  expect(saved.nodes.find((node) => node.id === "result")?.expression).toBe(
+    "hello",
+  );
 });

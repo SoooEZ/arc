@@ -19,7 +19,7 @@ import {
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { studioApi } from "../../api/studio";
 import type { FunctionEntry } from "../../types";
-import type { VariableOption } from "../../domain/graph";
+import { variableOptionLabel, type VariableOption } from "../../domain/graph";
 
 export default function ExpressionDialog({
   label,
@@ -82,7 +82,7 @@ export default function ExpressionDialog({
         </p>
         <div className="expression-variable-chips">
           {variables.map((variable) => (
-            <Tooltip key={variable.name} title={variable.label}>
+            <Tooltip key={variable.name} title={variableOptionLabel(variable)}>
               <Chip
                 size="small"
                 label={variable.name}

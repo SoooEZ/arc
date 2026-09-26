@@ -14,7 +14,7 @@ import {
   MiniMap,
   ReactFlow,
 } from "@xyflow/react";
-import { Code2, Pencil, Trash2 } from "lucide-react";
+import { Code2, Pencil, TextCursorInput, Trash2 } from "lucide-react";
 import type { Definition, NodeType, RuleNode } from "../../../types";
 import GraphNode from "./GraphNode";
 import RoutedEdge, { RoutedConnectionLine, RoutingContext } from "./RoutedEdge";
@@ -41,6 +41,7 @@ interface Props {
   action: (type: "validate") => Promise<void>;
   onAddNode: (type: NodeType) => void;
   onEditNode: (id: string) => void;
+  onRenameNode: (id: string) => void;
   onDeleteNode: (id: string) => void;
   hasTrace: boolean;
   children?: ReactNode;
@@ -62,6 +63,7 @@ export default function GraphCanvas({
   action,
   onAddNode,
   onEditNode,
+  onRenameNode,
   onDeleteNode,
   hasTrace,
   children,
@@ -232,6 +234,21 @@ export default function GraphCanvas({
             },
           }}
         >
+          {menuNode && (
+            <MenuItem
+              disabled={readOnly || !!busy}
+              onClick={() => {
+                if (readOnly || busy) return;
+                setContextMenu(null);
+                onRenameNode(menuNode.id);
+              }}
+            >
+              <ListItemIcon>
+                <TextCursorInput size={16} />
+              </ListItemIcon>
+              <ListItemText>Rename</ListItemText>
+            </MenuItem>
+          )}
           {menuNode && (
             <MenuItem
               disabled={readOnly || !!busy}

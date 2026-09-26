@@ -200,6 +200,9 @@ test("historical versions and pending saves disable context mutations", async ({
     menu.getByRole("menuitem", { name: "Edit", exact: true }),
   ).toBeDisabled();
   await expect(
+    menu.getByRole("menuitem", { name: "Rename", exact: true }),
+  ).toBeDisabled();
+  await expect(
     menu.getByRole("menuitem", { name: "Delete", exact: true }),
   ).toBeDisabled();
   await page.keyboard.press("Escape");
@@ -226,6 +229,9 @@ test("historical versions and pending saves disable context mutations", async ({
       menu.getByRole("menuitem", { name: "Edit", exact: true }),
     ).toBeDisabled();
     await expect(
+      menu.getByRole("menuitem", { name: "Rename", exact: true }),
+    ).toBeDisabled();
+    await expect(
       menu.getByRole("menuitem", { name: "Delete", exact: true }),
     ).toBeDisabled();
     await page.keyboard.press("Escape");
@@ -235,4 +241,52 @@ test("historical versions and pending saves disable context mutations", async ({
   } finally {
     release();
   }
+});
+
+test("Rename focuses the inline name, targets the clicked node, and preserves unfinished input JSON", async ({
+  page,
+  request,
+}) => {
+  const id = `node-context-rename-${Date.now()}`;
+  const original = await createRule(request, id);
+  await page.goto(`/#/rules/${id}`);
+  await card(page, "input").click();
+  const sidebar = page.locator(".inspector-sidebar");
+  const name = sidebar.getByLabel("Node name", { exact: true });
+  await sidebar.getByLabel("Default JSON (optional)").fill("[");
+  let menu = await openMenu(page, "calc");
+  await menu.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  await expect(
+    page.getByText("Fix the invalid JSON default before renaming another node"),
+  ).toBeVisible();
+  await expect(name).toHaveValue("Inputs");
+  await expect(sidebar.getByLabel("Default JSON (optional)")).toHaveValue("[");
+  menu = await openMenu(page, "input");
+  await menu.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  await expect(name).toBeFocused();
+  expect(
+    await name.evaluate((input: HTMLInputElement) => [
+      input.selectionStart,
+      input.selectionEnd,
+    ]),
+  ).toEqual([0, "Inputs".length]);
+  await page.keyboard.insertText("Renamed inputs");
+  await expect(name).toHaveValue("Renamed inputs");
+  await expect(sidebar.getByLabel("Default JSON (optional)")).toHaveValue("[");
+  await sidebar.getByLabel("Default JSON (optional)").fill("[]");
+  menu = await openMenu(page, "calc");
+  await menu.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  await expect(name).toHaveValue("Calculate");
+  await expect(name).toBeFocused();
+  await page.keyboard.insertText("Renamed calculation");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  const saved: Rule = await (await request.get(`/api/rules/${id}`)).json();
+  expect(saved.draft.nodes.map((node) => node.label)).toEqual([
+    "Renamed inputs",
+    "Renamed calculation",
+    "Result",
+  ]);
+  expect(saved.draft.edges).toEqual(original.draft.edges);
+  expect(saved.draft.inputs).toEqual(original.draft.inputs);
 });
