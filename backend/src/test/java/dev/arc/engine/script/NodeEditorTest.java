@@ -84,7 +84,7 @@ node out OUTPUT "Output" { return rate; }
   }
 
   @Test
-  void emptyTransformsGeneratePrefixedFunctionsWithoutRewritingExistingExpressions() {
+  void emptyTransformsGeneratePrefixedFunctionsAndOldSyntaxCannotBuild() {
     var draft =
         new Definition(
             1,
@@ -125,10 +125,10 @@ node out OUTPUT "Output" { return rate; }
     validator.validate(built.definition(), noRefs);
 
     var legacy = script.buildNode(draft, "transform", fragment.replace("$OBJECT()", "OBJECT()"));
-    assertThat(legacy.diagnostics()).isEmpty();
-    assertThat(script.renderNode(legacy.definition(), "transform"))
-        .contains("let data = OBJECT();")
-        .doesNotContain("$OBJECT()");
+    assertThat(legacy.definition()).isNull();
+    assertThat(legacy.diagnostics())
+        .extracting(ArcScript.Diagnostic::message)
+        .containsExactly("Function calls require a $ prefix; use $OBJECT(...)");
   }
 
   private Definition.Node node(String id, String type, String expression, String output) {

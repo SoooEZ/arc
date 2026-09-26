@@ -168,7 +168,7 @@ node check CONDITION "Order minimum" {
   false -> zero;
 }
 node calculate FORMULA "Taxed amount" {
-  let subtotal = ROUND(amount * (1 + taxRate), 2);
+  let subtotal = $ROUND(amount * (1 + taxRate), 2);
   next -> reuse;
 }
 node reuse REFERENCE "Discount" {
@@ -198,7 +198,7 @@ node zero OUTPUT "Below minimum" { return 0; }
   await setEditorText(
     page,
     page.getByLabel("Expression", { exact: true }),
-    "ROUND(amount * 2, 2)",
+    "$ROUND(amount * 2, 2)",
   );
   await page
     .locator(".node-outline")
@@ -212,7 +212,7 @@ node zero OUTPUT "Below minimum" { return 0; }
   await page.getByLabel("Source key", { exact: true }).fill("GB");
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
   await expect(page.locator(".view-lines")).toContainText(
-    "ROUND(amount * 2, 2)",
+    "$ROUND(amount * 2, 2)",
   );
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(

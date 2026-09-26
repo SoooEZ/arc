@@ -13,6 +13,7 @@ import {
   insertSnippet,
 } from "../studio/useArcLanguageSupport";
 import FunctionLibrary from "../studio/FunctionLibrary";
+import ExpressionColorKey from "../studio/ExpressionColorKey";
 import { useArcEditor, arcEditorOptions } from "../studio/useArcEditor";
 import { studioApi } from "../../api/studio";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
@@ -48,8 +49,8 @@ export default function NodeExpressionDialog({
     (signal) => studioApi.functions({ signal }),
     [] as FunctionEntry[],
   );
-  const { editor, onMount } = useArcEditor(diagnostics, "arc-node");
-  useArcLanguageSupport(editor, functions, definition);
+  const { editor, model, onMount } = useArcEditor(diagnostics, "arc-node");
+  useArcLanguageSupport(editor, model, functions, definition);
   const insert = (snippet: string) => {
     if (!readOnly) insertSnippet(editor.current, snippet);
   };
@@ -72,6 +73,7 @@ export default function NodeExpressionDialog({
           {node.type === "INPUT" &&
             "Input parameters and source mappings are included."}
         </p>
+        <ExpressionColorKey />
         {source === null ? (
           <CircularProgress size={24} />
         ) : (

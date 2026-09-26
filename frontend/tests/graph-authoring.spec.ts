@@ -77,13 +77,13 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   await page.keyboard.press("ControlOrMeta+a");
   await sum.click();
   await expect(dialog.locator(".view-lines")).toContainText("$SUM(values)");
-  await replaceExpression(page, dialog, "SUM(items) >= 20");
+  await replaceExpression(page, dialog, "$SUM(items) >= 20");
   await expect(
     dialog.getByRole("button", { name: "Apply expression" }),
   ).toBeEnabled();
   await dialog.getByRole("button", { name: "Apply expression" }).click();
   await expect(page.getByLabel("When", { exact: true })).toHaveValue(
-    "SUM(items)",
+    "$SUM(items)",
   );
   await focusNode(page, "Calculation");
   await page
@@ -95,7 +95,7 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   await replaceExpression(
     page,
     dialog,
-    "SUM(MAP(items, item, ROUND(item * 1.25, 2)))",
+    "$SUM($MAP(items, item, $ROUND(item * 1.25, 2)))",
   );
   await expect(
     dialog.getByRole("button", { name: "Apply expression" }),
@@ -103,7 +103,7 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   await dialog.getByRole("button", { name: "Apply expression" }).click();
   await expect(
     editorLines(page.getByLabel("Expression", { exact: true })),
-  ).toHaveText("SUM(MAP(items, item, ROUND(item * 1.25, 2)))");
+  ).toHaveText("$SUM($MAP(items, item, $ROUND(item * 1.25, 2)))");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("37.5");
@@ -123,7 +123,7 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(
     editorLines(page.getByLabel("Expression", { exact: true })),
-  ).toHaveText("SUM(MAP(items, item, ROUND(item * 1.25, 2)))");
+  ).toHaveText("$SUM($MAP(items, item, $ROUND(item * 1.25, 2)))");
   await save(page, request, id);
 });
 
@@ -137,8 +137,8 @@ test("Switch and Transform survive Graph/code edits, case reordering and version
     inputs { customer: OBJECT required default {"name":"  Ada  ","amount":"150"}; }
     node input INPUT "Inputs" at (350, 0) { next -> transform; }
     node transform TRANSFORM "Normalize customer" at (350, 160) {
-      field "name" = UPPER(TRIM(customer.name));
-      field "amount" = TO_NUMBER(customer.amount);
+      field "name" = $UPPER($TRIM(customer.name));
+      field "amount" = $TO_NUMBER(customer.amount);
       as normalized; next -> choose;
     }
     node choose SWITCH "Pricing tier" at (350, 340) {
@@ -146,9 +146,9 @@ test("Switch and Transform survive Graph/code edits, case reordering and version
       case standard "Standard" when normalized.amount >= 50;
       case:premium -> premium; case:standard -> standard; default -> fallback;
     }
-    node premium OUTPUT "Premium result" at (50, 520) { return OBJECT("tier", "premium", "data", normalized); }
-    node standard OUTPUT "Standard result" at (350, 520) { return OBJECT("tier", "standard", "data", normalized); }
-    node fallback OUTPUT "Fallback result" at (650, 520) { return OBJECT("tier", "fallback", "data", normalized); }
+    node premium OUTPUT "Premium result" at (50, 520) { return $OBJECT("tier", "premium", "data", normalized); }
+    node standard OUTPUT "Standard result" at (350, 520) { return $OBJECT("tier", "standard", "data", normalized); }
+    node fallback OUTPUT "Fallback result" at (650, 520) { return $OBJECT("tier", "fallback", "data", normalized); }
   `,
   );
   await page.goto(`/#/rules/${id}?node=transform`);
@@ -301,7 +301,7 @@ test("Transform mappings can become a whole array expression without losing the 
       exact: true,
     })
     .click();
-  await replaceExpression(page, dialog, "MAP(items, item, TO_NUMBER(item))");
+  await replaceExpression(page, dialog, "$MAP(items, item, $TO_NUMBER(item))");
   await expect(
     dialog.getByRole("button", { name: "Apply expression" }),
   ).toBeEnabled();
@@ -311,7 +311,7 @@ test("Transform mappings can become a whole array expression without losing the 
   await dialog.getByRole("button", { name: "Apply expression" }).click();
   await expect(
     editorLines(page.getByLabel("Transform expression", { exact: true })),
-  ).toHaveText("MAP(items, item, TO_NUMBER(item))");
+  ).toHaveText("$MAP(items, item, $TO_NUMBER(item))");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("[1.25,2.5]");
@@ -322,7 +322,7 @@ test("Transform mappings can become a whole array expression without losing the 
   await page.reload();
   await expect(
     editorLines(page.getByLabel("Transform expression", { exact: true })),
-  ).toHaveText("MAP(items, item, TO_NUMBER(item))");
+  ).toHaveText("$MAP(items, item, $TO_NUMBER(item))");
 });
 
 test("late expression checks cannot override newer text or reenable Apply", async ({

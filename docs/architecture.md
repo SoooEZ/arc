@@ -59,6 +59,8 @@ Example reference:
 
 Bindings are expressions evaluated in the caller's scope. The callee receives only mapped inputs and its own defaults; it does not see the caller's other variables. Its result becomes the caller's `output` variable. References can be nested inside every artifact kind, including formulas.
 
+Expressions read upstream Formula/Reference outputs as ordinary variables; they do not resolve or invoke library rules by display name. Direct custom Formula calls would require explicit immutable reference bindings and execution through the shared graph session, including lazy branch behavior, trace, deadline and recursion limits. No `@` or `#` call syntax is currently defined.
+
 Switch has two modes. When `selector` is absent or null, it evaluates boolean case expressions in their stored order and activates the first true case, preserving existing graphs and published versions. With a `selector` expression, it evaluates that expression once, then evaluates case expressions in order until one equals the selected value. Selector and reached case values must be booleans, numbers or strings. Equality requires the same value type, so `1` does not match `"1"`; decimal equality treats `1` and `1.0` as equal. A selector or reached case that returns null, an array or an object fails with `422` and a node location. Cases after the first match are not evaluated in either mode. No match activates `default`.
 
 Every case and default must be connected for validation/publication. Each selected exit can still fan out to multiple nodes. Case IDs are stable and case-sensitive; labels and order can change without reconnecting edges. The UI removes only the corresponding outgoing edges when deleting a case. Static scope analysis models case gates as mutually exclusive, including default, so branches can produce a common variable that is guaranteed at a join. Selector and case expressions read the Switch node's incoming scope.
@@ -102,7 +104,7 @@ An execution has isolated per-node variable scopes, a depth guard, an independen
 
 Expressions are parsed into a small syntax tree, never delegated to a general-purpose scripting engine.
 
-Function calls use the `$` namespace, for example `$ROUND(amount, 2)` or `$SUM(SUM)`. Functions are case insensitive; variables are case sensitive and cannot contain `$` or whitespace. The parser also accepts legacy unprefixed calls so existing drafts and immutable published versions keep their behavior. Catalog insertions and newly generated examples use the prefix; stored expressions and quoted strings are not rewritten.
+Function calls use the `$` namespace, for example `$ROUND(amount, 2)` or `$SUM(SUM)`. Functions are case insensitive; variables are case sensitive and cannot contain `$` or whitespace. The prefix is mandatory for every function call, including expressions stored before this requirement. Unprefixed calls fail with a message showing the required spelling. Existing snapshots are not rewritten: update the editable draft and publish a new version, then update any pinned parents. Quoted strings retain their literal contents.
 
 | Feature | Examples |
 | --- | --- |

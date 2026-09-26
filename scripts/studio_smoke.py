@@ -126,8 +126,8 @@ http_id = PREFIX + "-http"
 call("POST", "/sources", {"id": http_id, "name": "Blocked internal fixture", "definition": {"kind": "HTTP", "url": "http://127.0.0.1:8080/api/rules", "parameters": [], "timeoutMs": 500}})
 call("POST", f"/sources/{http_id}/test", {"inputs": {}}, 422)
 
-# Functions and inputs can share a basename. Existing immutable versions keep
-# their original syntax while new authoring uses the explicit function namespace.
+# Functions and inputs can share a basename. All calls require the namespace;
+# an invalid legacy draft must be corrected before publication/execution.
 namespace_script = '''schema 1;
 inputs {
   SUM: NUMBER required default 3;
@@ -146,15 +146,22 @@ assert dependencies["valid"] and set(dependencies["variables"]) == {"SUM", "ROUN
 legacy_definition = copy.deepcopy(namespace_definition)
 legacy_definition["nodes"][1]["expression"] = "SUM(SUM, ROUND(ROUND, 2))"
 namespace_id = PREFIX + "-namespace"
-namespace_rule = call("POST", "/rules", {"id": namespace_id, "name": "Function namespace", "kind": "FORMULA", "definition": legacy_definition}, 201)
+namespace_rule = call("POST", "/rules", {"id": namespace_id, "name": "Function namespace", "kind": "FORMULA", "definition": namespace_definition}, 201)
 namespace_rule = call("POST", f"/rules/{namespace_id}/publish", {"revision": namespace_rule["revision"]})
+legacy_check = call("POST", "/studio/expression/check", {"expression": legacy_definition["nodes"][1]["expression"]})
+assert not legacy_check["valid"] and "$SUM" in legacy_check["error"]
+call("POST", "/preview", {"definition": legacy_definition, "inputs": {}}, 422)
+namespace_rule = call("PUT", f"/rules/{namespace_id}", {
+    "name": namespace_rule["name"], "description": namespace_rule["description"],
+    "revision": namespace_rule["revision"], "definition": legacy_definition})
+call("POST", f"/rules/{namespace_id}/publish", {"revision": namespace_rule["revision"]}, 422)
 namespace_rule = call("PUT", f"/rules/{namespace_id}", {
     "name": namespace_rule["name"], "description": namespace_rule["description"],
     "revision": namespace_rule["revision"], "definition": namespace_definition})
 call("POST", f"/rules/{namespace_id}/publish", {"revision": namespace_rule["revision"]})
 for version in [1, 2]:
     assert call("POST", f"/rules/{namespace_id}/execute", {"version": version, "inputs": {}})["result"] == 4.23
-assert call("GET", f"/rules/{namespace_id}/versions/1")["definition"] == legacy_definition
+assert call("GET", f"/rules/{namespace_id}/versions/1")["definition"] == namespace_definition
 namespace_rendered = call("POST", "/studio/render", namespace_definition)
 assert "$SUM(SUM, $ROUND(ROUND, 2))" in namespace_rendered["source"]
 assert call("POST", "/studio/build", namespace_rendered)["definition"] == namespace_definition

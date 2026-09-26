@@ -27,7 +27,7 @@ export default function InlineExpressionEditor({
   onChange: (value: string) => void;
   helperText?: string;
 }) {
-  const { editor, onMount } = useArcEditor();
+  const { editor, model, onMount } = useArcEditor();
   const [catalogRequested, setCatalogRequested] = useState(false);
   // A Switch may have twenty case editors; load function help only when used.
   const { data: functions, error } = useAsyncResource(
@@ -37,12 +37,7 @@ export default function InlineExpressionEditor({
     0,
     catalogRequested,
   );
-  useArcLanguageSupport(
-    editor,
-    functions,
-    variables.map((variable) => variable.name),
-    false,
-  );
+  useArcLanguageSupport(editor, model, functions, variables, false);
   const completionNames = JSON.stringify([
     ...variables.map((variable) => variable.name),
     ...functions.filter((entry) => entry.supported).map((entry) => entry.name),

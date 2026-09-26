@@ -148,7 +148,7 @@ test("connected parameter dropdowns, unquoted string constants and reference mod
     ],
     nodes: [
       node("input", "INPUT"),
-      node("out", "OUTPUT", 'CONCAT(name, ":", amount)', undefined, 300, 180),
+      node("out", "OUTPUT", '$CONCAT(name, ":", amount)', undefined, 300, 180),
     ],
     edges: [edge("input", "out")],
   };

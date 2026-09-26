@@ -119,7 +119,7 @@ class ExecutionTraceTest {
                     type,
                     type,
                     null,
-                    "IFERROR(payload.value, 9)",
+                    "$IFERROR(payload.value, 9)",
                     "result",
                     null,
                     null,

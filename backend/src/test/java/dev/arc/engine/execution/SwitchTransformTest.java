@@ -142,10 +142,10 @@ class SwitchTransformTest {
         inputs { customer: OBJECT required; items: ARRAY required; }
         node input INPUT "Input" { next -> normalize; }
         node normalize TRANSFORM "Normalize" {
-          field "displayName" = UPPER(TRIM(customer.name));
-          field "amount" = TO_NUMBER(customer.amount);
-          field "country" = COALESCE(customer.country, "US");
-          field "items" = MAP(FILTER(items, item, item.active), item, OBJECT("sku", item.sku, "price", ROUND(TO_NUMBER(item.price), 2)));
+          field "displayName" = $UPPER($TRIM(customer.name));
+          field "amount" = $TO_NUMBER(customer.amount);
+          field "country" = $COALESCE(customer.country, "US");
+          field "items" = $MAP($FILTER(items, item, item.active), item, $OBJECT("sku", item.sku, "price", $ROUND($TO_NUMBER(item.price), 2)));
           field "optional" = null;
           as normalized;
           next -> out;
@@ -185,7 +185,7 @@ class SwitchTransformTest {
             """
         inputs { values: ARRAY required; }
         node input INPUT "Input" { next -> convert; }
-        node convert TRANSFORM "Convert" { let mapped = MAP(values, value, TO_NUMBER(value)); next -> out; }
+        node convert TRANSFORM "Convert" { let mapped = $MAP(values, value, $TO_NUMBER(value)); next -> out; }
         node out OUTPUT "Output" { return mapped; }
         """);
     assertThat(run(graph, Map.of("values", List.of("1.25", "2"))).result())
@@ -195,7 +195,7 @@ class SwitchTransformTest {
             """
         node input INPUT "Input" { next -> reuse; }
         node reuse REFERENCE "Normalize values" { use "normalizer" version 1; bind values = ["1.25", "2"]; as items; next -> out; }
-        node out OUTPUT "Output" { return SUM(items); }
+        node out OUTPUT "Output" { return $SUM(items); }
         """);
     assertThat(engine.execute("parent", 1, parent, Map.of(), (id, v) -> graph).result())
         .isEqualTo(new BigDecimal("3.25"));
@@ -216,7 +216,7 @@ class SwitchTransformTest {
     }
     assertThat(
             script
-                .build("node transform TRANSFORM \"T\" { field \"x\" = 1; let data = OBJECT(); }")
+                .build("node transform TRANSFORM \"T\" { field \"x\" = 1; let data = $OBJECT(); }")
                 .diagnostics())
         .isNotEmpty();
     assertThat(
@@ -224,16 +224,16 @@ class SwitchTransformTest {
                 .build("node transform TRANSFORM \"T\" { field \"x\" = 1; field \"x\" = 2; }")
                 .diagnostics())
         .isNotEmpty();
-    var bad = script.checkExpression("MAP(items, item, item.price + factor)");
+    var bad = script.checkExpression("$MAP(items, item, item.price + factor)");
     assertThat(bad.valid()).isTrue();
     assertThat(bad.variables()).containsExactlyInAnyOrder("items", "factor");
-    assertThat(script.checkExpression("SUM(1 +)").valid()).isFalse();
+    assertThat(script.checkExpression("$SUM(1 +)").valid()).isFalse();
   }
 
   @Test
   void transformFieldsCannotReadSiblingsAndDiagnosticsLocateBadCasesAndMappings() {
     var source =
-        script.render(transformation()).replace("TO_NUMBER(customer.amount)", "displayName");
+        script.render(transformation()).replace("$TO_NUMBER(customer.amount)", "displayName");
     var graph = script.parse(source);
     assertThat(validator.diagnostics(graph, noRefs))
         .anySatisfy(
@@ -252,22 +252,22 @@ class SwitchTransformTest {
 
   @Test
   void dataFunctionsHaveExplicitNullTypeDuplicateAndMergeSemantics() {
-    assertThat(Expressions.evaluate("COALESCE(null, false, 1 / 0)", Map.of())).isEqualTo(false);
-    assertThat(Expressions.evaluate("COALESCE(null, \"\", \"fallback\")", Map.of())).isEqualTo("");
-    assertThat(Expressions.evaluate("TO_NUMBER(null)", Map.of())).isNull();
-    assertThat(Expressions.evaluate("TO_BOOLEAN(\" FALSE \")", Map.of())).isEqualTo(false);
-    assertThat(Expressions.evaluate("TO_STRING(12.50)", Map.of())).isEqualTo("12.50");
+    assertThat(Expressions.evaluate("$COALESCE(null, false, 1 / 0)", Map.of())).isEqualTo(false);
+    assertThat(Expressions.evaluate("$COALESCE(null, \"\", \"fallback\")", Map.of())).isEqualTo("");
+    assertThat(Expressions.evaluate("$TO_NUMBER(null)", Map.of())).isNull();
+    assertThat(Expressions.evaluate("$TO_BOOLEAN(\" FALSE \")", Map.of())).isEqualTo(false);
+    assertThat(Expressions.evaluate("$TO_STRING(12.50)", Map.of())).isEqualTo("12.50");
     assertThat(
             Expressions.evaluate(
-                "MERGE(OBJECT(\"a\", 1), OBJECT(\"a\", 2, \"b\", true))", Map.of()))
+                "$MERGE($OBJECT(\"a\", 1), $OBJECT(\"a\", 2, \"b\", true))", Map.of()))
         .isEqualTo(Map.of("a", new BigDecimal("2"), "b", true));
-    assertThatThrownBy(() -> Expressions.compile("OBJECT(\"a\")"))
+    assertThatThrownBy(() -> Expressions.compile("$OBJECT(\"a\")"))
         .hasMessageContaining("key/value");
-    assertThatThrownBy(() -> Expressions.evaluate("OBJECT(\"a\", null, \"a\", 2)", Map.of()))
+    assertThatThrownBy(() -> Expressions.evaluate("$OBJECT(\"a\", null, \"a\", 2)", Map.of()))
         .hasMessageContaining("Duplicate");
-    assertThatThrownBy(() -> Expressions.evaluate("TO_BOOLEAN(1)", Map.of()))
+    assertThatThrownBy(() -> Expressions.evaluate("$TO_BOOLEAN(1)", Map.of()))
         .hasMessageContaining("TO_BOOLEAN");
-    assertThatThrownBy(() -> Expressions.evaluate("TO_NUMBER(\"1e1000\")", Map.of()))
+    assertThatThrownBy(() -> Expressions.evaluate("$TO_NUMBER(\"1e1000\")", Map.of()))
         .hasMessageContaining("precision");
   }
 }

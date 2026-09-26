@@ -27,7 +27,7 @@ class ArcScriptContractTest {
         node child REFERENCE "A \\\"quoted\\\" rule" {
           use "shared-rule" version 3;
           bind z = note;
-          bind a = CONCAT("{", note, ";}");
+          bind a = $CONCAT("{", note, ";}");
           as result;
           next -> done edge "child-result";
         }
@@ -49,7 +49,7 @@ class ArcScriptContractTest {
 
         node "child" REFERENCE "A \\\"quoted\\\" rule" at (300.0, 0.0) {
           use "shared-rule" version 3;
-          bind a = CONCAT("{", note, ";}");
+          bind a = $CONCAT("{", note, ";}");
           bind z = note;
           as result;
           next -> "done" edge "child-result";
@@ -89,13 +89,13 @@ class ArcScriptContractTest {
   }
 
   @Test
-  void prefixedFunctionsRoundTripWithoutRewritingLegacyCallsOrQuotedDollars() {
+  void prefixedFunctionsRoundTripWithoutRewritingQuotedDollars() {
     String source =
         """
         inputs { ROUND: NUMBER required; }
         node start INPUT "Start" { next -> calc; }
         node calc FORMULA "Calculate" {
-          let value = $ROUND(ROUND, 2) + ROUND(1, 0);
+          let value = $ROUND(ROUND, 2) + $ROUND(1, 0);
           next -> done;
         }
         node done OUTPUT "Done" {
@@ -105,7 +105,7 @@ class ArcScriptContractTest {
     var built = script.build(source);
     assertThat(built.diagnostics()).isEmpty();
     assertThat(built.source())
-        .contains("$ROUND(ROUND, 2) + ROUND(1, 0)", "\"$ROUND(1) and ROUND(1)\"");
+        .contains("$ROUND(ROUND, 2) + $ROUND(1, 0)", "\"$ROUND(1) and ROUND(1)\"");
     assertThat(script.build(built.source()).definition()).isEqualTo(built.definition());
     assertThat(
             script
@@ -121,6 +121,11 @@ class ArcScriptContractTest {
             (id, version) -> {
               throw new AssertionError("Unexpected reference");
             });
+    var legacy = script.build(source.replace("$ROUND(ROUND, 2)", "ROUND(ROUND, 2)"));
+    assertThat(legacy.definition()).isNull();
+    assertThat(legacy.diagnostics())
+        .extracting(ArcScript.Diagnostic::message)
+        .containsExactly("Function calls require a $ prefix; use $ROUND(...)");
   }
 
   @Test

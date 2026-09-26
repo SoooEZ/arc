@@ -70,6 +70,65 @@ class RuleExecutionServiceTest {
   }
 
   @Test
+  void storedDraftsAndPublishedVersionsRequireExplicitFunctionPrefixesWithoutRewritingHistory() {
+    var input = new Node("input", "INPUT", "Inputs", null, null, null, null, null, null);
+    var edge = new Edge("next", "input", "output", "next");
+    var parameters = List.of(new Input("ROUND", "NUMBER", true, null));
+    var oldDefinition =
+        new Definition(
+            1,
+            parameters,
+            List.of(
+                input,
+                new Node(
+                    "output", "OUTPUT", "Result", null, "ROUND(ROUND, 2)", null, null, null, null)),
+            List.of(edge));
+    var updatedDefinition =
+        new Definition(
+            1,
+            parameters,
+            List.of(
+                input,
+                new Node(
+                    "output",
+                    "OUTPUT",
+                    "Result",
+                    null,
+                    "$ROUND(ROUND, 2)",
+                    null,
+                    null,
+                    null,
+                    null)),
+            List.of(edge));
+    when(rules.publishedVersion("old-rule")).thenReturn(1);
+    when(rules.resolve("old-rule", 1)).thenReturn(oldDefinition);
+    when(rules.resolve("old-rule", 2)).thenReturn(updatedDefinition);
+    var inputs = Map.<String, Object>of("ROUND", new java.math.BigDecimal("1.235"));
+
+    assertThatThrownBy(() -> service.preview(new Preview(oldDefinition, inputs)))
+        .hasMessageContaining("Function calls require a $ prefix; use $ROUND(...)");
+    for (Integer version : Arrays.asList(null, 1)) {
+      assertThatThrownBy(() -> service.execute("old-rule", new Execution(inputs, version)))
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              failure -> {
+                assertThat(failure.status()).isEqualTo(422);
+                assertThat(failure.getMessage())
+                    .contains("Function calls require a $ prefix; use $ROUND(...)");
+                assertThat(failure.locations())
+                    .containsExactly(new ArcException.Location(null, null, "output", "Result"));
+              });
+    }
+    assertThat(service.execute("old-rule", new Execution(inputs, 2)).result())
+        .isEqualTo(new java.math.BigDecimal("1.24"));
+    assertThat(oldDefinition.nodes().getLast().expression()).isEqualTo("ROUND(ROUND, 2)");
+    verify(rules).publishedVersion("old-rule");
+    verify(rules, times(2)).resolve("old-rule", 1);
+    verify(rules).resolve("old-rule", 2);
+    verifyNoMoreInteractions(rules);
+  }
+
+  @Test
   void cachedPublishedPlansKeepConcurrentRequestInputsIsolated() throws Exception {
     when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank("FORMULA"));
     service.execute("rule", new Execution(Map.of("amount", 100), 1, false, null));

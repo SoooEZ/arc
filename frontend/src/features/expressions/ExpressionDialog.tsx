@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { arcEditorOptions, useArcEditor } from "../studio/useArcEditor";
 import FunctionLibrary from "../studio/FunctionLibrary";
+import ExpressionColorKey from "../studio/ExpressionColorKey";
 import {
   useArcLanguageSupport,
   insertSnippet,
@@ -37,7 +38,7 @@ export default function ExpressionDialog({
   onApply: (value: string) => void;
 }) {
   const [source, setSource] = useState(value);
-  const { editor, onMount } = useArcEditor();
+  const { editor, model, onMount } = useArcEditor();
   const { data: functions, error: catalogError } = useAsyncResource(
     "functions",
     (signal) => studioApi.functions({ signal }),
@@ -54,7 +55,7 @@ export default function ExpressionDialog({
     250,
   );
   const names = variables.map((variable) => variable.name);
-  useArcLanguageSupport(editor, functions, names, false);
+  useArcLanguageSupport(editor, model, functions, variables, false);
   const missing =
     check?.variables.filter((name) => !names.includes(name)) ?? [];
   const error =
@@ -80,6 +81,7 @@ export default function ExpressionDialog({
           Functions start with $. Use upstream variables as arguments. Tab moves
           between arguments; Ctrl/⌘ Space opens suggestions.
         </p>
+        <ExpressionColorKey />
         <div className="expression-variable-chips">
           {variables.map((variable) => (
             <Tooltip key={variable.name} title={variableOptionLabel(variable)}>

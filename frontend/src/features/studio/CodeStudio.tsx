@@ -11,6 +11,7 @@ import { useArcEditor, arcEditorOptions } from "./useArcEditor";
 import StudioLibrary from "./StudioLibrary";
 import StudioOutline from "./StudioOutline";
 import StudioProblems from "./StudioProblems";
+import ExpressionColorKey from "./ExpressionColorKey";
 
 interface Props {
   rule: Rule;
@@ -36,7 +37,7 @@ export default function CodeStudio({
   onGraph,
   onSave,
 }: Props) {
-  const { editor, onMount, reveal } = useArcEditor(diagnostics);
+  const { editor, model, onMount, reveal } = useArcEditor(diagnostics);
   const { data: functions, error: catalogError } = useAsyncResource(
     "functions",
     (signal) => studioApi.functions({ signal }),
@@ -47,7 +48,7 @@ export default function CodeStudio({
   const insert = (snippet: string, atEnd = false) => {
     if (!latest.current.readOnly) insertSnippet(editor.current, snippet, atEnd);
   };
-  useArcLanguageSupport(editor, functions, definition);
+  useArcLanguageSupport(editor, model, functions, definition);
 
   const mount = (instance: monaco.editor.IStandaloneCodeEditor) => {
     onMount(instance);
@@ -125,6 +126,7 @@ export default function CodeStudio({
             </Button>
           </div>
         </div>
+        <ExpressionColorKey />
         <MonacoEditor
           language="arc"
           theme="arc-light"

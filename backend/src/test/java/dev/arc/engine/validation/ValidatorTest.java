@@ -189,7 +189,7 @@ class ValidatorTest {
             null,
             null,
             null,
-            List.of(new Field("name", "UPPER(")));
+            List.of(new Field("name", "$UPPER(")));
     var definition =
         new Definition(
             1,

@@ -164,14 +164,14 @@ class EngineTest {
             List.of(new Input("amount", "NUMBER", false, null)),
             List.of(
                 node("input", "INPUT", null, null),
-                node("result", "OUTPUT", "if(amount == null, 0, amount)", null)),
+                node("result", "OUTPUT", "$if(amount == null, 0, amount)", null)),
             List.of(edge("input", "result", "next")));
     assertThat(run(d, Map.of()).result()).isEqualTo(BigDecimal.ZERO);
   }
 
   @Test
   void decimalFailuresIdentifyTheNodeForErrorNavigation() {
-    for (String expression : new String[] {"1e40 % 3", "ROUND(1, -2147483648)"}) {
+    for (String expression : new String[] {"1e40 % 3", "$ROUND(1, -2147483648)"}) {
       var definition =
           new Definition(
               1,

@@ -102,7 +102,7 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
   await setEditorText(
     page,
     page.getByLabel("Expression", { exact: true }),
-    "round(amount * 1.25, 2)",
+    "$round(amount * 1.25, 2)",
   );
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(

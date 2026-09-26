@@ -1,4 +1,15 @@
 /* Code studio and connected parameter workspace */
+.expression-color-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 6px 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.studio-editor > .expression-color-key {
+  padding-inline: 20px;
+}
 .code-studio {
   flex: 1;
   display: grid;

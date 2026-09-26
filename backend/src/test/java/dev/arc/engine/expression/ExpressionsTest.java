@@ -23,16 +23,16 @@ class ExpressionsTest {
 
   @Test
   void roundingAndFunctionsAreDeterministic() {
-    assertThat(eval("round(19.995, 2)")).isEqualTo(new BigDecimal("20.00"));
-    assertThat(eval("max(2, min(10, 5)) + abs(-3)")).isEqualTo(new BigDecimal("8"));
-    assertThat(eval("ceil(2.1) + floor(2.9)")).isEqualTo(new BigDecimal("5"));
+    assertThat(eval("$round(19.995, 2)")).isEqualTo(new BigDecimal("20.00"));
+    assertThat(eval("$max(2, $min(10, 5)) + $abs(-3)")).isEqualTo(new BigDecimal("8"));
+    assertThat(eval("$ceil(2.1) + $floor(2.9)")).isEqualTo(new BigDecimal("5"));
   }
 
   @Test
   void logicalOperatorsShortCircuit() {
     assertThat(eval("false && 1 / 0 > 0")).isEqualTo(false);
     assertThat(eval("true || 1 / 0 > 0")).isEqualTo(true);
-    assertThat(eval("if(true, 42, 1 / 0)")).isEqualTo(new BigDecimal("42"));
+    assertThat(eval("$if(true, 42, 1 / 0)")).isEqualTo(new BigDecimal("42"));
     assertThat(eval("!false && (1 == 1.0) && (2 <= 3)")).isEqualTo(true);
   }
 
@@ -52,9 +52,9 @@ class ExpressionsTest {
     assertThatThrownBy(() -> eval("1 / 0")).hasMessageContaining("Division by zero");
     assertThatThrownBy(() -> eval("missing + 1")).hasMessageContaining("Unknown variable");
     assertThatThrownBy(() -> eval("1 +")).hasMessageContaining("Incomplete expression");
-    assertThatThrownBy(() -> eval("round(1, 99)")).hasMessageContaining("-12 to 12");
-    assertThatThrownBy(() -> eval("round(1, 0.5)")).hasMessageContaining("integer");
-    assertThatThrownBy(() -> eval("max()")).hasMessageContaining("argument count");
+    assertThatThrownBy(() -> eval("$round(1, 99)")).hasMessageContaining("-12 to 12");
+    assertThatThrownBy(() -> eval("$round(1, 0.5)")).hasMessageContaining("integer");
+    assertThatThrownBy(() -> eval("$max()")).hasMessageContaining("argument count");
     assertThatThrownBy(() -> eval("true + 1")).hasMessageContaining("Expected a number");
   }
 
@@ -65,6 +65,7 @@ class ExpressionsTest {
           "Runtime.getRuntime()",
           "new ProcessBuilder()",
           "T(java.lang.Runtime)",
+          "$T(java.lang.Runtime)",
           "system('whoami')",
           "1e9999",
           "1 + ".repeat(200) + "1",
@@ -79,13 +80,13 @@ class ExpressionsTest {
     assertThatThrownBy(() -> eval("1e40 % 3"))
         .isInstanceOf(ArcException.class)
         .hasMessageContaining("Decimal operation");
-    assertThat(eval("IFERROR(1e40 % 3, 7)")).isEqualTo(new BigDecimal("7"));
+    assertThat(eval("$IFERROR(1e40 % 3, 7)")).isEqualTo(new BigDecimal("7"));
   }
 
   @Test
   void roundingRejectsIntegerMinimumPrecisionWithoutOverflow() {
     for (String function : new String[] {"ROUND", "ROUNDDOWN", "ROUNDUP"}) {
-      assertThatThrownBy(() -> eval(function + "(1, -2147483648)"))
+      assertThatThrownBy(() -> eval("$" + function + "(1, -2147483648)"))
           .isInstanceOf(ArcException.class)
           .hasMessageContaining("-12 to 12");
     }

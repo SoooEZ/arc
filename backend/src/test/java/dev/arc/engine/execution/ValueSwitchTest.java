@@ -114,7 +114,7 @@ class ValueSwitchTest {
                 assertThat(error.getMessage()).contains("Selector", "boolean, number or string");
                 assertThat(error.locations().getFirst().nodeId()).isEqualTo("choose");
               });
-    for (String expression : List.of("null", "[1]", "OBJECT()")) {
+    for (String expression : List.of("null", "[1]", "$OBJECT()")) {
       var graph =
           script.parse(script.render(choice()).replace("equals 0;", "equals " + expression + ";"));
       assertThat(run(graph, false).result()).isEqualTo("boolean");

@@ -1,6 +1,8 @@
 import { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/editor/editor.api";
 import "monaco-editor/features/register.all";
+// Monaco's all-features entry registers viewport tokens, but not document tokens.
+import "monaco-editor/editor/contrib/semanticTokens/browser/documentSemanticTokens";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
@@ -54,6 +56,9 @@ monaco.editor.defineTheme("arc-light", {
     { token: "keyword", foreground: "875295" },
     { token: "type", foreground: "327966" },
     { token: "function", foreground: "8B682F" },
+    { token: "parameter", foreground: "205FA6" },
+    { token: "variable", foreground: "7B3F98" },
+    { token: "variable.local", foreground: "52665D" },
     { token: "comment", foreground: "8C9792" },
     { token: "string", foreground: "277B61" },
   ],

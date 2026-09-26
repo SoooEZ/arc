@@ -116,7 +116,7 @@ test("node expressions edit one node, group functions, and flag all invalid expr
   );
   await replaceCode(
     page,
-    'node calc FORMULA "Calculation" at (250, 180) { let total = SUM([3, 4]); next -> out; }',
+    'node calc FORMULA "Calculation" at (250, 180) { let total = $SUM([3, 4]); next -> out; }',
   );
   await expect(
     dialog.getByRole("button", { name: "Apply to graph" }),
@@ -145,7 +145,7 @@ test("node expressions edit one node, group functions, and flag all invalid expr
   const saved = await (await request.get(`/api/rules/${id}`)).json();
   expect(
     saved.draft.nodes.find((n: RuleNode) => n.id === "calc").expression,
-  ).toBe("SUM([3, 4])");
+  ).toBe("$SUM([3, 4])");
   expect(saved.draft.nodes.find((n: RuleNode) => n.id === "input")).toEqual(
     original.draft.nodes[0],
   );

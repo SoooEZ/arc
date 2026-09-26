@@ -17,6 +17,7 @@ export const arcEditorOptions: monaco.editor.IStandaloneEditorConstructionOption
     wordWrap: "on",
     scrollBeyondLastLine: false,
     fixedOverflowWidgets: true,
+    "semanticHighlighting.enabled": true,
     suggest: { showWords: false },
   };
 
@@ -66,5 +67,5 @@ export function useArcEditor(diagnostics = noDiagnostics, owner = "arc") {
     editor.current?.focus();
   }, []);
 
-  return { editor, onMount, reveal };
+  return { editor, model, onMount, reveal };
 }

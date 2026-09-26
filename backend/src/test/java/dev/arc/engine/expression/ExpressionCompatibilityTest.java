@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class ExpressionCompatibilityTest {
   @Test
   void dependencyNamesRemainCaseSensitiveAndCollectionBindingsRemainLexical() {
-    var expression = Expressions.compile("amount + Amount + SUM(MAP(items, item, item.price))");
+    var expression = Expressions.compile("amount + Amount + $SUM($MAP(items, item, item.price))");
     assertThat(expression.variables()).containsExactlyInAnyOrder("amount", "Amount", "items");
     assertThat(
             expression.evaluate(
@@ -21,29 +21,29 @@ class ExpressionCompatibilityTest {
         .isEqualTo(new BigDecimal("10"));
     assertThat(
             Expressions.compile(
-                    "SUM(MAP(items, item, SUM(MAP(item.parts, item, item.price)) + item.price))")
+                    "$SUM($MAP(items, item, $SUM($MAP(item.parts, item, item.price)) + item.price))")
                 .variables())
         .containsExactly("items");
-    assertThat(Expressions.compile("MAP(items, item, item.price) + item").variables())
+    assertThat(Expressions.compile("$MAP(items, item, item.price) + item").variables())
         .containsExactlyInAnyOrder("items", "item");
   }
 
   @Test
   void lazyFunctionsPreserveFalsyValuesAndArrays() {
-    assertThat(eval("COALESCE(null, false, 1 / 0)")).isEqualTo(false);
-    assertThat(eval("COALESCE(null, 0, 1 / 0)")).isEqualTo(BigDecimal.ZERO);
-    assertThat(eval("COALESCE(null, '', 1 / 0)")).isEqualTo("");
-    assertThat(eval("COALESCE([null, 2], 1 / 0)"))
+    assertThat(eval("$COALESCE(null, false, 1 / 0)")).isEqualTo(false);
+    assertThat(eval("$COALESCE(null, 0, 1 / 0)")).isEqualTo(BigDecimal.ZERO);
+    assertThat(eval("$COALESCE(null, '', 1 / 0)")).isEqualTo("");
+    assertThat(eval("$COALESCE([null, 2], 1 / 0)"))
         .isEqualTo(Arrays.asList(null, new BigDecimal("2")));
-    assertThat(eval("AND(false, 1 / 0)")).isEqualTo(false);
-    assertThat(eval("OR(true, 1 / 0)")).isEqualTo(true);
-    assertThat(eval("IF(false, 1 / 0, 3)")).isEqualTo(new BigDecimal("3"));
-    assertThat(eval("SWITCH(2, 1, 1 / 0, 2, 7, 1 / 0)")).isEqualTo(new BigDecimal("7"));
+    assertThat(eval("$AND(false, 1 / 0)")).isEqualTo(false);
+    assertThat(eval("$OR(true, 1 / 0)")).isEqualTo(true);
+    assertThat(eval("$IF(false, 1 / 0, 3)")).isEqualTo(new BigDecimal("3"));
+    assertThat(eval("$SWITCH(2, 1, 1 / 0, 2, 7, 1 / 0)")).isEqualTo(new BigDecimal("7"));
   }
 
   @Test
   void scalarTypesAndDecimalLiteralPrecisionAreNotCoerced() {
-    for (String expression : List.of("'1' + 2", "IF(1, 2, 3)", "true * 2")) {
+    for (String expression : List.of("'1' + 2", "$IF(1, 2, 3)", "true * 2")) {
       assertThatThrownBy(() -> eval(expression)).isInstanceOf(ArcException.class);
     }
     String preciseLiteral = "1234567890123456789012345678901234567890.123456789";
@@ -51,7 +51,7 @@ class ExpressionCompatibilityTest {
     assertThat(eval("0.1 + 0.2")).isEqualTo(new BigDecimal("0.3"));
     assertThat(eval("-2^2")).isEqualTo(new BigDecimal("-4"));
     assertThat(eval("2^3^2")).isEqualTo(new BigDecimal("512"));
-    assertThat(eval("ROUND(1.235, 2)")).isEqualTo(new BigDecimal("1.24"));
+    assertThat(eval("$ROUND(1.235, 2)")).isEqualTo(new BigDecimal("1.24"));
   }
 
   @Test
@@ -60,9 +60,9 @@ class ExpressionCompatibilityTest {
     assertThat(Expressions.evaluate("customer.missing", Map.of("customer", Map.of()))).isNull();
     var customer = new HashMap<String, Object>();
     customer.put("value", null);
-    assertThat(Expressions.evaluate("GET(customer, 'value', 5)", Map.of("customer", customer)))
+    assertThat(Expressions.evaluate("$GET(customer, 'value', 5)", Map.of("customer", customer)))
         .isNull();
-    assertThat(Expressions.evaluate("GET(customer, 'missing', 5)", Map.of("customer", customer)))
+    assertThat(Expressions.evaluate("$GET(customer, 'missing', 5)", Map.of("customer", customer)))
         .isEqualTo(new BigDecimal("5"));
   }
 
@@ -78,7 +78,7 @@ class ExpressionCompatibilityTest {
 
   @Test
   void compiledExpressionsCanBeReusedAcrossConcurrentEvaluations() throws Exception {
-    var expression = Expressions.compile("SUM(MAP(items, item, item * factor))");
+    var expression = Expressions.compile("$SUM($MAP(items, item, item * factor))");
     try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
       List<Callable<Object>> evaluations = new ArrayList<>();
       for (int factor = 1; factor <= 20; factor++) {
@@ -93,7 +93,7 @@ class ExpressionCompatibilityTest {
 
   @Test
   void aFailedEvaluationDoesNotConsumeTheNextEvaluationsBudget() {
-    var expression = Expressions.compile("SUM(MAP(items, x, SUM(MAP(items, y, y))))");
+    var expression = Expressions.compile("$SUM($MAP(items, x, $SUM($MAP(items, y, y))))");
     assertThatThrownBy(() -> expression.evaluate(Map.of("items", Collections.nCopies(101, 1))))
         .hasMessageContaining("10,000 operations");
     assertThat(expression.evaluate(Map.of("items", List.of(1, 2)))).isEqualTo(new BigDecimal("6"));
@@ -106,11 +106,11 @@ class ExpressionCompatibilityTest {
           @Override
           public Object get(Object key) {
             // An embedded caller may supply a Map that obtains a value through another formula.
-            Expressions.evaluate("ABS(1)", Map.of());
+            Expressions.evaluate("$ABS(1)", Map.of());
             return super.get(key);
           }
         };
-    var expression = Expressions.compile("SUM(MAP(items, x, SUM(MAP(items, y, y.price))))");
+    var expression = Expressions.compile("$SUM($MAP(items, x, $SUM($MAP(items, y, y.price))))");
     assertThatThrownBy(() -> expression.evaluate(Map.of("items", Collections.nCopies(101, item))))
         .hasMessageContaining("10,000 operations");
   }

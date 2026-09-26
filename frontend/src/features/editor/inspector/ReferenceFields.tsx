@@ -142,7 +142,7 @@ export default function ReferenceFields({
         <>
           <h4>Parameter mapping</h4>
           <p className="muted-copy">
-            Pass a variable, a value, or a formula into each input.
+            Pass a variable, a value, or an expression into each input.
           </p>
           {child.definition.inputs.map((input) => (
             <ValueBinding

@@ -152,9 +152,11 @@ final class ExpressionParser {
   }
 
   private Expr functionCall(String token) {
+    if (!token.startsWith("$"))
+      throw ArcException.invalid(
+          "Function calls require a $ prefix; use $" + token.toUpperCase(Locale.ROOT) + "(...)");
     expect("(");
-    // Legacy calls remain executable in stored drafts, pinned versions and source mappings.
-    String name = (token.startsWith("$") ? token.substring(1) : token).toUpperCase(Locale.ROOT);
+    String name = token.substring(1).toUpperCase(Locale.ROOT);
     if (Set.of("MAP", "FILTER", "ALL", "ANY", "REDUCE").contains(name)) return collectionCall(name);
     List<Expr> arguments = arguments(")");
     Functions.arity(name, arguments.size());

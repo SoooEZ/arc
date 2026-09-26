@@ -57,12 +57,11 @@ test("a failed published version cannot expose the draft and can be retried", as
   });
 
   await page.goto(`/#/studio/${id}?version=1`);
-  await expect(page.getByRole("alert")).toContainText(
-    "Could not load version 1",
-  );
-  await expect(page.getByRole("alert")).toContainText(
-    "Version store unavailable",
-  );
+  const versionError = page
+    .getByRole("alert")
+    .filter({ hasText: "Could not load version 1" });
+  await expect(versionError).toBeVisible();
+  await expect(versionError).toContainText("Version store unavailable");
   await expect(page.locator(".monaco-editor")).toHaveCount(0);
   await expect(page.locator(".react-flow__node")).toHaveCount(0);
   await expect(
@@ -84,9 +83,7 @@ test("a failed published version cannot expose the draft and can be retried", as
   await expect(page.getByTestId("test-result")).toHaveText("21");
 
   await page.goto(`/#/rules/${id}?version=1`);
-  await expect(page.getByRole("alert")).toContainText(
-    "Could not load version 1",
-  );
+  await expect(versionError).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(0);
   await expect(
     page.getByText("Draft-only calculation", { exact: true }),

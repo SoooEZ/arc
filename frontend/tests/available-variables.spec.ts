@@ -231,7 +231,7 @@ test("variable menus and expression tooltips show declared types and live produc
         id: "calc",
         type: "FORMULA",
         label: "Compute score",
-        expression: 'GET(hello, "score", 0)',
+        expression: '$GET(hello, "score", 0)',
         output: "score",
         position: { x: 200, y: 180 },
       },
