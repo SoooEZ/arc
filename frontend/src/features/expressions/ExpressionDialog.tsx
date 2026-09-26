@@ -55,7 +55,13 @@ export default function ExpressionDialog({
     250,
   );
   const names = variables.map((variable) => variable.name);
-  useArcLanguageSupport(editor, model, functions, variables, false);
+  const { insertFormula } = useArcLanguageSupport(
+    editor,
+    model,
+    functions,
+    variables,
+    false,
+  );
   const missing =
     check?.variables.filter((name) => !names.includes(name)) ?? [];
   const error =
@@ -78,8 +84,9 @@ export default function ExpressionDialog({
       </DialogTitle>
       <DialogContent className="node-expression-content">
         <p className="muted-copy">
-          Functions start with $. Use upstream variables as arguments. Tab moves
-          between arguments; Ctrl/⌘ Space opens suggestions.
+          Functions start with $; published formulas start with @ and include a
+          version. Use upstream variables as arguments. Tab moves between
+          arguments; Ctrl/⌘ Space opens suggestions.
         </p>
         <ExpressionColorKey />
         <div className="expression-variable-chips">
@@ -100,6 +107,7 @@ export default function ExpressionDialog({
               functions={functions}
               readOnly={readOnly}
               onInsert={insert}
+              onInsertFormula={insertFormula}
             />
             {catalogError && <Alert severity="error">{catalogError}</Alert>}
           </aside>

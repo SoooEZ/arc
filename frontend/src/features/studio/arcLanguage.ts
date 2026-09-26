@@ -9,7 +9,7 @@ self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco });
 monaco.languages.register({ id: "arc" });
 monaco.languages.setLanguageConfiguration("arc", {
-  wordPattern: /\$?[A-Za-z_][\w.]*/g,
+  wordPattern: /@[a-z][a-z0-9-]*(?::[1-9]\d*)?|\$?[A-Za-z_][\w.]*/g,
   comments: { lineComment: "//" },
   brackets: [
     ["{", "}"],
@@ -32,6 +32,7 @@ monaco.languages.setMonarchTokensProvider("arc", {
     root: [
       [/\/\/.*$/, "comment"],
       [/"([^"\\]|\\.)*("|$)|'([^'\\]|\\.)*('|$)/, "string"],
+      [/@[a-z][a-z0-9-]*(?::[1-9]\d*)?/, "formula"],
       [
         /\b(schema|inputs|node|at|let|when|select|case|equals|field|return|use|version|bind|as|next|edge|source|required|optional|default)\b/,
         "keyword",
@@ -56,6 +57,7 @@ monaco.editor.defineTheme("arc-light", {
     { token: "keyword", foreground: "875295" },
     { token: "type", foreground: "327966" },
     { token: "function", foreground: "8B682F" },
+    { token: "formula", foreground: "007C83" },
     { token: "parameter", foreground: "205FA6" },
     { token: "variable", foreground: "7B3F98" },
     { token: "variable.local", foreground: "52665D" },

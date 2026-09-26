@@ -20,18 +20,38 @@ public final class Expressions {
     Object eval(ExpressionRuntime.Context context);
   }
 
+  public record FormulaCall(String id, int version, int argumentCount) {}
+
+  /** Host capability for a reached published Formula call; arguments retain explicit nulls. */
+  @FunctionalInterface
+  public interface FormulaCaller {
+    Object call(FormulaCall formula, List<Object> arguments);
+
+    static FormulaCaller unavailable() {
+      return (formula, arguments) -> {
+        throw ArcException.invalid("Published Formula calls need a rule execution context");
+      };
+    }
+  }
+
   /** Immutable compiled code; each evaluation owns its scope and operation budget. */
   public static final class Compiled {
     private final Expr expression;
     private final Set<String> variables;
+    private final List<FormulaCall> formulaCalls;
 
-    private Compiled(Expr expression, Set<String> variables) {
+    private Compiled(Expr expression, Set<String> variables, List<FormulaCall> formulaCalls) {
       this.expression = expression;
       this.variables = Set.copyOf(variables);
+      this.formulaCalls = List.copyOf(formulaCalls);
     }
 
     public Set<String> variables() {
       return variables;
+    }
+
+    public List<FormulaCall> formulaCalls() {
+      return formulaCalls;
     }
 
     public Object evaluate(Map<String, Object> scope) {
@@ -39,8 +59,14 @@ public final class Expressions {
     }
 
     public Object evaluate(Map<String, Object> scope, ExecutionDeadline deadline) {
+      return evaluate(scope, deadline, FormulaCaller.unavailable());
+    }
+
+    public Object evaluate(
+        Map<String, Object> scope, ExecutionDeadline deadline, FormulaCaller formulas) {
       deadline.check();
-      Object result = bounded(expression.eval(new ExpressionRuntime.Context(scope, deadline)));
+      Object result =
+          bounded(expression.eval(new ExpressionRuntime.Context(scope, deadline, formulas)));
       deadline.check();
       return result;
     }
@@ -53,7 +79,7 @@ public final class Expressions {
     Expr expression = parser.parse(0);
     if (!parser.peek().equals("<end>"))
       throw ArcException.invalid("Unexpected token: " + parser.peek());
-    return new Compiled(expression, parser.variables());
+    return new Compiled(expression, parser.variables(), parser.formulaCalls());
   }
 
   public static Object evaluate(String source, Map<String, Object> scope) {

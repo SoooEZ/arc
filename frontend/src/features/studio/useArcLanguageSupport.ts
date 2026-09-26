@@ -1,44 +1,17 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useMemo, type RefObject } from "react";
 import { monaco } from "./arcLanguage";
 import type { Definition, FunctionEntry } from "../../types";
 import { modules } from "./snippets";
 import { inputVariables, type VariableOption } from "../../domain/graph";
 import { expressionSymbols } from "../../domain/expressionSymbols";
+import { useFormulaSupport } from "./useFormulaSupport";
 
-/** Trigger characters also fire inside strings, independently of quickSuggestions. */
-export function isStringOrComment(
-  model: monaco.editor.ITextModel,
-  position: monaco.Position,
-) {
-  const tokens = monaco.editor.tokenize(
-    model.getLineContent(position.lineNumber),
-    "arc",
-  )[0];
-  let token: monaco.Token | undefined;
-  for (const entry of tokens ?? []) {
-    if (entry.offset >= position.column - 1) break;
-    token = entry;
-  }
-  return token?.type.startsWith("string") || token?.type.startsWith("comment");
-}
-
-/** Include the namespace marker even before the function name is entered. */
-export function completionWord(
-  model: monaco.editor.ITextModel,
-  position: monaco.Position,
-) {
-  const word = model.getWordUntilPosition(position);
-  if (
-    !word.word.startsWith("$") &&
-    model.getLineContent(position.lineNumber)[word.startColumn - 2] === "$"
-  )
-    return {
-      ...word,
-      word: "$" + word.word,
-      startColumn: word.startColumn - 1,
-    };
-  return word;
-}
+import { completionWord, isStringOrComment } from "./arcCompletion";
+export {
+  completionWord,
+  isStringOrComment,
+  insertSnippet,
+} from "./arcCompletion";
 
 /** Providers belong to one model; nested rule dialogs do not leak suggestions into each other. */
 export function useArcLanguageSupport(
@@ -48,25 +21,35 @@ export function useArcLanguageSupport(
   definition: Definition | VariableOption[],
   includeModules = true,
 ) {
+  const variables: VariableOption[] = useMemo(
+    () =>
+      Array.isArray(definition)
+        ? definition
+        : [
+            ...inputVariables(definition),
+            ...definition.nodes.flatMap((node): VariableOption[] =>
+              node.output
+                ? [{ name: node.output, type: "RESULT", label: node.label }]
+                : [],
+            ),
+          ],
+    [definition],
+  );
+  const formulaSupport = useFormulaSupport(
+    editor,
+    editorModel,
+    variables,
+    !Array.isArray(definition),
+  );
   useEffect(() => {
     // Providers must register after Monaco attaches the model. An initial token
     // request before onMount otherwise returns null and may never be retried.
     if (!editorModel || editorModel.isDisposed()) return;
-    const variables: VariableOption[] = Array.isArray(definition)
-      ? definition
-      : [
-          ...inputVariables(definition),
-          ...definition.nodes.flatMap((node): VariableOption[] =>
-            node.output
-              ? [{ name: node.output, type: "RESULT", label: node.label }]
-              : [],
-          ),
-        ];
     const colors = monaco.languages.registerDocumentSemanticTokensProvider(
       "arc",
       {
         getLegend: () => ({
-          tokenTypes: ["function", "parameter", "variable"],
+          tokenTypes: ["function", "parameter", "variable", "formula"],
           tokenModifiers: ["local"],
         }),
         provideDocumentSemanticTokens: (model) => {
@@ -86,11 +69,13 @@ export function useArcLanguageSupport(
               line - previousLine,
               line === previousLine ? column - previousColumn : column,
               symbol.length,
-              symbol.kind === "function"
-                ? 0
-                : symbol.kind === "parameter"
-                  ? 1
-                  : 2,
+              symbol.kind === "formula"
+                ? 3
+                : symbol.kind === "function"
+                  ? 0
+                  : symbol.kind === "parameter"
+                    ? 1
+                    : 2,
               symbol.kind === "variable.local" ? 1 : 0,
             );
             previousLine = line;
@@ -107,6 +92,7 @@ export function useArcLanguageSupport(
         if (model !== editor.current?.getModel()) return { suggestions: [] };
         if (isStringOrComment(model, position)) return { suggestions: [] };
         const w = completionWord(model, position);
+        if (w.word.startsWith("@")) return { suggestions: [] };
         const functionOnly = w.word.startsWith("$");
         const functionPrefix = functionOnly ? w.word.toUpperCase() : "$";
         const range = {
@@ -154,6 +140,44 @@ export function useArcLanguageSupport(
       provideHover: (model, position) => {
         if (model !== editor.current?.getModel()) return null;
         if (isStringOrComment(model, position)) return null;
+        const offset = model.getOffsetAt(position);
+        const symbol = expressionSymbols(
+          model.getValue(),
+          variables,
+          !Array.isArray(definition),
+        ).find(
+          (entry) =>
+            offset >= entry.offset && offset < entry.offset + entry.length,
+        );
+        if (symbol?.kind === "formula") return null;
+        if (symbol?.kind === "variable.local")
+          return {
+            contents: [
+              {
+                value:
+                  "Collection-local variable. Visible only inside this collection body.",
+              },
+            ],
+          };
+        if (symbol?.kind === "parameter" || symbol?.kind === "variable") {
+          const name = model
+            .getValue()
+            .slice(symbol.offset, symbol.offset + symbol.length);
+          const variable = variables.find((entry) => entry.name === name);
+          if (!variable) return null;
+          return {
+            contents: [
+              { value: "```arc\n" + variable.name + "\n```" },
+              {
+                value:
+                  variable.type === "RESULT"
+                    ? "Node result"
+                    : `Input · ${variable.type.toLowerCase()}`,
+              },
+              { value: `From: ${variable.label}` },
+            ],
+          };
+        }
         const w = model.getWordAtPosition(position);
         if (!w) return null;
         const explicitFunction = w.word.startsWith("$");
@@ -186,24 +210,6 @@ export function useArcLanguageSupport(
       hover.dispose();
       colors.dispose();
     };
-  }, [editor, editorModel, functions, definition, includeModules]);
-}
-export function insertSnippet(
-  editor: monaco.editor.IStandaloneCodeEditor | null,
-  snippet: string,
-  atEnd = false,
-) {
-  if (!editor) return;
-  editor.focus();
-  const model = editor.getModel();
-  if (atEnd && model)
-    editor.setPosition({
-      lineNumber: model.getLineCount(),
-      column: model.getLineMaxColumn(model.getLineCount()),
-    });
-  editor
-    .getContribution<{ insert: (text: string) => void; dispose: () => void }>(
-      "snippetController2",
-    )
-    ?.insert(snippet);
+  }, [editor, editorModel, functions, definition, variables, includeModules]);
+  return formulaSupport;
 }

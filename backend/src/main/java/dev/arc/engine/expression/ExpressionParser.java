@@ -24,7 +24,7 @@ final class ExpressionParser {
           .build();
   private static final Pattern TOKEN =
       Pattern.compile(
-          "\\s*(?:(\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|\\.\\d+)|(\\$?[A-Za-z_][A-Za-z_0-9.]*)|(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')|(&&|\\|\\||==|!=|<>|<=|>=|[=^\\[\\]+*/%<>()!,\\-]))");
+          "\\s*(?:(\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|\\.\\d+)|(\\$?[A-Za-z_][A-Za-z_0-9.]*|@[A-Za-z_][A-Za-z_0-9-]*(?::[0-9]+)?)|(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')|(&&|\\|\\||==|!=|<>|<=|>=|[=^\\[\\]+*/%<>()!,\\-]))");
 
   private static int priority(String op) {
     return switch (op) {
@@ -41,6 +41,7 @@ final class ExpressionParser {
 
   private final List<String> tokens = new ArrayList<>();
   private final Set<String> variables = new HashSet<>();
+  private final List<FormulaCall> formulaCalls = new ArrayList<>();
   private int index, depth;
   private final Set<String> locals = new HashSet<>();
 
@@ -132,6 +133,7 @@ final class ExpressionParser {
     if (token.equalsIgnoreCase("true") && !peek().equals("(")) return context -> true;
     if (token.equalsIgnoreCase("false") && !peek().equals("(")) return context -> false;
     if (token.equalsIgnoreCase("null")) return context -> null;
+    if (token.startsWith("@")) return formulaCall(token);
     if (!token.matches("\\$?[A-Za-z_][A-Za-z_0-9.]*"))
       throw ArcException.invalid("Unexpected token: " + token);
     if (peek().equals("(")) return functionCall(token);
@@ -161,6 +163,29 @@ final class ExpressionParser {
     List<Expr> arguments = arguments(")");
     Functions.arity(name, arguments.size());
     return context -> ExpressionRuntime.function(name, arguments, context);
+  }
+
+  private Expr formulaCall(String token) {
+    int separator = token.indexOf(':');
+    if (separator < 0)
+      throw ArcException.invalid("Formula calls require a pinned version: @rule-id:1(...)");
+    String id = token.substring(1, separator);
+    if (!id.matches("[a-z][a-z0-9-]{0,79}"))
+      throw ArcException.invalid("Formula call needs a valid rule ID");
+    int version;
+    try {
+      if (!token.substring(separator + 1).matches("[1-9][0-9]*")) throw new NumberFormatException();
+      version = Integer.parseInt(token.substring(separator + 1));
+      if (version <= 0) throw new NumberFormatException();
+    } catch (NumberFormatException error) {
+      throw ArcException.invalid("Formula call version must be a positive integer");
+    }
+    expect("(");
+    int callIndex = formulaCalls.size();
+    List<Expr> arguments = arguments(")");
+    var formula = new FormulaCall(id, version, arguments.size());
+    formulaCalls.add(callIndex, formula);
+    return context -> ExpressionRuntime.formula(formula, arguments, context);
   }
 
   private Expr collectionCall(String name) {
@@ -223,5 +248,9 @@ final class ExpressionParser {
 
   Set<String> variables() {
     return variables;
+  }
+
+  List<FormulaCall> formulaCalls() {
+    return formulaCalls;
   }
 }

@@ -154,7 +154,12 @@ export default function ValueBinding({
           value={value ?? ""}
           variables={variables}
           disabled={disabled}
-          onChange={(expression) => onChange(expression || undefined)}
+          onChange={(expression) => {
+            // Once editing begins, an empty buffer or a literal is still an
+            // expression draft. Only the source dropdown changes editor mode.
+            setChosenMode("expression");
+            onChange(expression || undefined);
+          }}
           helperText="ARC expression · quote literal text here"
         />
       )}

@@ -41,7 +41,7 @@ final class GraphValidation {
   private CompiledGraph validateGraph(Definition definition, RuleResolver resolver) {
     var expressions = new HashMap<String, Expressions.Compiled>();
     documentShape.validate(definition);
-    checkInputDependencies(definition, expressions);
+    checkInputDependencies(definition, expressions, resolver);
     checkConnections(definition);
     var plan = new GraphPlan(definition);
     checkReachability(definition, plan);
@@ -53,7 +53,7 @@ final class GraphValidation {
   }
 
   private void checkInputDependencies(
-      Definition definition, Map<String, Expressions.Compiled> expressions) {
+      Definition definition, Map<String, Expressions.Compiled> expressions, RuleResolver resolver) {
     var inputNames = definition.inputs().stream().map(Input::name).collect(Collectors.toSet());
     Map<String, Set<String>> dependencies = new HashMap<>();
     for (Input parameter : definition.inputs()) {
@@ -62,7 +62,7 @@ final class GraphValidation {
         for (String expr : parameter.source().bindings().values()) {
           var compiled =
               NodeValidation.expression(
-                  expr, inputNames, parameter.name() + " source", expressions);
+                  expr, inputNames, parameter.name() + " source", expressions, resolver);
           parameterDependencies.addAll(compiled.variables());
         }
       dependencies.put(parameter.name(), parameterDependencies);

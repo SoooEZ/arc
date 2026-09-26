@@ -1,10 +1,11 @@
-import { Autocomplete, MenuItem, TextField } from "@mui/material";
+import { Autocomplete, Button, MenuItem, TextField } from "@mui/material";
 import { ChevronRight } from "lucide-react";
 import ValueBinding from "../../expressions/ValueBinding";
 import ExpressionField from "../../expressions/ExpressionField";
 import { literalText, simpleComparison } from "../../../domain/expressions";
 import { useState } from "react";
 import type { NodeFieldsProps } from "./types";
+import InspectorSection from "./InspectorSection";
 export default function ExpressionFields({
   rule,
   node,
@@ -24,21 +25,28 @@ export default function ExpressionFields({
     patch({ expression: parts.join(" ") });
   };
   return (
-    <div className="inspector-section">
-      <div className="section-title">
-        <h4>
-          {node.type === "CONDITION"
-            ? "Condition"
-            : node.type === "OUTPUT"
-              ? "Return value"
-              : "Expression"}
-        </h4>
-        {node.type === "CONDITION" && condition && (
-          <button onClick={() => setExpressionMode((m) => !m)}>
+    <InspectorSection
+      title={
+        node.type === "CONDITION"
+          ? "Condition"
+          : node.type === "OUTPUT"
+            ? "Output As"
+            : "Expression"
+      }
+      variables={variables}
+      actions={
+        node.type === "CONDITION" &&
+        condition && (
+          <Button
+            size="small"
+            className="inspector-mode-button"
+            onClick={() => setExpressionMode((mode) => !mode)}
+          >
             {expressionMode ? "Builder" : "Expression"}
-          </button>
-        )}
-      </div>
+          </Button>
+        )
+      }
+    >
       {node.type === "OUTPUT" ? (
         <>
           <ValueBinding
@@ -145,6 +153,6 @@ export default function ExpressionFields({
           </div>
         </div>
       )}
-    </div>
+    </InspectorSection>
   );
 }

@@ -10,6 +10,7 @@ import ExpressionField from "../../expressions/ExpressionField";
 import ValueBinding from "../../expressions/ValueBinding";
 import SwitchDefaultReturn from "./SwitchDefaultReturn";
 import type { NodeFieldsProps } from "./types";
+import InspectorSection from "./InspectorSection";
 
 export default function SwitchFields(props: NodeFieldsProps) {
   const { node, patch, variables, readOnly } = props;
@@ -25,7 +26,7 @@ export default function SwitchFields(props: NodeFieldsProps) {
   };
   return (
     <>
-      <div className="inspector-section">
+      <InspectorSection title="Switch cases" variables={variables}>
         <TextField
           select
           label="Switch mode"
@@ -50,7 +51,7 @@ export default function SwitchFields(props: NodeFieldsProps) {
             onChange={(selector) => patch({ selector: selector ?? "" })}
           />
         )}
-        <h4>Cases · first match wins</h4>
+        <p className="inspector-section-caption">First match wins</p>
         <p className="muted-copy">
           {matchingValue
             ? 'Match a boolean, number or string from top to bottom. Values keep their types: 1 and "1" are different.'
@@ -174,7 +175,7 @@ export default function SwitchFields(props: NodeFieldsProps) {
           Connect every case and the Default handle. Reordering or renaming a
           case keeps its connections.
         </p>
-      </div>
+      </InspectorSection>
       <SwitchDefaultReturn {...props} />
     </>
   );

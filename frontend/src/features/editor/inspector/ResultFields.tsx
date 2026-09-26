@@ -1,42 +1,22 @@
-import { TextField, Tooltip } from "@mui/material";
-import { variableOptionLabel } from "../../../domain/graph";
+import { TextField } from "@mui/material";
 import type { NodeFieldsProps } from "./types";
+import InspectorSection from "./InspectorSection";
+
 export default function ResultFields({
   node,
   readOnly,
   patch,
-  variables,
 }: NodeFieldsProps) {
+  if (!["FORMULA", "REFERENCE", "TRANSFORM"].includes(node.type)) return null;
   return (
-    <>
-      {["FORMULA", "REFERENCE", "TRANSFORM"].includes(node.type) && (
-        <div className="inspector-section">
-          <h4>Store result as</h4>
-          <TextField
-            label="Result variable"
-            value={node.output || ""}
-            onChange={(e) => patch({ output: e.target.value })}
-            helperText="Use this variable in later nodes."
-            disabled={readOnly}
-          />
-        </div>
-      )}
-      <div className="inspector-section">
-        <h4>Available variables</h4>
-        <p className="muted-copy">
-          Inputs and results from preceding nodes can be used in expressions.
-        </p>
-        <div className="variable-list">
-          {variables.map((v) => (
-            <Tooltip key={v.name} title={variableOptionLabel(v)}>
-              <div>
-                <code>{v.name}</code>
-                <span>{v.type.toLowerCase()}</span>
-              </div>
-            </Tooltip>
-          ))}
-        </div>
-      </div>
-    </>
+    <InspectorSection title="Output Result As">
+      <TextField
+        label="Result variable"
+        value={node.output || ""}
+        onChange={(event) => patch({ output: event.target.value })}
+        helperText="Use this variable in later nodes."
+        disabled={readOnly}
+      />
+    </InspectorSection>
   );
 }

@@ -174,6 +174,79 @@ for index, invalid_name in enumerate(["bad name", "$SUM", "bad\tname"]):
                       "parameters": [{"name": invalid_name, "type": "STRING", "required": True}]}
     call("POST", "/sources", {"id": PREFIX + f"-invalid-source-name-{index}", "name": "Invalid source name", "definition": invalid_config}, 422)
 
-print(f"PASS: {checks} studio/source HTTP checks, function namespaces, identifier validation, version pins, fallbacks, caller overrides, diagnostics, and HTTP destination policy.")
+# Direct Formula calls keep their immutable version and use the ordinary nested
+# execution session, including sourced inputs, explicit null and lazy branches.
+def formula_graph(inputs, expression):
+    return {"schemaVersion": 1, "notes": [], "inputs": inputs, "nodes": [
+        {"id": "input", "type": "INPUT", "label": "Inputs", "position": {"x": 0, "y": 0}},
+        {"id": "output", "type": "OUTPUT", "label": "Result", "position": {"x": 0, "y": 160},
+         "expression": expression}], "edges": [
+        {"id": "input-output", "source": "input", "target": "output", "sourceHandle": "next"}]}
+
+
+def publish_formula(suffix, graph, kind="FORMULA"):
+    created = call("POST", "/rules", {"id": PREFIX + suffix, "name": "Formula call " + suffix,
+                   "kind": kind, "definition": graph}, 201)
+    return call("POST", f"/rules/{created['id']}/publish", {"revision": created["revision"]})
+
+
+callee_graph = formula_graph([
+    {"name": "amount", "type": "NUMBER", "required": True},
+    {"name": "rate", "type": "NUMBER", "required": True, "defaultValue": 0.1}],
+    "$ROUND(amount * (1 - rate), 2)")
+callee = publish_formula("-callee", callee_graph)
+formula_expression = f"$ROUND(@{callee['id']}:1(amount), 2)"
+check = call("POST", "/studio/expression/check", {"expression": formula_expression})
+assert check["valid"] and check["variables"] == ["amount"]
+assert check["formulaCalls"] == [{"id": callee["id"], "version": 1, "argumentCount": 1}]
+parent_graph = formula_graph([{"name": "amount", "type": "NUMBER", "required": True}], formula_expression)
+parent_formula = publish_formula("-caller", parent_graph)
+parent_rendered = call("POST", "/studio/render", parent_graph)
+assert formula_expression in parent_rendered["source"]
+assert call("POST", "/studio/build", parent_rendered)["definition"] == call(
+    "GET", f"/rules/{parent_formula['id']}/versions/1")["definition"]
+parent_result = call("POST", f"/rules/{parent_formula['id']}/execute", {"inputs": {"amount": 100}})
+assert parent_result["result"] == 90
+assert {step["ruleId"] for step in parent_result["trace"]} == {callee["id"], parent_formula["id"]}
+assert parent_result["executedSteps"] == 4
+callee_v2 = copy.deepcopy(callee_graph)
+callee_v2["nodes"][1]["expression"] = "amount * 0.5"
+callee = call("PUT", f"/rules/{callee['id']}", {
+    "name": callee["name"], "description": callee["description"],
+    "revision": callee["revision"], "definition": callee_v2})
+call("POST", f"/rules/{callee['id']}/publish", {"revision": callee["revision"]})
+assert call("POST", f"/rules/{callee['id']}/execute", {"inputs": {"amount": 100}})["result"] == 50
+assert call("POST", f"/rules/{parent_formula['id']}/execute", {
+    "inputs": {"amount": 100}, "trace": False})["result"] == 90
+
+for invalid_call in [f"@{callee['id']}:999(100)", f"@{callee['id']}:1()",
+                     f"@{callee['id']}:1(100, 0.1, 2)"]:
+    rejected = call("POST", "/studio/expression/check", {"expression": invalid_call})
+    assert not rejected["valid"] and rejected["error"]
+tree = publish_formula("-tree", formula_graph([], "1"), "DECISION_TREE")
+assert not call("POST", "/studio/expression/check", {"expression": f"@{tree['id']}:1()"})["valid"]
+
+# Required null fails at the child input and keeps the calling node location.
+null_graph = formula_graph([], f"@{callee['id']}:1(100, null)")
+null_failure = call("POST", "/preview", {"definition": null_graph, "inputs": {}}, 422)
+assert any(location["ruleId"] == callee["id"] and location["nodeId"] == "input"
+           for location in null_failure["locations"])
+assert any(location["nodeId"] == "output" for location in null_failure["locations"])
+optional = publish_formula("-optional", formula_graph([
+    {"name": "value", "type": "NUMBER", "required": False, "defaultValue": 9}], "value"))
+for arguments, expected in [("", 9), ("null", None)]:
+    graph = formula_graph([], f"@{optional['id']}:1({arguments})")
+    assert call("POST", "/preview", {"definition": graph, "inputs": {}})["result"] == expected
+
+sourced_call = f"@{rule_id}:1()"
+assert call("POST", "/studio/expression/check", {"expression": sourced_call})["valid"]
+sourced = call("POST", "/preview", {"definition": formula_graph([], sourced_call), "inputs": {}})
+assert sourced["result"] == 107 and sourced["sources"][0]["version"] == 1
+lazy = call("POST", "/preview", {
+    "definition": formula_graph([], f"$IF(false, {sourced_call}, 7)"), "inputs": {}})
+assert lazy["result"] == 7 and not lazy["sources"] and lazy["executedSteps"] == 2
+assert not any(step["ruleId"] == rule_id for step in lazy["trace"])
+
+print(f"PASS: {checks} studio/source HTTP checks, pinned Formula calls, function namespaces, identifier validation, version pins, fallbacks, caller overrides, diagnostics, and HTTP destination policy.")
 print(f"Created rule fixture: {rule_id}")
 print(f"Created source fixtures: {source_id}, {http_id}")

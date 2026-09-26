@@ -58,8 +58,11 @@ final class GraphExecution {
               .findFirst()
               .orElseThrow();
       Map<String, Object> provided;
+      Expressions.FormulaCaller formulas = (call, arguments) -> formula(call, arguments, depth);
       try {
-        provided = parameters.resolve(definition.inputs(), inputs, compiled::expression, deadline);
+        provided =
+            parameters.resolve(
+                definition.inputs(), inputs, compiled::expression, deadline, formulas);
       } catch (ArcException error) {
         throw error.atNode(ruleId, version, input.id(), input.label());
       }
@@ -73,7 +76,7 @@ final class GraphExecution {
           if (values == null) continue;
           checkStepBudget();
           executedSteps++;
-          Outcome outcome = evaluate(node, values.variables(), depth, compiled);
+          Outcome outcome = evaluate(node, values.variables(), depth, compiled, formulas);
           if (node.type().equals("OUTPUT")) outputs.put(node.id(), outcome.value());
           if (node.storesResult()) values.store(node.output(), outcome.value(), node.id());
           scopes.put(node.id(), values);
@@ -118,58 +121,76 @@ final class GraphExecution {
   }
 
   private Outcome evaluate(
-      Node node, Map<String, Object> scope, int depth, CompiledGraph compiled) {
+      Node node,
+      Map<String, Object> scope,
+      int depth,
+      CompiledGraph compiled,
+      Expressions.FormulaCaller formulas) {
     return switch (node.type()) {
       case "INPUT" -> new Outcome(new LinkedHashMap<>(scope), "next");
       case "FORMULA" ->
-          new Outcome(compiled.expression(node.expression()).evaluate(scope, deadline), "next");
+          new Outcome(
+              compiled.expression(node.expression()).evaluate(scope, deadline, formulas), "next");
       case "CONDITION" -> {
         boolean value =
-            Expressions.bool(compiled.expression(node.expression()).evaluate(scope, deadline));
+            Expressions.bool(
+                compiled.expression(node.expression()).evaluate(scope, deadline, formulas));
         yield new Outcome(value, Boolean.toString(value));
       }
       case "SWITCH" -> {
-        Object selector = node.selector() == null ? null : selector(node, scope, compiled);
+        Object selector =
+            node.selector() == null ? null : selector(node, scope, compiled, formulas);
         String branch = "default";
         for (BranchCase option : node.cases()) {
-          if (matches(option, selector, scope, compiled)) {
+          if (matches(option, selector, scope, compiled, formulas)) {
             branch = "case:" + option.id();
             break;
           }
         }
         yield new Outcome(branch, branch);
       }
-      case "TRANSFORM" -> new Outcome(transform(node, scope, compiled), "next");
-      case "REFERENCE" -> new Outcome(reference(node, scope, depth, compiled), "next");
+      case "TRANSFORM" -> new Outcome(transform(node, scope, compiled, formulas), "next");
+      case "REFERENCE" -> new Outcome(reference(node, scope, depth, compiled, formulas), "next");
       case "OUTPUT" ->
-          new Outcome(compiled.expression(node.expression()).evaluate(scope, deadline), null);
+          new Outcome(
+              compiled.expression(node.expression()).evaluate(scope, deadline, formulas), null);
       default -> throw ArcException.invalid("Unknown node type");
     };
   }
 
-  private Object transform(Node node, Map<String, Object> scope, CompiledGraph compiled) {
+  private Object transform(
+      Node node,
+      Map<String, Object> scope,
+      CompiledGraph compiled,
+      Expressions.FormulaCaller formulas) {
     if (node.fields() == null || node.fields().isEmpty())
-      return compiled.expression(node.expression()).evaluate(scope, deadline);
+      return compiled.expression(node.expression()).evaluate(scope, deadline, formulas);
     var transformed = new LinkedHashMap<String, Object>();
     for (Field field : node.fields()) {
       try {
         transformed.put(
-            field.name(), compiled.expression(field.expression()).evaluate(scope, deadline));
+            field.name(),
+            compiled.expression(field.expression()).evaluate(scope, deadline, formulas));
       } catch (ArcException error) {
         if (error.status() == 504) throw error;
-        throw ArcException.invalid("Field " + field.name() + ": " + error.getMessage());
+        throw error.withContext("Field " + field.name());
       }
     }
     return Expressions.bounded(transformed);
   }
 
   private Object reference(
-      Node node, Map<String, Object> scope, int depth, CompiledGraph compiled) {
+      Node node,
+      Map<String, Object> scope,
+      int depth,
+      CompiledGraph compiled,
+      Expressions.FormulaCaller formulas) {
     var inputs = new LinkedHashMap<String, Object>();
     if (node.bindings() != null) {
       for (var binding : node.bindings().entrySet()) {
         inputs.put(
-            binding.getKey(), compiled.expression(binding.getValue()).evaluate(scope, deadline));
+            binding.getKey(),
+            compiled.expression(binding.getValue()).evaluate(scope, deadline, formulas));
       }
     }
     return run(
@@ -180,25 +201,50 @@ final class GraphExecution {
         depth + 1);
   }
 
-  private Object selector(Node node, Map<String, Object> scope, CompiledGraph compiled) {
+  private Object formula(Expressions.FormulaCall call, List<Object> arguments, int depth) {
     try {
-      return switchValue(compiled.expression(node.selector()).evaluate(scope, deadline));
+      deadline.check();
+      Definition child = resolver.resolveFormula(call.id(), call.version());
+      if (arguments.size() > child.inputs().size())
+        throw ArcException.invalid("Too many arguments for @" + call.id() + ":" + call.version());
+      var inputs = new LinkedHashMap<String, Object>();
+      for (int index = 0; index < arguments.size(); index++)
+        inputs.put(child.inputs().get(index).name(), arguments.get(index));
+      return run(call.id(), call.version(), child, inputs, depth + 1);
+    } catch (ArcException error) {
+      if (error.locations().isEmpty())
+        throw error.atNode(call.id(), call.version(), null, "@" + call.id() + ":" + call.version());
+      throw error.inRule(call.id(), call.version());
+    }
+  }
+
+  private Object selector(
+      Node node,
+      Map<String, Object> scope,
+      CompiledGraph compiled,
+      Expressions.FormulaCaller formulas) {
+    try {
+      return switchValue(compiled.expression(node.selector()).evaluate(scope, deadline, formulas));
     } catch (ArcException error) {
       if (error.status() == 504) throw error;
-      throw ArcException.invalid("Selector: " + error.getMessage());
+      throw error.withContext("Selector");
     }
   }
 
   private boolean matches(
-      BranchCase option, Object selector, Map<String, Object> scope, CompiledGraph compiled) {
+      BranchCase option,
+      Object selector,
+      Map<String, Object> scope,
+      CompiledGraph compiled,
+      Expressions.FormulaCaller formulas) {
     try {
-      Object value = compiled.expression(option.expression()).evaluate(scope, deadline);
+      Object value = compiled.expression(option.expression()).evaluate(scope, deadline, formulas);
       return selector == null
           ? Expressions.bool(value)
           : Expressions.equal(selector, switchValue(value));
     } catch (ArcException error) {
       if (error.status() == 504) throw error;
-      throw ArcException.invalid("Case " + option.label() + ": " + error.getMessage());
+      throw error.withContext("Case " + option.label());
     }
   }
 

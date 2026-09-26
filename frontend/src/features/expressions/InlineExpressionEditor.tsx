@@ -37,7 +37,13 @@ export default function InlineExpressionEditor({
     0,
     catalogRequested,
   );
-  useArcLanguageSupport(editor, model, functions, variables, false);
+  const { formulaError } = useArcLanguageSupport(
+    editor,
+    model,
+    functions,
+    variables,
+    false,
+  );
   const completionNames = JSON.stringify([
     ...variables.map((variable) => variable.name),
     ...functions.filter((entry) => entry.supported).map((entry) => entry.name),
@@ -117,10 +123,12 @@ export default function InlineExpressionEditor({
         />
       </fieldset>
       <p className="inline-expression-help">
-        {error
-          ? "Function suggestions unavailable. Reopen this node to retry."
-          : helperText ||
-            "ARC expression · Tab completes suggestions or indents."}
+        {formulaError
+          ? `Formula suggestions unavailable: ${formulaError}`
+          : error
+            ? "Function suggestions unavailable. Reopen this node to retry."
+            : helperText ||
+              "ARC expression · Tab completes suggestions or indents."}
       </p>
     </div>
   );

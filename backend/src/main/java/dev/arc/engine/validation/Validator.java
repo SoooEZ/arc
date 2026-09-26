@@ -1,6 +1,7 @@
 package dev.arc.engine.validation;
 
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
@@ -36,6 +37,17 @@ public class Validator {
 
   public List<Problem> diagnostics(Definition definition, RuleResolver resolver) {
     return graphDiagnostics.diagnostics(definition, resolver);
+  }
+
+  public record FormulaReference(String nodeId, String label, Expressions.FormulaCall call) {}
+
+  /** Calls owned by executable expressions, including source bindings on the Input node. */
+  public static List<FormulaReference> formulaReferences(Definition definition) {
+    return NodeValidation.formulaReferences(definition);
+  }
+
+  public static void validateFormulaCalls(Expressions.Compiled expression, RuleResolver resolver) {
+    FormulaCallValidation.validate(expression, resolver);
   }
 
   public record Problem(String message, List<ArcException.Location> locations) {

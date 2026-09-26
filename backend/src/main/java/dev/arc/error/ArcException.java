@@ -53,6 +53,15 @@ public class ArcException extends RuntimeException {
             .toList());
   }
 
+  /** Adds the owning field/case description without losing a nested rule's locations or status. */
+  public ArcException withContext(String context) {
+    return new ArcException(
+        status,
+        context + ": " + getMessage(),
+        issues.stream().map(issue -> context + ": " + issue).toList(),
+        locations);
+  }
+
   public static ArcException invalid(String message) {
     return new ArcException(422, message);
   }

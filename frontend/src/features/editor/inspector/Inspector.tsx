@@ -22,6 +22,7 @@ import SwitchFields from "./SwitchFields";
 import TransformFields from "./TransformFields";
 import type { NodeFieldsProps } from "./types";
 import InspectorProblems from "./InspectorProblems";
+import InspectorSection from "./InspectorSection";
 const nodeDescriptions: Record<NodeType, string> = {
   INPUT: "Define the data your rule needs",
   FORMULA: "Calculate a value for the next step",
@@ -154,7 +155,7 @@ export default function Inspector({
       )}
       <div className="inspector-scroll" ref={scroll}>
         {presentation === "dialog" && (
-          <div className="inspector-section">
+          <InspectorSection key={`details:${node.id}`} title="Node details">
             <div className="inspector-node-title">
               <span className={`node-icon ${node.type.toLowerCase()}`}>
                 <NodeIcon type={node.type} size={19} />
@@ -166,10 +167,12 @@ export default function Inspector({
               <InspectorProblems key={node.id} errors={errors} />
             </div>
             {nameField}
-          </div>
+          </InspectorSection>
         )}
         <Fields key={node.id} {...fieldProps} />
-        {node.type !== "INPUT" && <ResultFields {...fieldProps} />}
+        {node.type !== "INPUT" && (
+          <ResultFields key={`result:${node.id}`} {...fieldProps} />
+        )}
       </div>
       {presentation === "sidebar" && (
         <div className="inspector-footer">

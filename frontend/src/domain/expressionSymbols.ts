@@ -1,7 +1,7 @@
 import type { VariableOption } from "./graph";
 
 export type ExpressionSymbolKind =
-  "function" | "parameter" | "variable" | "variable.local";
+  "function" | "formula" | "parameter" | "variable" | "variable.local";
 export interface ExpressionSymbol {
   offset: number;
   length: number;
@@ -19,7 +19,8 @@ interface LocalScope {
   end: number;
 }
 // ARC property paths also allow numeric segments, such as items.0.price.
-const identifier = /^\$?[A-Za-z_][A-Za-z_0-9.]*$/;
+const identifier =
+  /^(?:@[a-z][a-z0-9-]*(?::[1-9]\d*)?|\$?[A-Za-z_][A-Za-z_0-9.]*)$/;
 const localIdentifier = /^[A-Za-z_][A-Za-z_0-9]*$/;
 const inputTypes = new Set(["NUMBER", "STRING", "BOOLEAN", "ARRAY", "OBJECT"]);
 const collections = new Set(["MAP", "FILTER", "ALL", "ANY", "REDUCE"]);
@@ -27,7 +28,7 @@ const collections = new Set(["MAP", "FILTER", "ALL", "ANY", "REDUCE"]);
 /** This lexer only classifies visible names; execution and scope validation remain on the server. */
 function tokens(source: string): Token[] {
   const pattern =
-    /\/\/[^\r\n]*|"(?:[^"\\]|\\[\s\S])*(?:"|$)|'(?:[^'\\]|\\[\s\S])*(?:'|$)|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|\$?[A-Za-z_][A-Za-z_0-9.]*|[^\s]/g;
+    /\/\/[^\r\n]*|"(?:[^"\\]|\\[\s\S])*(?:"|$)|'(?:[^'\\]|\\[\s\S])*(?:'|$)|@[a-z][a-z0-9-]*(?::[1-9]\d*)?|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|\$?[A-Za-z_][A-Za-z_0-9.]*|[^\s]/g;
   return [...source.matchAll(pattern)]
     .filter((match) => !match[0].startsWith("//"))
     .map((match) => ({
@@ -154,6 +155,10 @@ export function expressionSymbols(
     const root = token.text.split(".")[0];
     let kind: ExpressionSymbolKind | undefined = declaration;
     let length = root.length;
+    if (token.text.startsWith("@")) {
+      kind = "formula";
+      length = token.text.length;
+    }
     if (
       !kind &&
       (token.text.startsWith("$") || lexical[index + 1]?.text === "(")

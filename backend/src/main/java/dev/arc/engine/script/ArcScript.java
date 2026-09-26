@@ -24,7 +24,11 @@ public class ArcScript {
 
   public record Build(Definition definition, String source, List<Diagnostic> diagnostics) {}
 
-  public record ExpressionCheck(boolean valid, Set<String> variables, String error) {}
+  public record ExpressionCheck(
+      boolean valid,
+      Set<String> variables,
+      String error,
+      List<Expressions.FormulaCall> formulaCalls) {}
 
   public ArcScript(ObjectMapper json, Validator validator) {
     this.validator = validator;
@@ -35,9 +39,10 @@ public class ArcScript {
   /** Syntax and dependencies only; runtime type errors still require execution. */
   public ExpressionCheck checkExpression(String expression) {
     try {
-      return new ExpressionCheck(true, Expressions.compile(expression).variables(), null);
+      var compiled = Expressions.compile(expression);
+      return new ExpressionCheck(true, compiled.variables(), null, compiled.formulaCalls());
     } catch (ArcException failure) {
-      return new ExpressionCheck(false, Set.of(), failure.getMessage());
+      return new ExpressionCheck(false, Set.of(), failure.getMessage(), List.of());
     }
   }
 

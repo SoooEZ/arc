@@ -48,7 +48,12 @@ export default function CodeStudio({
   const insert = (snippet: string, atEnd = false) => {
     if (!latest.current.readOnly) insertSnippet(editor.current, snippet, atEnd);
   };
-  useArcLanguageSupport(editor, model, functions, definition);
+  const { insertFormula } = useArcLanguageSupport(
+    editor,
+    model,
+    functions,
+    definition,
+  );
 
   const mount = (instance: monaco.editor.IStandaloneCodeEditor) => {
     onMount(instance);
@@ -101,6 +106,7 @@ export default function CodeStudio({
         catalogError={catalogError}
         readOnly={readOnly}
         onInsert={insert}
+        onInsertFormula={insertFormula}
       />
       <div className="studio-editor">
         <div className="studio-filebar">

@@ -1,4 +1,9 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 import type { Definition } from "../src/types";
 
 function definition(connected = false): Definition {
@@ -56,6 +61,29 @@ async function create(request: APIRequestContext, draft: Definition) {
   return id;
 }
 
+async function expectVariables(page: Page, names: string[]) {
+  await page
+    .getByRole("button", {
+      name: "Available variables · Switch cases",
+      exact: true,
+    })
+    .click();
+  const overlay = page.getByRole("dialog", {
+    name: "Available variables · Switch cases",
+    exact: true,
+  });
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator(".variable-list code")).toHaveText(names);
+  if (!names.length)
+    await expect(overlay).toContainText(
+      "No upstream variables are available at this node.",
+    );
+  await overlay
+    .getByRole("button", { name: "Close available variables", exact: true })
+    .click();
+  await expect(overlay).not.toBeVisible();
+}
+
 test("Switch upstream choices follow its incoming connections and preserve an unavailable selection", async ({
   page,
   request,
@@ -77,7 +105,7 @@ test("Switch upstream choices follow its incoming connections and preserve an un
   await expect(inspector.getByLabel("Node name", { exact: true })).toHaveValue(
     "Choose value",
   );
-  await expect(inspector.locator(".variable-list code")).toHaveCount(0);
+  await expectVariables(page, []);
   await inspector
     .getByRole("combobox", {
       name: "Value to match · value source",
@@ -120,10 +148,7 @@ test("Switch upstream choices follow its incoming connections and preserve an un
     '.react-flow__edge[aria-label="Edge from calc to choose"]',
   );
   await expect(incoming).toHaveCount(1);
-  await expect(inspector.locator(".variable-list code")).toHaveText([
-    "amount",
-    "price",
-  ]);
+  await expectVariables(page, ["amount", "price"]);
   await inspector
     .getByRole("combobox", { name: "Value to match", exact: true })
     .click();
@@ -148,7 +173,7 @@ test("Switch upstream choices follow its incoming connections and preserve an un
     .getByRole("button", { name: "Delete connection", exact: true })
     .click();
   await expect(incoming).toHaveCount(0);
-  await expect(inspector.locator(".variable-list code")).toHaveCount(0);
+  await expectVariables(page, []);
   await expect(
     inspector.getByRole("combobox", { name: "Value to match", exact: true }),
   ).toContainText("amount · unavailable");
@@ -184,7 +209,7 @@ test("pending and failed variable reads do not invent input choices or erase the
     await page.goto(`/#/rules/${id}?node=choose`);
     const inspector = page.locator(".inspector");
     await expect.poll(() => requested).toBe(true);
-    await expect(inspector.locator(".variable-list code")).toHaveCount(0);
+    await expectVariables(page, []);
     await expect(
       inspector.getByRole("combobox", { name: "Value to match", exact: true }),
     ).toContainText("amount · unavailable");
@@ -194,7 +219,7 @@ test("pending and failed variable reads do not invent input choices or erase the
     );
     release();
     await response;
-    await expect(inspector.locator(".variable-list code")).toHaveCount(0);
+    await expectVariables(page, []);
     await expect(
       inspector.getByRole("combobox", { name: "Value to match", exact: true }),
     ).toContainText("amount · unavailable");
@@ -290,12 +315,25 @@ test("variable menus and expression tooltips show declared types and live produc
     })
     .click();
   await inspector
+    .getByRole("button", {
+      name: "Available variables · Output As",
+      exact: true,
+    })
+    .click();
+  const variables = page.getByRole("dialog", {
+    name: "Available variables · Output As",
+    exact: true,
+  });
+  await variables
     .locator(".variable-list code")
     .filter({ hasText: /^hello$/ })
     .hover();
   await expect(page.getByRole("tooltip")).toHaveText(
     "hello (object) - Customer data",
   );
+  await variables
+    .getByRole("button", { name: "Close available variables", exact: true })
+    .click();
   await inspector
     .getByRole("combobox", { name: "Return value · value source", exact: true })
     .click();

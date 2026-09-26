@@ -9,11 +9,12 @@ import type { GraphProblem } from "./errors";
 import { http, type RequestOptions } from "./http";
 export const studioApi = {
   checkExpression: (expression: string, options?: RequestOptions) =>
-    http.post<{ valid: boolean; variables: string[]; error: string | null }>(
-      "/studio/expression/check",
-      { expression },
-      options,
-    ),
+    http.post<{
+      valid: boolean;
+      variables: string[];
+      error: string | null;
+      formulaCalls?: { id: string; version: number; argumentCount: number }[];
+    }>("/studio/expression/check", { expression }, options),
   diagnostics: (definition: Definition, options?: RequestOptions) =>
     http.post<GraphProblem[]>("/diagnostics", definition, options),
   variables: (definition: Definition, options?: RequestOptions) =>

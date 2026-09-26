@@ -158,22 +158,6 @@
 .inspector-error-list li + li {
   margin-top: 8px;
 }
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.section-title > span {
-  font-size: 9px;
-  color: #a1b090;
-}
-.section-title > button {
-  border: 0;
-  background: none;
-  color: #91a67e;
-  font-size: 8px;
-  padding: 0;
-}
 .condition-builder {
   display: flex;
   flex-direction: column;
@@ -397,4 +381,187 @@
 .inspector-dialog .inspector-section .MuiFormHelperText-root,
 .inspector-dialog .input-schema-card .MuiFormControlLabel-label {
   font-size: 11px;
+}
+
+/* Section actions stay outside the accordion toggle so each has one clear
+   keyboard target. Expanding content and opening variable help are separate. */
+.inspector-section.inspector-accordion {
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid #e8ede9;
+  border-radius: 0;
+  background: #fff;
+}
+.inspector-accordion::before {
+  display: none;
+}
+.inspector-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 0 12px 0 16px;
+  background: #fbfcfb;
+}
+.inspector-section-heading .MuiAccordionSummary-root {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0;
+  gap: 8px;
+  flex-direction: row-reverse;
+}
+.inspector-section-heading .MuiAccordionSummary-content {
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 12px 0;
+}
+.inspector-section-heading .MuiAccordionSummary-expandIconWrapper {
+  color: #68776f;
+}
+.inspector-section.inspector-accordion .inspector-section-heading h4 {
+  color: #17211d;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.inspector-section-count {
+  border-radius: 5px;
+  padding: 1px 6px;
+  color: #566b5d;
+  background: #edf2ee;
+  font-size: 10px;
+  font-weight: 600;
+}
+.inspector-section-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 3px;
+}
+.inspector-section-actions .inspector-mode-button {
+  min-width: 0;
+  min-height: 28px;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+.inspector-section-actions .inspector-variables-button {
+  width: 30px;
+  height: 30px;
+  color: #526e60;
+  border-radius: 7px;
+}
+.inspector-section-actions .inspector-variables-button:hover,
+.inspector-section-actions .inspector-variables-button[aria-expanded="true"] {
+  background: #eaf2ee;
+  color: #17674f;
+}
+.inspector-section.inspector-accordion
+  > .MuiCollapse-root
+  .MuiAccordionDetails-root {
+  display: flex;
+  flex-direction: column;
+  gap: 19px;
+  padding: 18px 19px 22px;
+}
+.inspector-section-caption {
+  margin: 0;
+  color: #263a30;
+  font-size: 11px;
+  font-weight: 600;
+}
+.inspector-dialog .inspector-section-heading {
+  padding: 0 18px 0 24px;
+}
+.inspector-dialog
+  .inspector-section.inspector-accordion
+  .inspector-section-heading
+  h4 {
+  font-size: 13px;
+}
+.inspector-dialog
+  .inspector-section.inspector-accordion
+  > .MuiCollapse-root
+  .MuiAccordionDetails-root {
+  padding: 20px 24px 24px;
+}
+.inspector-variable-popover,
+.MuiTooltip-tooltip.inspector-variable-tooltip {
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 14px 16px;
+  border: 1px solid #dfe8e2;
+  border-radius: 10px;
+  background: #fff;
+  color: #25382e;
+  box-shadow: 0 8px 30px rgb(22 47 32 / 14%);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.inspector-variable-tooltip .MuiTooltip-arrow {
+  color: #fff;
+}
+.inspector-variable-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.inspector-variable-empty,
+.inspector-variable-hint {
+  margin: 10px 0 0;
+  color: #64756b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.inspector-variable-hint {
+  padding-top: 10px;
+  border-top: 1px solid #edf1ed;
+}
+.inspector-variable-list.variable-list {
+  gap: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(360px, 55vh);
+  overflow-y: auto;
+}
+.inspector-variable-list > li {
+  padding: 9px 0;
+}
+.inspector-variable-list > li + li {
+  border-top: 1px solid #edf1ed;
+}
+.inspector-variable-list > li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.inspector-variable-list.variable-list code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.inspector-variable-list code[data-kind="input"] {
+  color: #205fa6;
+}
+.inspector-variable-list code[data-kind="result"] {
+  color: #7b3f98;
+}
+.inspector-variable-list.variable-list span {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #63746a;
+  background: #f2f5f2;
+}
+.inspector-variable-list small {
+  display: block;
+  margin-top: 3px;
+  color: #687b6f;
+  font-size: 10px;
+  overflow-wrap: anywhere;
 }

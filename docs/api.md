@@ -26,6 +26,8 @@ Both execute and preview accept optional `trace` and `timeoutMs` fields:
 
 Responses add `timing: {preparationMicros, executionMicros, totalMicros}`. Preparation includes root-version lookup and static checks; execution includes parameter reads and graph evaluation. Server timing ends before HTTP response serialization/transfer. Existing `durationMicros` retains engine timing. The UI separately measures the browser request round trip, including response download and JSON parsing; it is not sent as a server response field.
 
+Expressions can call a published Formula with `@rule-id:version(arguments)`. Arguments follow the pinned input order, and omitted trailing inputs use the callee's normal default/source rules. The callee must be a published `FORMULA`; the positive version is mandatory. Calls share the execution deadline, step/read/depth limits and trace with their parent. See [Formula calls in the editor](studio.md) for completion, hover and null/omission behavior.
+
 Each source handle may have multiple downstream connections. Active nodes execute once after their predecessors are resolved. A single reached Output returns its value, as before. Multiple reached Outputs return an object keyed by Output node ID, for example `"result":{"tax":10,"shipping":5}`. Conditional branches that are skipped do not produce keys. Shared joins combine upstream values before calculating their expression.
 
 ## Create and edit

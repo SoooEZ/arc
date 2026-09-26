@@ -307,7 +307,7 @@ paths:
                 expression: {type: string, maxLength: 2000}
       responses:
         '200':
-          description: Syntax/dependency check without execution or external data access
+          description: Syntax/dependency and published Formula pin/kind/arity check without execution or source value access
           content:
             application/json:
               schema:
@@ -316,6 +316,15 @@ paths:
                   valid: {type: boolean}
                   variables: {type: array, items: {type: string}}
                   error: {type: string, nullable: true}
+                  formulaCalls:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, version, argumentCount]
+                      properties:
+                        id: {type: string, pattern: '^[a-z][a-z0-9-]{0,79}$'}
+                        version: {type: integer, minimum: 1}
+                        argumentCount: {type: integer, minimum: 0}
   /studio/build:
     post:
       operationId: buildArcScript

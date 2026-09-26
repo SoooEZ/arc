@@ -50,7 +50,12 @@ export default function NodeExpressionDialog({
     [] as FunctionEntry[],
   );
   const { editor, model, onMount } = useArcEditor(diagnostics, "arc-node");
-  useArcLanguageSupport(editor, model, functions, definition);
+  const { insertFormula } = useArcLanguageSupport(
+    editor,
+    model,
+    functions,
+    definition,
+  );
   const insert = (snippet: string) => {
     if (!readOnly) insertSnippet(editor.current, snippet);
   };
@@ -83,6 +88,7 @@ export default function NodeExpressionDialog({
                 functions={functions}
                 readOnly={readOnly || busy}
                 onInsert={insert}
+                onInsertFormula={insertFormula}
               />
             </aside>
             <MonacoEditor

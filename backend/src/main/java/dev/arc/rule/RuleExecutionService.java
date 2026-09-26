@@ -135,11 +135,22 @@ public class RuleExecutionService {
 
   private RuleResolver resolver(ExecutionDeadline deadline) {
     return new MemoizingRuleResolver(
-        (id, version) -> {
-          deadline.check();
-          Definition definition = rules.resolve(id, version);
-          deadline.check();
-          return definition;
+        new RuleResolver() {
+          @Override
+          public Definition resolve(String id, int version) {
+            deadline.check();
+            Definition definition = rules.resolve(id, version);
+            deadline.check();
+            return definition;
+          }
+
+          @Override
+          public Definition resolveFormula(String id, int version) {
+            deadline.check();
+            Definition definition = rules.resolveFormula(id, version);
+            deadline.check();
+            return definition;
+          }
         });
   }
 

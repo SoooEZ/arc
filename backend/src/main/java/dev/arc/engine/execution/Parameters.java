@@ -35,6 +35,16 @@ public final class Parameters {
       Map<String, Object> supplied,
       Function<String, Expressions.Compiled> expressions,
       ExecutionDeadline deadline) {
+    return resolve(
+        parameters, supplied, expressions, deadline, Expressions.FormulaCaller.unavailable());
+  }
+
+  public Map<String, Object> resolve(
+      List<Input> parameters,
+      Map<String, Object> supplied,
+      Function<String, Expressions.Compiled> expressions,
+      ExecutionDeadline deadline,
+      Expressions.FormulaCaller formulas) {
     deadline.check();
     if (supplied == null) throw ArcException.invalid("inputs must be an object");
     var byName = new LinkedHashMap<String, Input>();
@@ -43,7 +53,7 @@ public final class Parameters {
       if (!byName.containsKey(name)) throw ArcException.invalid("Unknown input: " + name);
     var values = new LinkedHashMap<String, Object>();
     for (Input p : parameters)
-      resolveOne(p, byName, supplied, values, new HashSet<>(), expressions, deadline);
+      resolveOne(p, byName, supplied, values, new HashSet<>(), expressions, deadline, formulas);
     return values;
   }
 
@@ -54,7 +64,8 @@ public final class Parameters {
       Map<String, Object> values,
       Set<String> active,
       Function<String, Expressions.Compiled> expressions,
-      ExecutionDeadline deadline) {
+      ExecutionDeadline deadline,
+      Expressions.FormulaCaller formulas) {
     deadline.check();
     if (values.containsKey(p.name())) return;
     if (!active.add(p.name()))
@@ -71,9 +82,9 @@ public final class Parameters {
         for (String name : expr.variables()) {
           Input dependency = byName.get(name);
           if (dependency == null) throw ArcException.invalid("Unknown source dependency: " + name);
-          resolveOne(dependency, byName, supplied, values, active, expressions, deadline);
+          resolveOne(dependency, byName, supplied, values, active, expressions, deadline, formulas);
         }
-        args.put(e.getKey(), expr.evaluate(values, deadline));
+        args.put(e.getKey(), expr.evaluate(values, deadline, formulas));
       }
       if (++fetches > 50) throw ArcException.invalid("Execution exceeds 50 source reads");
       try {

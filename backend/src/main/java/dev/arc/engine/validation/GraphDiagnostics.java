@@ -47,7 +47,7 @@ final class GraphDiagnostics {
         if (scope != null)
           nodeValidation.validate(
               definition, node, scope.getOrDefault(node.id(), Set.of()), resolver);
-        else nodeValidation.syntax(node);
+        else nodeValidation.syntax(node, resolver);
       } catch (ArcException e) {
         problems.add(Problem.from(e.atNode(null, null, node.id(), node.label())));
       }
@@ -63,7 +63,10 @@ final class GraphDiagnostics {
         for (var binding : parameter.source().bindings().entrySet())
           try {
             NodeValidation.expression(
-                binding.getValue(), names, parameter.name() + " source / " + binding.getKey());
+                binding.getValue(),
+                names,
+                parameter.name() + " source / " + binding.getKey(),
+                resolver);
           } catch (ArcException e) {
             problems.add(
                 Problem.from(input == null ? e : e.atNode(null, null, input.id(), input.label())));

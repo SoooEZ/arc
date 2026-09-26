@@ -192,6 +192,23 @@ public class JdbcRuleRepository implements RuleRepository {
     return rows.getFirst();
   }
 
+  @Override
+  public Definition resolveFormula(String id, int version) {
+    var rows =
+        jdbc.query(
+            "SELECT r.kind, v.definition FROM rule_versions v JOIN rules r ON r.id = v.rule_id WHERE v.rule_id = ? AND v.version = ?",
+            (rs, index) -> {
+              if (!"FORMULA".equals(rs.getString("kind")))
+                throw ArcException.invalid("@ calls require a published Formula: " + id);
+              return decode(rs.getString("definition"));
+            },
+            id,
+            version);
+    if (rows.isEmpty())
+      throw new ArcException(404, "Published Formula version not found: " + id + " v" + version);
+    return rows.getFirst();
+  }
+
   private String encode(Definition d) {
     return json.encode(d);
   }

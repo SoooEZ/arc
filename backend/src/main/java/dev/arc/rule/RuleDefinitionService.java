@@ -2,7 +2,9 @@ package dev.arc.rule;
 
 import dev.arc.engine.MemoizingRuleResolver;
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
+import dev.arc.engine.script.ArcScript;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
@@ -30,6 +32,17 @@ public class RuleDefinitionService {
 
   public void validate(Definition definition) {
     validate(definition, new MemoizingRuleResolver(rules));
+  }
+
+  public ArcScript.ExpressionCheck checkExpression(String source) {
+    try {
+      var expression = Expressions.compile(source);
+      Validator.validateFormulaCalls(expression, new MemoizingRuleResolver(rules));
+      return new ArcScript.ExpressionCheck(
+          true, expression.variables(), null, expression.formulaCalls());
+    } catch (ArcException error) {
+      return new ArcScript.ExpressionCheck(false, Set.of(), error.getMessage(), List.of());
+    }
   }
 
   public void validate(Definition definition, RuleResolver resolver) {

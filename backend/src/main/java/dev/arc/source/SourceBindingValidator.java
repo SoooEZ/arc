@@ -1,6 +1,7 @@
 package dev.arc.source;
 
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
@@ -77,5 +78,21 @@ public final class SourceBindingValidator {
         } catch (ArcException e) {
           throw e.inRule(n.ruleId(), n.version()).atNode(null, null, n.id(), n.label());
         }
+    for (var site : Validator.formulaReferences(d)) {
+      var call = site.call();
+      if (!visited.add(call.id() + "@" + call.version())) continue;
+      try {
+        validateBindings(
+            resolver.resolveFormula(call.id(), call.version()),
+            resolver,
+            configurations,
+            visited,
+            depth + 1);
+      } catch (ArcException error) {
+        throw error
+            .inRule(call.id(), call.version())
+            .atNode(null, null, site.nodeId(), site.label());
+      }
+    }
   }
 }

@@ -4,6 +4,7 @@ import ExpressionField from "../../expressions/ExpressionField";
 import ValueBinding from "../../expressions/ValueBinding";
 import { quoteText } from "../../../domain/expressions";
 import type { NodeFieldsProps } from "./types";
+import InspectorSection from "./InspectorSection";
 
 export default function TransformFields({
   node,
@@ -14,8 +15,7 @@ export default function TransformFields({
   const fields = node.fields ?? [];
   const fieldMode = node.expression == null;
   return (
-    <div className="inspector-section">
-      <h4>Transform data</h4>
+    <InspectorSection title="Transform data" variables={variables}>
       <p className="muted-copy">
         Build a new object from upstream data. Rename fields, clean text,
         convert types and map arrays without changing the inputs.
@@ -123,6 +123,6 @@ export default function TransformFields({
           </p>
         </>
       )}
-    </div>
+    </InspectorSection>
   );
 }

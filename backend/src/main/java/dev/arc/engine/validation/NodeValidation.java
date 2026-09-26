@@ -46,7 +46,7 @@ final class NodeValidation {
               referenceParameters.contains(expression.bindingName()),
               node.label() + ": unknown parameter " + expression.bindingName());
         }
-        expression(expression.source(), scope, expression.label(), compiled);
+        expression(expression.source(), scope, expression.label(), compiled, resolver);
       }
 
       if (node.storesResult()) {
@@ -62,8 +62,9 @@ final class NodeValidation {
   }
 
   /** A cyclic/incomplete graph may have no scope plan; its expressions can still be parsed. */
-  void syntax(Node node) {
-    for (NodeExpression expression : expressions(node)) Expressions.compile(expression.source());
+  void syntax(Node node, RuleResolver resolver) {
+    for (NodeExpression expression : expressions(node))
+      FormulaCallValidation.validate(Expressions.compile(expression.source()), resolver);
   }
 
   Set<String> handles(Node node) {
@@ -79,15 +80,17 @@ final class NodeValidation {
     return Set.of("next");
   }
 
-  static Expressions.Compiled expression(String source, Set<String> scope, String label) {
-    return expression(source, scope, label, new HashMap<>());
+  static Expressions.Compiled expression(
+      String source, Set<String> scope, String label, RuleResolver resolver) {
+    return expression(source, scope, label, new HashMap<>(), resolver);
   }
 
   static Expressions.Compiled expression(
       String source,
       Set<String> scope,
       String label,
-      Map<String, Expressions.Compiled> expressions) {
+      Map<String, Expressions.Compiled> expressions,
+      RuleResolver resolver) {
     try {
       var compiled = expressions.computeIfAbsent(source, Expressions::compile);
       var unknown = new TreeSet<>(compiled.variables());
@@ -95,9 +98,10 @@ final class NodeValidation {
       require(
           unknown.isEmpty(),
           "Variables unavailable on every incoming path: " + String.join(", ", unknown));
+      FormulaCallValidation.validate(compiled, resolver);
       return compiled;
     } catch (ArcException error) {
-      throw ArcException.invalid(label + ": " + error.getMessage());
+      throw error.withContext(label);
     }
   }
 
@@ -117,7 +121,7 @@ final class NodeValidation {
     return child.inputs().stream().map(Input::name).collect(Collectors.toSet());
   }
 
-  private List<NodeExpression> expressions(Node node) {
+  private static List<NodeExpression> expressions(Node node) {
     var expressions = new ArrayList<NodeExpression>();
     if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(node.type()))
       expressions.add(new NodeExpression(node.expression(), node.label()));
@@ -141,6 +145,34 @@ final class NodeValidation {
     if (node.type().equals("TRANSFORM") && (node.fields() == null || node.fields().isEmpty()))
       expressions.add(new NodeExpression(node.expression(), node.label()));
     return expressions;
+  }
+
+  static List<Validator.FormulaReference> formulaReferences(Definition definition) {
+    var calls = new ArrayList<Validator.FormulaReference>();
+    for (Node node : definition.nodes()) {
+      try {
+        if (node.type().equals("INPUT"))
+          for (Input input : definition.inputs())
+            if (input.source() != null)
+              for (String source : input.source().bindings().values())
+                for (var call : formulaCalls(source))
+                  calls.add(new Validator.FormulaReference(node.id(), node.label(), call));
+        for (var expression : expressions(node)) {
+          if (expression.bindingName() != null && !node.type().equals("REFERENCE")) continue;
+          for (var call : formulaCalls(expression.source()))
+            calls.add(new Validator.FormulaReference(node.id(), node.label(), call));
+        }
+      } catch (ArcException error) {
+        throw error.atNode(null, null, node.id(), node.label());
+      }
+    }
+    return List.copyOf(calls);
+  }
+
+  private static List<Expressions.FormulaCall> formulaCalls(String source) {
+    return source == null || !source.contains("@")
+        ? List.of()
+        : Expressions.compile(source).formulaCalls();
   }
 
   private static void require(boolean condition, String message) {

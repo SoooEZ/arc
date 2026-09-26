@@ -17,15 +17,21 @@ final class ExpressionRuntime {
     private final Map<String, Object> variables;
     private final Budget budget;
     private final ExecutionDeadline deadline;
+    private final FormulaCaller formulas;
 
-    Context(Map<String, Object> variables, ExecutionDeadline deadline) {
-      this(variables, new Budget(), deadline);
+    Context(Map<String, Object> variables, ExecutionDeadline deadline, FormulaCaller formulas) {
+      this(variables, new Budget(), deadline, formulas);
     }
 
-    private Context(Map<String, Object> variables, Budget budget, ExecutionDeadline deadline) {
+    private Context(
+        Map<String, Object> variables,
+        Budget budget,
+        ExecutionDeadline deadline,
+        FormulaCaller formulas) {
       this.deadline = deadline;
       this.variables = variables;
       this.budget = budget;
+      this.formulas = formulas;
     }
 
     Object variable(String name) {
@@ -37,7 +43,7 @@ final class ExpressionRuntime {
       var local = new HashMap<>(variables);
       local.put(itemName, item);
       if (accumulatorName != null) local.put(accumulatorName, total);
-      return new Context(local, budget, deadline);
+      return new Context(local, budget, deadline, formulas);
     }
 
     void tick() {
@@ -45,6 +51,14 @@ final class ExpressionRuntime {
       if (++budget.operations > 10_000)
         throw ArcException.invalid("Expression exceeds 10,000 operations");
     }
+  }
+
+  static Object formula(FormulaCall formula, List<Expr> arguments, Context context) {
+    context.tick();
+    var values = arguments.stream().map(argument -> argument.eval(context)).toList();
+    Object result = context.formulas.call(formula, values);
+    context.deadline.check();
+    return bounded(result);
   }
 
   private static final class Budget {

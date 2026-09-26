@@ -3,6 +3,7 @@ package dev.arc.api;
 import dev.arc.engine.expression.Functions;
 import dev.arc.engine.script.ArcScript;
 import dev.arc.model.Definition;
+import dev.arc.rule.RuleDefinitionService;
 import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,9 +11,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 public class StudioController {
   private final ArcScript script;
+  private final RuleDefinitionService definitions;
 
-  public StudioController(ArcScript script) {
+  public StudioController(ArcScript script, RuleDefinitionService definitions) {
     this.script = script;
+    this.definitions = definitions;
   }
 
   public record Code(String source) {}
@@ -21,7 +24,7 @@ public class StudioController {
 
   @PostMapping("/studio/expression/check")
   public ArcScript.ExpressionCheck checkExpression(@RequestBody ExpressionCode code) {
-    return script.checkExpression(code.expression());
+    return definitions.checkExpression(code.expression());
   }
 
   public record NodeCode(Definition definition, String nodeId, String source) {}

@@ -4,6 +4,7 @@ import { inputVariables } from "../../../domain/graph";
 import InputParameterCard from "./InputParameterCard";
 import { useInputParameterRows } from "./useInputParameterRows";
 import type { NodeFieldsProps } from "./types";
+import InspectorSection from "./InspectorSection";
 
 export default function InputFields({
   rule,
@@ -17,11 +18,7 @@ export default function InputFields({
     onDefinitionChange,
   );
   return (
-    <div className="inspector-section">
-      <div className="section-title">
-        <h4>Input parameters</h4>
-        <span>{rule.draft.inputs.length}</span>
-      </div>
+    <InspectorSection title="Input parameters" count={rule.draft.inputs.length}>
       {parameters.rows.map(({ input, index, id }) => (
         <InputParameterCard
           key={id}
@@ -48,6 +45,6 @@ export default function InputFields({
           Add parameter
         </Button>
       )}
-    </div>
+    </InspectorSection>
   );
 }

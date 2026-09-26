@@ -6,6 +6,7 @@ import {
 } from "../../../domain/switchBranches";
 import ValueBinding from "../../expressions/ValueBinding";
 import type { NodeFieldsProps } from "./types";
+import InspectorSection from "./InspectorSection";
 
 export default function SwitchDefaultReturn({
   rule,
@@ -25,8 +26,11 @@ export default function SwitchDefaultReturn({
         edge.target,
     );
   return (
-    <div className="inspector-section" data-testid="switch-default-return">
-      <h4>Default · no case matches</h4>
+    <InspectorSection
+      title="Default · no case matches"
+      variables={variables}
+      testId="switch-default-return"
+    >
       <p className="muted-copy">Default runs when every case fails to match.</p>
       {output ? (
         <>
@@ -92,6 +96,6 @@ export default function SwitchDefaultReturn({
           </Button>
         </>
       )}
-    </div>
+    </InspectorSection>
   );
 }

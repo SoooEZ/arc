@@ -19,6 +19,7 @@ export default function StudioLibrary({
   catalogError,
   readOnly,
   onInsert,
+  onInsertFormula,
 }: {
   ruleId: string;
   definition: Definition;
@@ -26,6 +27,7 @@ export default function StudioLibrary({
   catalogError: string;
   readOnly: boolean;
   onInsert: (snippet: string, atEnd?: boolean) => void;
+  onInsertFormula: (rule: RuleSummary, signal?: AbortSignal) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   const [pane, setPane] = useState<Pane>("functions");
@@ -97,6 +99,7 @@ export default function StudioLibrary({
           functions={functions}
           readOnly={readOnly}
           onInsert={onInsert}
+          onInsertFormula={onInsertFormula}
         />
       )}
       {pane === "modules" && (
