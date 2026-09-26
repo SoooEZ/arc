@@ -185,7 +185,17 @@ test("node edit modal shares section controls without losing pending form values
   const sections = dialog.locator(
     ".inspector-section-heading .MuiAccordionSummary-root",
   );
-  await expect(sections).toHaveCount(3);
+  await expect(sections).toHaveCount(2);
+  await expect(dialog.getByLabel("Node name", { exact: true })).toHaveCount(1);
+  const header = dialog.locator(".node-edit-heading");
+  await expect(header.locator(".inspector-node-kind")).toHaveText("Formula");
+  const name = header.getByLabel("Node name", { exact: true });
+  await name.fill("Pending modal name");
+  await expect(name).toBeFocused();
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Node details", exact: true }),
+  ).toHaveCount(0);
   for (const section of await sections.all())
     await expect(section).toHaveAttribute("aria-expanded", "true");
   await dialog
@@ -218,6 +228,7 @@ test("node edit modal shares section controls without losing pending form values
   await expect(dialog).toBeVisible();
   await page.screenshot({
     path: test.info().outputPath("inspector-sections-modal.png"),
+    animations: "disabled",
   });
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(
@@ -225,6 +236,9 @@ test("node edit modal shares section controls without losing pending form values
       .locator(".inspector-sidebar")
       .getByLabel("Result variable", { exact: true }),
   ).toHaveValue("price");
+  await expect(
+    page.locator(".inspector-sidebar").getByLabel("Node name", { exact: true }),
+  ).toHaveValue("Calculate price");
 });
 
 test("published sections remain inspectable and variable overlays fit mobile without enabling edits", async ({

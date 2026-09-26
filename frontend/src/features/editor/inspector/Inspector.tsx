@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ComponentType, type Ref } from "react";
-import { IconButton, TextField, Tooltip } from "@mui/material";
+import { IconButton, Tooltip } from "@mui/material";
 import { Code2, Info, Trash2 } from "lucide-react";
 import type {
   Definition,
@@ -8,8 +8,6 @@ import type {
   Rule,
   RuleNode,
 } from "../../../types";
-import { nodeLabel } from "../../../types";
-import { NodeIcon } from "../../../components/Icons";
 import type { ReferenceTarget } from "../types";
 import { studioApi } from "../../../api/studio";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
@@ -22,16 +20,7 @@ import SwitchFields from "./SwitchFields";
 import TransformFields from "./TransformFields";
 import type { NodeFieldsProps } from "./types";
 import InspectorProblems from "./InspectorProblems";
-import InspectorSection from "./InspectorSection";
-const nodeDescriptions: Record<NodeType, string> = {
-  INPUT: "Define the data your rule needs",
-  FORMULA: "Calculate a value for the next step",
-  CONDITION: "Split your logic into two paths",
-  SWITCH: "Choose the first matching branch",
-  TRANSFORM: "Shape, clean and map data",
-  REFERENCE: "Connect a published rule",
-  OUTPUT: "Return the final result",
-};
+import NodeIdentity from "./NodeIdentity";
 // Exhaustive registry: every portable node kind has an editor.
 const fieldsByType: Record<NodeType, ComponentType<NodeFieldsProps>> = {
   INPUT: InputFields,
@@ -97,29 +86,16 @@ export default function Inspector({
     onInvalidJson,
     onOpenReference,
   };
-  const nameField = (
-    <TextField
-      className="inspector-node-name"
-      label="Node name"
-      size="small"
-      value={node.label}
-      title={node.label}
-      inputRef={nameInputRef}
-      onChange={(event) => patch({ label: event.target.value })}
-      disabled={readOnly}
-    />
-  );
   return (
     <aside className={`inspector inspector-${presentation}`}>
       {presentation === "sidebar" && (
         <div className="inspector-heading">
-          <div className="inspector-node-kind">
-            <span className={`node-icon ${node.type.toLowerCase()}`}>
-              <NodeIcon type={node.type} size={19} />
-            </span>
-            <span>{nodeLabel[node.type]}</span>
-          </div>
-          {nameField}
+          <NodeIdentity
+            node={node}
+            readOnly={readOnly}
+            inputRef={nameInputRef}
+            onRename={(label) => patch({ label })}
+          />
           {onExpression && (
             <Tooltip title="Node expression">
               <IconButton
@@ -154,21 +130,6 @@ export default function Inspector({
         </div>
       )}
       <div className="inspector-scroll" ref={scroll}>
-        {presentation === "dialog" && (
-          <InspectorSection key={`details:${node.id}`} title="Node details">
-            <div className="inspector-node-title">
-              <span className={`node-icon ${node.type.toLowerCase()}`}>
-                <NodeIcon type={node.type} size={19} />
-              </span>
-              <div>
-                <h3>{nodeLabel[node.type]}</h3>
-                <span>{nodeDescriptions[node.type]}</span>
-              </div>
-              <InspectorProblems key={node.id} errors={errors} />
-            </div>
-            {nameField}
-          </InspectorSection>
-        )}
         <Fields key={node.id} {...fieldProps} />
         {node.type !== "INPUT" && (
           <ResultFields key={`result:${node.id}`} {...fieldProps} />

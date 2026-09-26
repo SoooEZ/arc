@@ -129,9 +129,8 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
   await page.getByRole("button", { name: "Add node", exact: true }).click();
   await page.getByRole("menuitem", { name: "Reuse rule", exact: true }).click();
   await page
-    .getByLabel("Find published rule", { exact: true })
+    .getByLabel("Published rule", { exact: true })
     .fill("Apply discount");
-  await page.getByLabel("Published rule", { exact: true }).click();
   await page
     .getByRole("option", { name: "Apply discount", exact: true })
     .click();
@@ -231,13 +230,13 @@ test("mobile library and API reference stay within the viewport", async ({
   await expect(
     page.getByRole("heading", { name: "Rule library" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Find sidebar rule")).toBeHidden();
+  await expect(page.getByLabel("Find sidebar rule")).toHaveCount(0);
   await expect(
     page.getByRole("navigation", {
       name: "Sidebar rules pages",
       includeHidden: true,
     }),
-  ).toBeHidden();
+  ).toHaveCount(0);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

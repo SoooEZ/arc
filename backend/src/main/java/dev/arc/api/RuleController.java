@@ -39,8 +39,9 @@ public class RuleController {
   public CatalogPage<RuleVersionSummary> versionSummaries(
       @PathVariable String id,
       @RequestParam(defaultValue = "0") int offset,
-      @RequestParam(defaultValue = "20") int limit) {
-    return rules.versionSummaries(id, offset, limit);
+      @RequestParam(defaultValue = "20") int limit,
+      @RequestParam(defaultValue = "") String search) {
+    return rules.versionSummaries(id, offset, limit, search);
   }
 
   @PostMapping("/rules")

@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { usePagedResource } from "../../../hooks/usePagedResource";
-import CatalogPagination from "../../../components/CatalogPagination";
-import { Alert, Button, MenuItem, TextField } from "@mui/material";
+import PagedAutocomplete from "../../../components/PagedAutocomplete";
+import { Alert, Button } from "@mui/material";
 import { ArrowUpRight, Info } from "lucide-react";
-import type { Version } from "../../../types";
+import type { RuleSummary, Version, VersionSummary } from "../../../types";
 import ValueBinding from "../../expressions/ValueBinding";
 import { ruleApi } from "../../../api/rules";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
+type RuleChoice = Pick<RuleSummary, "id" | "name" | "publishedVersion">;
+
 export default function ReferenceFields({
   node,
   rules,
@@ -17,16 +18,26 @@ export default function ReferenceFields({
   variables,
   onOpenReference,
 }: NodeFieldsProps) {
-  const [search, setSearch] = useState("");
-  const catalog = usePagedResource(search, (offset, limit, signal) =>
-    ruleApi.catalog({ offset, limit, search, publishedOnly: true }, { signal }),
-  );
-  const versions = usePagedResource(
+  const [chosenRule, setChosenRule] = useState<RuleChoice | null>(null);
+  const knownRule =
+    chosenRule?.id === node.ruleId
+      ? chosenRule
+      : rules.find((rule) => rule.id === node.ruleId);
+  const selectedRule = useAsyncResource(
     node.ruleId || "",
-    (offset, limit, signal) =>
-      ruleApi.versionSummaries(node.ruleId!, { offset, limit }, { signal }),
-    !!node.ruleId,
+    (signal) => ruleApi.get(node.ruleId!, { signal }),
+    null as RuleChoice | null,
+    0,
+    !!node.ruleId && !knownRule,
   );
+  const ruleValue: RuleChoice | null = node.ruleId
+    ? knownRule ||
+      selectedRule.data || {
+        id: node.ruleId,
+        name: node.ruleId,
+        publishedVersion: node.version ?? null,
+      }
+    : null;
   const detail = useAsyncResource(
     `${node.ruleId}:${node.version}`,
     (signal) => ruleApi.version(node.ruleId!, node.version!, { signal }),
@@ -35,87 +46,63 @@ export default function ReferenceFields({
     !!node.ruleId && !!node.version,
   );
   const child = detail.data;
-  const refVersions = versions.data.items;
-  const refError = catalog.error || versions.error || detail.error;
+  const refError = selectedRule.error || detail.error;
   return (
     <>
       <InspectorSection title="Rule reference">
-        <TextField
-          label="Find published rule"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <TextField
-          select
+        <PagedAutocomplete<RuleChoice>
           label="Published rule"
-          value={node.ruleId || ""}
+          owner="published-rules"
+          value={ruleValue}
           disabled={readOnly}
-          onChange={(e) => {
-            const ref = catalog.data.items.find((r) => r.id === e.target.value);
-            patch({
-              ruleId: e.target.value,
-              version: ref?.publishedVersion || null,
-              bindings: {},
-            });
+          loadPage={(search, offset, limit, signal) =>
+            ruleApi.catalog(
+              { search, offset, limit, publishedOnly: true },
+              { signal },
+            )
+          }
+          itemKey={(rule) => rule.id}
+          itemLabel={(rule) => rule.name}
+          onChange={(rule) => {
+            if (readOnly) return;
+            setChosenRule(rule);
+            if (rule.id !== node.ruleId)
+              patch({
+                ruleId: rule.id,
+                version: rule.publishedVersion,
+                bindings: {},
+              });
           }}
-        >
-          <MenuItem value="" disabled>
-            Select a rule
-          </MenuItem>
-          {node.ruleId &&
-            !catalog.data.items.some((item) => item.id === node.ruleId) && (
-              <MenuItem value={node.ruleId}>
-                {rules.find((item) => item.id === node.ruleId)?.name ||
-                  node.ruleId}
-              </MenuItem>
-            )}
-          {catalog.data.items.map((r) => (
-            <MenuItem key={r.id} value={r.id}>
-              {r.name}
-            </MenuItem>
-          ))}
-        </TextField>
-        <CatalogPagination
-          label="Published rules"
-          offset={catalog.offset}
-          limit={catalog.limit}
-          total={catalog.data.total}
-          loading={catalog.loading}
-          onPage={catalog.setOffset}
         />
         {refError && <Alert severity="error">{refError}</Alert>}
         {node.ruleId && (
-          <TextField
-            select
+          <PagedAutocomplete<VersionSummary>
+            key={node.ruleId}
             label="Pinned version"
-            value={node.version || ""}
-            disabled={readOnly}
-            onChange={(e) =>
-              patch({
-                version: Number(e.target.value),
-                bindings: {},
-              })
+            owner={node.ruleId}
+            value={
+              node.version
+                ? {
+                    ruleId: node.ruleId,
+                    version: node.version,
+                    publishedAt: "",
+                  }
+                : null
             }
-          >
-            {node.version &&
-              !refVersions.some((item) => item.version === node.version) && (
-                <MenuItem value={node.version}>Version {node.version}</MenuItem>
-              )}
-            {refVersions.map((v) => (
-              <MenuItem value={v.version} key={v.version}>
-                Version {v.version}
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
-        {node.ruleId && (
-          <CatalogPagination
-            label="Pinned versions"
-            offset={versions.offset}
-            limit={versions.limit}
-            total={versions.data.total}
-            loading={versions.loading}
-            onPage={versions.setOffset}
+            disabled={readOnly}
+            loadPage={(search, offset, limit, signal) =>
+              ruleApi.versionSummaries(
+                node.ruleId!,
+                { search, offset, limit },
+                { signal },
+              )
+            }
+            itemKey={(version) => String(version.version)}
+            itemLabel={(version) => `Version ${version.version}`}
+            onChange={(version) => {
+              if (!readOnly && version.version !== node.version)
+                patch({ version: version.version, bindings: {} });
+            }}
           />
         )}
         {node.ruleId && node.version && (

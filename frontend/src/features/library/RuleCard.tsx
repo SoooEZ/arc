@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { ruleApi } from "../../api/rules";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
-import { Chip } from "@mui/material";
-import { ArrowUpRight } from "lucide-react";
+import { Button, Chip } from "@mui/material";
+import { ArrowUpRight, RotateCcw } from "lucide-react";
 import type { RuleSummary, Rule } from "../../types";
 import { kindLabel } from "../../types";
 import { KindIcon } from "../../components/Icons";
 import RulePreview from "./RulePreview";
+
 export default function RuleCard({
   rule,
   onOpen,
@@ -14,21 +15,15 @@ export default function RuleCard({
   rule: RuleSummary;
   onOpen: (rule: RuleSummary) => void;
 }) {
-  const [preview, setPreview] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  // Only mounted cards on the current catalog page fetch; unmount aborts old previews.
   const detail = useAsyncResource(
-    rule.id + ":" + rule.revision,
+    `${rule.id}:${rule.revision}:${attempt}`,
     (signal) => ruleApi.get(rule.id, { signal }),
     null as Rule | null,
-    150,
-    preview,
   );
   return (
-    <button
-      className="rule-card"
-      onMouseEnter={() => setPreview(true)}
-      onFocus={() => setPreview(true)}
-      onClick={() => onOpen(rule)}
-    >
+    <article className="rule-card">
       <div className="rule-card-top">
         <span className={`kind-icon ${rule.kind.toLowerCase()}`}>
           <KindIcon kind={rule.kind} />
@@ -45,7 +40,6 @@ export default function RuleCard({
       </div>
       <div className="rule-card-title">
         <h3>{rule.name}</h3>
-        <ArrowUpRight size={17} />
       </div>
       <p>
         {rule.description ||
@@ -54,18 +48,45 @@ export default function RuleCard({
       {detail.data ? (
         <RulePreview rule={detail.data} />
       ) : (
-        <div className="mini-graph">
-          <span>{kindLabel[rule.kind]} · hover or focus for graph preview</span>
+        <div className="rule-preview">
+          <div className="mini-graph preview-state" aria-live="polite">
+            {detail.error ? (
+              <>
+                <span>Graph preview unavailable</span>
+                <small>{detail.error}</small>
+                <Button
+                  className="preview-retry"
+                  size="small"
+                  startIcon={<RotateCcw size={13} />}
+                  onClick={() => setAttempt((value) => value + 1)}
+                >
+                  Retry preview
+                </Button>
+              </>
+            ) : (
+              <span>Loading graph…</span>
+            )}
+          </div>
+          <div className="rule-preview-caption">Current draft</div>
         </div>
       )}
       <div className="rule-card-footer">
         <span>{kindLabel[rule.kind]}</span>
         <span>
-          {rule.nodeCount} nodes
+          {rule.nodeCount} {rule.nodeCount === 1 ? "node" : "nodes"}
           <span className="tiny-divider" />
-          {rule.inputCount} inputs
+          {rule.inputCount} {rule.inputCount === 1 ? "input" : "inputs"}
         </span>
       </div>
-    </button>
+      <button
+        className="rule-card-open"
+        aria-label={`Open graph: ${rule.name}`}
+        onClick={() => onOpen(rule)}
+      >
+        <span>
+          Open graph <ArrowUpRight size={14} />
+        </span>
+      </button>
+    </article>
   );
 }

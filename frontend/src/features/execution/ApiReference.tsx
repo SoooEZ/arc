@@ -35,7 +35,7 @@ export default function ApiReference() {
           [
             "GET",
             "/rules/{id}/version-summaries",
-            "Page through published version metadata",
+            "Search and page through published version metadata",
           ],
           [
             "GET",

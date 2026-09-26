@@ -11,7 +11,8 @@ public interface RuleRepository extends RuleResolver {
   CatalogPage<RuleSummary> catalog(
       int offset, int limit, String search, String kind, boolean publishedOnly);
 
-  CatalogPage<RuleVersionSummary> versionSummaries(String id, int offset, int limit);
+  /** Version-descending metadata, filtered by a literal substring of the decimal version. */
+  CatalogPage<RuleVersionSummary> versionSummaries(String id, int offset, int limit, String search);
 
   Rule get(String id);
 

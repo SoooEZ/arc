@@ -15,7 +15,7 @@ import { ruleApi } from "./api/rules";
 import type { Rule } from "./types";
 export default function App() {
   const library = useRuleLibrary();
-  const { rules, loading } = library;
+  const { rules } = library;
   const [savedRule, setSavedRule] = useState<Rule | null>(null);
   const upsert = (rule: Rule) => {
     setSavedRule(rule);
@@ -44,11 +44,8 @@ export default function App() {
   return (
     <div className="app-shell">
       <Sidebar
-        rules={rules}
-        library={library}
         route={route}
-        selectedId={selectedId}
-        loading={loading}
+        studioRuleId={selectedId ?? rules[0]?.id ?? null}
         navigate={navigate}
         newRule={newRule}
       />

@@ -75,9 +75,16 @@ test("catalog reads only requested pages and search resets to the first page", a
   });
   await page.goto("/#/library");
   await expect(page.locator(".rule-card")).toHaveCount(20);
-  expect(reads.filter((url) => /\/api\/rules(?:\?|$|\/)/.test(url))).toEqual(
-    [],
+  await expect(page.locator(".rule-preview-svg")).toHaveCount(20);
+  const previewIds = () =>
+    reads
+      .map((url) => /\/api\/rules\/catalog-(\d+)$/.exec(url)?.[1])
+      .filter((id) => id !== undefined)
+      .map(Number);
+  expect([...new Set(previewIds())].sort((a, b) => a - b)).toEqual(
+    Array.from({ length: 20 }, (_, index) => index),
   );
+  expect(reads.some((url) => /\/api\/rules(?:\?|$)/.test(url))).toBe(false);
   await page
     .getByRole("navigation", { name: "Library rules pages" })
     .getByRole("button", { name: "Next" })
@@ -86,11 +93,17 @@ test("catalog reads only requested pages and search resets to the first page", a
     "Catalog rule 20",
   );
   await expect(page.locator(".rule-card")).toHaveCount(20);
+  await expect(page.locator(".rule-preview-svg")).toHaveCount(20);
+  expect([...new Set(previewIds())].sort((a, b) => a - b)).toEqual(
+    Array.from({ length: 40 }, (_, index) => index),
+  );
   await page
     .getByRole("textbox", { name: "Search rules" })
     .fill("Catalog rule 44");
   await expect(page.locator(".rule-card")).toHaveCount(1);
   await expect(page.locator(".rule-card")).toContainText("Catalog rule 44");
+  await expect(page.locator(".rule-preview-svg")).toHaveCount(1);
+  expect(previewIds().filter((id) => id >= 40)).toEqual([44]);
   const searches = reads.filter(
     (url) =>
       url.includes("/rule-summaries") &&

@@ -56,6 +56,10 @@ paths:
       - {$ref: '#/components/parameters/RuleId'}
       - {$ref: '#/components/parameters/Offset'}
       - {$ref: '#/components/parameters/Limit'}
+      - name: search
+        in: query
+        description: Trimmed literal substring of the version number. For example, 2 matches versions 2, 12 and 20. An empty search returns all versions.
+        schema: {type: string, maxLength: 200, default: ''}
     get:
       operationId: listRuleVersionSummaries
       responses:

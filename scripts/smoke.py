@@ -115,6 +115,22 @@ try:
     request("GET", "/api/rule-summaries?limit=101", expected=422)
     request("GET", "/api/rule-summaries?offset=-1", expected=422)
 
+    version_search = create("version-search")
+    for _ in range(12):
+        version_search = publish(version_search)
+    version_history = f"/api/rules/{version_search['id']}/version-summaries"
+    matches = request("GET", version_history + "?search=%202%20&limit=1")
+    assert matches["total"] == 2 and matches["items"][0]["version"] == 12
+    older = request("GET", version_history + "?search=2&limit=1&offset=1")
+    assert older["total"] == 2 and older["items"][0]["version"] == 2
+    assert request("GET", version_history + "?search=2&offset=2")["items"] == []
+    assert request("GET", version_history + "?search=%20")["total"] == 12
+    for query in ["99", "%25", "_", "invalid"]:
+        missing = request("GET", version_history + "?search=" + query)
+        assert missing["total"] == 0 and missing["items"] == []
+    request("GET", version_history + "?search=" + "1" * 201, expected=422)
+    request("GET", f"/api/rules/{PREFIX}-missing/version-summaries?search=2", expected=404)
+
     # A valid graph can repeat large intermediate values; only trace is bounded.
     payload = ['x' * 100 for _ in range(100)]
     large = {"schemaVersion": 1, "inputs": [{"name": "payload", "type": "ARRAY", "required": True}],

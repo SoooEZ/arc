@@ -61,22 +61,12 @@
   color: #a2b192;
   margin-left: 2px;
 }
-.inspector-node-title {
+.inspector-node-identity {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 3px;
-}
-.inspector-node-title > .node-icon {
-  height: 34px;
-  width: 34px;
-  border-radius: 7px;
-}
-.inspector-node-title > div > span {
-  font-size: 8px;
-  color: #a5b496;
-  display: block;
-  margin-top: 2px;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 .inspector-sidebar > .inspector-heading {
   display: flex;
@@ -107,19 +97,19 @@
   color: #71816a;
   white-space: nowrap;
 }
-.inspector-heading .inspector-node-name {
+.inspector-node-identity .inspector-node-name {
   flex: 1 1 0;
   min-width: 0;
 }
-.inspector-heading .inspector-node-name .MuiInputBase-root {
+.inspector-node-identity .inspector-node-name .MuiInputBase-root {
   font-size: 12px;
   color: #405638;
 }
-.inspector-heading .inspector-node-name .MuiInputBase-input {
+.inspector-node-identity .inspector-node-name .MuiInputBase-input {
   padding: 9px 8px;
   text-overflow: ellipsis;
 }
-.inspector-heading .inspector-node-name .MuiInputLabel-root {
+.inspector-node-identity .inspector-node-name .MuiInputLabel-root {
   font-size: 10px;
 }
 .inspector-heading > .MuiIconButton-root,
@@ -352,6 +342,21 @@
 .node-edit-dialog .MuiDialog-paper {
   height: min(820px, calc(100% - 64px));
 }
+.node-edit-dialog .node-edit-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+}
+.node-edit-heading .inspector-node-identity {
+  gap: 12px;
+}
+.node-edit-heading .inspector-node-name .MuiInputBase-root {
+  font-size: 16px;
+}
+.node-edit-heading .inspector-node-name .MuiInputLabel-root {
+  font-size: 12px;
+}
 .node-edit-content {
   display: flex;
   flex-direction: column;
@@ -377,7 +382,6 @@
   font-size: 13px;
 }
 .inspector-dialog .inspector-section h4,
-.inspector-dialog .inspector-node-title > div > span,
 .inspector-dialog .inspector-section .MuiFormHelperText-root,
 .inspector-dialog .input-schema-card .MuiFormControlLabel-label {
   font-size: 11px;

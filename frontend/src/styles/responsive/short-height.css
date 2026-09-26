@@ -1,17 +1,12 @@
-/* Preserve the rule navigator on laptop-height screens. */
-@media (max-height: 850px) and (min-width: 761px) {
-  .sidebar .build-note {
-    display: none;
+@media (max-height: 600px) {
+  .sidebar {
+    padding-top: 12px;
+  }
+  .sidebar-toggle {
+    margin-top: 12px;
+    margin-bottom: 10px;
   }
   .sidebar-bottom {
-    padding-top: 14px;
-    flex-shrink: 0;
-  }
-  .sidebar-rules {
-    flex: 1;
-    min-height: 80px;
-  }
-  .rules-label {
-    padding-top: 26px;
+    padding-top: 16px;
   }
 }

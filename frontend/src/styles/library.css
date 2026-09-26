@@ -166,6 +166,7 @@
   gap: 18px;
 }
 .rule-card {
+  position: relative;
   display: block;
   text-align: left;
   border: 1px solid #e0e6df;
@@ -232,6 +233,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  padding-right: 86px;
 }
 .rule-card-title h3 {
   font-size: 14px;

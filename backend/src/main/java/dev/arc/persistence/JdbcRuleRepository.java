@@ -83,19 +83,26 @@ public class JdbcRuleRepository implements RuleRepository {
     return new CatalogPage<>(items, total, offset, limit);
   }
 
-  public CatalogPage<RuleVersionSummary> versionSummaries(String id, int offset, int limit) {
+  public CatalogPage<RuleVersionSummary> versionSummaries(
+      String id, int offset, int limit, String search) {
     publishedVersion(id);
+    String filter = " WHERE rule_id = ? AND (? = '' OR strpos(version::text, ?) > 0)";
     Long total =
-        jdbc.queryForObject("SELECT count(*) FROM rule_versions WHERE rule_id = ?", Long.class, id);
+        jdbc.queryForObject(
+            "SELECT count(*) FROM rule_versions" + filter, Long.class, id, search, search);
     var items =
         jdbc.query(
-            "SELECT rule_id, version, published_at FROM rule_versions WHERE rule_id = ? ORDER BY version DESC LIMIT ? OFFSET ?",
+            "SELECT rule_id, version, published_at FROM rule_versions"
+                + filter
+                + " ORDER BY version DESC LIMIT ? OFFSET ?",
             (rs, index) ->
                 new RuleVersionSummary(
                     rs.getString("rule_id"),
                     rs.getInt("version"),
                     rs.getTimestamp("published_at").toInstant()),
             id,
+            search,
+            search,
             limit,
             offset);
     return new CatalogPage<>(items, total, offset, limit);

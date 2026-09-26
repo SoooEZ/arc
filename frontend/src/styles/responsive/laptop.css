@@ -1,18 +1,4 @@
 @media (max-width: 1250px) {
-  .sidebar {
-    width: 210px;
-    padding-left: 13px;
-    padding-right: 13px;
-  }
-  .main-content {
-    margin-left: 210px;
-    width: calc(100% - 210px);
-  }
-  .environment {
-    margin-left: -13px;
-    margin-right: -13px;
-    padding-left: 24px;
-  }
   .library-page,
   .api-page {
     padding: 30px 25px;
@@ -34,16 +20,6 @@
   }
   .rule-card-title h3 {
     font-size: 13px;
-  }
-  .mini-box {
-    font-size: 6px;
-  }
-  .formula-preview {
-    gap: 7px;
-    padding: 10px;
-  }
-  .formula-preview code {
-    font-size: 8px;
   }
   .stat {
     padding: 0 17px;

@@ -6,10 +6,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+import { X } from "lucide-react";
 import type { Rule, RuleSummary } from "../../types";
 import { patchGraphNode, type DefinitionChange } from "../../domain/graph";
 import Inspector from "./inspector/Inspector";
+import NodeIdentity from "./inspector/NodeIdentity";
 import { applyNodeFormDraft } from "./nodeFormDraft";
 import type { ReferenceTarget } from "./types";
 
@@ -31,6 +35,9 @@ export default function NodeEditDialog({
   onOpenReference: (target: ReferenceTarget) => void;
 }) {
   const [before] = useState(rule.draft);
+  const [dialogLabel] = useState(
+    `Edit node · ${rule.draft.nodes.find((node) => node.id === nodeId)!.label}`,
+  );
   const [draft, setDraft] = useState(before);
   const [invalidJson, setInvalidJson] = useState<Record<string, boolean>>({});
   const [error, setError] = useState("");
@@ -69,7 +76,27 @@ export default function NodeEditDialog({
       aria-labelledby="node-edit-title"
       className="node-edit-dialog"
     >
-      <DialogTitle id="node-edit-title">Edit node · {node.label}</DialogTitle>
+      <DialogTitle
+        id="node-edit-heading"
+        component="div"
+        className="node-edit-heading"
+      >
+        <span id="node-edit-title" className="visually-hidden">
+          {dialogLabel}
+        </span>
+        <NodeIdentity
+          node={node}
+          readOnly={readOnly}
+          onRename={(label) =>
+            changeDraft((current) => patchGraphNode(current, nodeId, { label }))
+          }
+        />
+        <Tooltip title="Close without applying">
+          <IconButton aria-label="Close node editor" onClick={onClose}>
+            <X size={20} />
+          </IconButton>
+        </Tooltip>
+      </DialogTitle>
       <DialogContent className="node-edit-content">
         <p className="node-edit-description">
           Edit this node’s settings, then apply them to the draft.

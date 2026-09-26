@@ -37,9 +37,11 @@ public class RuleService {
     return store.catalog(offset, limit, search, kind, publishedOnly);
   }
 
-  public CatalogPage<RuleVersionSummary> versionSummaries(String id, int offset, int limit) {
+  public CatalogPage<RuleVersionSummary> versionSummaries(
+      String id, int offset, int limit, String search) {
     pageBounds(offset, limit);
-    return store.versionSummaries(id, offset, limit);
+    if (search.length() > 200) throw ArcException.invalid("Search is limited to 200 characters");
+    return store.versionSummaries(id, offset, limit, search.trim());
   }
 
   private void pageBounds(int offset, int limit) {

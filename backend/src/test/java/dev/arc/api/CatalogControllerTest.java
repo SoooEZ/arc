@@ -64,6 +64,8 @@ class CatalogControllerTest {
         .andExpect(status().isUnprocessableEntity());
     mvc.perform(get("/api/source-summaries").param("search", "a".repeat(201)))
         .andExpect(status().isUnprocessableEntity());
+    mvc.perform(get("/api/rules/example/version-summaries").param("search", "2".repeat(201)))
+        .andExpect(status().isUnprocessableEntity());
     mvc.perform(get("/api/rule-summaries").param("kind", "unknown"))
         .andExpect(status().isUnprocessableEntity());
     verifyNoInteractions(rules, sources);
@@ -79,7 +81,7 @@ class CatalogControllerTest {
         .thenReturn(
             new CatalogPage<>(
                 List.of(new SourceVersionSummary("table", 3, Instant.EPOCH)), 3, 0, 20));
-    when(rules.versionSummaries("example", 0, 20))
+    when(rules.versionSummaries("example", 0, 20, ""))
         .thenReturn(
             new CatalogPage<>(
                 List.of(new RuleVersionSummary("example", 2, Instant.EPOCH)), 2, 0, 20));
@@ -95,11 +97,51 @@ class CatalogControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].version").value(2))
         .andExpect(jsonPath("$.items[0].definition").doesNotExist());
+    verify(rules).versionSummaries("example", 0, 20, "");
     when(rules.list()).thenReturn(List.of());
     when(sources.list()).thenReturn(List.of());
     mvc.perform(get("/api/rules")).andExpect(status().isOk()).andExpect(content().json("[]"));
     mvc.perform(get("/api/sources")).andExpect(status().isOk()).andExpect(content().json("[]"));
     verify(rules).list();
     verify(sources).list();
+  }
+
+  @Test
+  void versionSummarySearchTrimsTextAndRetainsFilteredPagingAndPublicationMetadata()
+      throws Exception {
+    var published = Instant.parse("2026-09-26T12:00:00Z");
+    when(rules.versionSummaries("example", 1, 1, "2"))
+        .thenReturn(
+            new CatalogPage<>(List.of(new RuleVersionSummary("example", 12, published)), 3, 1, 1));
+    mvc.perform(
+            get("/api/rules/example/version-summaries")
+                .param("search", " 2 ")
+                .param("offset", "1")
+                .param("limit", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(3))
+        .andExpect(jsonPath("$.offset").value(1))
+        .andExpect(jsonPath("$.limit").value(1))
+        .andExpect(jsonPath("$.items[0].version").value(12))
+        .andExpect(jsonPath("$.items[0].publishedAt").value(published.getEpochSecond()))
+        .andExpect(jsonPath("$.items[0].definition").doesNotExist());
+    verify(rules).versionSummaries("example", 1, 1, "2");
+    verifyNoMoreInteractions(rules);
+  }
+
+  @Test
+  void blankVersionSearchRetainsDefaultHistoryAndMaximumSearchLengthIsAccepted() throws Exception {
+    for (String search : List.of("", "2".repeat(200))) {
+      when(rules.versionSummaries("example", 0, 20, search))
+          .thenReturn(new CatalogPage<>(List.of(), 0, 0, 20));
+      mvc.perform(
+              get("/api/rules/example/version-summaries")
+                  .param("search", search.isEmpty() ? "   " : search))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.items").isEmpty())
+          .andExpect(jsonPath("$.total").value(0));
+      verify(rules).versionSummaries("example", 0, 20, search);
+    }
+    verifyNoMoreInteractions(rules);
   }
 }

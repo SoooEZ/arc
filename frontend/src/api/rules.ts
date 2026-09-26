@@ -24,7 +24,7 @@ export const ruleApi = {
     ),
   versionSummaries: (
     id: string,
-    query: { offset?: number; limit?: number } = {},
+    query: { offset?: number; limit?: number; search?: string } = {},
     options?: RequestOptions,
   ) =>
     http.get<Page<VersionSummary>>(

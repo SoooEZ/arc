@@ -1,167 +1,191 @@
+import { useEffect, useRef, useState } from "react";
 import {
-  ArrowUpRight,
   BookOpen,
-  ChevronDown,
-  ChevronRight,
   CircleHelp,
   Layers3,
-  Plus,
+  PanelLeftClose,
+  PanelLeftOpen,
   Terminal,
   Workflow,
 } from "lucide-react";
-import type { RuleSummary } from "../types";
-import { TextField } from "@mui/material";
-import CatalogPagination from "../components/CatalogPagination";
-import type { useRuleLibrary } from "./useRuleLibrary";
-import { ArcMark, KindIcon } from "../components/Icons";
+import { Tooltip, useMediaQuery } from "@mui/material";
+import FocusTrap from "@mui/material/Unstable_TrapFocus";
+import { ArcMark } from "../components/Icons";
+
+const preferenceKey = "arc.navigation.expanded";
 interface Props {
-  rules: RuleSummary[];
-  library: ReturnType<typeof useRuleLibrary>;
   route: string;
-  selectedId: string | null;
-  loading: boolean;
+  studioRuleId: string | null;
   navigate: (path: string) => void;
   newRule: () => void;
 }
 export default function Sidebar({
-  rules,
-  library,
   route,
-  selectedId,
-  loading,
+  studioRuleId,
   navigate,
   newRule,
 }: Props) {
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(preferenceKey) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const toggleButton = useRef<HTMLButtonElement>(null);
+  const mobile = useMediaQuery("(max-width:760px)");
+  const toggleExpanded = (next: boolean) => {
+    setExpanded(next);
+    if (!next && mobile) toggleButton.current?.focus();
+    try {
+      localStorage.setItem(preferenceKey, String(next));
+    } catch {
+      // Navigation remains usable when browser storage is unavailable.
+    }
+  };
+  useEffect(() => {
+    if (!expanded || !mobile) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") toggleExpanded(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [expanded, mobile]);
+  const open = (path: string) => {
+    navigate(path);
+    if (mobile) toggleExpanded(false);
+  };
+  const links = [
+    {
+      label: "Rule library",
+      icon: Layers3,
+      active: route === "/library" || route.startsWith("/rules/"),
+      action: () => open("/library"),
+    },
+    {
+      label: "API playground",
+      icon: Terminal,
+      active: route === "/playground",
+      action: () => open("/playground"),
+    },
+    {
+      label: "API reference",
+      icon: BookOpen,
+      active: route === "/docs",
+      action: () => open("/docs"),
+    },
+    {
+      label: "Code studio",
+      icon: Terminal,
+      active: route.startsWith("/studio/"),
+      action: () => {
+        if (studioRuleId) open(`/studio/${studioRuleId}`);
+        else {
+          newRule();
+          if (mobile) toggleExpanded(false);
+        }
+      },
+    },
+    {
+      label: "Data sources",
+      icon: Workflow,
+      active: route === "/sources",
+      action: () => open("/sources"),
+    },
+  ];
   return (
-    <aside className="sidebar">
-      <button className="brand" onClick={() => navigate("/library")}>
-        <ArcMark />
-        <span>
-          arc<span className="brand-dot">.</span>
-        </span>
-        <span className="brand-beta">BETA</span>
-      </button>
-      <div className="workspace-switch">
-        <span className="workspace-avatar">A</span>
-        <div>
-          <strong>ARC workspace</strong>
-          <small>Rules & calculations</small>
-        </div>
-        <ChevronDown size={14} />
-      </div>
-      <div className="nav-section-label">WORKSPACE</div>
-      <nav className="main-nav">
+    <>
+      {expanded && mobile && (
         <button
-          className={
-            route === "/library" || route.startsWith("/rules/") ? "active" : ""
-          }
-          onClick={() => navigate("/library")}
-        >
-          <Layers3 size={18} />
-          Rule library<span className="nav-count">{library.total}</span>
-        </button>
-        <button
-          className={route === "/playground" ? "active" : ""}
-          onClick={() => navigate("/playground")}
-        >
-          <Terminal size={18} />
-          API playground
-        </button>
-        <button
-          className={route === "/docs" ? "active" : ""}
-          onClick={() => navigate("/docs")}
-        >
-          <BookOpen size={18} />
-          API reference
-          <ArrowUpRight size={14} className="nav-tail" />
-        </button>
-        <button
-          className={route.startsWith("/studio/") ? "active" : ""}
-          onClick={() =>
-            selectedId
-              ? navigate(`/studio/${selectedId}`)
-              : rules.length
-                ? navigate(`/studio/${rules[0].id}`)
-                : newRule()
-          }
-        >
-          <Terminal size={18} />
-          Code studio
-        </button>
-        <button
-          className={route === "/sources" ? "active" : ""}
-          onClick={() => navigate("/sources")}
-        >
-          <Workflow size={18} />
-          Data sources
-        </button>
-      </nav>
-      <div className="nav-section-label rules-label">
-        YOUR RULES
-        <button onClick={newRule} aria-label="Create rule">
-          <Plus size={16} />
-        </button>
-      </div>
-      <TextField
-        className="sidebar-catalog-search"
-        size="small"
-        label="Find sidebar rule"
-        value={library.search}
-        onChange={(event) => library.setSearch(event.target.value)}
-      />
-      <div className="sidebar-rules">
-        {rules.map((rule) => (
-          <button
-            key={rule.id}
-            title={rule.name}
-            className={selectedId === rule.id ? "selected" : ""}
-            onClick={() => navigate(`/rules/${rule.id}`)}
-          >
-            <KindIcon kind={rule.kind} size={16} />
-            <span>{rule.name}</span>
-            <span
-              className={`status-dot ${rule.publishedVersion ? "published" : ""}`}
-            />
-          </button>
-        ))}
-        {!loading && !rules.length && (
-          <div className="sidebar-empty">Your first rule starts here.</div>
-        )}
-      </div>
-      <div className="sidebar-pagination">
-        <CatalogPagination
-          label="Sidebar rules"
-          offset={library.page.offset}
-          limit={library.page.limit}
-          total={library.total}
-          loading={loading}
-          onPage={library.page.setOffset}
+          className="sidebar-backdrop"
+          aria-label="Close navigation"
+          onClick={() => toggleExpanded(false)}
         />
-      </div>
-      <div className="sidebar-bottom">
-        <div className="build-note">
-          <Workflow size={19} />
-          <strong>Build once. Reuse everywhere.</strong>
-          <p>
-            Connect your business logic,
-            <br />
-            one rule at a time.
-          </p>
-          <button onClick={() => navigate("/docs")}>
-            Explore the API <ArrowUpRight size={14} />
+      )}
+      <FocusTrap open={mobile && expanded} disableRestoreFocus>
+        <aside
+          role={mobile && expanded ? "dialog" : undefined}
+          aria-modal={mobile && expanded ? true : undefined}
+          aria-label="Workspace navigation"
+          tabIndex={-1}
+          className={`sidebar ${expanded ? "is-expanded" : "is-compact"}`}
+        >
+          <button
+            className="brand"
+            aria-label="ARC home"
+            onClick={() => open("/library")}
+          >
+            <ArcMark />
+            <span className="nav-label">
+              arc<span className="brand-dot">.</span>
+            </span>
           </button>
-        </div>
-        <button className="help-link" onClick={() => navigate("/docs")}>
-          <CircleHelp size={17} />
-          Getting started
-          <ChevronRight size={14} />
-        </button>
-        <div className="environment">
-          <span className="status-dot published" />
-          <span>Development</span>
-          <span>v0.2</span>
-        </div>
-      </div>
-    </aside>
+          <Tooltip
+            title={expanded ? "Collapse navigation" : "Expand navigation"}
+            placement="right"
+          >
+            <button
+              className="sidebar-toggle"
+              ref={toggleButton}
+              aria-label={
+                expanded ? "Collapse navigation" : "Expand navigation"
+              }
+              aria-expanded={expanded}
+              aria-controls="workspace-navigation"
+              onClick={() => toggleExpanded(!expanded)}
+            >
+              {expanded ? (
+                <PanelLeftClose size={19} />
+              ) : (
+                <PanelLeftOpen size={19} />
+              )}
+              <span className="nav-label">Collapse navigation</span>
+            </button>
+          </Tooltip>
+          <nav
+            className="main-nav"
+            id="workspace-navigation"
+            aria-label="Workspace"
+          >
+            {links.map(({ label, icon: Icon, active, action }) => (
+              <Tooltip
+                key={label}
+                title={expanded ? "" : label}
+                placement="right"
+              >
+                <button
+                  aria-label={label}
+                  aria-current={active ? "page" : undefined}
+                  className={active ? "active" : ""}
+                  onClick={action}
+                >
+                  <Icon size={19} />
+                  <span className="nav-label">{label}</span>
+                </button>
+              </Tooltip>
+            ))}
+          </nav>
+          <div className="sidebar-bottom">
+            <Tooltip
+              title={expanded ? "" : "Getting started"}
+              placement="right"
+            >
+              <button
+                className="help-link"
+                aria-label="Getting started"
+                onClick={() => open("/docs")}
+              >
+                <CircleHelp size={19} />
+                <span className="nav-label">Getting started</span>
+              </button>
+            </Tooltip>
+            <div className="environment" title="Development">
+              <span className="status-dot published" />
+              <span className="nav-label">Development</span>
+            </div>
+          </div>
+        </aside>
+      </FocusTrap>
+    </>
   );
 }
