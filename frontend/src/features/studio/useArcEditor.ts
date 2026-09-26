@@ -5,10 +5,14 @@ import type { Diagnostic } from "../../types";
 export const arcEditorOptions: monaco.editor.IStandaloneEditorConstructionOptions =
   {
     automaticLayout: true,
+    // The native EditContext path drops space/rapid key events in Chromium.
+    // Use Monaco's established textarea input path for consistent editing.
+    editContext: false,
     tabSize: 2,
     insertSpaces: true,
     minimap: { enabled: false },
     fontFamily: "JetBrains Mono, monospace",
+    fontLigatures: false,
     fontSize: 12,
     wordWrap: "on",
     scrollBeyondLastLine: false,

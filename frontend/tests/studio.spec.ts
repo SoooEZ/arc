@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { setEditorText } from "./helpers/editor";
 
 async function replaceCode(
   page: import("@playwright/test").Page,
@@ -194,9 +195,11 @@ node zero OUTPUT "Below minimum" { return 0; }
     .locator(".node-outline")
     .getByRole("button", { name: /Taxed amount/ })
     .click();
-  await page
-    .getByLabel("Expression", { exact: true })
-    .fill("ROUND(amount * 2, 2)");
+  await setEditorText(
+    page,
+    page.getByLabel("Expression", { exact: true }),
+    "ROUND(amount * 2, 2)",
+  );
   await page
     .locator(".node-outline")
     .getByRole("button", { name: /Input/ })

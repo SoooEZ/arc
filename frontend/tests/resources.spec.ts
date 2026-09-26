@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { editorLines, setEditorText } from "./helpers/editor";
 
 test("a failed published version cannot expose the draft and can be retried", async ({
   page,
@@ -157,9 +158,9 @@ test("moving a node reuses semantic reads and late diagnostics cannot mark a new
   await page.goto(`/#/rules/${id}`);
   const node = page.locator('.react-flow__node[data-id="calculate"]');
   await node.locator(".graph-node").click();
-  await expect(page.getByLabel("Expression", { exact: true })).toHaveValue(
-    "1 + 1",
-  );
+  await expect(
+    editorLines(page.getByLabel("Expression", { exact: true })),
+  ).toHaveText("1 + 1");
   await expect.poll(() => reads.variables).toBeGreaterThan(0);
   await expect.poll(() => reads.diagnostics).toBeGreaterThan(0);
   const before = { ...reads };
@@ -206,7 +207,11 @@ test("moving a node reuses semantic reads and late diagnostics cannot mark a new
     delivered = true;
   });
   try {
-    await page.getByLabel("Expression", { exact: true }).fill("missing + 1");
+    await setEditorText(
+      page,
+      page.getByLabel("Expression", { exact: true }),
+      "missing + 1",
+    );
     await expect.poll(() => held).toBe(true);
     const currentCheck = page.waitForResponse(
       (response) =>
@@ -218,7 +223,11 @@ test("moving a node reuses semantic reads and late diagnostics cannot mark a new
             (node: { expression: string }) => node.expression === "42",
           ),
     );
-    await page.getByLabel("Expression", { exact: true }).fill("42");
+    await setEditorText(
+      page,
+      page.getByLabel("Expression", { exact: true }),
+      "42",
+    );
     expect((await currentCheck).ok()).toBe(true);
     release();
     await expect.poll(() => delivered).toBe(true);
@@ -226,9 +235,9 @@ test("moving a node reuses semantic reads and late diagnostics cannot mark a new
     await expect(
       page.getByText("Stale unknown variable", { exact: true }),
     ).toHaveCount(0);
-    await expect(page.getByLabel("Expression", { exact: true })).toHaveValue(
-      "42",
-    );
+    await expect(
+      editorLines(page.getByLabel("Expression", { exact: true })),
+    ).toHaveText("42");
   } finally {
     release();
   }

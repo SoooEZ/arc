@@ -190,9 +190,39 @@
   font-size: 8px;
   color: #91a67c;
 }
-.expression-field textarea {
-  font-family: "JetBrains Mono", monospace;
-  line-height: 1.8;
+.inline-expression-editor {
+  min-width: 0;
+  margin: 0;
+  padding: 0 10px 5px;
+  border: 1px solid #cbd8ce;
+  border-radius: 6px;
+}
+.inline-expression-editor legend {
+  padding: 0 4px;
+  color: #73856c;
+  font-size: 10px;
+}
+.inline-expression-editor:focus-within {
+  border-color: #1b7a60;
+  box-shadow: 0 0 0 1px #1b7a60;
+}
+.inline-expression-editor[data-readonly="true"] {
+  background: #f8faf7;
+}
+.inline-expression-help {
+  min-height: 24px;
+  margin: 4px 12px 0;
+  color: #73856c;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.inline-expression-loading {
+  min-height: 138px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
 }
 .branch-explainer {
   display: flex;

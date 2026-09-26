@@ -288,9 +288,6 @@
     min-width: 0;
     padding: 0 9px;
   }
-  .test-input .json-input .MuiInputBase-root {
-    padding: 10px;
-  }
   .test-result > strong {
     font-size: 15px;
   }

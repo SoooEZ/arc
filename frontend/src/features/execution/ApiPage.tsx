@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Alert, Button, Chip, MenuItem, TextField } from "@mui/material";
 import {
   ArrowRight,
@@ -13,6 +14,8 @@ import { usePublishedExecution } from "./usePublishedExecution";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
 import ExecutionTiming from "./ExecutionTiming";
 import CatalogPagination from "../../components/CatalogPagination";
+
+const InputJsonEditor = lazy(() => import("./InputJsonEditor"));
 
 export default function ApiPage({
   mode,
@@ -166,15 +169,20 @@ export default function ApiPage({
             <label className="field-label">
               Input parameters <span>application/json</span>
             </label>
-            <TextField
-              multiline
-              rows={7}
-              value={inputs}
-              onChange={(e) => request.setInputs(e.target.value)}
-              className="json-input"
-              slotProps={{ htmlInput: { "aria-label": "API input JSON" } }}
-              spellCheck={false}
-            />
+            <Suspense
+              fallback={
+                <div className="execution-json-editor" role="status">
+                  Loading JSON editor…
+                </div>
+              }
+            >
+              <InputJsonEditor
+                key={JSON.stringify([id, version])}
+                label="API input JSON"
+                value={inputs}
+                onChange={request.setInputs}
+              />
+            </Suspense>
             {definition && (
               <div className="parameter-chips">
                 {definition.inputs.map((p) => (

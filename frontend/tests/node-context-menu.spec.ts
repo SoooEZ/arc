@@ -1,3 +1,4 @@
+import { setEditorText } from "./helpers/editor";
 import {
   expect,
   test,
@@ -96,9 +97,11 @@ test("node context menu edits in a roomy form, cancels safely, and deletes its t
   await dialog
     .getByLabel("Node name", { exact: true })
     .fill("Updated calculation");
-  await dialog
-    .getByRole("textbox", { name: "Expression", exact: true })
-    .fill("6 * 7");
+  await setEditorText(
+    page,
+    dialog.getByRole("textbox", { name: "Expression", exact: true }),
+    "6 * 7",
+  );
   await dialog
     .getByRole("button", { name: "Apply to graph", exact: true })
     .click();

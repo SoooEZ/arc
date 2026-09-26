@@ -1,9 +1,10 @@
 import { lazy, Suspense, useState } from "react";
-import { Button, CircularProgress, TextField } from "@mui/material";
+import { Button, CircularProgress } from "@mui/material";
 import { Braces } from "lucide-react";
 import type { VariableOption } from "../../domain/graph";
 
 const ExpressionDialog = lazy(() => import("./ExpressionDialog"));
+const InlineExpressionEditor = lazy(() => import("./InlineExpressionEditor"));
 
 /** Graph expression inputs share the same catalog and language tools as Code studio. */
 export default function ExpressionField({
@@ -29,16 +30,23 @@ export default function ExpressionField({
   return (
     <div className="expression-input">
       {!hideInput && (
-        <TextField
-          className="expression-field"
-          label={label}
-          value={value}
-          multiline
-          minRows={3}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-          helperText={helperText}
-        />
+        <Suspense
+          fallback={
+            <div className="inline-expression-loading" role="status">
+              <CircularProgress size={16} /> Loading {label.toLowerCase()}{" "}
+              editor…
+            </div>
+          }
+        >
+          <InlineExpressionEditor
+            label={label}
+            value={value}
+            variables={variables}
+            readOnly={disabled}
+            onChange={onChange}
+            helperText={helperText}
+          />
+        </Suspense>
       )}
       <Button
         size="small"

@@ -1,3 +1,4 @@
+import { editorLines, setEditorText } from "./helpers/editor";
 import {
   expect,
   test,
@@ -127,9 +128,11 @@ for (const scenario of [
     await page.getByRole("button", { name: "Test rule", exact: true }).click();
     await page.getByRole("button", { name: "Run test", exact: true }).click();
     await expect(page.getByTestId("test-result")).toHaveText('"matched"');
-    await page
-      .locator(".test-input textarea:not([aria-hidden])")
-      .fill(JSON.stringify({ value: scenario.other }));
+    await setEditorText(
+      page,
+      page.getByLabel("Test input JSON", { exact: true }),
+      JSON.stringify({ value: scenario.other }),
+    );
     await page.getByRole("button", { name: "Run test", exact: true }).click();
     await expect(page.getByTestId("test-result")).toHaveText('"No match"');
     await page
@@ -148,8 +151,12 @@ for (const scenario of [
     await page
       .getByRole("button", { name: "Code editor", exact: true })
       .click();
-    await expect(page.locator(".view-lines")).toContainText("select value;");
-    await expect(page.locator(".view-lines")).toContainText("equals");
+    await expect(
+      editorLines(page.getByLabel("ARC code editor", { exact: true })),
+    ).toContainText("select value;");
+    await expect(
+      editorLines(page.getByLabel("ARC code editor", { exact: true })),
+    ).toContainText("equals");
     await page.getByRole("button", { name: "Graph view", exact: true }).click();
     await page.reload();
     await page
@@ -214,7 +221,9 @@ test("range cases and a staged Default return survive cancel, apply, code round 
     .click();
   await expect(page.locator(".react-flow__node")).toHaveCount(5);
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
-  await expect(page.locator(".view-lines")).toContainText("return 3;");
+  await expect(
+    editorLines(page.getByLabel("ARC code editor", { exact: true })),
+  ).toContainText("return 3;");
   await page.getByRole("button", { name: "Graph view", exact: true }).click();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(

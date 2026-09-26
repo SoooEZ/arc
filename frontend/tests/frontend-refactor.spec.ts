@@ -1,3 +1,4 @@
+import { setEditorText } from "./helpers/editor";
 import {
   expect,
   test,
@@ -273,9 +274,11 @@ test("changing a pinned source version removes obsolete mappings and retains com
   await page.getByLabel("Source accountId", { exact: true }).fill("account-1");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   // Caller override keeps this contract regression independent of external HTTP services.
-  await page
-    .getByLabel("Test input JSON", { exact: true })
-    .fill('{"amount":7}');
+  await setEditorText(
+    page,
+    page.getByLabel("Test input JSON", { exact: true }),
+    '{"amount":7}',
+  );
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("7");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();

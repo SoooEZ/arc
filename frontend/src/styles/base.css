@@ -41,6 +41,10 @@ p {
 code,
 pre {
   font-family: "JetBrains Mono", monospace;
+  font-variant-ligatures: none;
+  font-feature-settings:
+    "liga" 0,
+    "calt" 0;
 }
 pre {
   white-space: pre-wrap;

@@ -62,8 +62,20 @@
   text-transform: none;
   color: #a0b68a;
 }
-.test-input .json-input {
+.execution-json-editor {
+  height: 190px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e5edd9;
+  border-radius: 6px;
+  background: #fcfdfc;
+}
+.test-input .execution-json-editor {
   flex: 1;
+  min-height: 0;
+  height: auto;
+  border: 0;
+  border-radius: 0;
 }
 .json-input .MuiOutlinedInput-notchedOutline {
   border: 0 !important;

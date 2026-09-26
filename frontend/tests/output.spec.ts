@@ -1,3 +1,4 @@
+import { editorLines, setEditorText } from "./helpers/editor";
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition } from "../src/types";
 async function select(page: Page, label: string, option: string | RegExp) {
@@ -115,7 +116,11 @@ test("Output selects values of any type and round-trips typed constants through 
     .fill('[1, "two", false, null]');
   await run([1, "two", false, null]);
   await select(page, "Return value · value source", "Expression");
-  await page.getByLabel("Return value", { exact: true }).fill("total + 5");
+  await setEditorText(
+    page,
+    page.getByLabel("Return value", { exact: true }),
+    "total + 5",
+  );
   await run(25);
   await select(page, "Return value · value source", "Constant");
   await select(page, "Constant type", "string");
@@ -133,9 +138,9 @@ test("Output selects values of any type and round-trips typed constants through 
     .getByRole("button", { name: "Close test panel", exact: true })
     .click();
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
-  await expect(page.locator(".view-lines")).toContainText(
-    `return ${JSON.stringify(text)}`,
-  );
+  await expect(
+    editorLines(page.getByLabel("ARC code editor", { exact: true })),
+  ).toContainText(`return ${JSON.stringify(text)}`);
   await page.getByRole("button", { name: "Graph view", exact: true }).click();
   await expect(page.getByLabel("Return value", { exact: true })).toHaveValue(
     text,

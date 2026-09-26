@@ -123,11 +123,6 @@
   font-weight: 400;
   color: #afc096;
 }
-.api-request .json-input {
-  border: 1px solid #e5edd9;
-  border-radius: 6px;
-  overflow: hidden;
-}
 .api-request > .MuiButton-root {
   align-self: flex-start;
   font-size: 10px;

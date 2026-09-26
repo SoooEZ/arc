@@ -28,7 +28,7 @@ monaco.languages.setMonarchTokensProvider("arc", {
   tokenizer: {
     root: [
       [/\/\/.*$/, "comment"],
-      [/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/, "string"],
+      [/"([^"\\]|\\.)*("|$)|'([^'\\]|\\.)*('|$)/, "string"],
       [
         /\b(schema|inputs|node|at|let|when|select|case|equals|field|return|use|version|bind|as|next|edge|source|required|optional|default)\b/,
         "keyword",

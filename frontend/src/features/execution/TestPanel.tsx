@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Button, IconButton, Tab, Tabs, TextField } from "@mui/material";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { Button, IconButton, Tab, Tabs } from "@mui/material";
 import { Play, Terminal, X } from "lucide-react";
 import { studioApi } from "../../api/studio";
 import type { GraphProblem } from "../../api/errors";
@@ -14,6 +14,8 @@ import type { Definition, Execution } from "../../types";
 import ExecutionError from "./ExecutionError";
 import ExecutionResult from "./ExecutionResult";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
+
+const InputJsonEditor = lazy(() => import("./InputJsonEditor"));
 
 export default function TestPanel({
   definition,
@@ -40,7 +42,7 @@ export default function TestPanel({
   const [tab, setTab] = useState(0);
   const [trace, setTrace] = useState(true);
   const [timeoutMs, setTimeoutMs] = useState(30000);
-  const inputElement = useRef<HTMLTextAreaElement>(null);
+  const [inputFocusRequest, setInputFocusRequest] = useState(0);
   const inputSchema = JSON.stringify(definition.inputs);
   const execution = useExecutionRequest(
     JSON.stringify([definition, input, trace, timeoutMs]),
@@ -107,16 +109,20 @@ export default function TestPanel({
             <Tab label="cURL" />
           </Tabs>
           {tab === 0 ? (
-            <TextField
-              inputRef={inputElement}
-              slotProps={{ htmlInput: { "aria-label": "Test input JSON" } }}
-              multiline
-              rows={6}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="json-input"
-              spellCheck={false}
-            />
+            <Suspense
+              fallback={
+                <div className="execution-json-editor" role="status">
+                  Loading JSON editor…
+                </div>
+              }
+            >
+              <InputJsonEditor
+                label="Test input JSON"
+                value={input}
+                onChange={setInput}
+                focusRequest={inputFocusRequest}
+              />
+            </Suspense>
           ) : (
             <div className="curl-preview">
               {!publishedVersion && (
@@ -149,7 +155,7 @@ export default function TestPanel({
               onOpenReference={onOpenReference}
               onEditInputs={() => {
                 setTab(0);
-                requestAnimationFrame(() => inputElement.current?.focus());
+                setInputFocusRequest((request) => request + 1);
               }}
             />
           ) : result ? (

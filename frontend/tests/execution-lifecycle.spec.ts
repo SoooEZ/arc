@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Execution } from "../src/types";
+import { editorLines, setEditorText } from "./helpers/editor";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -94,9 +95,11 @@ test("changing preview inputs discards the old request and allows a current exec
   try {
     await page.getByRole("button", { name: "Run test", exact: true }).click();
     await expect.poll(pending.held).toBe(true);
-    await page
-      .getByLabel("Test input JSON", { exact: true })
-      .fill('{"amount":3}');
+    await setEditorText(
+      page,
+      page.getByLabel("Test input JSON", { exact: true }),
+      '{"amount":3}',
+    );
     await page.getByRole("button", { name: "Run test", exact: true }).click();
     await expect(page.getByTestId("test-result")).toHaveText("6");
     pending.release();
@@ -255,7 +258,8 @@ test("save commands disable all graph mutation actions until the submitted draft
   await page
     .locator('.react-flow__node[data-id="calculate"] .graph-node')
     .click();
-  await page.getByLabel("Expression", { exact: true }).fill("amount * 3");
+  const expression = page.getByLabel("Expression", { exact: true });
+  await setEditorText(page, expression, "amount * 3");
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -276,12 +280,11 @@ test("save commands disable all graph mutation actions until the submitted draft
     await expect(
       page.getByRole("button", { name: "Add node", exact: true }),
     ).toBeDisabled();
-    await expect(page.getByLabel("Expression", { exact: true })).toBeDisabled();
+    await setEditorText(page, expression, "amount * 4");
+    await expect(editorLines(expression)).toHaveText("amount * 3");
     release();
     await expect(page.getByText("All changes saved")).toBeVisible();
-    await expect(page.getByLabel("Expression", { exact: true })).toHaveValue(
-      "amount * 3",
-    );
+    await expect(editorLines(expression)).toHaveText("amount * 3");
   } finally {
     release();
   }

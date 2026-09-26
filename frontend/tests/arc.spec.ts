@@ -1,3 +1,4 @@
+import { setEditorText } from "./helpers/editor";
 import { expect, test } from "@playwright/test";
 
 test("library, graph preview, reference navigation, and published API execution", async ({
@@ -24,16 +25,22 @@ test("library, graph preview, reference navigation, and published API execution"
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("120");
   await expect(page.locator(".node-visited")).toHaveCount(4);
-  await page
-    .locator(".test-input textarea:not([aria-hidden])")
-    .fill('{"orderTotal": 150, "customerTier": "standard"}');
+  await setEditorText(
+    page,
+    page.getByLabel("Test input JSON", { exact: true }),
+    '{"orderTotal": 150, "customerTier": "standard"}',
+  );
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("135");
-  await page
-    .locator(".test-input textarea:not([aria-hidden])")
-    .fill('{"orderTotal": "bad", "customerTier": "standard"}');
+  await setEditorText(
+    page,
+    page.getByLabel("Test input JSON", { exact: true }),
+    '{"orderTotal": "bad", "customerTier": "standard"}',
+  );
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("must be number");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "must be number" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Close test panel" }).click();
   await page.getByRole("button", { name: "Node outline" }).click();
   await page
@@ -92,9 +99,11 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
     .locator(".node-outline")
     .getByRole("button", { name: /Calculate/ })
     .click();
-  await page
-    .getByLabel("Expression", { exact: true })
-    .fill("round(amount * 1.25, 2)");
+  await setEditorText(
+    page,
+    page.getByLabel("Expression", { exact: true }),
+    "round(amount * 1.25, 2)",
+  );
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(
     page.getByText("All changes saved", { exact: false }),
@@ -128,7 +137,11 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
     .click();
   await page.getByLabel("amount * · value source", { exact: true }).click();
   await page.getByRole("option", { name: "Expression", exact: true }).click();
-  await page.getByLabel("amount *", { exact: true }).fill("total");
+  await setEditorText(
+    page,
+    page.getByLabel("amount *", { exact: true }),
+    "total",
+  );
   await page.getByLabel("rate * · value source", { exact: true }).click();
   await page.getByRole("option", { name: "Constant", exact: true }).click();
   await page.getByLabel("rate *", { exact: true }).fill("0.2");
@@ -151,8 +164,8 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
     );
     await expect(from).toBeVisible();
     await expect(to).toBeVisible();
-    // Arrange completes before React Flow paints its fitted viewport. Both
-    // handles must be inside the canvas before starting a connection gesture.
+    // Fit the current measured nodes before testing the connection gesture.
+    await page.getByRole("button", { name: "Fit View", exact: true }).click();
     await expect
       .poll(async () => {
         const canvas = await page.locator(".flow-container").boundingBox();

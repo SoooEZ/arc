@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, RuleSummary } from "../src/types";
+import { editorLines, setEditorText } from "./helpers/editor";
 
 const ruleId = "catalog-pricing";
 const publishedAt = "2026-09-25T12:00:00Z";
@@ -216,9 +217,11 @@ test("a chosen historical pin survives discovery of a newer published version", 
   await expect(
     page.getByRole("button", { name: "Execute rule", exact: true }),
   ).toBeEnabled();
-  await page
-    .getByLabel("API input JSON", { exact: true })
-    .fill('{"amount":123}');
+  await setEditorText(
+    page,
+    page.getByLabel("API input JSON", { exact: true }),
+    '{"amount":123}',
+  );
 
   state.version = 4;
   const refreshed = page.waitForResponse(
@@ -251,7 +254,7 @@ test("paging history retains the newest implicit version learned after stale cat
     page.getByRole("button", { name: "Execute rule", exact: true }),
   ).toBeEnabled();
   const inputs = page.getByLabel("API input JSON", { exact: true });
-  await inputs.fill('{"amount":456}');
+  await setEditorText(page, inputs, '{"amount":456}');
 
   const historyPages = page.getByRole("navigation", {
     name: "Published versions pages",
@@ -262,7 +265,7 @@ test("paging history retains the newest implicit version learned after stale cat
   await expect(
     page.getByRole("combobox", { name: "Version", exact: true }),
   ).toHaveText("v25");
-  await expect(inputs).toHaveValue('{"amount":456}');
+  await expect(editorLines(inputs)).toHaveText('{"amount":456}');
   await executeVersion(page, 25);
 
   expect(state.executions[0]).toMatchObject({
@@ -281,7 +284,7 @@ test("retrying metadata for the same rule and version preserves edited execution
     page.getByRole("button", { name: "Execute rule", exact: true }),
   ).toBeEnabled();
   const inputs = page.getByLabel("API input JSON", { exact: true });
-  await inputs.fill('{"amount":987}');
+  await setEditorText(page, inputs, '{"amount":987}');
 
   state.failCatalogOnce = true;
   await page
@@ -302,7 +305,7 @@ test("retrying metadata for the same rule and version preserves edited execution
   await expect(
     page.getByRole("button", { name: "Retry loading", exact: true }),
   ).toHaveCount(0);
-  await expect(inputs).toHaveValue('{"amount":987}');
+  await expect(editorLines(inputs)).toHaveText('{"amount":987}');
   await executeVersion(page, 1);
 
   expect(state.executions[0].inputs).toEqual({ amount: 987 });
@@ -319,7 +322,7 @@ test("runtime errors keep edited inputs and offer execution rather than a metada
     page.getByRole("button", { name: "Execute rule", exact: true }),
   ).toBeEnabled();
   const inputs = page.getByLabel("API input JSON", { exact: true });
-  await inputs.fill('{"amount":321}');
+  await setEditorText(page, inputs, '{"amount":321}');
   await page.getByRole("button", { name: "Execute rule", exact: true }).click();
   await expect(
     page.getByText("Amount is invalid for this rule", { exact: true }),
@@ -327,7 +330,7 @@ test("runtime errors keep edited inputs and offer execution rather than a metada
   await expect(
     page.getByRole("button", { name: "Retry loading", exact: true }),
   ).toHaveCount(0);
-  await expect(inputs).toHaveValue('{"amount":321}');
+  await expect(editorLines(inputs)).toHaveText('{"amount":321}');
 
   state.executionError = false;
   await executeVersion(page, 1);

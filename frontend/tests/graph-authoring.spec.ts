@@ -1,3 +1,4 @@
+import { editorLines } from "./helpers/editor";
 import {
   expect,
   test,
@@ -100,9 +101,9 @@ test("Graph condition and formula editors expose functions, insertion, validatio
     dialog.getByRole("button", { name: "Apply expression" }),
   ).toBeEnabled();
   await dialog.getByRole("button", { name: "Apply expression" }).click();
-  await expect(page.getByLabel("Expression", { exact: true })).toHaveValue(
-    "SUM(MAP(items, item, ROUND(item * 1.25, 2)))",
-  );
+  await expect(
+    editorLines(page.getByLabel("Expression", { exact: true })),
+  ).toHaveText("SUM(MAP(items, item, ROUND(item * 1.25, 2)))");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("37.5");
@@ -120,9 +121,9 @@ test("Graph condition and formula editors expose functions, insertion, validatio
     dialog.getByRole("button", { name: "Apply expression" }),
   ).toBeDisabled();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(page.getByLabel("Expression", { exact: true })).toHaveValue(
-    "SUM(MAP(items, item, ROUND(item * 1.25, 2)))",
-  );
+  await expect(
+    editorLines(page.getByLabel("Expression", { exact: true })),
+  ).toHaveText("SUM(MAP(items, item, ROUND(item * 1.25, 2)))");
   await save(page, request, id);
 });
 
@@ -180,9 +181,9 @@ test("Switch and Transform survive Graph/code edits, case reordering and version
     page.getByRole("button", { name: "Arrange graph", exact: true }),
   ).toBeEnabled();
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
-  await expect(page.locator(".view-lines")).toContainText(
-    'field "displayName"',
-  );
+  await expect(
+    editorLines(page.getByLabel("ARC code editor", { exact: true })),
+  ).toContainText('field "displayName"');
   const rendered = await (
     await request.post("/api/studio/render", {
       data: (await (await request.get(`/api/rules/${id}`)).json()).draft,
@@ -309,8 +310,8 @@ test("Transform mappings can become a whole array expression without losing the 
   });
   await dialog.getByRole("button", { name: "Apply expression" }).click();
   await expect(
-    page.getByLabel("Transform expression", { exact: true }),
-  ).toHaveValue("MAP(items, item, TO_NUMBER(item))");
+    editorLines(page.getByLabel("Transform expression", { exact: true })),
+  ).toHaveText("MAP(items, item, TO_NUMBER(item))");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("[1.25,2.5]");
@@ -320,8 +321,8 @@ test("Transform mappings can become a whole array expression without losing the 
   ).toBeNull();
   await page.reload();
   await expect(
-    page.getByLabel("Transform expression", { exact: true }),
-  ).toHaveValue("MAP(items, item, TO_NUMBER(item))");
+    editorLines(page.getByLabel("Transform expression", { exact: true })),
+  ).toHaveText("MAP(items, item, TO_NUMBER(item))");
 });
 
 test("late expression checks cannot override newer text or reenable Apply", async ({

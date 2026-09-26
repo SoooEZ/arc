@@ -1,3 +1,4 @@
+import { editorLines, setEditorText } from "./helpers/editor";
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
 const node = (
@@ -95,12 +96,20 @@ test("settings modal and runtime/validation errors jump to the failing node from
   await expect(page.locator('.react-flow__node[data-id="bad"]')).toHaveClass(
     /selected/,
   );
-  await page.getByLabel("Expression", { exact: true }).fill("missing + 1");
+  await setEditorText(
+    page,
+    page.getByLabel("Expression", { exact: true }),
+    "missing + 1",
+  );
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Show problem · bad", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Expression", { exact: true }).fill("1 / 0");
+  await setEditorText(
+    page,
+    page.getByLabel("Expression", { exact: true }),
+    "1 / 0",
+  );
   await page
     .getByRole("button", { name: "Close test panel", exact: true })
     .click();
@@ -343,8 +352,12 @@ test("condition string builder quotes text and graph connections retain multiple
     result.trace.filter((s: { nodeId: string }) => s.nodeId === "base"),
   ).toHaveLength(1);
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
-  await expect(page.locator(".view-lines")).toContainText('next -> "shipping"');
-  await expect(page.locator(".view-lines")).toContainText('next -> "tax"');
+  await expect(
+    editorLines(page.getByLabel("ARC code editor", { exact: true })),
+  ).toContainText('next -> "shipping"');
+  await expect(
+    editorLines(page.getByLabel("ARC code editor", { exact: true })),
+  ).toContainText('next -> "tax"');
 });
 
 test("errors inside reused rules open the failing published node in a modal", async ({
