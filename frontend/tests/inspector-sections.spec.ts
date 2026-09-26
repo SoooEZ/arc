@@ -56,7 +56,7 @@ test("inspector accordions start expanded and variable help previews, pins and d
     exact: true,
   });
   const result = sidebar.getByRole("button", {
-    name: "Output Result As",
+    name: "Output As",
     exact: true,
   });
   await expect(expression).toHaveAttribute("aria-expanded", "true");
@@ -202,7 +202,7 @@ test("node edit modal shares section controls without losing pending form values
     .getByLabel("Result variable", { exact: true })
     .fill("quoted_price");
   const result = dialog.getByRole("button", {
-    name: "Output Result As",
+    name: "Output As",
     exact: true,
   });
   await result.click();

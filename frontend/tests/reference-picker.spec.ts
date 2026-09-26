@@ -10,7 +10,10 @@ async function fixture(request: APIRequestContext, versions = 2) {
   const id = `reference-picker-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const definition: Definition = {
     schemaVersion: 1,
-    inputs: [{ name: "amount", type: "NUMBER", required: true }],
+    inputs: [
+      { name: "amount", type: "NUMBER", required: true },
+      { name: "rate", type: "NUMBER", required: false, defaultValue: 0.2 },
+    ],
     nodes: [
       {
         id: "input",
@@ -97,6 +100,80 @@ const deferred = () => {
   });
   return { promise, release };
 };
+
+test("reference header actions stay separate from collapse and parameter cards describe the pinned contract", async ({
+  page,
+  request,
+}) => {
+  const { parent, child } = await fixture(request, 1);
+  await page.goto(`/#/rules/${parent.id}?node=ref`);
+  const inspector = sidebar(page);
+  const heading = inspector.locator(".inspector-section-heading").filter({
+    has: page.getByRole("button", { name: "Select Rule", exact: true }),
+  });
+  const section = heading.getByRole("button", {
+    name: "Select Rule",
+    exact: true,
+  });
+  const info = heading.getByRole("button", { name: "About pinned versions" });
+  const open = heading.getByRole("button", { name: "Open referenced rule" });
+  await expect(section).toHaveAttribute("aria-expanded", "true");
+  await expect(heading.locator("button button")).toHaveCount(0);
+  await expect(inspector.locator(".inspector-note")).toHaveCount(0);
+  await info.hover();
+  await expect(
+    page.getByRole("tooltip", {
+      name: "This reference stays on the selected version, even when that rule is updated.",
+    }),
+  ).toBeVisible();
+  await info.click();
+  await expect(section).toHaveAttribute("aria-expanded", "true");
+  await open.hover();
+  await expect(
+    page.getByRole("tooltip", {
+      name: "Open the selected published version in a rule viewer.",
+    }),
+  ).toBeVisible();
+  const parameters = inspector.getByRole("region", {
+    name: "Parameters for Rule section",
+    exact: true,
+  });
+  const amount = parameters.getByRole("group", { name: "Parameter amount" });
+  const rate = parameters.getByRole("group", { name: "Parameter rate" });
+  await expect(amount).toContainText("Required");
+  await expect(amount).toContainText("Type: number");
+  await expect(rate).toContainText("Optional");
+  await expect(rate).toContainText("Type: number");
+  await expect(rate).toContainText("Default: 0.2");
+  await expect(
+    inspector.getByRole("button", { name: "Output As", exact: true }),
+  ).toBeVisible();
+  await page.mouse.move(70, 70);
+  await page.screenshot({
+    path: test.info().outputPath("reference-cards-desktop.png"),
+    animations: "disabled",
+  });
+  await section.click();
+  await expect(section).toHaveAttribute("aria-expanded", "false");
+  await open.click();
+  const viewer = page.getByRole("dialog", { name: "Referenced rule viewer" });
+  await expect(
+    viewer.getByRole("heading", { name: child.name, exact: true }),
+  ).toBeVisible();
+  await viewer.getByRole("button", { name: "Close all", exact: true }).click();
+  await expect(section).toHaveAttribute("aria-expanded", "false");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await rate.scrollIntoViewIfNeeded();
+  for (const card of [amount, rate]) {
+    const bounds = (await card.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+  }
+  await page.screenshot({
+    path: test.info().outputPath("reference-cards-mobile.png"),
+    animations: "disabled",
+  });
+});
 
 test("reference typeahead preserves off-page pins, appends without focus or scroll jumps, and searches actual versions", async ({
   page,

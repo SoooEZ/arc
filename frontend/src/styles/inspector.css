@@ -339,6 +339,37 @@
   font-size: 9px;
   color: #96aa81;
 }
+.reference-parameter-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #526e60;
+  font-size: 11px;
+}
+.reference-parameter-heading > svg {
+  flex-shrink: 0;
+}
+.reference-parameter-heading > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.reference-parameter-heading > span {
+  margin-left: auto;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #edf2ee;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.reference-parameter-type {
+  margin-top: -10px;
+  color: #6f8175;
+  font-size: 10px;
+}
+.reference-parameter-type code {
+  color: #405b4c;
+}
 .node-edit-dialog .MuiDialog-paper {
   height: min(820px, calc(100% - 64px));
 }
@@ -452,13 +483,15 @@
   padding: 3px 5px;
   font-size: 10px;
 }
-.inspector-section-actions .inspector-variables-button {
+.inspector-section-actions .inspector-variables-button,
+.inspector-section-actions .inspector-reference-action {
   width: 30px;
   height: 30px;
   color: #526e60;
   border-radius: 7px;
 }
 .inspector-section-actions .inspector-variables-button:hover,
+.inspector-section-actions .inspector-reference-action:hover,
 .inspector-section-actions .inspector-variables-button[aria-expanded="true"] {
   background: #eaf2ee;
   color: #17674f;

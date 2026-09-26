@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PagedAutocomplete from "../../../components/PagedAutocomplete";
-import { Alert, Button } from "@mui/material";
-import { ArrowUpRight, Info } from "lucide-react";
+import { Alert, IconButton, Tooltip } from "@mui/material";
+import { ArrowUpRight, Braces, Info } from "lucide-react";
 import type { RuleSummary, Version, VersionSummary } from "../../../types";
 import ValueBinding from "../../expressions/ValueBinding";
 import { ruleApi } from "../../../api/rules";
@@ -49,7 +49,47 @@ export default function ReferenceFields({
   const refError = selectedRule.error || detail.error;
   return (
     <>
-      <InspectorSection title="Rule reference">
+      <InspectorSection
+        title="Select Rule"
+        actions={
+          <>
+            <Tooltip
+              title={
+                node.ruleId && node.version
+                  ? "Open the selected published version in a rule viewer."
+                  : "Select a published rule and version to open it."
+              }
+            >
+              <span>
+                <IconButton
+                  className="inspector-reference-action"
+                  size="small"
+                  aria-label="Open referenced rule"
+                  disabled={!node.ruleId || !node.version}
+                  onClick={() => {
+                    if (node.ruleId && node.version)
+                      onOpenReference({
+                        ruleId: node.ruleId,
+                        version: node.version,
+                      });
+                  }}
+                >
+                  <ArrowUpRight size={16} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="This reference stays on the selected version, even when that rule is updated.">
+              <IconButton
+                className="inspector-reference-action"
+                size="small"
+                aria-label="About pinned versions"
+              >
+                <Info size={16} />
+              </IconButton>
+            </Tooltip>
+          </>
+        }
+      >
         <PagedAutocomplete<RuleChoice>
           label="Published rule"
           owner="published-rules"
@@ -105,49 +145,46 @@ export default function ReferenceFields({
             }}
           />
         )}
-        {node.ruleId && node.version && (
-          <Button
-            size="small"
-            endIcon={<ArrowUpRight size={14} />}
-            onClick={() =>
-              onOpenReference({
-                ruleId: node.ruleId!,
-                version: node.version!,
-              })
-            }
-          >
-            Open referenced rule
-          </Button>
-        )}
-        <div className="inspector-note">
-          <Info size={15} />
-          <p>
-            This reference stays on the selected version, even when that rule is
-            updated.
-          </p>
-        </div>
       </InspectorSection>
       {child && (
-        <InspectorSection title="Parameter mapping" variables={variables}>
+        <InspectorSection title="Parameters for Rule" variables={variables}>
           <p className="muted-copy">
             Pass a variable, a value, or an expression into each input.
           </p>
           {child.definition.inputs.map((input) => (
-            <ValueBinding
+            <div
+              className="input-schema-card reference-parameter-card"
+              role="group"
+              aria-label={`Parameter ${input.name}`}
               key={`${node.id}:${node.ruleId}:${node.version}:${input.name}`}
-              label={`${input.name}${input.required ? " *" : ""}`}
-              type={input.type}
-              value={node.bindings?.[input.name]}
-              variables={variables}
-              disabled={readOnly}
-              helperText={`${input.type.toLowerCase()}${input.defaultValue != null ? ` · default: ${JSON.stringify(input.defaultValue)}` : ""}`}
-              onChange={(value) => {
-                const bindings = { ...node.bindings };
-                if (value !== undefined) bindings[input.name] = value;
-                else delete bindings[input.name];
-                patch({ bindings });
-              }}
-            />
+            >
+              <div className="reference-parameter-heading">
+                <Braces size={14} />
+                <strong>{input.name}</strong>
+                <span>{input.required ? "Required" : "Optional"}</span>
+              </div>
+              <div className="reference-parameter-type">
+                Type: <code>{input.type.toLowerCase()}</code>
+              </div>
+              <ValueBinding
+                label={`${input.name}${input.required ? " *" : ""}`}
+                type={input.type}
+                value={node.bindings?.[input.name]}
+                variables={variables}
+                disabled={readOnly}
+                helperText={
+                  input.defaultValue != null
+                    ? `Default: ${JSON.stringify(input.defaultValue)}`
+                    : undefined
+                }
+                onChange={(value) => {
+                  const bindings = { ...node.bindings };
+                  if (value !== undefined) bindings[input.name] = value;
+                  else delete bindings[input.name];
+                  patch({ bindings });
+                }}
+              />
+            </div>
           ))}
         </InspectorSection>
       )}
