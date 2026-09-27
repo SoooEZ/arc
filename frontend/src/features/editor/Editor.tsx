@@ -278,7 +278,6 @@ function EditorContent({
                 readOnly={readOnly || !!busy}
                 pending={sourceDirty}
                 onBuild={build}
-                onGraph={() => void switchView()}
                 onSave={() => void action("save")}
               />
             ) : (

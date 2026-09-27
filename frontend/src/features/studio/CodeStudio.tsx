@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { Button } from "@mui/material";
-import { Check, Code2, GitBranch } from "lucide-react";
+import { Check, Code2 } from "lucide-react";
 import { monaco } from "./arcLanguage";
 import { studioApi } from "../../api/studio";
 import type { Definition, Diagnostic, FunctionEntry, Rule } from "../../types";
@@ -22,7 +22,6 @@ interface Props {
   readOnly: boolean;
   pending: boolean;
   onBuild: () => Promise<unknown>;
-  onGraph: () => void;
   onSave: () => void;
 }
 export default function CodeStudio({
@@ -34,7 +33,6 @@ export default function CodeStudio({
   readOnly,
   pending,
   onBuild,
-  onGraph,
   onSave,
 }: Props) {
   const { editor, model, onMount, reveal } = useArcEditor(diagnostics);
@@ -122,13 +120,6 @@ export default function CodeStudio({
               startIcon={<Check size={14} />}
             >
               Build graph
-            </Button>
-            <Button
-              size="small"
-              onClick={onGraph}
-              startIcon={<GitBranch size={14} />}
-            >
-              Open graph
             </Button>
           </div>
         </div>

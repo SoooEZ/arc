@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
-  acceptsParameterNameEdit,
-  parameterNameError,
+  acceptsIdentifierEdit,
+  identifierError,
 } from "../../src/domain/identifiers";
 import {
   createSourceDraft,
@@ -10,9 +10,9 @@ import {
   sourceParameterBufferError,
 } from "../../src/features/sources/model";
 
-test("parameter editing permits keyword prefixes and clearing, but rejects invalid syntax intact", () => {
+test("identifier editing permits keyword prefixes and clearing, but rejects invalid syntax intact", () => {
   for (const name of ["", "a", "_", "true", "trueValue", "SUM", "a".repeat(64)])
-    expect(acceptsParameterNameEdit(name), name).toBe(true);
+    expect(acceptsIdentifierEdit(name), name).toBe(true);
   for (const name of [
     "first name",
     "first\tname",
@@ -20,15 +20,17 @@ test("parameter editing permits keyword prefixes and clearing, but rejects inval
     "first\u00a0name",
     "$amount",
     "amount$",
+    "@amount",
+    "amount@",
     "1amount",
     "a-b",
     "a".repeat(65),
   ])
-    expect(acceptsParameterNameEdit(name), name).toBe(false);
+    expect(acceptsIdentifierEdit(name), name).toBe(false);
   for (const name of ["", "true", "FALSE", "Null", "and", "OR"])
-    expect(parameterNameError(name), name).not.toBeNull();
+    expect(identifierError(name), name).not.toBeNull();
   for (const name of ["SUM", "trueValue", "amount_1", "_amount"])
-    expect(parameterNameError(name), name).toBeNull();
+    expect(identifierError(name), name).toBeNull();
 });
 
 test("source declaration validation rejects invalid names without changing raw buffers or defaults", () => {
@@ -38,6 +40,7 @@ test("source declaration validation rejects invalid names without changing raw b
     "account name",
     "account$name",
     "$account",
+    "account@name",
     "account\tname",
     "account\u00a0name",
     "AND",

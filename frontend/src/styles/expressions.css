@@ -33,6 +33,17 @@
   box-shadow: 0 8px 30px rgb(22 47 32 / 14%);
   font-size: 12px;
   line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.expression-variable-popper {
+  z-index: 1500;
+}
+.expression-variable-tooltip > div {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .expression-variable-tooltip .MuiTooltip-arrow {
   color: #fff;
@@ -42,6 +53,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-shrink: 0;
 }
 .expression-variable-empty,
 .expression-variable-hint {
@@ -61,6 +73,8 @@
   list-style: none;
   max-height: min(360px, 55vh);
   overflow-y: auto;
+  min-height: 0;
+  flex-shrink: 1;
 }
 .expression-variable-list > li {
   padding: 9px 0;
@@ -96,4 +110,22 @@
   color: #687b6f;
   font-size: 10px;
   overflow-wrap: anywhere;
+}
+.value-binding-variable {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.value-binding-variable > strong {
+  font-weight: 700;
+}
+.value-binding-variable-from {
+  color: #68776d;
+}
+.value-binding-variable > em {
+  color: inherit;
+  font-style: italic;
+  font-synthesis: style;
 }

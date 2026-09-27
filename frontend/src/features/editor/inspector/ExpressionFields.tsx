@@ -26,19 +26,11 @@ export default function ExpressionFields({
   };
   return (
     <InspectorSection
-      title={
-        node.type === "CONDITION"
-          ? "Condition"
-          : node.type === "OUTPUT"
-            ? "Output As"
-            : "Expression"
-      }
+      title={node.type === "CONDITION" ? "Condition" : "Expression"}
       help={
         node.type === "CONDITION"
           ? "Choose a comparison or write an expression that returns true or false to select the next branch."
-          : node.type === "OUTPUT"
-            ? "Choose the value returned when execution reaches this Output, using a variable, constant or expression."
-            : "Calculate a value using available inputs, upstream results, functions and pinned Formula calls."
+          : "Calculate a value using available inputs, upstream results, functions and pinned Formula calls."
       }
       actions={
         node.type === "CONDITION" &&
@@ -53,23 +45,7 @@ export default function ExpressionFields({
         )
       }
     >
-      {node.type === "OUTPUT" ? (
-        <>
-          <ValueBinding
-            key={node.id}
-            label="Return value"
-            type="ANY"
-            value={node.expression ?? undefined}
-            variables={variables}
-            disabled={readOnly}
-            optional={false}
-            onChange={(value) => patch({ expression: value ?? "" })}
-          />
-          <div className="expression-preview">
-            <code>{node.expression || "Choose a return value"}</code>
-          </div>
-        </>
-      ) : simpleCondition ? (
+      {simpleCondition ? (
         <div className="condition-builder">
           <Autocomplete
             freeSolo

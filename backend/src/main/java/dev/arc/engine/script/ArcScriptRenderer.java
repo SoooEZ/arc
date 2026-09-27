@@ -107,10 +107,13 @@ final class ArcScriptRenderer {
           out.append("  when ")
               .append(node.expression() == null ? "true" : node.expression())
               .append(";\n");
-      case "OUTPUT" ->
-          out.append("  return ")
-              .append(node.expression() == null ? "null" : node.expression())
-              .append(";\n");
+      case "OUTPUT" -> {
+        out.append("  return ")
+            .append(node.expression() == null ? "null" : node.expression())
+            .append(";\n");
+        if (node.outputName() != null && !node.outputName().isEmpty())
+          out.append("  as ").append(node.outputName()).append(";\n");
+      }
       case "REFERENCE" -> {
         if (node.ruleId() != null && node.version() != null)
           out.append("  use ")

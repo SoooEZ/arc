@@ -4,7 +4,8 @@ import {
   setSwitchDefaultReturn,
   switchDefaultOutput,
 } from "../../../domain/switchBranches";
-import ValueBinding from "../../expressions/ValueBinding";
+import { patchGraphNode } from "../../../domain/graph";
+import OutputValueFields from "./OutputValueFields";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 
@@ -34,24 +35,16 @@ export default function SwitchDefaultReturn({
       <p className="muted-copy">Default runs when every case fails to match.</p>
       {output ? (
         <>
-          <ValueBinding
+          <OutputValueFields
             key={output.id}
+            node={output}
             label="Default return value"
-            type="ANY"
-            value={output.expression ?? undefined}
             variables={variables}
-            disabled={readOnly}
-            optional={false}
-            onChange={(value) =>
+            readOnly={readOnly}
+            patch={(patch) =>
               onDefinitionChange((current) =>
                 switchDefaultOutput(current, node.id)?.id === output.id
-                  ? setSwitchDefaultReturn(
-                      current,
-                      node.id,
-                      value ?? "",
-                      output.id,
-                      "",
-                    )
+                  ? patchGraphNode(current, output.id, patch)
                   : current,
               )
             }

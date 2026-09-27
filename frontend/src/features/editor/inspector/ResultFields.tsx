@@ -1,6 +1,6 @@
-import { TextField } from "@mui/material";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
+import IdentifierField from "./IdentifierField";
 
 export default function ResultFields({
   node,
@@ -13,10 +13,10 @@ export default function ResultFields({
       title="Output As"
       help="Name this node’s result so connected downstream nodes can use it in variables and expressions."
     >
-      <TextField
+      <IdentifierField
         label="Result variable"
         value={node.output || ""}
-        onChange={(event) => patch({ output: event.target.value })}
+        onChange={(output) => patch({ output })}
         helperText="Use this variable in later nodes."
         disabled={readOnly}
       />

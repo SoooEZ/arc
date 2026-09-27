@@ -40,18 +40,23 @@ class SourceServiceTest {
   }
 
   @Test
-  void sourceParameterNamesRejectWhitespaceAndDollarBeforeStorage() {
+  void sourceParameterNamesRejectWhitespaceAndFunctionPrefixesBeforeStorage() {
     var repository = mock(SourceRepository.class);
     var adapter = mock(SourceAdapter.class);
     when(adapter.kind()).thenReturn("MEMORY");
     var service =
         new SourceService(repository, new SourceValidator(new SourceAdapters(List.of(adapter))));
-    for (String name : List.of("unit price", "price\t", "price\u00a0", "$ROUND", "round$")) {
+    for (String name :
+        List.of("unit price", "price\t", "price\u00a0", "$ROUND", "round$", "@key", "key@")) {
       var definition =
           new SourceDefinition(
               "MEMORY", null, List.of(new Input(name, "NUMBER", true, null)), null, null, 0);
       assertThatThrownBy(
               () -> service.create(new SourceService.Create("memory", "Memory", definition)))
+          .as(name)
+          .hasMessage("Invalid source parameter");
+      assertThatThrownBy(
+              () -> service.update("memory", new SourceService.Update("Memory", 1, definition)))
           .as(name)
           .hasMessage("Invalid source parameter");
     }

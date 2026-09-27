@@ -40,7 +40,7 @@ References always contain a rule ID and positive integer version. Publishing nev
 | `SWITCH` | Optional `selector` expression; ordered `cases`: `{id, label, expression}` | `case:<id>` for each case, then `default` |
 | `TRANSFORM` | `fields`: `{name, expression}` mappings **or** one `expression`; `output` variable | `next` |
 | `REFERENCE` | `ruleId`, `version`, `bindings`, `output` variable | `next` |
-| `OUTPUT` | `expression` returning a value | None |
+| `OUTPUT` | `expression` returning a value; optional `outputName` wraps it in a named field | None |
 
 Example reference:
 
@@ -85,7 +85,7 @@ The layout module loads on demand. Layout updates only node positions, preservin
 
 ## Validation and execution
 
-Draft saves enforce document shape, identifiers, declared input types, and size limits, but allow an unfinished graph. Publishing, validation, and preview require a complete executable graph:
+Draft saves enforce document shape, identifiers, declared input types, and size limits, but allow an unfinished graph. Supplied result-variable and Output field names follow the same identifier policy as input names; null/empty result names may remain in an unfinished draft. Publishing, validation, and preview require a complete executable graph:
 
 1. Exactly one Input node, with no incoming edges.
 2. Correct outgoing branches for each node; unique node/edge IDs and no dangling edges.
@@ -98,7 +98,9 @@ Input values are not coerced: a numeric string is not a number. Unknown input na
 
 Every outgoing handle supports multiple target nodes. The evaluator processes the DAG in topological order with node IDs as a stable tie-breaker. Each activated node runs once; skipped condition branches are resolved without evaluation. A join waits until every incoming predecessor has either executed or been skipped, then merges only the active upstream scopes. Sibling results are not visible until a connecting path brings them into scope. Execution is deterministic and sequential, not concurrent HTTP dispatch. Conditions require booleans at runtime. Result types and arithmetic operand types are also checked at runtime; graph validation does not prove all possible input values are safe (for example, a denominator may still be zero). Errors include structured `locations` with node ID, label, rule ID and version. Nested failures retain both the child location and the calling reference. The test panel can focus the current graph or open a pinned child node in the reference modal. Nested references replace the current modal view; Back restores the previous rule and selected node, and Close all returns to the unchanged parent draft.
 
-If exactly one Output is reached, its value is returned unchanged. When multiple Outputs are reached, `result` is an object keyed by their node IDs (including null values); Output labels can change without changing these keys. Existing decision trees that select one of several Outputs keep their original result shape. Reused rules follow the same convention.
+An Output normally returns its expression value unchanged. An optional `outputName` wraps that value in an object: `outputName: "total"` returns `{"total": value}`, including null, arrays and object values without flattening. Missing, null or empty `outputName` preserves the original behavior. ARC Script stores the name as a separate `as total;` statement beside `return expression;`.
+
+If exactly one Output is reached, its value is returned. When multiple Outputs are reached, `result` remains an object keyed by their node IDs; each named Output contributes its wrapped object, for example `{"outA": {"total": 42}, "outB": null}`. Display labels and output names do not replace those outer IDs. Existing unnamed Outputs and published snapshots retain their result shape. References and direct Formula calls receive the same returned value.
 
 An execution has isolated per-node variable scopes, a depth guard, an independent shared step counter, and optional bounded trace collection across nested calls. Published graphs reuse immutable compiled topology and expressions in a bounded process cache; unsaved root definitions are compiled per request. Source configuration is memoized per request, while source values remain live. Each trace step includes rule ID, version, node ID, node label, value, chosen branch, and nesting depth. Child steps appear before the reference node's returned result. `durationMicros` measures engine execution including source HTTP reads, excluding initial preparation and response serialization. `timing` additionally reports preparation and server total duration. Browser request timing includes response transfer and parsing. Trace defaults on, is capped at 256 KiB of serialized JSON and reports `traceTruncated` when only a prefix fits; the final result remains complete. A shared `timeoutMs` deadline (100–30,000 ms, default 30,000) spans preparation and nested execution, cancels active HTTP requests, and is checked at computation/IO boundaries. It does not forcibly interrupt arbitrary database/DNS calls or JVM pauses.
 
@@ -106,7 +108,7 @@ An execution has isolated per-node variable scopes, a depth guard, an independen
 
 Expressions are parsed into a small syntax tree, never delegated to a general-purpose scripting engine.
 
-Function calls use the `$` namespace, for example `$ROUND(amount, 2)` or `$SUM(SUM)`. Functions are case insensitive; variables are case sensitive and cannot contain `$` or whitespace. The prefix is mandatory for every function call, including expressions stored before this requirement. Unprefixed calls fail with a message showing the required spelling. Existing snapshots are not rewritten: update the editable draft and publish a new version, then update any pinned parents. Quoted strings retain their literal contents.
+Function calls use the `$` namespace, for example `$ROUND(amount, 2)` or `$SUM(SUM)`. Functions are case insensitive; variables are case sensitive and cannot contain whitespace, `$` or `@`. The prefix is mandatory for every function call, including expressions stored before this requirement. Unprefixed calls fail with a message showing the required spelling. Existing snapshots are not rewritten: update the editable draft and publish a new version, then update any pinned parents. Quoted strings retain their literal contents.
 
 | Feature | Examples |
 | --- | --- |
@@ -161,7 +163,7 @@ The parser and runtime are separate internal modules behind `engine.expression.E
 
 Input parameters and computed results both follow the node's incoming scope reported by `/api/variables`. Disconnected non-Input nodes have no available variables; pending or failed scope reads do not fall back to global input suggestions. Input-source parameter editors separately use the rule's declared inputs to configure their source mappings.
 
-The inspector requests `/api/variables` for the current definition and offers inputs and guaranteed connected upstream results. A mapping can select a variable, enter a typed constant, write an ARC expression, or omit the binding to use the callee’s default/source. Plain string constants are escaped into ARC literals automatically, including empty strings, quotes and backslashes. The simple condition builder and data-source mappings use the same controls. Output nodes also offer variable, constant and expression modes. Output variables are not restricted by value type, so arrays and objects can be returned directly. Output constants have an explicit number/string/boolean/array/null selector. These controls continue to store an ordinary ARC expression, preserving code/graph round trips and published version behavior. Expression mode and ARC Script retain explicit string literal syntax. Rule metadata lives in the gear dialog; applying it updates the draft and Save draft persists it.
+The inspector requests `/api/variables` for the current definition and offers inputs and guaranteed connected upstream results. A mapping can select a variable, enter a typed constant, write an ARC expression, or omit the binding to use the callee’s default/source. Plain string constants are escaped into ARC literals automatically, including empty strings, quotes and backslashes. The simple condition builder and data-source mappings use the same controls. Output nodes also offer variable, constant and expression modes. Output variables are not restricted by value type, so arrays and objects can be returned directly. Output constants have an explicit number/string/boolean/array/null selector. The optional **Output name** applies to all value sources, including the Switch default shortcut, and is serialized independently of its expression. These controls continue to store an ordinary ARC expression, preserving code/graph round trips and published version behavior. Expression mode and ARC Script retain explicit string literal syntax. Rule metadata lives in the gear dialog; applying it updates the draft and Save draft persists it.
 
 
 ## Node code and graph diagnostics

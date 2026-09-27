@@ -68,6 +68,20 @@ final class DefinitionShape {
       require(
           node.expression() == null || node.expression().length() <= 2000,
           "Expression exceeds 2,000 characters");
+      require(
+          !node.storesResult()
+              || node.output() == null
+              || node.output().isEmpty()
+              || Identifiers.isValid(node.output()),
+          node.label() + ": provide a valid result variable");
+      require(
+          node.outputName() == null || node.type().equals("OUTPUT"),
+          "Output names belong to Output nodes");
+      require(
+          node.outputName() == null
+              || node.outputName().isEmpty()
+              || Identifiers.isValid(node.outputName()),
+          node.label() + ": provide a valid output name");
       require(node.cases() == null || node.type().equals("SWITCH"), "Cases belong to Switch nodes");
       require(
           node.selector() == null || node.type().equals("SWITCH"),

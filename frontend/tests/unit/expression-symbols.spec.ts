@@ -110,3 +110,40 @@ node "out" OUTPUT "Output" { return return + price; }`,
     { text: "price", kind: "variable" },
   ]);
 });
+
+test("Output aliases name fields without reclassifying same-named inputs as results", () => {
+  expect(
+    names(
+      `inputs { total: NUMBER required; }
+node out OUTPUT "Result" { return total; as total; }`,
+      true,
+    ),
+  ).toEqual([
+    { text: "total", kind: "parameter" },
+    { text: "total", kind: "parameter" },
+  ]);
+});
+
+test("node-aware as declarations preserve Reference and Transform results across quoted and nested braces", () => {
+  expect(
+    names(
+      `inputs { total: NUMBER required; source total = {"id":"lookup", "bindings":{"key":"as total;"}}; }
+node reused-reference reference "Reuse" { bind amount = total; as reused; }
+node "shaped-transform" TRANSFORM "Shape { as total; }" { field total = reused; as shaped; }
+// node fake REFERENCE "Comment" { as total; }
+node out OUTPUT "Result" { as total; return total + shaped.total; }
+node last OUTPUT "Last" { return reused; as reused; }`,
+      true,
+    ),
+  ).toEqual([
+    { text: "total", kind: "parameter" },
+    { text: "total", kind: "parameter" },
+    { text: "total", kind: "parameter" },
+    { text: "reused", kind: "variable" },
+    { text: "reused", kind: "variable" },
+    { text: "shaped", kind: "variable" },
+    { text: "total", kind: "parameter" },
+    { text: "shaped", kind: "variable" },
+    { text: "reused", kind: "variable" },
+  ]);
+});

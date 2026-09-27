@@ -297,3 +297,23 @@ test("disconnected expression scopes do not inherit input or result colors from 
   await focusNode(page, "Calculate price");
   await expectColor(formula, "amount", colors.input);
 });
+
+test("an Output field alias does not color its same-named input as a computed result in Script", async ({
+  page,
+  request,
+}) => {
+  const id = await create(request);
+  await page.goto(`/#/studio/${id}`);
+  const editor = page.getByLabel("ARC code editor", { exact: true });
+  await setEditorText(
+    page,
+    editor,
+    `schema 1;
+inputs { total: NUMBER required; }
+node input INPUT "Inputs" { next -> out; }
+node out OUTPUT "Result" { return total; as total; }`,
+  );
+  await expectColor(editor, "total", colors.input);
+  await expectColor(editor, "total", colors.input, 1);
+  await expectUnclassified(editor, "total", 2);
+});

@@ -86,9 +86,33 @@ function scriptNames(
 ) {
   const expressions = new Set<number>();
   const declarations = new Map<number, ExpressionSymbolKind>();
+  let depth = 0;
+  let pendingNodeType: string | undefined;
+  let nodeType: string | undefined;
   for (let index = 0; index < tokens.length; index++) {
-    if (index && ![";", "{", "}"].includes(tokens[index - 1].text)) continue;
     const token = tokens[index];
+    if (token.text === "{") {
+      depth++;
+      if (depth === 1) {
+        nodeType = pendingNodeType;
+        pendingNodeType = undefined;
+      }
+    } else if (token.text === "}") {
+      depth = Math.max(0, depth - 1);
+      if (!depth) nodeType = undefined;
+    }
+    if (index && ![";", "{", "}"].includes(tokens[index - 1].text)) continue;
+    if (!depth && token.text.toLowerCase() === "node") {
+      let typeIndex = index + 2;
+      // A bare hyphenated node ID spans multiple expression tokens.
+      while (
+        tokens[typeIndex] &&
+        tokens[typeIndex].offset ===
+          tokens[typeIndex - 1].offset + tokens[typeIndex - 1].text.length
+      )
+        typeIndex++;
+      pendingNodeType = tokens[typeIndex]?.text.toUpperCase();
+    }
     let end = index;
     while (end < tokens.length && tokens[end].text !== ";") end++;
     const declare = (at: number, kind: ExpressionSymbolKind) => {
@@ -104,7 +128,14 @@ function scriptNames(
       declare(index, "parameter");
       continue;
     }
-    if (token.text === "as") declare(index + 1, "variable");
+    // OUTPUT aliases name returned object fields; only these nodes declare
+    // an `as` value that later expressions can read from their scope.
+    if (
+      token.text === "as" &&
+      depth === 1 &&
+      (nodeType === "REFERENCE" || nodeType === "TRANSFORM")
+    )
+      declare(index + 1, "variable");
     if (token.text === "source") declare(index + 1, "parameter");
     let start = end;
     if (["when", "select", "return"].includes(token.text)) start = index + 1;

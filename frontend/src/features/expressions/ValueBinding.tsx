@@ -142,8 +142,19 @@ export default function ValueBinding({
             </MenuItem>
           )}
           {choices.map((v) => (
-            <MenuItem key={v.name} value={v.name}>
-              {variableOptionLabel(v)}
+            <MenuItem
+              key={v.name}
+              value={v.name}
+              aria-label={variableOptionLabel(v)}
+            >
+              <span
+                className="value-binding-variable"
+                title={variableOptionLabel(v)}
+              >
+                <strong>{v.name}</strong>{" "}
+                <span className="value-binding-variable-from">from</span>{" "}
+                <em>{v.label}</em> ({v.type.toLowerCase()})
+              </span>
             </MenuItem>
           ))}
         </TextField>

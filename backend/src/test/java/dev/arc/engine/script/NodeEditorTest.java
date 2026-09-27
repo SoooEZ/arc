@@ -84,6 +84,52 @@ node out OUTPUT "Output" { return rate; }
   }
 
   @Test
+  void namedOutputsRoundTripAndNodeEditsPreserveTheContainingGraph() {
+    var original =
+        script
+            .build(
+                """
+        inputs { value: NUMBER required; }
+        node input INPUT "Input" { next -> out; }
+        node out OUTPUT "Output" { return value; }
+        """)
+            .definition();
+    String fragment =
+        script.renderNode(original, "out").replace("return value;", "return value;\n  as total;");
+    var named = script.buildNode(original, "out", fragment);
+    assertThat(named.diagnostics()).isEmpty();
+    assertThat(named.definition().inputs()).isEqualTo(original.inputs());
+    assertThat(named.definition().edges()).isEqualTo(original.edges());
+    assertThat(named.definition().nodes().getFirst()).isEqualTo(original.nodes().getFirst());
+    assertThat(named.definition().nodes().getLast().outputName()).isEqualTo("total");
+    assertThat(named.definition().nodes().getLast().expression()).isEqualTo("value");
+    assertThat(named.definition().nodes().getLast().output()).isNull();
+    String canonical = script.render(named.definition());
+    assertThat(canonical).contains("return value;\n  as total;");
+    assertThat(script.build(canonical).definition()).isEqualTo(named.definition());
+    assertThat(script.buildNode(named.definition(), "out", named.source()).definition())
+        .isEqualTo(named.definition());
+    assertThat(
+            script
+                .buildNode(named.definition(), "out", named.source().replace("  as total;\n", ""))
+                .definition())
+        .isEqualTo(original);
+    for (String name : List.of("unit price", "$total", "@total", "true")) {
+      var invalid = script.buildNode(original, "out", fragment.replace("as total", "as " + name));
+      assertThat(invalid.definition()).isNull();
+      assertThat(invalid.diagnostics())
+          .extracting(ArcScript.Diagnostic::message)
+          .containsExactly("Names must be identifiers (letters, digits, underscores; max 64)");
+    }
+    assertThat(
+            script
+                .buildNode(
+                    original, "out", fragment.replace("as total;", "as total; as duplicate;"))
+                .definition())
+        .isNull();
+  }
+
+  @Test
   void emptyTransformsGeneratePrefixedFunctionsAndOldSyntaxCannotBuild() {
     var draft =
         new Definition(

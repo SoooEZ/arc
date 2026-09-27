@@ -1,5 +1,5 @@
 import type { DataSource, Input, SourceConfig } from "../../types";
-import { parameterNameError } from "../../domain/identifiers";
+import { identifierError } from "../../domain/identifiers";
 
 export interface SourceBuffers {
   parameters: string;
@@ -37,7 +37,7 @@ export function sourceParameterNamesError(parameters: unknown): string | null {
   if (!Array.isArray(parameters))
     return "Source parameters must be a JSON array.";
   for (const [index, parameter] of parameters.entries()) {
-    const error = parameterNameError(parameter?.name);
+    const error = identifierError(parameter?.name);
     if (error) return `Parameter ${index + 1}: ${error}`;
   }
   return null;

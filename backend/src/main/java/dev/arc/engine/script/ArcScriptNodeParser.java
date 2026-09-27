@@ -2,6 +2,7 @@ package dev.arc.engine.script;
 
 import static dev.arc.engine.script.ArcScriptSyntax.ID;
 import static dev.arc.engine.script.ArcScriptSyntax.error;
+import static dev.arc.engine.script.ArcScriptSyntax.identifier;
 
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.script.ArcScriptScanner.Statement;
@@ -56,6 +57,7 @@ final class ArcScriptNodeParser {
   private Boolean valueCases;
   private Statement firstCase;
   private String output;
+  private String outputName;
   private String ruleId;
   private Integer version;
 
@@ -99,7 +101,8 @@ final class ArcScriptNodeParser {
         type.equals("REFERENCE") ? bindings : null,
         type.equals("SWITCH") ? cases : null,
         type.equals("TRANSFORM") && !fields.isEmpty() ? fields : null,
-        selector);
+        selector,
+        outputName);
   }
 
   private Edge parseEdge(Matcher match, Statement statement) {
@@ -142,9 +145,12 @@ final class ArcScriptNodeParser {
       parseReference(statement);
     } else if (text.startsWith("bind ") && type.equals("REFERENCE")) {
       parseBinding(statement);
-    } else if (text.startsWith("as ") && (type.equals("REFERENCE") || type.equals("TRANSFORM"))) {
+    } else if (text.startsWith("as ")
+        && (type.equals("REFERENCE") || type.equals("TRANSFORM") || type.equals("OUTPUT"))) {
       unique("as", statement);
-      output = text.substring(3).trim();
+      String name = identifier(text.substring(3).trim(), statement);
+      if (type.equals("OUTPUT")) outputName = name;
+      else output = name;
     } else {
       throw error("Unsupported statement for " + type + ": " + text, statement);
     }
@@ -212,6 +218,6 @@ final class ArcScriptNodeParser {
   private Assignment assignment(String text, Statement statement) {
     Matcher match = ASSIGNMENT.matcher(text);
     if (!match.matches()) throw error("Expected variable = expression", statement);
-    return new Assignment(match.group(1), match.group(2).trim());
+    return new Assignment(identifier(match.group(1), statement), match.group(2).trim());
   }
 }

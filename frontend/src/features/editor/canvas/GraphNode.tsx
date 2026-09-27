@@ -80,7 +80,9 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
                 : `${n.cases?.length ?? 0} cases · first match + default`
               : n.type === "TRANSFORM" && n.fields?.length
                 ? `${n.fields.length} fields → ${n.output || "data"}`
-                : n.expression || "Add an expression"}
+                : n.type === "OUTPUT" && n.outputName
+                  ? `${n.outputName} ← ${n.expression || "Choose a value"}`
+                  : n.expression || "Add an expression"}
       </div>
       {!!data.errors.length && (
         <Tooltip

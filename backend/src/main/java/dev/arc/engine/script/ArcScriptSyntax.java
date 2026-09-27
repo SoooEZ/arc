@@ -3,6 +3,7 @@ package dev.arc.engine.script;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.Identifiers;
 import dev.arc.engine.script.ArcScriptScanner.Statement;
 import dev.arc.engine.script.ArcScriptScanner.SyntaxException;
 
@@ -28,6 +29,12 @@ final class ArcScriptSyntax {
 
   String unquote(String text, Statement statement) {
     return text.startsWith("\"") ? read(text, String.class, statement) : text;
+  }
+
+  static String identifier(String text, Statement statement) {
+    if (!Identifiers.isValid(text))
+      throw error("Names must be identifiers (letters, digits, underscores; max 64)", statement);
+    return text;
   }
 
   static SyntaxException error(String message, Statement statement) {

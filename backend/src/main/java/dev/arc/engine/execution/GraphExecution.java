@@ -151,9 +151,15 @@ final class GraphExecution {
       }
       case "TRANSFORM" -> new Outcome(transform(node, scope, compiled, formulas), "next");
       case "REFERENCE" -> new Outcome(reference(node, scope, depth, compiled, formulas), "next");
-      case "OUTPUT" ->
-          new Outcome(
-              compiled.expression(node.expression()).evaluate(scope, deadline, formulas), null);
+      case "OUTPUT" -> {
+        Object value = compiled.expression(node.expression()).evaluate(scope, deadline, formulas);
+        if (node.outputName() != null && !node.outputName().isEmpty()) {
+          var named = new LinkedHashMap<String, Object>();
+          named.put(node.outputName(), value);
+          value = Expressions.bounded(named);
+        }
+        yield new Outcome(value, null);
+      }
       default -> throw ArcException.invalid("Unknown node type");
     };
   }

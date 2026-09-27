@@ -23,6 +23,7 @@ export interface RuleNode {
   expression?: string | null;
   selector?: string | null;
   output?: string | null;
+  outputName?: string | null;
   ruleId?: string | null;
   version?: number | null;
   bindings?: Record<string, string> | null;

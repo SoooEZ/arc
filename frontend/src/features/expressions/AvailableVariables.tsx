@@ -1,5 +1,5 @@
-import { useId, useState } from "react";
-import { Button, IconButton, Popover, Tooltip } from "@mui/material";
+import { useId, useLayoutEffect, useRef, useState } from "react";
+import { Button, IconButton, Paper, Popper, Tooltip } from "@mui/material";
 import { X } from "lucide-react";
 import { variableOptionLabel, type VariableOption } from "../../domain/graph";
 
@@ -38,10 +38,28 @@ export default function AvailableVariables({
 }) {
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const [preview, setPreview] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [availableHeight, setAvailableHeight] = useState(0);
   const id = useId();
+  const visible = preview || !!anchor;
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const measure = () => {
+      const top = trigger.current?.getBoundingClientRect().top ?? 0;
+      setAvailableHeight(Math.max(0, Math.floor(top - 20)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    document.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      document.removeEventListener("scroll", measure, true);
+    };
+  }, [visible]);
   const close = () => {
     setAnchor(null);
     setPreview(false);
+    trigger.current?.focus();
   };
   const label = `Available variables · ${title}`;
   return (
@@ -66,11 +84,21 @@ export default function AvailableVariables({
             </div>
           )
         }
-        placement="bottom-end"
+        placement="top-end"
         describeChild
-        slotProps={{ tooltip: { className: "expression-variable-tooltip" } }}
+        slotProps={{
+          tooltip: {
+            className: "expression-variable-tooltip",
+            style: { maxHeight: availableHeight },
+          },
+          popper: {
+            popperOptions: { strategy: "fixed" },
+            modifiers: [{ name: "flip", enabled: false }],
+          },
+        }}
       >
         <Button
+          ref={trigger}
           className="expression-variables-button"
           size="small"
           aria-label={label}
@@ -85,33 +113,46 @@ export default function AvailableVariables({
           Available variables
         </Button>
       </Tooltip>
-      <Popover
-        id={id}
+      <Popper
+        className="expression-variable-popper"
+        role="presentation"
         open={!!anchor}
         anchorEl={anchor}
-        onClose={close}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{
-          paper: {
-            className: "expression-variable-popover",
-            role: "dialog",
-            "aria-label": label,
-          },
-        }}
+        placement="top-end"
+        popperOptions={{ strategy: "fixed" }}
+        modifiers={[
+          { name: "offset", options: { offset: [0, 8] } },
+          { name: "flip", enabled: false },
+          { name: "preventOverflow", options: { padding: 8 } },
+        ]}
+        // Keep the nonmodal panel within an enclosing dialog's focus boundary.
+        container={anchor?.closest('[role="dialog"]') ?? undefined}
       >
-        <div className="expression-variable-heading">
-          <strong>Available variables</strong>
-          <IconButton
-            size="small"
-            aria-label="Close available variables"
-            onClick={close}
-          >
-            <X size={16} />
-          </IconButton>
-        </div>
-        <VariableList variables={variables} />
-      </Popover>
+        <Paper
+          id={id}
+          className="expression-variable-popover"
+          role="dialog"
+          aria-label={label}
+          aria-modal={false}
+          style={{ maxHeight: availableHeight }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") event.stopPropagation();
+          }}
+        >
+          <div className="expression-variable-heading">
+            <strong>Available variables</strong>
+            <IconButton
+              autoFocus
+              size="small"
+              aria-label="Close available variables"
+              onClick={close}
+            >
+              <X size={16} />
+            </IconButton>
+          </div>
+          <VariableList variables={variables} />
+        </Paper>
+      </Popper>
     </>
   );
 }

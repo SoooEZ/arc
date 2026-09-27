@@ -16,6 +16,7 @@ import InputFields from "./InputFields";
 import ReferenceFields from "./ReferenceFields";
 import ExpressionFields from "./ExpressionFields";
 import ResultFields from "./ResultFields";
+import OutputFields from "./OutputFields";
 import SwitchFields from "./SwitchFields";
 import TransformFields from "./TransformFields";
 import type { NodeFieldsProps } from "./types";
@@ -29,7 +30,7 @@ const fieldsByType: Record<NodeType, ComponentType<NodeFieldsProps>> = {
   CONDITION: ExpressionFields,
   SWITCH: SwitchFields,
   TRANSFORM: TransformFields,
-  OUTPUT: ExpressionFields,
+  OUTPUT: OutputFields,
 };
 interface Props {
   rule: Rule;

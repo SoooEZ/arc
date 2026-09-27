@@ -1,6 +1,7 @@
 package dev.arc.engine.script;
 
 import static dev.arc.engine.script.ArcScriptSyntax.error;
+import static dev.arc.engine.script.ArcScriptSyntax.identifier;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.script.ArcScriptScanner.Statement;
@@ -84,7 +85,8 @@ final class ArcScriptParser {
         if (!match.matches())
           throw error("Use: source parameter = { JSON source binding };", statement);
         if (sources.putIfAbsent(
-                match.group(1), syntax.read(match.group(2), SourceBinding.class, statement))
+                identifier(match.group(1), statement),
+                syntax.read(match.group(2), SourceBinding.class, statement))
             != null) throw error("Duplicate input source", statement);
       } else {
         Matcher match = INPUT.matcher(statement.text());
@@ -95,7 +97,7 @@ final class ArcScriptParser {
               statement);
         inputs.add(
             new Input(
-                match.group(1),
+                identifier(match.group(1), statement),
                 match.group(2).toUpperCase(Locale.ROOT),
                 match.group(3).equalsIgnoreCase("required"),
                 match.group(4) == null

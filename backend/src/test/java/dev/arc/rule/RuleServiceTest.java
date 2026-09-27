@@ -5,8 +5,11 @@ import static org.mockito.Mockito.*;
 
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
+import dev.arc.model.Definition;
+import dev.arc.model.Definition.Node;
 import dev.arc.model.Rule;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class RuleServiceTest {
@@ -67,5 +70,31 @@ class RuleServiceTest {
     verify(repository)
         .create(
             eq("valid-id"), eq("Example"), eq(""), eq("FORMULA"), eq(RuleSamples.blank("FORMULA")));
+  }
+
+  @Test
+  void invalidResultNamesNeverCreateOrUpdateADraft() {
+    when(repository.lock("example")).thenReturn(draft);
+    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE")) {
+      for (String name : List.of("unit price", "$value", "@value")) {
+        var invalid =
+            new Definition(
+                1,
+                List.of(),
+                List.of(new Node("result", type, "Result", null, null, name, null, null, null)),
+                List.of());
+        assertThatThrownBy(
+                () ->
+                    service.create(
+                        new RuleService.Create("example", "Example", "", "RULE", invalid)))
+            .hasMessageContaining("valid result variable");
+        assertThatThrownBy(
+                () -> service.update("example", new RuleService.Update("Example", "", 3, invalid)))
+            .hasMessageContaining("valid result variable");
+      }
+    }
+    verify(repository, never()).create(anyString(), anyString(), anyString(), anyString(), any());
+    verify(repository, never()).update(anyString(), anyString(), anyString(), any());
+    verifyNoInteractions(definitions);
   }
 }

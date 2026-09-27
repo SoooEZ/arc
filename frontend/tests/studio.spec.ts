@@ -123,6 +123,12 @@ test("code studio builds, round-trips graph edits, inserts chips/modules, and pu
   await page.goto(`/#/studio/${id}`);
   await expect(page.locator(".monaco-editor")).toBeVisible();
   await expect(page.locator(".studio-filebar")).toContainText(`${id}.arc`);
+  await expect(
+    page.getByRole("button", { name: "Graph view", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: "Open graph", exact: true }),
+  ).toHaveCount(0);
   await page.getByPlaceholder("Search functions…").fill("SUM");
   const sum = page
     .locator(".function-chips")

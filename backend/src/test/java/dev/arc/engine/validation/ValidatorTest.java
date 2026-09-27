@@ -117,9 +117,10 @@ class ValidatorTest {
   }
 
   @Test
-  void inputNamesRejectWhitespaceAndDollarWithoutReservingFunctionNames() {
+  void inputNamesRejectWhitespaceAndFunctionPrefixesWithoutReservingFunctionNames() {
     var base = RuleSamples.blank("FORMULA");
-    for (String name : List.of("unit price", "price\t", "price\u00a0", "$ROUND", "round$")) {
+    for (String name :
+        List.of("unit price", "price\t", "price\u00a0", "$ROUND", "round$", "@price", "price@")) {
       var definition =
           new Definition(
               1, List.of(new Input(name, "NUMBER", true, null)), base.nodes(), base.edges());
@@ -130,6 +131,64 @@ class ValidatorTest {
     validator.shape(
         new Definition(
             1, List.of(new Input("ROUND", "NUMBER", true, null)), base.nodes(), base.edges()));
+  }
+
+  @Test
+  void suppliedResultNamesAreCheckedEvenInIncompleteDrafts() {
+    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE")) {
+      for (String name :
+          List.of(
+              "unit price",
+              "price\t",
+              "price\u00a0",
+              "$value",
+              "value$",
+              "@value",
+              "value@",
+              "true",
+              "a".repeat(65))) {
+        var definition =
+            new Definition(1, List.of(), List.of(node("result", type, null, name)), List.of());
+        assertThatThrownBy(() -> validator.shape(definition))
+            .as(type + " " + name)
+            .isInstanceOfSatisfying(
+                ArcException.class,
+                failure -> {
+                  assertThat(failure.getMessage()).contains("valid result variable");
+                  assertThat(failure.locations())
+                      .extracting(ArcException.Location::nodeId)
+                      .containsExactly("result");
+                });
+        assertThat(validator.diagnostics(definition, resolver))
+            .extracting(Validator.Problem::message)
+            .containsExactly("result: provide a valid result variable");
+      }
+      for (String name : Arrays.asList(null, "", "ROUND", "_result2", "a".repeat(64)))
+        validator.shape(
+            new Definition(1, List.of(), List.of(node("result", type, null, name)), List.of()));
+    }
+  }
+
+  @Test
+  void parameterMappingKeysUseTheSameIdentifierPolicy() {
+    for (String name : List.of("unit price", "$value", "@value")) {
+      var reference =
+          new Node("ref", "REFERENCE", "Ref", null, null, "result", "child", 1, Map.of(name, "1"));
+      assertThatThrownBy(
+              () -> validator.shape(new Definition(1, List.of(), List.of(reference), List.of())))
+          .hasMessageContaining("Invalid parameter binding");
+      var source = new SourceBinding("source", 1, Map.of(name, "1"), null, "FAIL");
+      var input = new Input("value", "NUMBER", true, null, source);
+      assertThatThrownBy(
+              () ->
+                  validator.shape(
+                      new Definition(
+                          1,
+                          List.of(input),
+                          List.of(node("input", "INPUT", null, null)),
+                          List.of())))
+          .hasMessageContaining("Invalid source mapping");
+    }
   }
 
   @Test

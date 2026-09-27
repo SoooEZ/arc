@@ -39,7 +39,37 @@ public record Definition(
       Map<String, String> bindings,
       List<BranchCase> cases,
       List<Field> fields,
-      String selector) {
+      String selector,
+      String outputName) {
+    public Node(
+        String id,
+        String type,
+        String label,
+        Position position,
+        String expression,
+        String output,
+        String ruleId,
+        Integer version,
+        Map<String, String> bindings,
+        List<BranchCase> cases,
+        List<Field> fields,
+        String selector) {
+      this(
+          id,
+          type,
+          label,
+          position,
+          expression,
+          output,
+          ruleId,
+          version,
+          bindings,
+          cases,
+          fields,
+          selector,
+          null);
+    }
+
     public Node(
         String id,
         String type,

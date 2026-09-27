@@ -1,13 +1,19 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import { editorLines } from "./helpers/editor";
+import { editorLines, setEditorText } from "./helpers/editor";
 
-async function create(request: APIRequestContext) {
+async function create(request: APIRequestContext, inputCount = 1) {
   const id = `inspector-sections-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
       { name: "amount", type: "NUMBER", required: true, defaultValue: 25 },
+      ...Array.from({ length: inputCount - 1 }, (_, index) => ({
+        name: `field_${index + 1}`,
+        type: "NUMBER" as const,
+        required: false,
+        defaultValue: 0,
+      })),
     ],
     nodes: [
       {
@@ -44,7 +50,7 @@ async function create(request: APIRequestContext) {
   return (await response.json()) as Rule;
 }
 
-test("inspector accordions start expanded and variable help previews, pins and dismisses without moving content", async ({
+test("inspector accordions start expanded and variable help opens above without blocking editing", async ({
   page,
   request,
 }) => {
@@ -112,7 +118,14 @@ test("inspector accordions start expanded and variable help previews, pins and d
   await expect(preview.locator(".variable-list code")).toHaveText(["amount"]);
   await expect(preview).toContainText("number");
   await expect(preview).toContainText("Inputs");
-  await expect(preview).toHaveCSS("opacity", "1");
+  await expect(preview.locator(".expression-variable-tooltip")).toHaveCSS(
+    "opacity",
+    "1",
+  );
+  const previewBounds = (await preview
+    .locator(".expression-variable-tooltip")
+    .boundingBox())!;
+  expect(previewBounds.y + previewBounds.height).toBeLessThan(variableBounds.y);
   expect(await geometry()).toEqual(before);
   await page.mouse.move(10, 10);
   await expect(preview).not.toBeVisible();
@@ -123,21 +136,32 @@ test("inspector accordions start expanded and variable help previews, pins and d
     exact: true,
   });
   await expect(overlay.locator(".variable-list code")).toHaveText(["amount"]);
+  await expect(overlay).toHaveAttribute("aria-modal", "false");
+  const overlayBounds = (await overlay.boundingBox())!;
+  expect(overlayBounds.y + overlayBounds.height).toBeLessThan(variableBounds.y);
   await page.mouse.move(10, 10);
   await expect(overlay).toBeVisible();
   expect(await geometry()).toEqual(before);
   await page.keyboard.press("Escape");
-  await expect(overlay).not.toBeVisible();
+  await expect(overlay).toBeVisible();
   await expect(preview).not.toBeVisible();
+  await page.mouse.click(10, 10);
+  await expect(overlay).toBeVisible();
   await variables.click();
   await expect(overlay).toBeVisible();
-  await page.mouse.click(10, 10);
-  await expect(overlay).not.toBeVisible();
-  await variables.click();
+  const inlineEditor = sidebar.getByLabel("Expression", { exact: true });
+  await setEditorText(page, inlineEditor, "amount * 3");
+  await expect(editorLines(inlineEditor)).toHaveText("amount * 3");
+  await expect(inlineEditor).toBeFocused();
+  await expect(overlay).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(overlay).toBeVisible();
+  await setEditorText(page, inlineEditor, "amount * 2");
   await overlay
     .getByRole("button", { name: "Close available variables", exact: true })
     .click();
   await expect(overlay).not.toBeVisible();
+  await expect(variables).toBeFocused();
   expect(await geometry()).toEqual(before);
 
   await expression.click();
@@ -180,7 +204,9 @@ test("inspector accordions start expanded and variable help previews, pins and d
   ]);
   await expect(outputVariables).toContainText("Calculate price");
   await page.keyboard.press("Escape");
+  await expect(outputVariables).toBeVisible();
   await page.locator('.react-flow__node[data-id="calc"] .graph-node').click();
+  await expect(outputVariables).not.toBeVisible();
   await expect(expression).toHaveAttribute("aria-expanded", "true");
   await expect(
     sidebar.getByRole("button", { name: "Save draft", exact: true }),
@@ -250,7 +276,24 @@ test("node edit modal shares section controls without losing pending form values
   });
   await expect(variables.locator(".variable-list code")).toHaveText(["amount"]);
   await page.keyboard.press("Escape");
+  await expect(variables).toBeVisible();
   await expect(dialog).toBeVisible();
+  const expression = dialog.getByLabel("Expression", { exact: true });
+  await setEditorText(page, expression, "amount * 4");
+  await expect(editorLines(expression)).toHaveText("amount * 4");
+  await expect(expression).toBeFocused();
+  await expect(variables).toBeVisible();
+  await variables
+    .getByRole("button", { name: "Close available variables", exact: true })
+    .focus();
+  await page.keyboard.press("Enter");
+  await expect(variables).not.toBeVisible();
+  await expect(
+    dialog.getByRole("button", {
+      name: "Available variables · Expression",
+      exact: true,
+    }),
+  ).toBeFocused();
   await page.screenshot({
     path: test.info().outputPath("inspector-sections-modal.png"),
     animations: "disabled",
@@ -312,10 +355,17 @@ test("published sections remain inspectable and variable overlays fit mobile wit
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
   expect(bounds.y).toBeGreaterThanOrEqual(0);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(844);
+  const triggerBounds = (await variables.boundingBox())!;
+  expect(bounds.y + bounds.height).toBeLessThan(triggerBounds.y);
   await page.screenshot({
     path: test.info().outputPath("inspector-sections-mobile.png"),
   });
   await page.keyboard.press("Escape");
+  await expect(overlay).toBeVisible();
+  await overlay
+    .getByRole("button", { name: "Close available variables", exact: true })
+    .click();
+  await expect(overlay).not.toBeVisible();
   await expect(
     sidebar.getByLabel("Result variable", { exact: true }),
   ).toBeDisabled();
@@ -325,4 +375,54 @@ test("published sections remain inspectable and variable overlays fit mobile wit
   const after: Rule = await (await request.get(`/api/rules/${rule.id}`)).json();
   expect(after.revision).toBe(published.revision);
   expect(after.draft).toEqual(rule.draft);
+});
+
+test("long pinned variable help scrolls above its editor on mobile and retains an accessible close button", async ({
+  page,
+  request,
+}) => {
+  const rule = await create(request, 40);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/#/rules/${rule.id}?node=calc`);
+  const trigger = page.getByRole("button", {
+    name: "Available variables · Expression",
+    exact: true,
+  });
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.click();
+  const overlay = page.getByRole("dialog", {
+    name: "Available variables · Expression",
+    exact: true,
+  });
+  await expect(overlay.locator(".variable-list code")).toHaveCount(40);
+  const bounds = (await overlay.boundingBox())!;
+  const triggerBounds = (await trigger.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.y + bounds.height).toBeLessThan(triggerBounds.y);
+  const list = overlay.locator(".variable-list");
+  expect(
+    await list.evaluate(
+      (element) => element.scrollHeight > element.clientHeight,
+    ),
+  ).toBe(true);
+  await list.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(list.locator("code").last()).toBeInViewport();
+  const close = overlay.getByRole("button", {
+    name: "Close available variables",
+    exact: true,
+  });
+  await expect(close).toBeInViewport();
+  await page.screenshot({
+    path: test.info().outputPath("pinned-variables-mobile-scroll.png"),
+  });
+  await close.focus();
+  await page.keyboard.press("Escape");
+  await expect(overlay).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(overlay).not.toBeVisible();
+  await expect(trigger).toBeFocused();
 });

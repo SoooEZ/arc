@@ -1,7 +1,7 @@
 import { TextField } from "@mui/material";
 import type { SourceConfig } from "../../types";
 import { sourceParameterBufferError, type SourceBuffers } from "./model";
-import { parameterNameGuidance } from "../../domain/identifiers";
+import { identifierGuidance } from "../../domain/identifiers";
 
 export default function SourceConfigurationFields({
   configuration,
@@ -52,8 +52,8 @@ export default function SourceConfigurationFields({
         helperText={
           parametersError ||
           (http
-            ? `Declare name, type (STRING / NUMBER / BOOLEAN / ARRAY / OBJECT), required, and optional defaultValue. ${parameterNameGuidance}`
-            : `Lookup tables require a parameter named "key". ${parameterNameGuidance}`)
+            ? `Declare name, type (STRING / NUMBER / BOOLEAN / ARRAY / OBJECT), required, and optional defaultValue. ${identifierGuidance}`
+            : `Lookup tables require a parameter named "key". ${identifierGuidance}`)
         }
         slotProps={{ input: { className: "json-input" } }}
       />

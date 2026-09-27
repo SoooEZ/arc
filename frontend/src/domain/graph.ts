@@ -126,7 +126,7 @@ export interface VariableOption {
   label: string;
 }
 export function variableOptionLabel(option: VariableOption): string {
-  return `${option.name} (${option.type.toLowerCase()}) - ${option.label}`;
+  return `${option.name} from ${option.label} (${option.type.toLowerCase()})`;
 }
 export function inputVariables(definition: Definition): VariableOption[] {
   const inputNode = definition.nodes.find((node) => node.type === "INPUT");
