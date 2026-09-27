@@ -147,7 +147,7 @@ async function fixture(page: Page) {
   return { reads, saved: () => rule };
 }
 
-test("each provider picker searches bounded pages, keeps keyboard text and preserves its immutable pin", async ({
+test("each provider picker searches and appends bounded pages while preserving focus and its immutable pin", async ({
   page,
 }) => {
   const state = await fixture(page);
@@ -187,16 +187,32 @@ test("each provider picker searches bounded pages, keeps keyboard text and prese
     page.getByRole("button", { name: "Save draft", exact: true }),
   ).toBeDisabled();
   await picker.click();
+  await expect(page.getByRole("option")).toHaveCount(21);
   await expect(
-    page.getByRole("option", { name: "More providers", exact: true }),
-  ).toBeVisible();
-  await picker.press("End");
-  await picker.press("Enter");
+    page.getByRole("option", {
+      name: /More providers|Previous providers|of 45 providers/,
+    }),
+  ).toHaveCount(0);
+  const listbox = page.getByRole("listbox");
+  const beforeAppend = await listbox.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    return element.scrollTop;
+  });
+  await expect(page.getByRole("option")).toHaveCount(41);
+  await expect
+    .poll(() => listbox.evaluate((element) => element.scrollTop))
+    .toBe(beforeAppend);
+  await expect(picker).toBeFocused();
   await expect(
     page.getByRole("option", { name: "Provider 39", exact: true }),
   ).toBeVisible();
   expect(
     state.reads.some((query) => query.offset === 20 && query.search === ""),
+  ).toBe(true);
+  await picker.press("End");
+  await expect(page.getByRole("option")).toHaveCount(46);
+  expect(
+    state.reads.some((query) => query.offset === 40 && query.search === ""),
   ).toBe(true);
   await picker.fill("provider-44");
   await expect(
@@ -210,6 +226,12 @@ test("each provider picker searches bounded pages, keeps keyboard text and prese
   await picker.fill("provider-44");
   await page.getByRole("option", { name: "Provider 44", exact: true }).click();
   await expect(picker).toHaveValue("Provider 44");
+  await expect(
+    page.getByRole("combobox", { name: "Source version", exact: true }),
+  ).toHaveText("v2");
+  await picker.fill("Provider 00");
+  await page.getByRole("option", { name: "Provider 00", exact: true }).click();
+  await expect(picker).toHaveValue("Provider 00");
   await expect(
     page.getByRole("combobox", { name: "Source version", exact: true }),
   ).toHaveText("v2");
@@ -236,17 +258,20 @@ test("late search success and search errors cannot replace newer results or clea
     release = resolve;
   });
   let held = false;
+  let failSearch = true;
   await page.route("**/api/source-summaries?*", async (route) => {
     const search = new URL(route.request().url()).searchParams.get("search");
     if (search === "Provider 2") {
       held = true;
       await gate;
     }
-    if (search === "broken")
+    if (search === "broken" && failSearch) {
+      failSearch = false;
       return route.fulfill({
         status: 503,
         json: { message: "Provider search unavailable" },
       });
+    }
     await route.fallback();
   });
   try {
@@ -258,6 +283,9 @@ test("late search success and search errors cannot replace newer results or clea
     await expect(picker).toHaveValue("Provider 24");
     await picker.fill("Provider 2");
     await expect.poll(() => held).toBe(true);
+    await expect(
+      page.getByRole("option", { name: "Loading results…", exact: true }),
+    ).toHaveAttribute("aria-disabled", "true");
     await picker.fill("Provider 44");
     await expect(
       page.getByRole("option", { name: "Provider 44", exact: true }),
@@ -267,11 +295,17 @@ test("late search success and search errors cannot replace newer results or clea
       page.getByRole("option", { name: "Provider 20", exact: true }),
     ).toHaveCount(0);
     await picker.fill("broken");
+    const retry = page.getByRole("option", {
+      name: /Retry loading results.*Provider search unavailable/,
+    });
+    await expect(retry).toBeVisible();
+    await retry.click();
+    await expect(picker).toHaveValue("broken");
     await expect(
-      page.getByRole("option", {
-        name: "Provider search unavailable",
-        exact: true,
-      }),
+      page.getByRole("option", { name: "No matching results", exact: true }),
+    ).toHaveAttribute("aria-disabled", "true");
+    await expect(
+      page.getByRole("option", { name: "Caller / default value", exact: true }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(picker).toHaveValue("Provider 24");
@@ -285,6 +319,115 @@ test("late search success and search errors cannot replace newer results or clea
     release();
   }
 });
+
+test("a failed appended provider page retains options and retries without replacing the source pin", async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  let attempts = 0;
+  await page.route("**/api/source-summaries?*", async (route) => {
+    if (
+      new URL(route.request().url()).searchParams.get("offset") === "20" &&
+      ++attempts === 1
+    )
+      return route.fulfill({
+        status: 503,
+        json: { message: "Next provider page unavailable" },
+      });
+    await route.fallback();
+  });
+  await page.goto("/#/rules/provider-picker?node=input");
+  const picker = page.getByRole("combobox", {
+    name: "Value provider",
+    exact: true,
+  });
+  await expect(picker).toHaveValue("Provider 24");
+  await picker.click();
+  await expect(page.getByRole("option")).toHaveCount(21);
+  await page.getByRole("listbox").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const retry = page.getByRole("option", {
+    name: /Retry loading results.*Next provider page unavailable/,
+  });
+  await expect(retry).toBeVisible();
+  await expect(page.getByRole("option")).toHaveCount(22);
+  await retry.click();
+  await expect(page.getByRole("option")).toHaveCount(41);
+  expect(attempts).toBe(2);
+  expect(state.reads.at(-1)).toEqual({ search: "", offset: 20, limit: 20 });
+  await picker.press("Escape");
+  await expect(picker).toHaveValue("Provider 24");
+  await expect(
+    page.getByRole("combobox", { name: "Source version", exact: true }),
+  ).toHaveText("v1");
+  await expect(page.getByLabel("JSON pointer", { exact: true })).toHaveValue(
+    "/amount",
+  );
+  await expect(
+    page.getByRole("button", { name: "Save draft", exact: true }),
+  ).toBeDisabled();
+});
+
+for (const failure of [false, true]) {
+  test(`a late appended provider page ${failure ? "failure" : "success"} cannot enter a newer search`, async ({
+    page,
+  }) => {
+    await fixture(page);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = false;
+    let completed = false;
+    await page.route("**/api/source-summaries?*", async (route) => {
+      const query = new URL(route.request().url()).searchParams;
+      if (query.get("offset") === "20" && !query.get("search")) {
+        held = true;
+        await gate;
+        try {
+          if (failure)
+            await route.fulfill({
+              status: 503,
+              json: { message: "Obsolete provider failure" },
+            });
+          else await route.fallback();
+        } finally {
+          completed = true;
+        }
+      } else await route.fallback();
+    });
+    try {
+      await page.goto("/#/rules/provider-picker?node=input");
+      const picker = page.getByRole("combobox", {
+        name: "Value provider",
+        exact: true,
+      });
+      await expect(picker).toHaveValue("Provider 24");
+      await picker.click();
+      await expect(page.getByRole("option")).toHaveCount(21);
+      await page.getByRole("listbox").evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      await expect.poll(() => held).toBe(true);
+      await picker.fill("Provider 44");
+      await expect(
+        page.getByRole("option", { name: "Provider 44", exact: true }),
+      ).toBeVisible();
+      release();
+      await expect.poll(() => completed).toBe(true);
+      await expect(page.getByRole("option")).toHaveCount(2);
+      await expect(picker).toBeFocused();
+      await picker.press("Escape");
+      await expect(picker).toHaveValue("Provider 24");
+      await expect(
+        page.getByRole("button", { name: "Save draft", exact: true }),
+      ).toBeDisabled();
+    } finally {
+      release();
+    }
+  });
+}
 
 test("nested source management keeps its staged parent and blocks closing during any pending save", async ({
   page,

@@ -9,7 +9,10 @@ import { Autocomplete, CircularProgress, TextField } from "@mui/material";
 import { useAutocompletePages } from "../hooks/useAutocompletePages";
 import type { Page } from "../types";
 
-type Choice<T> = { type: "item"; item: T } | { type: "retry" };
+type Choice<T> =
+  | { type: "item"; item: T }
+  | { type: "retry" }
+  | { type: "status"; label: string };
 
 /** One editable field combines server search with an append-only option list. */
 export default function PagedAutocomplete<T>({
@@ -21,6 +24,8 @@ export default function PagedAutocomplete<T>({
   itemKey,
   itemLabel,
   onChange,
+  fixedOptions = [],
+  helperText,
 }: {
   label: string;
   owner: string;
@@ -35,6 +40,8 @@ export default function PagedAutocomplete<T>({
   itemKey: (item: T) => string;
   itemLabel: (item: T) => string;
   onChange: (item: T) => void;
+  fixedOptions?: T[];
+  helperText?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -51,11 +58,17 @@ export default function PagedAutocomplete<T>({
     listbox.current = element instanceof HTMLElement ? element : null;
   }, []);
   const scroll = useRef<number | null>(null);
-  const options: Choice<T>[] = pages.items.map((item) => ({
-    type: "item",
-    item,
-  }));
+  const fixedKeys = new Set(fixedOptions.map(itemKey));
+  const options: Choice<T>[] = [
+    ...fixedOptions,
+    ...pages.items.filter((item) => !fixedKeys.has(itemKey(item))),
+  ].map((item) => ({ type: "item", item }));
   if (pages.error) options.push({ type: "retry" });
+  else if (fixedOptions.length && !pages.items.length)
+    options.push({
+      type: "status",
+      label: pages.loading ? "Loading results…" : "No matching results",
+    });
   const selected: Choice<T> | null = value
     ? { type: "item", item: value }
     : null;
@@ -105,13 +118,16 @@ export default function PagedAutocomplete<T>({
       options={options}
       filterOptions={(items) => items}
       getOptionKey={(option) =>
-        option.type === "item" ? `item:${itemKey(option.item)}` : "retry"
+        option.type === "item" ? `item:${itemKey(option.item)}` : option.type
       }
       getOptionLabel={(option) =>
         option.type === "item"
           ? itemLabel(option.item)
-          : "Retry loading results"
+          : option.type === "status"
+            ? option.label
+            : "Retry loading results"
       }
+      getOptionDisabled={(option) => option.type === "status"}
       isOptionEqualToValue={(option, selectedOption) =>
         option.type === "item" &&
         selectedOption.type === "item" &&
@@ -125,7 +141,7 @@ export default function PagedAutocomplete<T>({
       disableCloseOnSelect
       selectOnFocus
       onChange={(_event, option) => {
-        if (disabled || !option) return;
+        if (disabled || !option || option.type === "status") return;
         if (option.type === "retry") more();
         else {
           onChange(option.item);
@@ -133,15 +149,11 @@ export default function PagedAutocomplete<T>({
         }
       }}
       onHighlightChange={(_event, option, reason) => {
-        if (
-          reason === "keyboard" &&
-          option?.type === "item" &&
-          pages.items.findIndex(
-            (item) => itemKey(item) === itemKey(option.item),
-          ) >=
-            pages.items.length - 3
-        )
-          more();
+        if (reason !== "keyboard" || option?.type !== "item") return;
+        const index = pages.items.findIndex(
+          (item) => itemKey(item) === itemKey(option.item),
+        );
+        if (index >= 0 && index >= pages.items.length - 3) more();
       }}
       slotProps={{
         listbox: {
@@ -163,6 +175,8 @@ export default function PagedAutocomplete<T>({
         <li key={key} {...props}>
           {option.type === "item" ? (
             itemLabel(option.item)
+          ) : option.type === "status" ? (
+            option.label
           ) : (
             <span>
               <strong>Retry loading results</strong>
@@ -176,6 +190,7 @@ export default function PagedAutocomplete<T>({
           {...params}
           label={label}
           placeholder="Type to search"
+          helperText={helperText}
           slotProps={{
             ...params.slotProps,
             input: {

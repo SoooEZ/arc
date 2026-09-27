@@ -1,21 +1,17 @@
-import { useState } from "react";
-import { Autocomplete, TextField } from "@mui/material";
+import PagedAutocomplete from "../../components/PagedAutocomplete";
 import { sourceApi } from "../../api/sources";
-import { useAsyncResource } from "../../hooks/useAsyncResource";
-import type { Page, SourceSummary } from "../../types";
+import type { SourceSummary } from "../../types";
 
 type ProviderOption =
-  | { type: "source"; source: SourceSummary }
-  | { type: "caller" }
-  | { type: "status"; label: string }
-  | { type: "page"; offset: number; label: string };
+  { type: "source"; source: SourceSummary } | { type: "caller" };
 
 function optionLabel(option: ProviderOption) {
-  if (option.type === "source") return option.source.name;
-  return option.type === "caller" ? "Caller / default value" : option.label;
+  return option.type === "source"
+    ? option.source.name
+    : "Caller / default value";
 }
 
-/** One open picker owns one bounded search page; the binding remains a separate immutable pin. */
+/** Search pages are separate from the currently selected immutable source pin. */
 export default function SourceProviderSelect({
   selected,
   revision,
@@ -27,111 +23,36 @@ export default function SourceProviderSelect({
   readOnly: boolean;
   onChange: (source: SourceSummary | null) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const key = JSON.stringify([search, revision]);
-  const [position, setPosition] = useState({ key, offset: 0 });
-  const offset = position.key === key ? position.offset : 0;
-  const limit = 20;
-  const catalog = useAsyncResource(
-    JSON.stringify([key, offset]),
-    (signal) => sourceApi.catalog({ search, offset, limit }, { signal }),
-    { items: [], total: 0, offset, limit } as Page<SourceSummary>,
-    180,
-    open && !readOnly,
-  );
-  const value: ProviderOption = selected
-    ? { type: "source", source: selected }
-    : { type: "caller" };
-  const options: ProviderOption[] = [
-    { type: "caller" },
-    ...catalog.data.items.map((source): ProviderOption => ({
-      type: "source",
-      source,
-    })),
-  ];
-  if (
-    selected &&
-    !search &&
-    !catalog.data.items.some((source) => source.id === selected.id)
-  )
-    options.splice(1, 0, value);
-  options.push({
-    type: "status",
-    label:
-      catalog.error ||
-      (catalog.loading
-        ? "Searching data sources…"
-        : catalog.data.total
-          ? `${offset + 1}–${Math.min(offset + limit, catalog.data.total)} of ${catalog.data.total} provider${catalog.data.total === 1 ? "" : "s"}`
-          : "No matching data sources"),
-  });
-  if (offset > 0)
-    options.push({
-      type: "page",
-      offset: Math.max(0, offset - limit),
-      label: "Previous providers",
-    });
-  if (offset + limit < catalog.data.total)
-    options.push({
-      type: "page",
-      offset: offset + limit,
-      label: "More providers",
-    });
   return (
-    <Autocomplete
-      className="source-provider-select"
-      open={open}
-      onOpen={() => setOpen(true)}
-      onClose={() => {
-        setOpen(false);
-        setSearch("");
-      }}
-      value={value}
-      inputValue={open ? search : optionLabel(value)}
-      onInputChange={(_event, text, reason) => {
-        if (reason === "input") setSearch(text);
-      }}
-      options={options}
-      filterOptions={(items) => items}
-      getOptionLabel={optionLabel}
-      getOptionKey={(option) =>
-        option.type === "source"
-          ? `source:${option.source.id}`
-          : option.type === "page"
-            ? `page:${option.offset}`
-            : option.type
+    <PagedAutocomplete<ProviderOption>
+      label="Value provider"
+      owner={`source-providers:${revision}`}
+      value={
+        selected ? { type: "source", source: selected } : { type: "caller" }
       }
-      isOptionEqualToValue={(option, selectedOption) =>
-        option.type === "source" && selectedOption.type === "source"
-          ? option.source.id === selectedOption.source.id
-          : option.type === selectedOption.type
-      }
-      getOptionDisabled={(option) =>
-        option.type === "status" || (option.type === "page" && catalog.loading)
-      }
-      loading={catalog.loading}
+      fixedOptions={[{ type: "caller" }]}
       disabled={readOnly}
-      disableClearable
-      disableCloseOnSelect
-      onChange={(_event, option) => {
-        if (readOnly || option.type === "status") return;
-        if (option.type === "page") setPosition({ key, offset: option.offset });
-        else {
-          onChange(option.type === "source" ? option.source : null);
-          setOpen(false);
-          setSearch("");
-        }
+      loadPage={async (search, offset, limit, signal) => {
+        const page = await sourceApi.catalog(
+          { search, offset, limit },
+          { signal },
+        );
+        return {
+          ...page,
+          items: page.items.map((source): ProviderOption => ({
+            type: "source",
+            source,
+          })),
+        };
       }}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          label="Value provider"
-          placeholder="Search data sources"
-          error={!!catalog.error}
-          helperText="Search by source name or ID."
-        />
-      )}
+      itemKey={(option) =>
+        option.type === "source" ? `source:${option.source.id}` : "caller"
+      }
+      itemLabel={optionLabel}
+      helperText="Type a source name or ID to search. Scroll for more results."
+      onChange={(option) =>
+        onChange(option.type === "source" ? option.source : null)
+      }
     />
   );
 }
