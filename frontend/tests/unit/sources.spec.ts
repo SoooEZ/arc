@@ -80,6 +80,82 @@ test("saving advances the revision without dropping a newer edit, which can stil
   expect(sourceIsDirty(document!)).toBe(false);
 });
 
+for (const reopen of [false, true]) {
+  test(`source save acknowledgements retain edited test JSON ${reopen ? "after reopening the source" : "in the current selection"}`, () => {
+    const original = source("first");
+    let document = sourceDocumentReducer(openSource(original, 1), {
+      type: "metadata",
+      patch: { name: "Saved name" },
+    })!;
+    const submitted = document.source;
+    document = sourceDocumentReducer(document, {
+      type: "save/start",
+      request: 1,
+    })!;
+    if (reopen)
+      document = sourceDocumentReducer(document, {
+        type: "select",
+        source: original,
+        selection: 2,
+      })!;
+    document = sourceDocumentReducer(document, {
+      type: "test/input",
+      value: '{"key":',
+    })!;
+
+    const saved = sourceDocumentReducer(document, {
+      type: "save/success",
+      request: 1,
+      selection: 1,
+      source: { ...submitted, version: 2 },
+    })!;
+    expect(saved.testInput).toBe('{"key":');
+    expect(saved.testInputEdited).toBe(true);
+    expect(saved.source.version).toBe(2);
+    expect(saved.source.name).toBe("Saved name");
+    expect(saved.selection).toBe(reopen ? 2 : 1);
+    expect(saved.saving).toBeNull();
+    expect(sourceIsDirty(saved)).toBe(false);
+
+    const failed = sourceDocumentReducer(document, {
+      type: "save/failure",
+      request: 1,
+      selection: 1,
+      error: "Save conflict",
+    })!;
+    expect(failed.testInput).toBe('{"key":');
+    expect(failed.testInputEdited).toBe(true);
+    expect(failed.source.version).toBe(1);
+    expect(failed.error).toBe(reopen ? "" : "Save conflict");
+  });
+}
+
+test("saving configuration updates an untouched source test sample", () => {
+  const original = source("first");
+  const document = sourceDocumentReducer(openSource(original, 1), {
+    type: "save/start",
+    request: 1,
+  });
+  const saved = sourceDocumentReducer(document, {
+    type: "save/success",
+    request: 1,
+    selection: 1,
+    source: {
+      ...original,
+      version: 2,
+      definition: {
+        ...original.definition,
+        parameters: original.definition.parameters.map((parameter) => ({
+          ...parameter,
+          defaultValue: "GB",
+        })),
+      },
+    },
+  })!;
+  expect(JSON.parse(saved.testInput)).toEqual({ key: "GB" });
+  expect(saved.testInputEdited).toBe(false);
+});
+
 test("test responses belong to the selected source, version and input", () => {
   const first = source("first");
   const running = sourceDocumentReducer(openSource(first, 1), {

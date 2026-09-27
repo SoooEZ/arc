@@ -179,15 +179,19 @@ export function sourceDocumentReducer(
         document.source.version > action.source.version
       )
         return document;
+      const saved = openSource(action.source, document.selection);
+      // Saving configuration must not reinitialize a user-owned test buffer.
+      if (document.testInputEdited) {
+        saved.testInput = document.testInput;
+        saved.testInputEdited = true;
+      }
       if (
         document.selection !== action.selection ||
         document.saving?.request !== action.request
       ) {
         // Reopening A while its save completes should expose its new revision, without
         // replacing edits made in that reopened document.
-        if (!sourceIsDirty(document))
-          return openSource(action.source, document.selection);
-        const saved = openSource(action.source, document.selection);
+        if (!sourceIsDirty(document)) return saved;
         return {
           ...document,
           source: { ...document.source, version: action.source.version },
@@ -195,7 +199,6 @@ export function sourceDocumentReducer(
           baseline: saved.baseline,
         };
       }
-      const saved = openSource(action.source, document.selection);
       if (
         document.saving.snapshot ===
         sourceSnapshot(document.source, document.buffers)

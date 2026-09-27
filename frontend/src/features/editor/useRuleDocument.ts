@@ -39,6 +39,12 @@ export function useRuleDocument({
   const { rule, source, sourceDirty, baseline } = state;
   const latestState = useRef(state);
   latestState.current = state;
+  const session = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    session.current = controller;
+    return () => controller.abort();
+  }, []);
   const [invalidDefaults, setInvalidDefaults] = useState<
     Record<string, boolean>
   >({});
@@ -80,18 +86,20 @@ export function useRuleDocument({
     [reportRuntimeError],
   );
   const runTask = useCallback(
-    async (name: string, task: () => Promise<unknown>) => {
-      if (running.current || versionUnavailable) return;
+    async (name: string, task: (signal: AbortSignal) => Promise<unknown>) => {
+      const signal = session.current?.signal;
+      if (!signal || signal.aborted || running.current || versionUnavailable)
+        return;
       running.current = true;
       setBusy(name);
       setError("");
       try {
-        await task();
+        await task(signal);
       } catch (failure) {
-        fail(failure);
+        if (!signal.aborted) fail(failure);
       } finally {
         running.current = false;
-        setBusy("");
+        if (!signal.aborted) setBusy("");
       }
     },
     [fail, versionUnavailable],
@@ -125,12 +133,16 @@ export function useRuleDocument({
     [readOnly],
   );
   const buildCode = useCallback(async (): Promise<Definition> => {
+    const signal = session.current?.signal;
+    if (!signal || signal.aborted)
+      throw new DOMException("The editor session has closed", "AbortError");
     if (hasInvalidDefaults)
       throw new Error(
         "Fix the invalid parameter default before saving or changing views",
       );
     if (!sourceDirty || source === null || readOnly) return rule.draft;
-    const result = await studioApi.build(source);
+    const result = await studioApi.build(source, { signal });
+    signal.throwIfAborted();
     if (latestState.current.source !== source)
       throw new Error(
         "The code changed while building. Build the current buffer again.",
@@ -199,22 +211,23 @@ export function useRuleDocument({
     if (mode !== "graph" || !current.current.sourceDirty) return;
     // A sidebar navigation must compile the code buffer before exposing the graph.
     const latest = current.current;
-    void latest.runTask("switch", async () => {
+    void latest.runTask("switch", async (signal) => {
       try {
         await latest.buildCode();
       } catch (failure) {
-        latest.navigate(`/studio/${latest.ruleId}`);
+        if (!signal.aborted) latest.navigate(`/studio/${latest.ruleId}`);
         throw failure;
       }
     });
   }, [mode]);
   const switchView = () =>
-    runTask("switch", async () => {
+    runTask("switch", async (signal) => {
       if (hasInvalidDefaults)
         throw new Error(
           "Fix the invalid parameter default before changing views",
         );
       if (mode === "code") await buildCode();
+      signal.throwIfAborted();
       navigate(
         `/${mode === "code" ? "rules" : "studio"}/${rule.id}${requestedVersion ? `?version=${requestedVersion}` : ""}`,
       );

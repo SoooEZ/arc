@@ -37,13 +37,10 @@ export default function InlineExpressionEditor({
     0,
     catalogRequested,
   );
-  const { formulaError } = useArcLanguageSupport(
-    editor,
-    model,
-    functions,
+  const { formulaError } = useArcLanguageSupport(editor, model, functions, {
+    kind: "expression",
     variables,
-    false,
-  );
+  });
   const completionNames = JSON.stringify([
     ...variables.map((variable) => variable.name),
     ...functions.filter((entry) => entry.supported).map((entry) => entry.name),

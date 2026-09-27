@@ -3,10 +3,11 @@ import { MenuItem, TextField } from "@mui/material";
 
 import { variableOptionLabel, type VariableOption } from "../../domain/graph";
 import {
+  acceptsVariableType,
+  bindingConstantTypes,
+  compatibleConstantType,
   constantDefaults,
   inferBindingMode,
-  inferConstantType,
-  isBindingConstant,
   type BindingMode,
   type BindingType,
   type ConstantType,
@@ -34,48 +35,32 @@ export default function ValueBinding({
 }) {
   const [chosenMode, setChosenMode] = useState<BindingMode | null>(null);
   const [chosenType, setChosenType] = useState<ConstantType | null>(null);
-  const inferredType = inferConstantType(value ?? "");
   const dynamicType = type === "ANY" || type === "SCALAR";
-  const constantTypes: ConstantType[] =
-    type === "SCALAR"
-      ? ["NUMBER", "STRING", "BOOLEAN"]
-      : ["NUMBER", "STRING", "BOOLEAN", "ARRAY", "NULL"];
-  const acceptedType =
-    inferredType && constantTypes.includes(inferredType) ? inferredType : null;
+  const constantTypes = bindingConstantTypes[type];
+  const acceptedType = compatibleConstantType(value ?? "", type);
+  const selectedType =
+    chosenType && constantTypes.includes(chosenType) ? chosenType : null;
   const effectiveType = dynamicType
-    ? (chosenType ?? acceptedType ?? "NUMBER")
+    ? (selectedType ?? acceptedType ?? "NUMBER")
     : type;
-  const isConstant = isBindingConstant(value ?? "", type);
   const mode =
     chosenMode ??
-    (type === "SCALAR" && inferredType !== null && acceptedType === null
-      ? "expression"
-      : inferBindingMode(
-          value,
-          isConstant,
-          variables.map((variable) => variable.name),
-        ));
-  const choices = variables.filter(
-    (v) =>
-      type === "ANY" ||
-      v.type === type ||
-      v.type === "RESULT" ||
-      (type === "SCALAR" && ["NUMBER", "STRING", "BOOLEAN"].includes(v.type)),
-  );
+    inferBindingMode(
+      value,
+      type,
+      variables.map((variable) => variable.name),
+    );
+  const choices = variables.filter((v) => acceptsVariableType(type, v.type));
   const chooseMode = (next: BindingMode) => {
+    if (next === "constant" && !constantTypes.length) return;
     setChosenMode(next);
     if (next === "default") onChange(undefined);
     else if (next === "variable") {
       if (!choices.some((v) => v.name === value)) onChange(undefined);
     } else if (next === "constant") {
-      if (dynamicType) {
-        const nextType = acceptedType ?? chosenType ?? "NUMBER";
-        setChosenType(nextType);
-        if (acceptedType === null) onChange(constantDefaults[nextType]);
-      } else if (!isConstant) {
-        const nextType = type === "OBJECT" ? "ARRAY" : type;
-        onChange(constantDefaults[nextType]);
-      }
+      const nextType = acceptedType ?? selectedType ?? constantTypes[0];
+      if (dynamicType) setChosenType(nextType);
+      if (acceptedType === null) onChange(constantDefaults[nextType]);
     }
   };
   return (
@@ -88,7 +73,9 @@ export default function ValueBinding({
         onChange={(e) => chooseMode(e.target.value as BindingMode)}
       >
         <MenuItem value="variable">Upstream variable</MenuItem>
-        {type !== "OBJECT" && <MenuItem value="constant">Constant</MenuItem>}
+        {!!constantTypes.length && (
+          <MenuItem value="constant">Constant</MenuItem>
+        )}
         <MenuItem value="expression">Expression</MenuItem>
         {optional && <MenuItem value="default">Use default / omit</MenuItem>}
       </TextField>

@@ -13,33 +13,41 @@ export {
   insertSnippet,
 } from "./arcCompletion";
 
+export type ArcEditorContext =
+  | { kind: "expression"; variables: VariableOption[] }
+  | { kind: "node" | "script"; definition: Definition };
+
 /** Providers belong to one model; nested rule dialogs do not leak suggestions into each other. */
 export function useArcLanguageSupport(
   editor: RefObject<monaco.editor.IStandaloneCodeEditor | null>,
   editorModel: monaco.editor.ITextModel | null,
   functions: FunctionEntry[],
-  definition: Definition | VariableOption[],
-  includeModules = true,
+  context: ArcEditorContext,
 ) {
-  const variables: VariableOption[] = useMemo(
+  const definition = context.kind === "expression" ? null : context.definition;
+  const declaredVariables: VariableOption[] = useMemo(
     () =>
-      Array.isArray(definition)
-        ? definition
-        : [
+      definition
+        ? [
             ...inputVariables(definition),
             ...definition.nodes.flatMap((node): VariableOption[] =>
               node.output
                 ? [{ name: node.output, type: "RESULT", label: node.label }]
                 : [],
             ),
-          ],
+          ]
+        : [],
     [definition],
   );
+  const variables =
+    context.kind === "expression" ? context.variables : declaredVariables;
+  const scriptSyntax = context.kind !== "expression";
+  const includeModules = context.kind === "script";
   const formulaSupport = useFormulaSupport(
     editor,
     editorModel,
     variables,
-    !Array.isArray(definition),
+    scriptSyntax,
   );
   useEffect(() => {
     // Providers must register after Monaco attaches the model. An initial token
@@ -60,7 +68,7 @@ export function useArcLanguageSupport(
           for (const symbol of expressionSymbols(
             model.getValue(),
             variables,
-            !Array.isArray(definition),
+            scriptSyntax,
           )) {
             const position = model.getPositionAt(symbol.offset);
             const line = position.lineNumber - 1;
@@ -144,7 +152,7 @@ export function useArcLanguageSupport(
         const symbol = expressionSymbols(
           model.getValue(),
           variables,
-          !Array.isArray(definition),
+          scriptSyntax,
         ).find(
           (entry) =>
             offset >= entry.offset && offset < entry.offset + entry.length,
@@ -210,6 +218,6 @@ export function useArcLanguageSupport(
       hover.dispose();
       colors.dispose();
     };
-  }, [editor, editorModel, functions, definition, variables, includeModules]);
+  }, [editor, editorModel, functions, variables, scriptSyntax, includeModules]);
   return formulaSupport;
 }

@@ -40,7 +40,8 @@ export const studioApi = {
     http.get<FunctionEntry[]>("/functions", options),
   render: (definition: Definition, options?: RequestOptions) =>
     http.post<{ source: string }>("/studio/render", definition, options),
-  build: (source: string) => http.post<Build>("/studio/build", { source }),
+  build: (source: string, options?: RequestOptions) =>
+    http.post<Build>("/studio/build", { source }, options),
   renderNode: (
     definition: Definition,
     nodeId: string,

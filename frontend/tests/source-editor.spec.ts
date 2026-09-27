@@ -126,6 +126,93 @@ test("saving A preserves the selection and edits of B when A completes", async (
   }
 });
 
+for (const scenario of ["current", "reopened", "failed"] as const) {
+  test(`source save ${scenario} retains test parameters edited before its response`, async ({
+    page,
+  }) => {
+    await mockWorkspace(page);
+    const gate = deferredResponse();
+    let held = false;
+    let delivered = false;
+    await page.route("**/api/sources/source-a", async (route) => {
+      held = true;
+      const payload = route.request().postDataJSON();
+      await gate.promise;
+      await route.fulfill(
+        scenario === "failed"
+          ? { status: 409, json: { message: "Source save conflict" } }
+          : {
+              json: {
+                ...first,
+                name: payload.name,
+                definition: payload.definition,
+                version: 3,
+              },
+            },
+      );
+      delivered = true;
+    });
+    let tested: unknown;
+    await page.route("**/api/sources/source-a/test", (route) => {
+      tested = route.request().postDataJSON();
+      return route.fulfill({ json: { result: 42 } });
+    });
+    page.on("dialog", (dialog) => dialog.accept());
+    try {
+      await page.goto("/#/sources");
+      await page.getByLabel("Name", { exact: true }).fill("Saved A");
+      await page.getByRole("button", { name: "Save new version" }).click();
+      await expect.poll(() => held).toBe(true);
+      if (scenario === "reopened") {
+        await page
+          .locator(".source-list > button")
+          .filter({ hasText: "Source B" })
+          .click();
+        await page
+          .locator(".source-list > button")
+          .filter({ hasText: "Source A" })
+          .click();
+        await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
+          "Source A",
+        );
+      }
+      const input = page.getByLabel("Test parameters · JSON");
+      await expect(input).toBeEnabled();
+      await input.fill('{"key":"CUSTOM"}');
+      gate.release();
+      await expect.poll(() => delivered).toBe(true);
+      await expect(page.getByLabel("Name", { exact: true })).toBeEnabled();
+      await expect(input).toHaveValue('{"key":"CUSTOM"}');
+      await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
+        "Saved A",
+      );
+      const save = page.getByRole("button", { name: "Save new version" });
+      if (scenario === "failed") {
+        await expect(page.getByText("Source save conflict")).toBeVisible();
+        await expect(save).toBeEnabled();
+        await expect(
+          page.getByRole("combobox", { name: "Inspect version" }),
+        ).toContainText("v2");
+      } else {
+        await expect(save).toBeDisabled();
+        await expect(
+          page.getByRole("combobox", { name: "Inspect version" }),
+        ).toContainText("v3");
+        await page.getByRole("button", { name: "Fetch sample" }).click();
+        await expect(page.getByTestId("source-result")).toHaveText("42");
+        expect(tested).toEqual({ version: 3, inputs: { key: "CUSTOM" } });
+        await page
+          .locator(".source-list > button")
+          .filter({ hasText: "Source B" })
+          .click();
+        await expect(input).toHaveValue(JSON.stringify({ key: "US" }, null, 2));
+      }
+    } finally {
+      gate.release();
+    }
+  });
+}
+
 for (const change of ["source", "version", "input"] as const) {
   test(`a source test ignores late results after changing ${change}`, async ({
     page,

@@ -46,12 +46,10 @@ export default function CodeStudio({
   const insert = (snippet: string, atEnd = false) => {
     if (!latest.current.readOnly) insertSnippet(editor.current, snippet, atEnd);
   };
-  const { insertFormula } = useArcLanguageSupport(
-    editor,
-    model,
-    functions,
+  const { insertFormula } = useArcLanguageSupport(editor, model, functions, {
+    kind: "script",
     definition,
-  );
+  });
 
   const mount = (instance: monaco.editor.IStandaloneCodeEditor) => {
     onMount(instance);

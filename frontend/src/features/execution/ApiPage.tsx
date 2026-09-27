@@ -108,7 +108,7 @@ export default function ApiPage({
             <CatalogPagination
               label="Published rules"
               offset={request.offset}
-              limit={20}
+              limit={request.catalogPage.limit}
               total={request.catalogPage.total}
               loading={request.catalogLoading}
               onPage={request.setOffset}
@@ -150,7 +150,7 @@ export default function ApiPage({
             <CatalogPagination
               label="Published versions"
               offset={request.versionOffset}
-              limit={20}
+              limit={request.versionPage.limit}
               total={request.versionPage.total}
               loading={request.versionLoading || !id}
               onPage={request.setVersionOffset}

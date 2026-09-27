@@ -55,13 +55,10 @@ export default function ExpressionDialog({
     250,
   );
   const names = variables.map((variable) => variable.name);
-  const { insertFormula } = useArcLanguageSupport(
-    editor,
-    model,
-    functions,
+  const { insertFormula } = useArcLanguageSupport(editor, model, functions, {
+    kind: "expression",
     variables,
-    false,
-  );
+  });
   const missing =
     check?.variables.filter((name) => !names.includes(name)) ?? [];
   const error =

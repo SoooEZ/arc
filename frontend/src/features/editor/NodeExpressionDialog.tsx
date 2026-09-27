@@ -50,12 +50,10 @@ export default function NodeExpressionDialog({
     [] as FunctionEntry[],
   );
   const { editor, model, onMount } = useArcEditor(diagnostics, "arc-node");
-  const { insertFormula } = useArcLanguageSupport(
-    editor,
-    model,
-    functions,
+  const { insertFormula } = useArcLanguageSupport(editor, model, functions, {
+    kind: "node",
     definition,
-  );
+  });
   const insert = (snippet: string) => {
     if (!readOnly) insertSnippet(editor.current, snippet);
   };

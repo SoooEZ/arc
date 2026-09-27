@@ -2,7 +2,8 @@ import { Autocomplete, Button, MenuItem, TextField } from "@mui/material";
 import { ChevronRight } from "lucide-react";
 import ValueBinding from "../../expressions/ValueBinding";
 import ExpressionField from "../../expressions/ExpressionField";
-import { literalText, simpleComparison } from "../../../domain/expressions";
+import { simpleComparison } from "../../../domain/expressions";
+import { comparisonBindingType } from "../../../domain/valueBinding";
 import { useState } from "react";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
@@ -82,11 +83,11 @@ export default function ExpressionFields({
           <ValueBinding
             key={`${node.id}:${condition[1].trim()}`}
             label="Comparison value"
-            type={
+            type={comparisonBindingType(
+              condition[3].trim(),
               rule.draft.inputs.find((v) => v.name === condition[1].trim())
-                ?.type ||
-              (literalText(condition[3].trim()) !== null ? "STRING" : "NUMBER")
-            }
+                ?.type,
+            )}
             value={condition[3].trim()}
             variables={variables}
             disabled={readOnly}
