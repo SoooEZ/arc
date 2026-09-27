@@ -150,6 +150,100 @@ test("provider changes keep raw JSON editing separate from a saved configuration
   expect(original.definition.kind).toBe("LOOKUP");
 });
 
+test("historical source metadata initializes only the untouched test buffer of its selection", () => {
+  const current = source("first");
+  current.version = 3;
+  const historical = {
+    ...current.definition,
+    parameters: current.definition.parameters.map((parameter) => ({
+      ...parameter,
+      defaultValue: "GB",
+    })),
+  };
+  const inspecting = sourceDocumentReducer(openSource(current, 1), {
+    type: "version",
+    version: 2,
+    configuration: current.definition,
+  });
+  const loaded = {
+    type: "version/loaded" as const,
+    selection: 1,
+    version: 2,
+    configuration: historical,
+  };
+  expect(
+    JSON.parse(sourceDocumentReducer(inspecting, loaded)!.testInput),
+  ).toEqual({ key: "GB" });
+
+  const edited = sourceDocumentReducer(inspecting, {
+    type: "test/input",
+    value: '{"key":',
+  });
+  expect(sourceDocumentReducer(edited, loaded)).toBe(edited);
+  expect(edited!.testInput).toBe('{"key":');
+
+  const anotherVersion = sourceDocumentReducer(inspecting, {
+    type: "version",
+    version: 3,
+    configuration: current.definition,
+  });
+  expect(sourceDocumentReducer(anotherVersion, loaded)).toBe(anotherVersion);
+  const reopened = sourceDocumentReducer(inspecting, {
+    type: "select",
+    source: { ...current, version: 2 },
+    selection: 2,
+  });
+  expect(sourceDocumentReducer(reopened, loaded)).toBe(reopened);
+});
+
+test("source candidates serialize only the active provider without consuming inactive JSON buffers", () => {
+  const original = source("first");
+  original.definition.url = "https://example.com/source";
+  original.definition.secretHeaders = { Authorization: "CRM_TOKEN" };
+  let document = sourceDocumentReducer(openSource(original, 1), {
+    type: "buffer",
+    field: "entries",
+    value: "{unfinished lookup",
+  });
+  document = sourceDocumentReducer(document, {
+    type: "provider",
+    kind: "HTTP",
+  });
+  const http = sourceCandidate(document!.source, document!.buffers);
+  expect(http.definition).toMatchObject({
+    kind: "HTTP",
+    url: original.definition.url,
+    secretHeaders: original.definition.secretHeaders,
+  });
+  expect(http.definition).not.toHaveProperty("entries");
+  expect(document!.buffers.entries).toBe("{unfinished lookup");
+
+  document = sourceDocumentReducer(document, {
+    type: "buffer",
+    field: "secretHeaders",
+    value: "{unfinished headers",
+  });
+  document = sourceDocumentReducer(document, {
+    type: "provider",
+    kind: "LOOKUP",
+  });
+  expect(document!.buffers.entries).toBe("{unfinished lookup");
+  expect(() => sourceCandidate(document!.source, document!.buffers)).toThrow();
+  document = sourceDocumentReducer(document, {
+    type: "buffer",
+    field: "entries",
+    value: '{"US": false}',
+  });
+  const lookup = sourceCandidate(document!.source, document!.buffers);
+  expect(lookup.definition).toMatchObject({
+    kind: "LOOKUP",
+    entries: { US: false },
+  });
+  expect(lookup.definition).not.toHaveProperty("url");
+  expect(lookup.definition).not.toHaveProperty("secretHeaders");
+  expect(document!.buffers.secretHeaders).toBe("{unfinished headers");
+});
+
 test("source samples respect structured values and falsy defaults", () => {
   const config = source("first").definition;
   config.parameters = [

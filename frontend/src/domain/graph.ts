@@ -36,7 +36,10 @@ export function removeGraphNode(
   definition: Definition,
   id: string,
 ): Definition {
-  if (definition.nodes.find((node) => node.id === id)?.type === "INPUT")
+  if (
+    definition.nodes.length <= 1 ||
+    definition.nodes.find((node) => node.id === id)?.type === "INPUT"
+  )
     return definition;
   return {
     ...definition,

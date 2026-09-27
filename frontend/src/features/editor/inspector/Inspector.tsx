@@ -42,7 +42,7 @@ interface Props {
   onNodeChange: (id: string, patch: Partial<RuleNode>) => void;
   onDelete?: (id: string) => void;
   onDefinitionChange: (fn: (d: Definition) => Definition) => void;
-  onInvalidJson: (key: string, invalid: boolean) => void;
+  onInvalidDefault: (key: string, invalid: boolean) => void;
   onExpression?: (id: string) => void;
   onOpenReference: (target: ReferenceTarget) => void;
   errors: string[];
@@ -57,7 +57,7 @@ export default function Inspector({
   onNodeChange,
   onDelete,
   onDefinitionChange,
-  onInvalidJson,
+  onInvalidDefault,
   onExpression,
   onOpenReference,
   errors,
@@ -84,7 +84,7 @@ export default function Inspector({
     patch,
     variables,
     onDefinitionChange,
-    onInvalidJson,
+    onInvalidDefault,
     onOpenReference,
   };
   return (
@@ -111,7 +111,13 @@ export default function Inspector({
               </Tooltip>
             )}
             <Tooltip
-              title={onDelete && node.type !== "INPUT" ? "Delete node" : ""}
+              title={
+                onDelete && node.type !== "INPUT"
+                  ? rule.draft.nodes.length <= 1
+                    ? "Keep at least one node in the draft"
+                    : "Delete node"
+                  : ""
+              }
             >
               <span className="inspector-delete-slot">
                 {onDelete && node.type !== "INPUT" && (
@@ -119,9 +125,10 @@ export default function Inspector({
                     size="small"
                     color="error"
                     aria-label="Delete node"
-                    disabled={readOnly}
+                    disabled={readOnly || rule.draft.nodes.length <= 1}
                     onClick={() => {
-                      if (!readOnly) onDelete(node.id);
+                      if (!readOnly && rule.draft.nodes.length > 1)
+                        onDelete(node.id);
                     }}
                   >
                     <Trash2 size={16} />

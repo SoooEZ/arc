@@ -31,7 +31,8 @@ monaco.languages.setMonarchTokensProvider("arc", {
   tokenizer: {
     root: [
       [/\/\/.*$/, "comment"],
-      [/"([^"\\]|\\.)*("|$)|'([^'\\]|\\.)*('|$)/, "string"],
+      [/"/, "string", "@doubleQuotedString"],
+      [/'/, "string", "@singleQuotedString"],
       [/@[a-z][a-z0-9-]*(?::[1-9]\d*)?/, "formula"],
       [
         /\b(schema|inputs|node|at|let|when|select|case|equals|field|return|use|version|bind|as|next|edge|source|required|optional|default)\b/,
@@ -47,6 +48,18 @@ monaco.languages.setMonarchTokensProvider("arc", {
       [/\d+(\.\d+)?/, "number"],
       [/[{}()[\]]/, "@brackets"],
       [/[+\-*/=><!&|^]+/, "operator"],
+    ],
+    doubleQuotedString: [
+      [/[^"\\]+/, "string"],
+      [/\\./, "string"],
+      [/\\/, "string"],
+      [/"/, "string", "@pop"],
+    ],
+    singleQuotedString: [
+      [/[^'\\]+/, "string"],
+      [/\\./, "string"],
+      [/\\/, "string"],
+      [/'/, "string", "@pop"],
     ],
   },
 });

@@ -172,7 +172,8 @@ export function useSourceEditor({
       ) {
         setInspectedConfig(loaded.definition);
         dispatch({
-          type: "version",
+          type: "version/loaded",
+          selection: currentSelection,
           version,
           configuration: loaded.definition,
         });

@@ -479,3 +479,132 @@ test("source history pages load only the inspected version definition", async ({
   await expect(page.locator(".source-json")).toContainText('"US": 25');
   expect(details).toEqual([45, 25]);
 });
+
+for (const failure of [false, true]) {
+  test(`historical source metadata ${failure ? "failure" : "success"} preserves test parameters typed while loading`, async ({
+    page,
+  }) => {
+    await mockWorkspace(page);
+    const gate = deferredResponse();
+    let held = false;
+    const historical = {
+      ...first,
+      version: 1,
+      definition: {
+        ...first.definition,
+        parameters: first.definition.parameters.map((parameter) => ({
+          ...parameter,
+          defaultValue: "GB",
+        })),
+      },
+    };
+    await page.route("**/api/sources/source-a/versions/1", async (route) => {
+      held = true;
+      await gate.promise;
+      await route.fulfill(
+        failure
+          ? { status: 503, json: { message: "Historical source unavailable" } }
+          : { json: historical },
+      );
+    });
+    let tested: unknown;
+    await page.route("**/api/sources/source-a/test", (route) => {
+      tested = route.request().postDataJSON();
+      return route.fulfill({ json: { result: 42 } });
+    });
+    try {
+      await page.goto("/#/sources");
+      await page.getByRole("combobox", { name: "Inspect version" }).click();
+      await page.getByRole("option", { name: "v1 · immutable" }).click();
+      await expect.poll(() => held).toBe(true);
+      const input = page.getByLabel("Test parameters · JSON");
+      await input.fill('{"key":"CUSTOM"}');
+      gate.release();
+      await expect(page.getByLabel("Loading source version")).toHaveCount(0);
+      await expect(input).toHaveValue('{"key":"CUSTOM"}');
+      const fetchSample = page.getByRole("button", { name: "Fetch sample" });
+      if (failure) {
+        await expect(
+          page.getByText("Historical source unavailable"),
+        ).toBeVisible();
+        await expect(fetchSample).toBeDisabled();
+        expect(tested).toBeUndefined();
+      } else {
+        await fetchSample.click();
+        await expect(page.getByTestId("source-result")).toHaveText("42");
+        expect(tested).toEqual({ version: 1, inputs: { key: "CUSTOM" } });
+
+        await page.getByRole("combobox", { name: "Inspect version" }).click();
+        await page.getByRole("option", { name: "v2 · latest" }).click();
+        await page.getByRole("combobox", { name: "Inspect version" }).click();
+        await page.getByRole("option", { name: "v1 · immutable" }).click();
+        await expect(input).toHaveValue(JSON.stringify({ key: "GB" }, null, 2));
+      }
+    } finally {
+      gate.release();
+    }
+  });
+}
+
+for (const provider of ["HTTP", "LOOKUP"] as const) {
+  test(`saving ${provider} ignores inactive provider JSON and excludes its configuration`, async ({
+    page,
+  }) => {
+    await mockWorkspace(page);
+    let saved: DataSource | undefined;
+    await page.route("**/api/sources/source-a", (route) => {
+      const payload = route.request().postDataJSON();
+      saved = { ...first, ...payload, version: 3 };
+      return route.fulfill({ json: saved });
+    });
+    await page.goto("/#/sources");
+    const providerField = page.getByRole("combobox", {
+      name: "Provider",
+      exact: true,
+    });
+    if (provider === "HTTP") {
+      await page
+        .getByLabel("Lookup entries · JSON object")
+        .fill("{unfinished lookup");
+      await providerField.click();
+      await page
+        .getByRole("option", { name: "HTTP GET · JSON response" })
+        .click();
+      await page.getByLabel("HTTP URL").fill("https://example.com/source");
+      await page
+        .getByLabel("Secret header aliases · JSON")
+        .fill('{"Authorization":"CRM_TOKEN"}');
+    } else {
+      await providerField.click();
+      await page
+        .getByRole("option", { name: "HTTP GET · JSON response" })
+        .click();
+      await page.getByLabel("HTTP URL").fill("https://example.com/obsolete");
+      await page
+        .getByLabel("Secret header aliases · JSON")
+        .fill("{unfinished headers");
+      await providerField.click();
+      await page.getByRole("option", { name: "Local lookup table" }).click();
+      await page
+        .getByLabel("Lookup entries · JSON object")
+        .fill('{"US": false}');
+    }
+    await page.getByRole("button", { name: "Save new version" }).click();
+    await expect.poll(() => saved?.version).toBe(3);
+    await expect(
+      page.getByRole("button", { name: "Save new version" }),
+    ).toBeDisabled();
+    expect(saved!.definition.kind).toBe(provider);
+    if (provider === "HTTP") {
+      expect(saved!.definition).not.toHaveProperty("entries");
+      expect(saved!.definition.secretHeaders).toEqual({
+        Authorization: "CRM_TOKEN",
+      });
+      expect(saved!.definition.url).toBe("https://example.com/source");
+    } else {
+      expect(saved!.definition).not.toHaveProperty("url");
+      expect(saved!.definition).not.toHaveProperty("secretHeaders");
+      expect(saved!.definition.entries).toEqual({ US: false });
+    }
+  });
+}

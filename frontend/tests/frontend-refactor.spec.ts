@@ -68,7 +68,7 @@ async function expectInvalidDefaultCannotSave(
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect(
       page.getByText(
-        "Fix the invalid JSON default before saving or changing views",
+        "Fix the invalid parameter default before saving or changing views",
         { exact: true },
       ),
     ).toBeVisible();

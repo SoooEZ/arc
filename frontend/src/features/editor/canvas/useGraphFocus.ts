@@ -11,7 +11,7 @@ interface Options {
   mode: "graph" | "code";
   unavailable: boolean;
   measurements: Record<string, { width: number; height: number }>;
-  selectNode: (id: string) => void;
+  selectNode: (id: string) => boolean;
   selectEdge: (id: string | null) => void;
   navigate: (path: string) => void;
 }
@@ -33,7 +33,7 @@ export function useGraphFocus({
   const [pendingFocus, setPendingFocus] = useState(requestedNode || null);
   const focusNode = useCallback(
     (id: string) => {
-      selectNode(id);
+      if (!selectNode(id)) return;
       selectEdge(null);
       const node = definition.nodes.find((candidate) => candidate.id === id);
       if (node)
@@ -47,7 +47,7 @@ export function useGraphFocus({
   );
 
   const jumpToNode = (id: string) => {
-    selectNode(id);
+    if (!selectNode(id)) return;
     setPendingFocus(id);
     if (mode === "code")
       navigate(

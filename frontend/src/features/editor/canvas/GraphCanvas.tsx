@@ -265,9 +265,20 @@ export default function GraphCanvas({
             </MenuItem>
           )}
           <MenuItem
-            disabled={readOnly || !!busy || menuNode?.type === "INPUT"}
+            disabled={
+              readOnly ||
+              !!busy ||
+              menuNode?.type === "INPUT" ||
+              (!!menuNode && definition.nodes.length <= 1)
+            }
             onClick={() => {
-              if (readOnly || busy || menuNode?.type === "INPUT") return;
+              if (
+                readOnly ||
+                busy ||
+                menuNode?.type === "INPUT" ||
+                (menuNode && definition.nodes.length <= 1)
+              )
+                return;
               setContextMenu(null);
               if (menuEdge) removeEdge(menuEdge.id);
               else if (menuNode) onDeleteNode(menuNode.id);

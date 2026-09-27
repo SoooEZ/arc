@@ -66,8 +66,8 @@ function EditorContent({
     dispatch,
     readOnly,
     dirty,
-    hasInvalidJson,
-    onInvalidJson,
+    hasInvalidDefaults,
+    onInvalidDefault,
     changeDefinition,
     busy,
     runTask,
@@ -86,9 +86,32 @@ function EditorContent({
     initial.draft.nodes.find((node) => node.type === "CONDITION")?.id ||
       initial.draft.nodes[0].id,
   );
+  const selectNode = useCallback(
+    (id: string) => {
+      if (hasInvalidDefaults && id !== selected) {
+        setError(
+          "Fix the invalid parameter default before selecting another node",
+        );
+        return false;
+      }
+      setSelected(id);
+      return true;
+    },
+    [hasInvalidDefaults, selected, setError],
+  );
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const nodeNameInput = useRef<HTMLInputElement>(null);
   const [nodeCode, setNodeCode] = useState<string | null>(null);
+  const openNodeCode = useCallback(
+    (id: string) => {
+      if (hasInvalidDefaults) {
+        setError("Fix the invalid parameter default before opening node code");
+        return;
+      }
+      setNodeCode(id);
+    },
+    [hasInvalidDefaults, setError],
+  );
   const [nodeEdit, setNodeEdit] = useState<string | null>(null);
   const [nodeCodeProblems, setNodeCodeProblems] = useState<string[]>([]);
   const [referenceTarget, setReferenceTarget] =
@@ -100,7 +123,7 @@ function EditorContent({
     rule,
     version: requestedVersion,
     loading: versionUnavailable,
-    invalidJson: hasInvalidJson,
+    invalidDefaults: hasInvalidDefaults,
     runtime: runtimeProblems,
     inherited: initialProblems,
     nodeCode,
@@ -113,7 +136,7 @@ function EditorContent({
     selected,
     selectedEdge,
     setSelectedEdge,
-    onExpression: setNodeCode,
+    onExpression: openNodeCode,
     trace,
     nodeErrors,
     readOnly,
@@ -128,7 +151,7 @@ function EditorContent({
     busy,
     changeDefinition,
     dispatch,
-    selectNode: setSelected,
+    selectNode,
     runTask,
   });
   const { focusNode, jumpToNode } = useGraphFocus({
@@ -139,7 +162,7 @@ function EditorContent({
     mode,
     unavailable: versionUnavailable,
     measurements,
-    selectNode: setSelected,
+    selectNode,
     selectEdge: setSelectedEdge,
     navigate,
   });
@@ -165,9 +188,9 @@ function EditorContent({
   };
   const openNodeEditor = (id: string) => {
     if (readOnly || busy) return;
-    if (hasInvalidJson) {
+    if (hasInvalidDefaults) {
       setError(
-        "Fix the invalid JSON default before opening another node editor",
+        "Fix the invalid parameter default before opening another node editor",
       );
       return;
     }
@@ -175,8 +198,10 @@ function EditorContent({
   };
   const renameNode = (id: string) => {
     if (readOnly || busy) return;
-    if (hasInvalidJson && id !== selected) {
-      setError("Fix the invalid JSON default before renaming another node");
+    if (hasInvalidDefaults && id !== selected) {
+      setError(
+        "Fix the invalid parameter default before renaming another node",
+      );
       return;
     }
     setSelected(id);
@@ -256,7 +281,7 @@ function EditorContent({
           onClose={() => setHistory(false)}
         />
       )}
-      {mode === "code" || sourceDirty ? (
+      {(mode === "code" && !hasInvalidDefaults) || sourceDirty ? (
         <>
           <Suspense
             fallback={
@@ -297,7 +322,7 @@ function EditorContent({
             busy={busy}
             selected={selected}
             selectedEdge={selectedEdge}
-            setSelected={setSelected}
+            setSelected={selectNode}
             setSelectedEdge={setSelectedEdge}
             nodeErrors={nodeErrors}
             focusNode={focusNode}
@@ -322,14 +347,14 @@ function EditorContent({
               rule.draft.nodes[0]
             }
             rules={rules}
-            readOnly={readOnly || !!busy || !!nodeEdit}
+            readOnly={readOnly || !!busy || !!nodeEdit || !!nodeCode}
             nameInputRef={nodeNameInput}
             onNodeChange={patchNode}
             onDelete={removeNode}
             onDefinitionChange={changeDefinition}
-            onInvalidJson={onInvalidJson}
+            onInvalidDefault={onInvalidDefault}
             errors={nodeErrors[selected] || []}
-            onExpression={(id) => setNodeCode(id)}
+            onExpression={openNodeCode}
             onOpenReference={openReference}
           />
         </div>

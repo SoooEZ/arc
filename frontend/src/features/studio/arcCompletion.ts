@@ -5,11 +5,17 @@ export function isStringOrComment(
   model: monaco.editor.ITextModel,
   position: monaco.Position,
 ) {
-  const tokens = monaco.editor.tokenize(
-    model.getLineContent(position.lineNumber),
-    "arc",
-  )[0];
-  let token: monaco.Token | undefined;
+  // Tokenizing a line alone loses an opening quote from an earlier line.
+  // Carry the language's lexical state through the current document prefix.
+  const prefix = model.getValueInRange({
+    startLineNumber: 1,
+    startColumn: 1,
+    endLineNumber: position.lineNumber,
+    endColumn: model.getLineMaxColumn(position.lineNumber),
+  });
+  const tokens = monaco.editor.tokenize(prefix, "arc")[position.lineNumber - 1];
+  // Hover can target the first character of a continued string line.
+  let token = tokens?.[0];
   for (const entry of tokens ?? []) {
     if (entry.offset >= position.column - 1) break;
     token = entry;

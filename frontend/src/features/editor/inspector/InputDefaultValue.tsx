@@ -1,6 +1,7 @@
 import { MenuItem, TextField } from "@mui/material";
 import type { Input } from "../../../types";
 import JsonField from "../../../components/JsonField";
+import NumericDefaultField from "./NumericDefaultField";
 
 export default function InputDefaultValue({
   input,
@@ -42,17 +43,23 @@ export default function InputDefaultValue({
         <MenuItem value="false">false</MenuItem>
       </TextField>
     );
+  if (input.type === "NUMBER")
+    return (
+      <NumericDefaultField
+        value={input.defaultValue}
+        disabled={disabled}
+        onChange={onChange}
+        onValidity={onValidity}
+      />
+    );
   return (
     <TextField
       label="Default value (optional)"
-      type={input.type === "NUMBER" ? "number" : "text"}
       value={input.defaultValue ?? ""}
       disabled={disabled}
       onChange={(event) => {
         const value = event.target.value;
-        onChange(
-          value === "" ? null : input.type === "NUMBER" ? Number(value) : value,
-        );
+        onChange(value === "" ? null : value);
       }}
     />
   );

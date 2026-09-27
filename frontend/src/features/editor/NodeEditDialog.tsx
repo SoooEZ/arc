@@ -39,12 +39,14 @@ export default function NodeEditDialog({
     `Edit node · ${rule.draft.nodes.find((node) => node.id === nodeId)!.label}`,
   );
   const [draft, setDraft] = useState(before);
-  const [invalidJson, setInvalidJson] = useState<Record<string, boolean>>({});
+  const [invalidDefaults, setInvalidDefaults] = useState<
+    Record<string, boolean>
+  >({});
   const [error, setError] = useState("");
   const node = draft.nodes.find((candidate) => candidate.id === nodeId)!;
-  const hasInvalidJson = Object.values(invalidJson).some(Boolean);
-  const onInvalidJson = useCallback((key: string, invalid: boolean) => {
-    setInvalidJson((current) =>
+  const hasInvalidDefaults = Object.values(invalidDefaults).some(Boolean);
+  const onInvalidDefault = useCallback((key: string, invalid: boolean) => {
+    setInvalidDefaults((current) =>
       current[key] === invalid ? current : { ...current, [key]: invalid },
     );
   }, []);
@@ -54,7 +56,7 @@ export default function NodeEditDialog({
     setError("");
   };
   const apply = () => {
-    if (readOnly || hasInvalidJson) return;
+    if (readOnly || hasInvalidDefaults) return;
     if (!applyNodeFormDraft(rule.draft, before, draft, nodeId)) {
       setError(
         "This node changed while the editor was open. Cancel and reopen it to use the latest values.",
@@ -112,7 +114,7 @@ export default function NodeEditDialog({
             changeDraft((current) => patchGraphNode(current, id, patch))
           }
           onDefinitionChange={changeDraft}
-          onInvalidJson={onInvalidJson}
+          onInvalidDefault={onInvalidDefault}
           onOpenReference={onOpenReference}
           errors={[]}
         />
@@ -122,7 +124,7 @@ export default function NodeEditDialog({
         <Button
           variant="contained"
           onClick={apply}
-          disabled={readOnly || hasInvalidJson}
+          disabled={readOnly || hasInvalidDefaults}
         >
           Apply to graph
         </Button>

@@ -22,13 +22,20 @@ export function sourceCandidate(
   const parameters: unknown = JSON.parse(buffers.parameters);
   const namesError = sourceParameterNamesError(parameters);
   if (namesError) throw new Error(namesError);
+  const {
+    entries: _entries,
+    secretHeaders: _secretHeaders,
+    url,
+    ...configuration
+  } = source.definition;
   return {
     ...source,
     definition: {
-      ...source.definition,
+      ...configuration,
       parameters: parameters as Input[],
-      entries: JSON.parse(buffers.entries),
-      secretHeaders: JSON.parse(buffers.secretHeaders),
+      ...(configuration.kind === "HTTP"
+        ? { url, secretHeaders: JSON.parse(buffers.secretHeaders) }
+        : { entries: JSON.parse(buffers.entries) }),
     },
   };
 }

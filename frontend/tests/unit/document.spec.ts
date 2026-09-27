@@ -205,6 +205,8 @@ test("graph mutations preserve fan-out, avoid duplicate edges, and protect Input
   const removed = removeGraphNode(connected, "left");
   expect(removed.edges.map((edge) => edge.id)).toEqual(["fanout"]);
   expect(definition.nodes).toHaveLength(4);
+  const unfinished = { ...definition, nodes: [definition.nodes[3]], edges: [] };
+  expect(removeGraphNode(unfinished, "output")).toBe(unfinished);
 });
 
 test("moving a card changes the saved draft but not semantic diagnostic identity", () => {

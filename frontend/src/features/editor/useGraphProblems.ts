@@ -9,7 +9,7 @@ interface Options {
   rule: Rule;
   version: number | null;
   loading: boolean;
-  invalidJson: boolean;
+  invalidDefaults: boolean;
   runtime: GraphProblem[];
   inherited: GraphProblem[];
   nodeCode: string | null;
@@ -21,7 +21,7 @@ export function useGraphProblems({
   rule,
   version,
   loading,
-  invalidJson,
+  invalidDefaults,
   runtime,
   inherited,
   nodeCode,
@@ -67,8 +67,8 @@ export function useGraphProblems({
       (errors[location.nodeId] ||= []).push(problem.message);
     }
   const input = rule.draft.nodes.find((node) => node.type === "INPUT");
-  if (invalidJson && input)
-    (errors[input.id] ||= []).push("Fix the invalid JSON parameter value.");
+  if (invalidDefaults && input)
+    (errors[input.id] ||= []).push("Fix the invalid parameter default.");
   if (nodeCode && codeProblems.length)
     (errors[nodeCode] ||= []).push(...codeProblems);
   for (const id of Object.keys(errors)) errors[id] = [...new Set(errors[id])];

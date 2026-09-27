@@ -170,6 +170,8 @@ The included `country-tax` lookup returns `{ "rate": 0.07, "currency": "USD" }` 
 
 ## Formula examples
 
+Unfinished JSON defaults and numeric defaults that cannot be saved exactly show an error and block saving, node changes and code-view navigation until corrected or removed. Numeric fields accept equivalent decimal and exponent notation, but never silently round the submitted default. At least one node must remain in a draft, even while its graph is incomplete.
+
 Every built-in function call must use `$FUNCTION(...)`; published Formula calls use `@rule-id:version(...)`. Unprefixed calls are rejected in new and existing expressions, including published versions and source bindings. Update old drafts to add the prefix to calls, publish a new version, and update any parent references that pin the old version. Historical snapshots are not rewritten. Quoted strings retain their literal text; do not prefix function-like text inside a string.
 
 A rule’s permanent **Rule ID** uses 1–80 lowercase letters, digits or hyphens and starts with a letter. Spaces, `$` and `@` are forbidden. The create dialog rejects those characters when typing or pasting; its ID suggestion stays valid when the display name starts with a number. Rule display names remain separate from IDs.

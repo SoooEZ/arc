@@ -56,7 +56,14 @@ export function useGraphCommands({
 
   const removeNode = (id: string) => {
     const node = definition.nodes.find((candidate) => candidate.id === id);
-    if (readOnly || busy || !node || node.type === "INPUT") return;
+    if (
+      readOnly ||
+      busy ||
+      !node ||
+      node.type === "INPUT" ||
+      definition.nodes.length <= 1
+    )
+      return;
     changeDefinition((current) => removeGraphNode(current, id));
     const next =
       definition.nodes.find((node) => node.type === "INPUT") ||

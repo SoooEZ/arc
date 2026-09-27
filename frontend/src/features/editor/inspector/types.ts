@@ -9,6 +9,6 @@ export interface NodeFieldsProps {
   variables: VariableOption[];
   patch: (patch: Partial<RuleNode>) => void;
   onDefinitionChange: (change: (definition: Definition) => Definition) => void;
-  onInvalidJson: (key: string, invalid: boolean) => void;
+  onInvalidDefault: (key: string, invalid: boolean) => void;
   onOpenReference: (target: ReferenceTarget) => void;
 }

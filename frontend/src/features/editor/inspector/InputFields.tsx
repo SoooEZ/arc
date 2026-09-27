@@ -10,7 +10,7 @@ export default function InputFields({
   rule,
   readOnly,
   onDefinitionChange,
-  onInvalidJson,
+  onInvalidDefault,
 }: NodeFieldsProps) {
   const allVariables = inputVariables(rule.draft);
   const parameters = useInputParameterRows(
@@ -35,7 +35,7 @@ export default function InputFields({
           )}
           onChange={(patch) => parameters.change(index, patch)}
           onRemove={() => parameters.remove(index)}
-          onValidity={(valid) => onInvalidJson(id, !valid)}
+          onValidity={(valid) => onInvalidDefault(id, !valid)}
         />
       ))}
       {!readOnly && (

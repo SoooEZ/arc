@@ -8,6 +8,7 @@ export interface SourceDocument {
   baseline: string;
   viewedVersion: number;
   testInput: string;
+  testInputEdited: boolean;
   result: unknown;
   error: string;
   saving: { request: number; snapshot: string } | null;
@@ -49,6 +50,7 @@ export function openSource(
     baseline: sourceSnapshot(source, buffers),
     viewedVersion: source.version,
     testInput: sourceSample(source.definition),
+    testInputEdited: false,
     result: undefined,
     error: "",
     saving: null,
@@ -70,6 +72,12 @@ export type SourceDocumentAction =
   | { type: "buffer"; field: keyof SourceBuffers; value: string }
   | { type: "provider"; kind: SourceConfig["kind"] }
   | { type: "version"; version: number; configuration: SourceConfig }
+  | {
+      type: "version/loaded";
+      selection: number;
+      version: number;
+      configuration: SourceConfig;
+    }
   | { type: "test/input"; value: string }
   | { type: "save/start"; request: number }
   | {
@@ -142,9 +150,20 @@ export function sourceDocumentReducer(
         ...invalidateTest(document),
         viewedVersion: action.version,
         testInput: sourceSample(action.configuration),
+        testInputEdited: false,
       };
+    case "version/loaded":
+      return document.selection === action.selection &&
+        document.viewedVersion === action.version &&
+        !document.testInputEdited
+        ? { ...document, testInput: sourceSample(action.configuration) }
+        : document;
     case "test/input":
-      return { ...invalidateTest(document), testInput: action.value };
+      return {
+        ...invalidateTest(document),
+        testInput: action.value,
+        testInputEdited: true,
+      };
     case "save/start":
       return {
         ...document,

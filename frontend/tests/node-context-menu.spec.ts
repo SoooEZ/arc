@@ -152,7 +152,7 @@ test("input modal validates JSON locally and cancel clears only its own buffer",
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
     page.getByText(
-      "Fix the invalid JSON default before opening another node editor",
+      "Fix the invalid parameter default before opening another node editor",
     ),
   ).toBeVisible();
   await expect(sidebar.getByLabel("Default JSON (optional)")).toHaveValue("[");
@@ -260,7 +260,9 @@ test("Rename focuses the inline name, targets the clicked node, and preserves un
   let menu = await openMenu(page, "calc");
   await menu.getByRole("menuitem", { name: "Rename", exact: true }).click();
   await expect(
-    page.getByText("Fix the invalid JSON default before renaming another node"),
+    page.getByText(
+      "Fix the invalid parameter default before renaming another node",
+    ),
   ).toBeVisible();
   await expect(name).toHaveValue("Inputs");
   await expect(sidebar.getByLabel("Default JSON (optional)")).toHaveValue("[");

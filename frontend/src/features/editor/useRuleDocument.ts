@@ -39,8 +39,10 @@ export function useRuleDocument({
   const { rule, source, sourceDirty, baseline } = state;
   const latestState = useRef(state);
   latestState.current = state;
-  const [invalidJson, setInvalidJson] = useState<Record<string, boolean>>({});
-  const hasInvalidJson = Object.values(invalidJson).some(Boolean);
+  const [invalidDefaults, setInvalidDefaults] = useState<
+    Record<string, boolean>
+  >({});
+  const hasInvalidDefaults = Object.values(invalidDefaults).some(Boolean);
   const [busy, setBusy] = useState("");
   const running = useRef(false);
   const [error, setError] = useState("");
@@ -55,13 +57,13 @@ export function useRuleDocument({
   const readOnly = !!requestedVersion;
   const dirty =
     !readOnly &&
-    (hasInvalidJson || sourceDirty || ruleSnapshot(rule) !== baseline);
+    (hasInvalidDefaults || sourceDirty || ruleSnapshot(rule) !== baseline);
   useEffect(() => {
     onDirty(dirty);
   }, [dirty, onDirty]);
-  const onInvalidJson = useCallback(
+  const onInvalidDefault = useCallback(
     (key: string, invalid: boolean) =>
-      setInvalidJson((old) =>
+      setInvalidDefaults((old) =>
         old[key] === invalid ? old : { ...old, [key]: invalid },
       ),
     [],
@@ -123,9 +125,9 @@ export function useRuleDocument({
     [readOnly],
   );
   const buildCode = useCallback(async (): Promise<Definition> => {
-    if (hasInvalidJson)
+    if (hasInvalidDefaults)
       throw new Error(
-        "Fix the invalid JSON default before saving or changing views",
+        "Fix the invalid parameter default before saving or changing views",
       );
     if (!sourceDirty || source === null || readOnly) return rule.draft;
     const result = await studioApi.build(source);
@@ -149,9 +151,20 @@ export function useRuleDocument({
       source: result.source,
     });
     return result.definition;
-  }, [hasInvalidJson, sourceDirty, source, readOnly, rule.draft]);
+  }, [hasInvalidDefaults, sourceDirty, source, readOnly, rule.draft]);
   useEffect(() => {
-    if (mode !== "code" || source !== null || versionUnavailable) return;
+    if (mode !== "code" || !hasInvalidDefaults) return;
+    setError("Fix the invalid parameter default before changing views");
+    navigate(`/rules/${rule.id}`);
+  }, [mode, hasInvalidDefaults, navigate, rule.id]);
+  useEffect(() => {
+    if (
+      mode !== "code" ||
+      source !== null ||
+      versionUnavailable ||
+      hasInvalidDefaults
+    )
+      return;
     const controller = new AbortController();
     studioApi
       .render(rule.draft, { signal: controller.signal })
@@ -167,7 +180,7 @@ export function useRuleDocument({
         if (!controller.signal.aborted) fail(failure);
       });
     return () => controller.abort();
-  }, [mode, source, rule.draft, versionUnavailable, fail]);
+  }, [mode, source, rule.draft, versionUnavailable, hasInvalidDefaults, fail]);
   const current = useRef({
     sourceDirty,
     buildCode,
@@ -197,8 +210,10 @@ export function useRuleDocument({
   }, [mode]);
   const switchView = () =>
     runTask("switch", async () => {
-      if (hasInvalidJson)
-        throw new Error("Fix the invalid JSON default before changing views");
+      if (hasInvalidDefaults)
+        throw new Error(
+          "Fix the invalid parameter default before changing views",
+        );
       if (mode === "code") await buildCode();
       navigate(
         `/${mode === "code" ? "rules" : "studio"}/${rule.id}${requestedVersion ? `?version=${requestedVersion}` : ""}`,
@@ -247,8 +262,8 @@ export function useRuleDocument({
     dispatch,
     readOnly,
     dirty,
-    hasInvalidJson,
-    onInvalidJson,
+    hasInvalidDefaults,
+    onInvalidDefault,
     changeDefinition,
     busy,
     runTask,

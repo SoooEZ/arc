@@ -30,17 +30,17 @@ export default function App() {
     requestedVersion = parsed.version;
   const [detailAttempt, setDetailAttempt] = useState(0);
   const detail = useAsyncResource(
-    `${selectedId}:${detailAttempt}`,
+    `${selectedId}:${requestedVersion}:${detailAttempt}`,
     (signal) => ruleApi.get(selectedId!, { signal }),
     null as Rule | null,
     0,
     !!selectedId,
   );
   const selected =
-    savedRule?.id === selectedId &&
-    (!detail.data || savedRule.revision >= detail.data.revision)
+    detail.data &&
+    (savedRule?.id === selectedId && savedRule.revision >= detail.data.revision
       ? savedRule
-      : detail.data;
+      : detail.data);
   return (
     <div className="app-shell">
       <Sidebar
