@@ -25,7 +25,7 @@ ENGINE_DEPENDENCIES = {
     "graph": {"graph"},
     "validation": {"validation", "graph", "expression", "Identifiers", "InputTypes", "RuleResolver"},
     "script": {"script", "expression", "validation", "Identifiers"},
-    "execution": {"execution", "graph", "validation", "expression", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline"},
+    "execution": {"execution", "graph", "validation", "expression", "Identifiers", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline"},
 }
 PURE_FRONTEND = {
     "domain/": ("types", "domain/"),

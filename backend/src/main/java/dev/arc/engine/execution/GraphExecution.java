@@ -1,6 +1,7 @@
 package dev.arc.engine.execution;
 
 import dev.arc.engine.ExecutionDeadline;
+import dev.arc.engine.Identifiers;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
@@ -13,6 +14,8 @@ import java.util.*;
 /** One execution session; nested rules share its trace, recursion guard and source-read budget. */
 final class GraphExecution {
   private record Outcome(Object value, String branch) {}
+
+  private record ReachedOutput(Node node, Object value) {}
 
   private final ExecutionPlans.Session plans;
   private final ExecutionDeadline deadline;
@@ -68,7 +71,7 @@ final class GraphExecution {
       }
       Map<String, ExecutionScope> scopes = new HashMap<>();
       Map<String, String> branches = new HashMap<>();
-      Map<String, Object> outputs = new LinkedHashMap<>();
+      Map<String, ReachedOutput> outputs = new LinkedHashMap<>();
       // Topological order resolves skipped parents too. Every active join executes once.
       for (Node node : plan.order()) {
         try {
@@ -77,7 +80,18 @@ final class GraphExecution {
           checkStepBudget();
           executedSteps++;
           Outcome outcome = evaluate(node, values.variables(), depth, compiled, formulas);
-          if (node.type().equals("OUTPUT")) outputs.put(node.id(), outcome.value());
+          Object traceValue = outcome.value();
+          if (node.type().equals("OUTPUT")) {
+            String field = outputField(node);
+            if (outputs.containsKey(field)) {
+              Node previous = outputs.get(field).node();
+              throw ArcException.invalid(
+                      "Duplicate output field '" + field + "'; set distinct Output names")
+                  .atNode(ruleId, version, previous.id(), previous.label());
+            }
+            outputs.put(field, new ReachedOutput(node, outcome.value()));
+            traceValue = namedOutput(node, outcome.value());
+          }
           if (node.storesResult()) values.store(node.output(), outcome.value(), node.id());
           scopes.put(node.id(), values);
           branches.put(node.id(), outcome.branch());
@@ -88,7 +102,7 @@ final class GraphExecution {
                   node.id(),
                   node.label(),
                   node.type(),
-                  outcome.value(),
+                  traceValue,
                   outcome.branch(),
                   depth));
         } catch (ArcException error) {
@@ -96,12 +110,35 @@ final class GraphExecution {
         }
       }
       if (outputs.isEmpty()) throw ArcException.invalid("Execution did not reach an Output node");
-      return outputs.size() == 1 ? outputs.values().iterator().next() : outputs;
+      if (outputs.size() == 1) {
+        ReachedOutput output = outputs.values().iterator().next();
+        try {
+          return Expressions.bounded(namedOutput(output.node(), output.value()));
+        } catch (ArcException error) {
+          throw error.atNode(ruleId, version, output.node().id(), output.node().label());
+        }
+      }
+      var result = new LinkedHashMap<String, Object>();
+      outputs.forEach((field, output) -> result.put(field, output.value()));
+      return result;
     } catch (ArcException error) {
       throw error.inRule(ruleId, version);
     } finally {
       activeRules.remove(key);
     }
+  }
+
+  private String outputField(Node node) {
+    if (node.outputName() != null && !node.outputName().isEmpty()) return node.outputName();
+    String expression = node.expression().trim();
+    return Identifiers.isValid(expression) ? expression : node.id();
+  }
+
+  private Object namedOutput(Node node, Object value) {
+    if (node.outputName() == null || node.outputName().isEmpty()) return value;
+    var named = new LinkedHashMap<String, Object>();
+    named.put(node.outputName(), value);
+    return named;
   }
 
   /** Null means that every incoming path was skipped; it is distinct from a value of null. */
@@ -151,15 +188,9 @@ final class GraphExecution {
       }
       case "TRANSFORM" -> new Outcome(transform(node, scope, compiled, formulas), "next");
       case "REFERENCE" -> new Outcome(reference(node, scope, depth, compiled, formulas), "next");
-      case "OUTPUT" -> {
-        Object value = compiled.expression(node.expression()).evaluate(scope, deadline, formulas);
-        if (node.outputName() != null && !node.outputName().isEmpty()) {
-          var named = new LinkedHashMap<String, Object>();
-          named.put(node.outputName(), value);
-          value = Expressions.bounded(named);
-        }
-        yield new Outcome(value, null);
-      }
+      case "OUTPUT" ->
+          new Outcome(
+              compiled.expression(node.expression()).evaluate(scope, deadline, formulas), null);
       default -> throw ArcException.invalid("Unknown node type");
     };
   }

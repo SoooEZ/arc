@@ -131,6 +131,67 @@ try:
     request("GET", version_history + "?search=" + "1" * 201, expected=422)
     request("GET", f"/api/rules/{PREFIX}-missing/version-summaries?search=2", expected=404)
 
+    # Multiple reached Outputs name fields without adding a second alias wrapper.
+    named_graph = {
+        "schemaVersion": 1,
+        "inputs": [{"name": "amount", "type": "NUMBER", "required": True}],
+        "nodes": [
+            {"id": "input", "type": "INPUT", "label": "Inputs"},
+            {"id": "first", "type": "OUTPUT", "label": "Original", "expression": "amount"},
+            {"id": "second", "type": "OUTPUT", "label": "Discounted",
+             "expression": "amount * 0.72", "outputName": "discounted"}],
+        "edges": [{"id": name, "source": "input", "target": name, "sourceHandle": "next"}
+                  for name in ["first", "second"]]}
+    outputs = publish(create("outputs", definition=named_graph))
+    pinned_outputs = request("GET", f"/api/rules/{outputs['id']}/versions/1")["definition"]
+    for amount in [100, 50]:
+        expected = {"amount": amount, "discounted": amount * 0.72}
+        assert execute(outputs["id"], {"amount": amount}, 1)["result"] == expected
+        assert request("POST", "/api/preview", {
+            "definition": named_graph, "inputs": {"amount": amount}})["result"] == expected
+    rendered_outputs = request("POST", "/api/studio/render", named_graph)
+    assert "as discounted;" in rendered_outputs["source"]
+    rebuilt_outputs = request("POST", "/api/studio/build", rendered_outputs)
+    assert not rebuilt_outputs["diagnostics"]
+    assert request("POST", "/api/preview", {
+        "definition": rebuilt_outputs["definition"], "inputs": {"amount": 100}
+    })["result"] == {"amount": 100, "discounted": 72}
+
+    reused_graph = copy.deepcopy(parent["draft"])
+    reused_graph["nodes"][1].update(ruleId=outputs["id"], version=1,
+                                     bindings={"amount": "amount"}, output="totals")
+    reused_graph["nodes"][2]["expression"] = "totals.discounted"
+    reused_outputs = publish(create("reused-outputs", definition=reused_graph))
+    called_graph = copy.deepcopy(child["draft"])
+    called_graph["nodes"][1]["expression"] = f"@{outputs['id']}:1(amount)"
+    called_graph["nodes"][2]["expression"] = "total.amount"
+    called_outputs = publish(create("called-outputs", definition=called_graph))
+    assert execute(reused_outputs["id"], {"amount": 100})["result"] == 72
+    assert execute(called_outputs["id"], {"amount": 100})["result"] == 100
+    outputs["draft"]["nodes"][1]["outputName"] = "original"
+    outputs["draft"]["nodes"][2]["outputName"] = "payable"
+    outputs = publish(save(outputs))
+    assert execute(outputs["id"], {"amount": 100})["result"] == {"original": 100, "payable": 72}
+    assert execute(outputs["id"], {"amount": 100}, 1)["result"] == {"amount": 100, "discounted": 72}
+    assert execute(reused_outputs["id"], {"amount": 100})["result"] == 72
+    assert execute(called_outputs["id"], {"amount": 100})["result"] == 100
+    assert request("GET", f"/api/rules/{outputs['id']}/versions/1")["definition"] == pinned_outputs
+
+    collision = copy.deepcopy(named_graph)
+    collision["nodes"][1].update(expression="null", outputName="amount")
+    collision["nodes"][2].update(expression="amount", outputName=None)
+    failed = request("POST", "/api/preview", {"definition": collision, "inputs": {"amount": 100}}, 422)
+    assert "amount" in failed["message"]
+    assert {location["nodeId"] for location in failed["locations"]} == {"first", "second"}
+    collided_outputs = publish(create("output-collision", definition=collision))
+    failed = execute(collided_outputs["id"], {"amount": 100}, 1, expected=422)
+    assert {location["nodeId"] for location in failed["locations"]} == {"first", "second"}
+    nullable = copy.deepcopy(named_graph)
+    nullable["nodes"][1].update(expression="null", outputName="absent")
+    nullable["nodes"][2].update(expression='$OBJECT("amount", amount)', outputName="details")
+    assert request("POST", "/api/preview", {"definition": nullable, "inputs": {"amount": 100}})["result"] == {
+        "absent": None, "details": {"amount": 100}}
+
     # A valid graph can repeat large intermediate values; only trace is bounded.
     payload = ['x' * 100 for _ in range(100)]
     large = {"schemaVersion": 1, "inputs": [{"name": "payload", "type": "ARRAY", "required": True}],
@@ -170,6 +231,6 @@ try:
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         statuses = sorted(executor.map(competing_update, [1, 2]))
     assert statuses == [200, 409], statuses
-    print(f"PASS: {checks} HTTP checks, all pricing branches, immutable references, and concurrent edits.")
+    print(f"PASS: {checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, and concurrent edits.")
 finally:
     print("Created fixtures: " + ", ".join(created))

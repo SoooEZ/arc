@@ -234,6 +234,83 @@ class FormulaCallExecutionTest {
   }
 
   @Test
+  void referencesAndFormulaCallsReceiveTheSameNamedAggregate() {
+    var child =
+        script.parse(
+            """
+        inputs { amount: NUMBER required default 42; }
+        node in INPUT "Input" { next -> total; next -> missing; }
+        node total OUTPUT "Total" { return amount; as payable; }
+        node missing OUTPUT "Missing" { return null; as extra; }
+        """);
+    var resolver = formulas(Map.of("child:7", child));
+    for (String call :
+        List.of(
+            "node call REFERENCE \"Call\" { use child version 7; as bundle; next -> out; }",
+            "node call FORMULA \"Call\" { let bundle = @child:7(); next -> out; }")) {
+      var parent =
+          script.parse(
+              "node in INPUT \"Input\" { next -> call; } "
+                  + call
+                  + " node out OUTPUT \"Out\" { return bundle; }");
+      var result = run(parent, resolver);
+      var expected = new LinkedHashMap<String, Object>();
+      expected.put("extra", null);
+      expected.put("payable", new BigDecimal("42"));
+      assertThat(result.result()).isEqualTo(expected);
+      assertThat(result.trace())
+          .filteredOn(step -> step.ruleId().equals("child"))
+          .extracting(Engine.Step::nodeId)
+          .containsExactly("in", "missing", "total");
+      assertThat(result.trace())
+          .filteredOn(step -> step.ruleId().equals("child") && step.nodeId().equals("total"))
+          .extracting(Engine.Step::value)
+          .containsExactly(Map.of("payable", new BigDecimal("42")));
+      assertThat(result.trace())
+          .filteredOn(step -> step.nodeId().equals("call"))
+          .extracting(Engine.Step::value)
+          .containsExactly(expected);
+    }
+  }
+
+  @Test
+  void reachedDuplicateOutputFieldsRetainBothChildLocationsAndTheCaller() {
+    var child =
+        script.parse(
+            """
+        node in INPUT "Input" { next -> a; next -> b; }
+        node a OUTPUT "First" { return null; as total; }
+        node b OUTPUT "Second" { return 2; as total; }
+        """);
+    var resolver = formulas(Map.of("child:7", child));
+    for (String call :
+        List.of(
+            "node call REFERENCE \"Call\" { use child version 7; as bundle; next -> out; }",
+            "node call FORMULA \"Call\" { let bundle = @child:7(); next -> out; }")) {
+      var parent =
+          script.parse(
+              "node in INPUT \"Input\" { next -> call; } "
+                  + call
+                  + " node out OUTPUT \"Out\" { return bundle; }");
+      assertThatThrownBy(() -> run(parent, resolver))
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(422);
+                assertThat(error.getMessage())
+                    .isEqualTo("Duplicate output field 'total'; set distinct Output names");
+                assertThat(error.locations())
+                    .containsExactly(
+                        new ArcException.Location("child", 7, "a", "First"),
+                        new ArcException.Location("child", 7, "b", "Second"),
+                        new ArcException.Location("parent", 1, "call", "Call"));
+              });
+    }
+    assertThat(run(graph(List.of(), "$IF(false, @child:7(), 0)"), resolver).result())
+        .isEqualTo(BigDecimal.ZERO);
+  }
+
+  @Test
   void aChildDeadlineCannotBeHiddenByIferror() {
     var deadline = ExecutionDeadline.start(100);
     var child =

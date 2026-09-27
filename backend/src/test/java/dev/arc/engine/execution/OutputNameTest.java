@@ -74,7 +74,7 @@ class OutputNameTest {
   }
 
   @Test
-  void multipleOutputsStillAggregateByNodeIdAndAliasesCanRepeat() {
+  void multipleNamedOutputsContributeRawValuesAtTheirEffectiveKeys() {
     var single = graph(output("first", "value", "total"));
     var definition =
         new Definition(
@@ -83,18 +83,17 @@ class OutputNameTest {
             List.of(
                 single.nodes().getFirst(),
                 single.nodes().getLast(),
-                output("second", "null", "total"),
+                output("second", "null", "missing"),
                 output("plain", "value + 1", null)),
             List.of(
                 edge("input", "first", "next"),
                 edge("input", "second", "next"),
                 edge("input", "plain", "next")));
-    assertThat(run(definition).result())
-        .isEqualTo(
-            Map.of(
-                "first", Map.of("total", new BigDecimal("42")),
-                "second", Collections.singletonMap("total", null),
-                "plain", new BigDecimal("43")));
+    var expected = new LinkedHashMap<String, Object>();
+    expected.put("total", new BigDecimal("42"));
+    expected.put("plain", new BigDecimal("43"));
+    expected.put("missing", null);
+    assertThat(run(definition).result()).isEqualTo(expected);
   }
 
   @Test

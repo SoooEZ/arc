@@ -308,7 +308,7 @@ Rule (stable ID)
     └── Reference nodes → rule ID + exact version + parameter expressions
 ```
 
-The evaluator starts at Input and executes active nodes in a deterministic dependency order. A handle may feed several downstream nodes. Joins wait for their active upstream computations and run once; conditions activate only their selected exit. One reached Output returns its value; multiple reached Outputs return an object keyed by node ID, such as `{"tax": 10, "shipping": 5}`. Graphs cannot contain cycles. Node positions are presentation metadata.
+The evaluator starts at Input and executes active nodes in a deterministic dependency order. A handle may feed several downstream nodes. Joins wait for their active upstream computations and run once; conditions activate only their selected exit. One reached Output returns its value, wrapped in an object when an Output name is set. Multiple reached Outputs return one object keyed by Output name, otherwise a directly returned variable name, otherwise node ID; for example `{"amount": 100, "discounted": 72}`. Duplicate keys among reached Outputs fail rather than overwrite a value. Graphs cannot contain cycles. Node positions are presentation metadata.
 
 - [API reference and request examples](docs/api.md)
 - [Graph schema, expression language, and architecture](docs/architecture.md)

@@ -1,4 +1,5 @@
 import ValueBinding from "../../expressions/ValueBinding";
+import { multipleOutputFieldName } from "../../../domain/outputNames";
 import IdentifierField from "./IdentifierField";
 import type { NodeFieldsProps } from "./types";
 
@@ -40,7 +41,7 @@ export default function OutputValueFields({
         optional
         disabled={readOnly}
         onChange={(outputName) => patch({ outputName: outputName || null })}
-        helperText="Optional. Return an object with this field name; leave blank to return the value directly."
+        helperText="Optional result field name. With multiple Outputs, unnamed variables use their own name; other values use the node ID."
       />
       <div
         className="expression-preview output-return-preview"
@@ -51,7 +52,7 @@ export default function OutputValueFields({
         {hasOtherOutputs && (
           <>
             <span>When multiple Outputs run · this field</span>
-            <code>{`{ ${JSON.stringify(node.id)}: ${returnedValue}, … }`}</code>
+            <code>{`{ ${JSON.stringify(multipleOutputFieldName(node))}: ${value}, … }`}</code>
           </>
         )}
       </div>

@@ -512,7 +512,7 @@ components:
             properties:
               ruleId: {type: string}
               version: {type: integer, nullable: true}
-              result: {nullable: true, description: A single reached Output value or an object keyed by node ID when multiple Outputs are reached}
+              result: {nullable: true, description: A single reached Output value (wrapped when outputName is set) or raw values keyed by outputName then direct variable name then node ID when multiple Outputs are reached. Duplicate reached keys return 422 with both node locations. Applies to existing published versions}
               durationMicros: {type: integer, format: int64, description: Engine duration excluding preparation and response serialization}
               traceEnabled: {type: boolean}
               traceTruncated: {type: boolean, description: True when the 256 KiB trace budget stopped recording complete steps}

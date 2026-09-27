@@ -21,7 +21,7 @@ These are project-local instructions. They do not authorize extra dependencies, 
 
 - HTTP payloads/statuses, graph JSON, ARC Script round trips, and existing published versions are compatibility boundaries. Make intended behavior changes explicit and test their callers.
 - Pinned references remain immutable. Draft save and publish retain revision checks and atomic transactions. Leave applied Flyway migrations unchanged; schema changes use a new migration.
-- Fan-out, joins, branch-sensitive variables, and multiple Outputs follow the graph contract. One reached Output returns its value; multiple reached Outputs return an object keyed by node ID.
+- Fan-out, joins, branch-sensitive variables, and multiple Outputs follow the graph contract. One reached Output returns its value (wrapped when named); multiple reached Outputs use Output name, then a direct variable name, then node ID as the field key. Duplicate keys among reached Outputs fail rather than overwrite values.
 - The browser's graph and code views share one draft. Failed builds and late async work must not erase newer edits. Error locations must remain navigable through referenced rules.
 - Keep decimal arithmetic, explicit null versus missing input, source overrides/fallbacks, and shared execution limits intact. Static diagnostics must not fetch external data.
 
