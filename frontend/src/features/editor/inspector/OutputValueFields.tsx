@@ -3,14 +3,25 @@ import IdentifierField from "./IdentifierField";
 import type { NodeFieldsProps } from "./types";
 
 export default function OutputValueFields({
+  rule,
   node,
   variables,
   readOnly,
   patch,
   label = "Return value",
-}: Pick<NodeFieldsProps, "node" | "variables" | "readOnly" | "patch"> & {
+}: Pick<
+  NodeFieldsProps,
+  "rule" | "node" | "variables" | "readOnly" | "patch"
+> & {
   label?: string;
 }) {
+  const value = node.expression || "…";
+  const returnedValue = node.outputName
+    ? `{ ${JSON.stringify(node.outputName)}: ${value} }`
+    : value;
+  const hasOtherOutputs = rule.draft.nodes.some(
+    (other) => other.type === "OUTPUT" && other.id !== node.id,
+  );
   return (
     <>
       <ValueBinding
@@ -31,12 +42,18 @@ export default function OutputValueFields({
         onChange={(outputName) => patch({ outputName: outputName || null })}
         helperText="Optional. Return an object with this field name; leave blank to return the value directly."
       />
-      <div className="expression-preview" aria-label="Return value preview">
-        <code>
-          {node.outputName
-            ? `{ ${JSON.stringify(node.outputName)}: ${node.expression || "…"} }`
-            : node.expression || "Choose a return value"}
-        </code>
+      <div
+        className="expression-preview output-return-preview"
+        aria-label="Return value preview"
+      >
+        <span>When only this Output runs</span>
+        <code>{returnedValue}</code>
+        {hasOtherOutputs && (
+          <>
+            <span>When multiple Outputs run · this field</span>
+            <code>{`{ ${JSON.stringify(node.id)}: ${returnedValue}, … }`}</code>
+          </>
+        )}
       </div>
     </>
   );

@@ -37,6 +37,7 @@ export default function SwitchDefaultReturn({
         <>
           <OutputValueFields
             key={output.id}
+            rule={rule}
             node={output}
             label="Default return value"
             variables={variables}

@@ -117,15 +117,15 @@
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 400;
+  font-style: normal;
 }
 .value-binding-variable > strong {
   font-weight: 700;
+  font-style: normal;
 }
 .value-binding-variable-from {
   color: #68776d;
-}
-.value-binding-variable > em {
-  color: inherit;
   font-style: italic;
   font-synthesis: style;
 }

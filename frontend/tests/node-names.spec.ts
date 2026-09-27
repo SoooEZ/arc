@@ -175,7 +175,7 @@ test("named Outputs survive graph/code and staged edits, preserve null and publi
     .getByRole("combobox", { name: "Return value", exact: true })
     .click();
   await page
-    .getByRole("option", { name: "total from Calculate (result)", exact: true })
+    .getByRole("option", { name: "total [result] from Calculate", exact: true })
     .click();
   await save(page);
   await page

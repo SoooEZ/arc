@@ -110,7 +110,7 @@ for (const scenario of [
       page,
       page,
       "Value to match",
-      `value from Inputs (${scenario.type.toLowerCase()})`,
+      `value [${scenario.type.toLowerCase()}] from Inputs`,
     );
     const option = page.getByTestId("switch-case-one");
     await select(page, option, "Constant type", scenario.type.toLowerCase());

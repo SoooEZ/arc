@@ -171,6 +171,21 @@
   font-size: 8px;
   color: #91a67c;
 }
+.output-return-preview {
+  display: grid;
+  gap: 6px;
+}
+.output-return-preview > span {
+  font-size: 10px;
+  color: #68776d;
+}
+.output-return-preview > code {
+  font-size: 11px;
+  color: #48705a;
+}
+.output-return-preview > code + span {
+  margin-top: 6px;
+}
 .inline-expression-editor {
   min-width: 0;
   margin: 0;

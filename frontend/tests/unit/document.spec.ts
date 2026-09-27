@@ -275,8 +275,8 @@ test("variable labels follow producer renames while merged results keep their id
     before.map(({ name, type }) => ({ name, type })),
   );
   expect(options.map(variableOptionLabel)).toEqual([
-    "amount from Customer inputs (number)",
-    "price from Compute price / Second calculation (result)",
+    "amount [number] from Customer inputs",
+    "price [result] from Compute price / Second calculation",
   ]);
   expect(inputVariables(renamed)[0].label).toBe("Customer inputs");
 });

@@ -134,7 +134,7 @@ test("Switch upstream choices follow its incoming connections and preserve an un
     .click();
   await expect(
     page.getByRole("option", {
-      name: "amount from Inputs (number)",
+      name: "amount [number] from Inputs",
       exact: true,
     }),
   ).toHaveCount(0);
@@ -164,7 +164,7 @@ test("Switch upstream choices follow its incoming connections and preserve an un
     .getByRole("combobox", { name: "Value to match", exact: true })
     .click();
   await page
-    .getByRole("option", { name: "amount from Inputs (number)", exact: true })
+    .getByRole("option", { name: "amount [number] from Inputs", exact: true })
     .click();
   await expect(page.locator(".MuiMenu-root")).toHaveCount(0);
   await expect(
@@ -294,27 +294,36 @@ test("variable menus and expression tooltips show declared types and live produc
   await variable.click();
   await expect(
     page.getByRole("option", {
-      name: "hello from Inputs (object)",
+      name: "hello [object] from Inputs",
       exact: true,
     }),
   ).toBeVisible();
   await expect(
     page.getByRole("option", {
-      name: "score from Compute score (result)",
+      name: "score [result] from Compute score",
       exact: true,
     }),
   ).toBeVisible();
   const option = page.getByRole("option", {
-    name: "score from Compute score (result)",
+    name: "score [result] from Compute score",
     exact: true,
   });
-  await expect(option.locator("strong")).toHaveText("score");
-  await expect(option.locator("strong")).toHaveCSS("font-weight", "700");
-  await expect(option.locator("em")).toHaveText("Compute score");
+  await expect(option.locator("strong")).toHaveText(["score", "Compute score"]);
+  await expect(option.locator("strong").first()).toHaveCSS(
+    "font-weight",
+    "700",
+  );
+  await expect(option.locator("strong").last()).toHaveCSS("font-weight", "700");
+  await expect(option.locator("strong").last()).toHaveCSS(
+    "font-style",
+    "normal",
+  );
+  await expect(option.locator("em")).toHaveText("from");
   await expect(option.locator("em")).toHaveCSS("font-style", "italic");
   await expect(option.locator("em")).toHaveCSS("font-synthesis", "style");
   const sourceColor = await option
-    .locator("em")
+    .locator("strong")
+    .last()
     .evaluate((element) => getComputedStyle(element).color);
   await expect(option.locator(".value-binding-variable-from")).not.toHaveCSS(
     "color",
@@ -325,8 +334,19 @@ test("variable menus and expression tooltips show declared types and live produc
     animations: "disabled",
   });
   await page.keyboard.press("Escape");
-  await expect(variable).toHaveText("score from Compute score (result)");
-  await expect(variable.locator("strong")).toHaveCSS("font-weight", "700");
+  await expect(variable).toHaveText("score [result] from Compute score");
+  await expect(variable.locator("strong").first()).toHaveCSS(
+    "font-weight",
+    "700",
+  );
+  await expect(variable.locator("strong").last()).toHaveCSS(
+    "font-weight",
+    "700",
+  );
+  await expect(variable.locator("strong").last()).toHaveCSS(
+    "font-style",
+    "normal",
+  );
   await expect(variable.locator("em")).toHaveCSS("font-style", "italic");
   await expect(variable.locator("em")).toHaveCSS("font-synthesis", "style");
   for (const [nodeId, label] of [
@@ -342,19 +362,22 @@ test("variable menus and expression tooltips show declared types and live produc
   await variable.click();
   await expect(
     page.getByRole("option", {
-      name: "score from Normalize score (result)",
+      name: "score [result] from Normalize score",
       exact: true,
     }),
   ).toBeVisible();
   await page
     .getByRole("option", {
-      name: "hello from Customer data (object)",
+      name: "hello [object] from Customer data",
       exact: true,
     })
     .click();
-  await expect(variable).toHaveText("hello from Customer data (object)");
-  await expect(variable.locator("strong")).toHaveText("hello");
-  await expect(variable.locator("em")).toHaveText("Customer data");
+  await expect(variable).toHaveText("hello [object] from Customer data");
+  await expect(variable.locator("strong")).toHaveText([
+    "hello",
+    "Customer data",
+  ]);
+  await expect(variable.locator("em")).toHaveText("from");
   await page.screenshot({
     path: test.info().outputPath("upstream-variable-selected.png"),
     animations: "disabled",
@@ -381,7 +404,7 @@ test("variable menus and expression tooltips show declared types and live produc
     .filter({ hasText: /^hello$/ })
     .hover();
   await expect(page.getByRole("tooltip")).toHaveText(
-    "hello from Customer data (object)",
+    "hello [object] from Customer data",
   );
   await variables
     .getByRole("button", { name: "Close available variables", exact: true })
@@ -398,12 +421,12 @@ test("variable menus and expression tooltips show declared types and live produc
   });
   await dialog
     .getByRole("button", {
-      name: "score from Normalize score (result)",
+      name: "score [result] from Normalize score",
       exact: true,
     })
     .hover();
   await expect(page.getByRole("tooltip")).toHaveText(
-    "score from Normalize score (result)",
+    "score [result] from Normalize score",
   );
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Save draft", exact: true }).click();

@@ -151,9 +151,9 @@ export default function ValueBinding({
                 className="value-binding-variable"
                 title={variableOptionLabel(v)}
               >
-                <strong>{v.name}</strong>{" "}
-                <span className="value-binding-variable-from">from</span>{" "}
-                <em>{v.label}</em> ({v.type.toLowerCase()})
+                <strong>{v.name}</strong> [{v.type.toLowerCase()}]{" "}
+                <em className="value-binding-variable-from">from</em>{" "}
+                <strong>{v.label}</strong>
               </span>
             </MenuItem>
           ))}

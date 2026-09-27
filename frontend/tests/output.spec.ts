@@ -93,11 +93,11 @@ test("Output selects values of any type and round-trips typed constants through 
     );
   };
   await run(20);
-  await select(page, "Return value", "customer from Inputs (object)");
+  await select(page, "Return value", "customer [object] from Inputs");
   await run({ name: "Ada", active: true });
-  await select(page, "Return value", "items from Inputs (array)");
+  await select(page, "Return value", "items [array] from Inputs");
   await run([1, 2, 3]);
-  await select(page, "Return value", "total from Double amount (result)");
+  await select(page, "Return value", "total [result] from Double amount");
   await run(20);
   await select(page, "Return value · value source", "Constant");
   await select(page, "Constant type", "number");
