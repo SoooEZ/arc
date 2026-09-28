@@ -61,6 +61,22 @@ public class Validator {
     return NodeValidation.dependencies(definition, NodeValidation::formulaCallsOf);
   }
 
+  /**
+   * Rules a stored draft or version calls, like {@link #dependencies}, except that a malformed
+   * expression calls nothing instead of failing: a draft may be unfinished.
+   */
+  public static List<Dependency> draftDependencies(Definition definition) {
+    return NodeValidation.dependencies(definition, Validator::wellFormedFormulaCalls);
+  }
+
+  private static List<Expressions.FormulaCall> wellFormedFormulaCalls(String source) {
+    try {
+      return NodeValidation.formulaCallsOf(source);
+    } catch (ArcException malformed) {
+      return List.of();
+    }
+  }
+
   public static void validateFormulaCalls(Expressions.Compiled expression, RuleResolver resolver) {
     FormulaCallValidation.validate(expression, resolver);
   }

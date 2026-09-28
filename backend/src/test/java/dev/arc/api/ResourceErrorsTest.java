@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.persistence.JdbcRuleRepository;
 import dev.arc.persistence.JdbcSourceRepository;
@@ -43,7 +44,8 @@ class ResourceErrorsTest {
                   new RuleService(
                       new JdbcRuleRepository(jdbc, json),
                       new Validator(),
-                      mock(RuleDefinitionService.class)),
+                      mock(RuleDefinitionService.class),
+                      mock(Engine.class)),
                   mock(RuleExecutionService.class)),
               new SourceController(
                   new SourceService(

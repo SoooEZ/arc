@@ -18,6 +18,7 @@ const tasks: (EditorTask | "")[] = [
   "switch",
   "test",
   "layout",
+  "delete",
 ];
 
 test("capabilities match the conditions each control used to spell out", () => {
@@ -37,6 +38,7 @@ test("capabilities match the conditions each control used to spell out", () => {
           test: !busy,
           switchView: !busy,
           openSettings: !busy,
+          delete: !readOnly && !busy,
         });
       }
 });

@@ -57,6 +57,11 @@ public class Engine {
     return new Session(resolver, deadline, true);
   }
 
+  /** Drops the cached plans of a deleted rule. Call it after the deletion commits. */
+  public void forget(String ruleId) {
+    plans.forget(ruleId);
+  }
+
   public final class Session {
     private final RuleResolver resolver;
     private final ExecutionDeadline deadline;

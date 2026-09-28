@@ -48,6 +48,7 @@ function EditorContent({
   requestedNode,
   onSaved,
   onDirty,
+  onDeleted,
   navigate,
   notify,
   embedded = false,
@@ -64,6 +65,7 @@ function EditorContent({
     requestedVersion,
     onSaved,
     onDirty,
+    onDeleted,
     navigate,
     notify,
     reportCommandProblem: setCommandProblem,
@@ -94,6 +96,7 @@ function EditorContent({
     switchView,
     action,
     toggleTest,
+    deleteRule,
   } = document;
   const graphKey = useMemo(() => semanticGraphKey(rule.draft), [rule.draft]);
   const preview = usePreviewExecution(rule.draft, graphKey);
@@ -389,6 +392,8 @@ function EditorContent({
           readOnly={!can.edit}
           onClose={() => setSettingsOpen(false)}
           onApply={editMetadata}
+          onDelete={onDeleted && !readOnly ? deleteRule : undefined}
+          canDelete={can.delete}
         />
       )}
     </div>

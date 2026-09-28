@@ -4,8 +4,11 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.model.*;
 import java.util.List;
 
-/** Storage port. lock/update/publish are called inside the application transaction. */
+/** Storage port. lock/update/publish/delete are called inside the application transaction. */
 public interface RuleRepository extends RuleResolver {
+  /** A rule's draft ({@code version} null) or one of its published versions. */
+  record StoredDefinition(String ruleId, Integer version, Definition definition) {}
+
   List<Rule> list();
 
   /** Whether any rule is stored, without reading rule rows. */
@@ -35,6 +38,15 @@ public interface RuleRepository extends RuleResolver {
   List<RuleVersion> versions(String id);
 
   RuleVersion version(String id, int version);
+
+  /**
+   * The drafts and published versions of other rules whose stored JSON contains the ID: every
+   * definition that calls the rule, and possibly more, for the caller to check exactly.
+   */
+  List<StoredDefinition> definitionsMentioning(String id);
+
+  /** Removes the rule with its draft and every published version. */
+  void delete(String id);
 
   @Override
   default Definition resolve(String id, int version) {

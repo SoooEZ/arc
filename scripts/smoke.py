@@ -66,6 +66,13 @@ def execute(rule_id, inputs, version=None, expected=200):
     return request("POST", f"/api/rules/{rule_id}/execute", {"inputs": inputs, "version": version}, expected)
 
 
+def delete(rule_id, expected=204, headers=None):
+    body = request("DELETE", "/api/rules/" + rule_id, expected=expected, headers=headers)
+    if expected == 204:
+        created.remove(rule_id)
+    return body
+
+
 try:
     assert request("GET", "/actuator/health")["status"] == "UP"
     request("GET", "/api/missing-endpoint", expected=404)
@@ -264,6 +271,31 @@ try:
     big_default = save(big_default)
     assert request("POST", "/api/preview", {"definition": big_default["draft"], "inputs": {}})["result"] == 10 ** 100
 
+    # A rule that other rules call is kept; once none does, it goes with every version.
+    callee = publish(create("delete-callee"))
+    assert execute(callee["id"], {"amount": 100}, 1)["result"] == 90
+    calling = copy.deepcopy(callee["draft"])
+    calling["nodes"][1] = {"id": "calculate", "type": "REFERENCE", "label": "Callee",
+        "position": {"x": 280, "y": 160}, "ruleId": callee["id"], "version": 1,
+        "bindings": {"amount": "amount"}, "output": "total"}
+    caller = create("delete-caller", "DECISION_TREE", calling)
+    assert delete(callee["id"], 409)["issues"] == [caller["id"] + " (draft)"]
+    caller = publish(caller)
+    assert delete(callee["id"], 409)["issues"] == [caller["id"] + " (draft)", caller["id"] + " v1"]
+    # Browsers send an Origin with every DELETE, so CORS must allow the method.
+    request("OPTIONS", "/api/rules/" + caller["id"], headers={"Origin": "https://example.com",
+            "Access-Control-Request-Method": "DELETE"})
+    delete(caller["id"], headers={"Origin": "https://example.com"})
+    delete(callee["id"])
+    request("GET", "/api/rules/" + callee["id"], expected=404)
+    execute(callee["id"], {"amount": 100}, 1, expected=404)
+    delete(callee["id"], 404)
+    # The ID is free again, and its new version 1 never runs the deleted rule's cached plan.
+    halving = copy.deepcopy(callee["draft"])
+    halving["nodes"][1]["expression"] = "amount * 0.5"
+    recreated = publish(create("delete-callee", definition=halving))
+    assert execute(recreated["id"], {"amount": 100}, 1)["result"] == 50
+
     # Row locks + revision checks allow exactly one competing update.
     race = create("concurrent")
     def competing_update(number):
@@ -277,6 +309,6 @@ try:
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         statuses = sorted(executor.map(competing_update, [1, 2]))
     assert statuses == [200, 409], statuses
-    print(f"PASS: {checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, and concurrent edits.")
+    print(f"PASS: {checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, and concurrent edits.")
 finally:
     print("Created fixtures: " + ", ".join(created))

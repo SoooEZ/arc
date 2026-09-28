@@ -2,13 +2,17 @@ package dev.arc.rule;
 
 import dev.arc.engine.Identifiers;
 import dev.arc.engine.Limits;
+import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Draft commands and immutable publication; transaction boundaries live here. */
 @Service
@@ -22,14 +26,20 @@ public class RuleService {
 
   private static final Set<String> KINDS = Set.of("DECISION_TREE", "FORMULA", "RULE");
 
+  /** How many callers a refused deletion names in its message; `issues` lists them all. */
+  private static final int NAMED_CALLERS = 5;
+
   private final RuleRepository store;
   private final Validator validator;
   private final RuleDefinitionService definitions;
+  private final Engine engine;
 
-  public RuleService(RuleRepository store, Validator validator, RuleDefinitionService definitions) {
+  public RuleService(
+      RuleRepository store, Validator validator, RuleDefinitionService definitions, Engine engine) {
     this.store = store;
     this.validator = validator;
     this.definitions = definitions;
+    this.engine = engine;
   }
 
   /** An empty kind lists every kind. */
@@ -99,6 +109,69 @@ public class RuleService {
     revision(rule, revision);
     definitions.validate(rule.draft());
     return store.publish(rule);
+  }
+
+  /**
+   * Deletes the rule with its draft and every published version, so the execution API answers 404
+   * for it afterwards. A rule that other rules still call stays, because deleting it would break
+   * them.
+   */
+  @Transactional
+  public void delete(String id) {
+    // A missing rule is a 404; a concurrent save or publish of this rule waits for the deletion.
+    store.lock(id);
+    List<String> callers = callersOf(id);
+    if (!callers.isEmpty())
+      throw new ArcException(
+          409,
+          "Other rules call this rule: "
+              + named(callers)
+              + ". Remove those calls before deleting it.",
+          callers);
+    store.delete(id);
+    afterCommit(() -> engine.forget(id));
+  }
+
+  /** Each draft ("checkout (draft)") or published version ("checkout v3") that calls the rule. */
+  private List<String> callersOf(String id) {
+    var callers = new ArrayList<String>();
+    for (var stored : store.definitionsMentioning(id)) {
+      boolean calls =
+          Validator.draftDependencies(stored.definition()).stream()
+              .anyMatch(dependency -> dependency.ruleId().equals(id));
+      if (!calls) continue;
+      callers.add(
+          stored.version() == null
+              ? stored.ruleId() + " (draft)"
+              : stored.ruleId() + " v" + stored.version());
+    }
+    return callers;
+  }
+
+  private static String named(List<String> callers) {
+    if (callers.size() <= NAMED_CALLERS) return String.join(", ", callers);
+    return String.join(", ", callers.subList(0, NAMED_CALLERS))
+        + " and "
+        + (callers.size() - NAMED_CALLERS)
+        + " more";
+  }
+
+  /**
+   * Runs the action once the current transaction commits, or at once outside one. Until the commit,
+   * other requests still read the deleted rule, so its plans are forgotten only afterwards.
+   */
+  private static void afterCommit(Runnable action) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      action.run();
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            action.run();
+          }
+        });
   }
 
   private void revision(Rule rule, int revision) {

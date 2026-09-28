@@ -32,6 +32,8 @@ interface Options {
   requestedVersion: number | null;
   onSaved: (rule: Rule) => void;
   onDirty: (dirty: boolean) => void;
+  /** Told once the rule is deleted, before the editor leaves for the library. */
+  onDeleted?: (id: string) => void;
   navigate: (path: string) => void;
   notify: (message: string) => void;
   /** Receives located failures of save, validate, publish and build commands. */
@@ -56,6 +58,7 @@ export function useRuleDocument({
   requestedVersion,
   onSaved,
   onDirty,
+  onDeleted,
   navigate,
   notify,
   reportCommandProblem,
@@ -394,6 +397,30 @@ export function useRuleDocument({
       await buildCode();
       toggle();
     });
+  /**
+   * Deletes the rule and leaves for the library. Unsaved changes go with the
+   * rule, so leaving does not ask about them. Resolves to the reason the server
+   * kept the rule, such as the rules that still call it, or null.
+   */
+  const deleteRule = async (): Promise<string | null> => {
+    let refusal: string | null = null;
+    await runTask("delete", async (signal) => {
+      try {
+        await ruleApi.delete(rule.id, { signal });
+      } catch (failure) {
+        if (!signal.aborted) refusal = errorMessage(failure);
+        return;
+      }
+      // The rule is gone even when the user has left the editor meanwhile;
+      // only an editor that is still open leaves for the library.
+      onDeleted?.(rule.id);
+      if (signal.aborted) return;
+      onDirty(false);
+      notify(`Rule ${rule.id} deleted`);
+      navigate("/library");
+    });
+    return refusal;
+  };
   return {
     rule,
     source,
@@ -421,5 +448,6 @@ export function useRuleDocument({
     switchView,
     arrange,
     toggleTest,
+    deleteRule,
   };
 }

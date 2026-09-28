@@ -72,6 +72,26 @@ class ExecutionPlansTest {
     assertThat(validator.compilations).isEqualTo(2);
   }
 
+  /**
+   * A deleted rule's ID may name a different rule later, so none of its plans may survive: neither
+   * a cached one nor one that a request which began before the deletion compiles afterwards.
+   */
+  @Test
+  void forgettingARuleDropsItsPlansAndEarlierRequestsCannotCacheThemAgain() {
+    var plans = new ExecutionPlans(new CountingValidator(), json);
+    var kept = session(plans).prepare("kept", 1, () -> graph("1"));
+    session(plans).prepare("deleted", 1, () -> graph("2"));
+    var beganBeforeDeletion = session(plans);
+
+    plans.forget("deleted");
+    // This request read the rule before the deletion committed.
+    beganBeforeDeletion.prepare("deleted", 1, () -> graph("3"));
+
+    var recreated = session(plans).prepare("deleted", 1, () -> graph("4"));
+    assertThat(recreated.expressions()).containsOnlyKeys("4");
+    assertThat(session(plans).prepare("kept", 1, () -> graph("1"))).isSameAs(kept);
+  }
+
   @Test
   void everyStoredFieldCountsTowardsAPlansWeight() {
     var plans = new ExecutionPlans(new CountingValidator(), json, 10, 12_000);

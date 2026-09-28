@@ -60,6 +60,12 @@ public class RuleController {
     return rules.update(id, request);
   }
 
+  @DeleteMapping("/rules/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void delete(@PathVariable String id) {
+    rules.delete(id);
+  }
+
   @PostMapping("/rules/{id}/publish")
   public Rule publish(@PathVariable String id, @RequestBody Publish request) {
     return rules.publish(id, request.revision());

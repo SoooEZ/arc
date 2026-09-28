@@ -18,7 +18,7 @@ class CatalogControllerTest {
   private final org.springframework.test.web.servlet.MockMvc mvc =
       MockMvcBuilders.standaloneSetup(
               new RuleController(
-                  new RuleService(rules, null, null), mock(RuleExecutionService.class)),
+                  new RuleService(rules, null, null, null), mock(RuleExecutionService.class)),
               new SourceController(
                   new SourceService(sources, null), mock(SourceExecutionService.class)))
           .setControllerAdvice(new Errors())

@@ -29,7 +29,11 @@ export function useCodeStudioTarget({
   const lookup = useRef<AbortController | null>(null);
   useEffect(() => () => lookup.current?.abort(), [route]);
 
-  return async () => {
+  /** A deleted rule is no longer a target. */
+  const forget = (ruleId: string) =>
+    setLastOpened((last) => (last === ruleId ? null : last));
+
+  const open = async () => {
     const known = routeRuleId ?? lastOpened;
     if (known) {
       navigate(`/studio/${known}`);
@@ -54,4 +58,5 @@ export function useCodeStudioTarget({
       if (lookup.current === controller) lookup.current = null;
     }
   };
+  return { open, forget };
 }

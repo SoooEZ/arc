@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -47,5 +48,14 @@ class JdbcRuleRepositoryTest {
         .isPositive()
         .isLessThan(page.indexOf("jsonb_array_length"));
     assertThat(arguments.getFirst()).containsExactly("tax", "tax", "RULE", "RULE", true, 10, 40);
+  }
+
+  /** Versions reference their rule, so they are removed before it. */
+  @Test
+  void deletingARuleRemovesItsVersionsFirst() {
+    repository.delete("old-draft");
+    var order = inOrder(jdbc);
+    order.verify(jdbc).update("DELETE FROM rule_versions WHERE rule_id = ?", "old-draft");
+    order.verify(jdbc).update("DELETE FROM rules WHERE id = ?", "old-draft");
   }
 }

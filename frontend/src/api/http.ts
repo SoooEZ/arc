@@ -87,6 +87,8 @@ export function createHttpClient(
       request<T>(path, "POST", body, options),
     put: <T>(path: string, body: unknown, options?: RequestOptions) =>
       request<T>(path, "PUT", body, options),
+    delete: <T>(path: string, options?: RequestOptions) =>
+      request<T>(path, "DELETE", undefined, options),
   };
 }
 export const http = createHttpClient();

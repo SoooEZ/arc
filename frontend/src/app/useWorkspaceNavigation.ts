@@ -97,6 +97,15 @@ export function useWorkspaceNavigation() {
     return () => window.removeEventListener("beforeunload", leave);
   }, []);
 
+  /**
+   * Also updates what navigate() reads at once, so a document that reports
+   * itself clean, e.g. after deleting its rule, can leave in the same call.
+   */
+  const setDirty = useCallback((value: boolean) => {
+    dirty.current = value;
+    setRuleDirty(value);
+  }, []);
+
   /** Asks before the browser moves, so a cancelled navigation creates no history entry. */
   const navigate = useCallback(
     (path: string) => {
@@ -111,5 +120,5 @@ export function useWorkspaceNavigation() {
     },
     [warningFor],
   );
-  return { route, navigate, setDirty: setRuleDirty };
+  return { route, navigate, setDirty };
 }

@@ -1,21 +1,29 @@
 package dev.arc.rule;
 
+import static dev.arc.support.GraphFixtures.inputNode;
 import static dev.arc.support.GraphFixtures.nodeOf;
+import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
+import dev.arc.model.Definition.Node;
 import dev.arc.model.Rule;
+import dev.arc.rule.RuleRepository.StoredDefinition;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class RuleServiceTest {
   private final RuleRepository repository = mock(RuleRepository.class);
   private final RuleDefinitionService definitions = mock(RuleDefinitionService.class);
-  private final RuleService service = new RuleService(repository, new Validator(), definitions);
+  private final Engine engine = mock(Engine.class);
+  private final RuleService service =
+      new RuleService(repository, new Validator(), definitions, engine);
   private final Rule draft =
       new Rule(
           "example",
@@ -112,5 +120,80 @@ class RuleServiceTest {
     verify(repository, never()).create(anyString(), anyString(), anyString(), anyString(), any());
     verify(repository, never()).update(anyString(), anyString(), anyString(), any());
     verifyNoInteractions(definitions);
+  }
+
+  /** A graph whose Input node leads to {@code node}; edges do not matter to dependencies. */
+  private static Definition graphWith(Node node) {
+    return new Definition(1, List.of(), List.of(inputNode("in", "Input"), node), List.of());
+  }
+
+  private static Definition returning(String expression) {
+    return graphWith(outputNode("out", "Output", expression));
+  }
+
+  /**
+   * The text search only narrows the candidates: a string, another rule's ID that contains this
+   * one, and an unfinished expression mention the rule without calling it.
+   */
+  @Test
+  void aRuleThatOnlyMentionsTheDeletedOneDoesNotKeepIt() {
+    when(repository.lock("example")).thenReturn(draft);
+    when(repository.definitionsMentioning("example"))
+        .thenReturn(
+            List.of(
+                new StoredDefinition("labels", 1, returning("\"example\"")),
+                new StoredDefinition("other", 2, returning("@example-two:1()")),
+                new StoredDefinition("unfinished", null, returning("@example:1("))));
+    service.delete("example");
+    var order = inOrder(repository, engine);
+    order.verify(repository).lock("example");
+    order.verify(repository).delete("example");
+    order.verify(engine).forget("example");
+  }
+
+  @Test
+  void aRuleThatOtherRulesCallIsKeptAndEveryCallerIsNamed() {
+    when(repository.lock("example")).thenReturn(draft);
+    Node reference = nodeOf("tax", "REFERENCE", "Tax").rule("example", 1).output("tax").build();
+    when(repository.definitionsMentioning("example"))
+        .thenReturn(
+            List.of(
+                new StoredDefinition("checkout", null, graphWith(reference)),
+                new StoredDefinition("checkout", 3, returning("@example:1() * 2"))));
+    assertThatThrownBy(() -> service.delete("example"))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(409);
+              assertThat(error.getMessage())
+                  .isEqualTo(
+                      "Other rules call this rule: checkout (draft), checkout v3. Remove those"
+                          + " calls before deleting it.");
+              assertThat(error.issues()).containsExactly("checkout (draft)", "checkout v3");
+            });
+    verify(repository, never()).delete(anyString());
+    verifyNoInteractions(engine);
+  }
+
+  @Test
+  void aLongCallerListNamesTheFirstFiveAndCountsTheRest() {
+    when(repository.lock("example")).thenReturn(draft);
+    var callers = new ArrayList<StoredDefinition>();
+    for (String id : List.of("a", "b", "c", "d", "e", "f", "g"))
+      callers.add(new StoredDefinition(id, 1, returning("@example:1()")));
+    when(repository.definitionsMentioning("example")).thenReturn(callers);
+    assertThatThrownBy(() -> service.delete("example"))
+        .hasMessage(
+            "Other rules call this rule: a v1, b v1, c v1, d v1, e v1 and 2 more. Remove those"
+                + " calls before deleting it.")
+        .isInstanceOfSatisfying(ArcException.class, error -> assertThat(error.issues()).hasSize(7));
+  }
+
+  @Test
+  void deletingAMissingRuleIsNotFoundAndChangesNothing() {
+    when(repository.lock("missing")).thenThrow(new ArcException(404, "Rule not found: missing"));
+    assertThatThrownBy(() -> service.delete("missing")).hasMessage("Rule not found: missing");
+    verify(repository, never()).delete(anyString());
+    verifyNoInteractions(engine);
   }
 }

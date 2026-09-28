@@ -20,7 +20,7 @@ public class ArcApplication {
         registry
             .addMapping("/api/**")
             .allowedOrigins("*")
-            .allowedMethods("GET", "POST", "PUT", "OPTIONS")
+            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
             .allowedHeaders("*");
       }
     };

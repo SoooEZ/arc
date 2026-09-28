@@ -1,6 +1,13 @@
 /** Commands that hold the document lock; `busy` names the running one. */
 export type EditorTask =
-  "save" | "validate" | "publish" | "build" | "switch" | "test" | "layout";
+  | "save"
+  | "validate"
+  | "publish"
+  | "build"
+  | "switch"
+  | "test"
+  | "layout"
+  | "delete";
 
 /** The document facts that decide what the editor allows. */
 export interface EditorStatus {
@@ -35,6 +42,8 @@ export interface EditorCapabilities {
   switchView: boolean;
   /** Open rule settings, read-only unless the draft is editable. */
   openSettings: boolean;
+  /** Delete the rule from its settings, which show the editable draft. */
+  delete: boolean;
 }
 
 /** Commands take turns, and none starts before the shown version has loaded. */
@@ -64,12 +73,14 @@ export function editorCapabilities(status: EditorStatus): EditorCapabilities {
     test: idle,
     switchView: idle,
     openSettings: idle,
+    delete: edit,
   };
 }
 
 /**
  * Leaving aborts a pending write, but the server may already have applied it,
- * so leaving during one asks first.
+ * so leaving during one asks first. A deletion does not ask: it leaves for the
+ * library itself once it finishes.
  */
 export function pendingWriteWarning(task: EditorTask | ""): string | null {
   if (task === "save")

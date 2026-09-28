@@ -83,7 +83,7 @@ export default function App() {
     setSavedRule(rule);
     library.markChanged();
   };
-  const openCodeStudio = useCodeStudioTarget({
+  const codeStudio = useCodeStudioTarget({
     route,
     routeRuleId: ruleId,
     openedRuleId: selected?.id ?? null,
@@ -91,6 +91,12 @@ export default function App() {
     createRule: newRule,
     notify: setNotice,
   });
+  /** Nothing keeps offering a deleted rule: saved copy, library page or Code studio target. */
+  const forgetDeletedRule = (id: string) => {
+    if (savedRule?.id === id) setSavedRule(null);
+    library.markChanged();
+    codeStudio.forget(id);
+  };
 
   const ruleContent = (rule: RuleRoute): ReactNode => {
     if (selected)
@@ -109,6 +115,7 @@ export default function App() {
             requestedNode={rule.node}
             onSaved={acknowledgeSave}
             onDirty={setDirty}
+            onDeleted={forgetDeletedRule}
             navigate={navigate}
             notify={setNotice}
           />
@@ -162,7 +169,7 @@ export default function App() {
       <Sidebar
         route={view}
         navigate={navigate}
-        openCodeStudio={() => void openCodeStudio()}
+        openCodeStudio={() => void codeStudio.open()}
       />
       <main className={`main-content ${selected ? "editor-main" : ""}`}>
         <WorkspaceHeader

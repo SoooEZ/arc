@@ -16,6 +16,8 @@ export interface EditorProps {
   requestedNode?: string | null;
   onSaved: (r: Rule) => void;
   onDirty: (value: boolean) => void;
+  /** Offers deleting the rule from its settings; told once it is deleted. */
+  onDeleted?: (id: string) => void;
   navigate: (path: string) => void;
   notify: (message: string) => void;
   embedded?: boolean;

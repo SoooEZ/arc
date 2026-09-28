@@ -38,6 +38,18 @@ test("transport preserves method, typed payload and abort signal", async () => {
   expect(pathId("a/b?x=1")).toBe("a%2Fb%3Fx%3D1");
 });
 
+test("DELETE sends no body and a 204 resolves without a value", async () => {
+  const calls: { url: string; options?: RequestInit }[] = [];
+  const client = createHttpClient("/api", async (url, options) => {
+    calls.push({ url: String(url), options });
+    return new Response(null, { status: 204 });
+  });
+  expect(await client.delete("/rules/old-draft")).toBeUndefined();
+  expect(calls[0].url).toBe("/api/rules/old-draft");
+  expect(calls[0].options?.method).toBe("DELETE");
+  expect(calls[0].options?.body).toBeUndefined();
+});
+
 test("numbers a double cannot represent round-trip from a response to the next request", async () => {
   const draft =
     '{"inputs":[{"name":"id","type":"NUMBER","required":true,"defaultValue":9007199254740993},{"name":"rate","type":"NUMBER","required":false,"defaultValue":0.12345678901234567890123}],"entries":{"US":{"accountId":12345678901234567890,"limit":1e400}}}';

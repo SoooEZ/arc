@@ -42,6 +42,20 @@ public class JdbcRuleRepository implements RuleRepository {
   private static final String VERSION_FILTER =
       " WHERE rule_id = ? AND (? = '' OR strpos(version::text, ?) > 0)";
 
+  /**
+   * A cheap text search that narrows the exact dependency check. Rule IDs contain only lowercase
+   * letters, digits and hyphens, which JSON never escapes, so every call of the ID matches.
+   */
+  private static final String DEFINITIONS_MENTIONING =
+      """
+      SELECT id AS rule_id, NULL::integer AS version, draft AS definition FROM rules
+      WHERE id <> ? AND strpos(draft::text, ?) > 0
+      UNION ALL
+      SELECT rule_id, version, definition FROM rule_versions
+      WHERE rule_id <> ? AND strpos(definition::text, ?) > 0
+      ORDER BY rule_id, version NULLS FIRST
+      """;
+
   private static final RowMapper<RuleSummary> SUMMARY_MAPPER =
       (row, index) ->
           new RuleSummary(
@@ -241,6 +255,27 @@ public class JdbcRuleRepository implements RuleRepository {
     if (rows.isEmpty())
       throw new ArcException(404, "Published rule version not found: " + id + " v" + version);
     return rows.getFirst();
+  }
+
+  @Override
+  public List<StoredDefinition> definitionsMentioning(String id) {
+    return jdbc.query(
+        DEFINITIONS_MENTIONING,
+        (row, index) ->
+            new StoredDefinition(
+                row.getString("rule_id"),
+                row.getObject("version", Integer.class),
+                decode(row.getString("definition"))),
+        id,
+        id,
+        id,
+        id);
+  }
+
+  @Override
+  public void delete(String id) {
+    jdbc.update("DELETE FROM rule_versions WHERE rule_id = ?", id);
+    jdbc.update("DELETE FROM rules WHERE id = ?", id);
   }
 
   @Override
