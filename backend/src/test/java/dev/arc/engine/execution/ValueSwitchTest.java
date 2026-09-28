@@ -226,8 +226,9 @@ class ValueSwitchTest {
     }
   }
 
+  /** A Switch's expression was once ignored; a stored graph that keeps one fails at the Switch. */
   @Test
-  void legacyPredicateSwitchKeepsIgnoringPreviouslyUnusedExpression() throws Exception {
+  void aStoredSwitchThatStillSetsAnExpressionFailsAtTheSwitch() throws Exception {
     var graph =
         script.parse(
             """
@@ -245,18 +246,18 @@ class ValueSwitchTest {
     var stored = json.valueToTree(graph);
     ((com.fasterxml.jackson.databind.node.ObjectNode) stored.get("nodes").get(1))
         .put("expression", "missing + 1");
-    graph = json.treeToValue(stored, Definition.class);
-    for (var example : Map.of("49.999", "1", "50", "2", "99.999", "2", "100", "3").entrySet())
-      assertThat(
-              engine
-                  .execute(
-                      "legacy",
-                      1,
-                      graph,
-                      Map.of("amount", new BigDecimal(example.getKey())),
-                      noRefs)
-                  .result())
-          .isEqualTo(new BigDecimal(example.getValue()));
+    var legacy = json.treeToValue(stored, Definition.class);
+    assertThatThrownBy(
+            () ->
+                engine.execute("legacy", 1, legacy, Map.of("amount", new BigDecimal("50")), noRefs))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage())
+                  .isEqualTo(
+                      "Expressions belong to Formula, Condition, Transform and Output nodes");
+              assertThat(error.locations().getFirst().nodeId()).isEqualTo("choose");
+            });
   }
 
   private Node withSelector(Node node, String selector) {

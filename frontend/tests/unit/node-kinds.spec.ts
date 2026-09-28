@@ -2,16 +2,18 @@ import { expect, test } from "@playwright/test";
 import { connectGraphNodes, createGraphNode } from "../../src/domain/graph";
 import {
   addableNodeTypes,
+  clearUnusedProperties,
   isNodeType,
   nodeKinds,
   nodeTypes,
+  unusedProperties,
 } from "../../src/domain/nodeKinds";
 import {
   hasTargetPort,
   nodeWidth,
   sourcePorts,
 } from "../../src/domain/nodePorts";
-import type { Definition, NodeType } from "../../src/types";
+import type { Definition, NodeType, RuleNode } from "../../src/types";
 
 const empty: Definition = {
   schemaVersion: 1,
@@ -178,4 +180,49 @@ test("only Conditions stand out on the minimap", () => {
     expect(nodeKinds[type].minimapColor, type).toBe(
       type === "CONDITION" ? "#e8d8b2" : "#d4dfd8",
     );
+});
+
+test("a node's unused properties are the ones it sets but its kind does not use, as on the server", () => {
+  // The server's NodeKind.properties() lists the same properties per kind.
+  expect(
+    Object.fromEntries(
+      nodeTypes.map((type) => [type, nodeKinds[type].properties]),
+    ),
+  ).toEqual({
+    INPUT: [],
+    FORMULA: ["expression", "output"],
+    CONDITION: ["expression"],
+    SWITCH: ["selector", "cases"],
+    TRANSFORM: ["fields", "expression", "output"],
+    REFERENCE: ["rule", "bindings", "output"],
+    OUTPUT: ["expression", "outputName"],
+  });
+  const formula: RuleNode = {
+    id: "calc",
+    type: "FORMULA",
+    label: "Calc",
+    position: { x: 0, y: 0 },
+    expression: "1",
+    output: "total",
+    ruleId: "other-rule",
+    version: null,
+    bindings: { amount: "1" },
+    cases: null,
+  };
+  expect(unusedProperties(formula)).toEqual(["rule", "bindings"]);
+  const patch = clearUnusedProperties(formula);
+  expect(Object.keys(patch)).toEqual(["ruleId", "version", "bindings"]);
+  expect(unusedProperties({ ...formula, ...patch })).toEqual([]);
+  expect(
+    nodeTypes.flatMap((type) =>
+      unusedProperties(
+        createGraphNode(
+          { schemaVersion: 1, inputs: [], nodes: [], edges: [] },
+          type,
+          "new",
+          { x: 0, y: 0 },
+        ),
+      ),
+    ),
+  ).toEqual([]);
 });

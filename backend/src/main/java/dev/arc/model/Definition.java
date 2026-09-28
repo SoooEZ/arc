@@ -110,6 +110,20 @@ public record Definition(
       return kind().storesResult();
     }
 
+    /** Whether the node sets the property: an unset property is null. */
+    public boolean sets(NodeKind.Property property) {
+      return switch (property) {
+        case EXPRESSION -> expression != null;
+        case OUTPUT -> output != null;
+        case RULE -> ruleId != null || version != null;
+        case BINDINGS -> bindings != null;
+        case SELECTOR -> selector != null;
+        case CASES -> cases != null;
+        case FIELDS -> fields != null;
+        case OUTPUT_NAME -> outputName != null;
+      };
+    }
+
     /** The handles this node connects, in canvas order (see {@link NodeKind#handles}). */
     public List<String> handles() {
       return kind().handles(cases);

@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.arc.model.Definition.BranchCase;
+import dev.arc.model.NodeKind.Property;
 import dev.arc.model.NodeKind.Slot;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +34,27 @@ class NodeKindTest {
           .as(kind.name())
           .isEqualTo(
               Set.of(NodeKind.FORMULA, NodeKind.TRANSFORM, NodeKind.REFERENCE).contains(kind));
+  }
+
+  /** A result variable is the property of the kinds that store a result; every slot is one. */
+  @Test
+  void propertiesCoverTheResultVariableAndEveryExpressionSlot() {
+    var slotProperties =
+        Map.of(
+            Slot.EXPRESSION, Property.EXPRESSION,
+            Slot.SELECTOR, Property.SELECTOR,
+            Slot.CASES, Property.CASES,
+            Slot.FIELDS, Property.FIELDS,
+            Slot.BINDINGS, Property.BINDINGS);
+    for (NodeKind kind : NodeKind.values()) {
+      assertThat(kind.uses(Property.OUTPUT)).as(kind.name()).isEqualTo(kind.storesResult());
+      for (Slot slot : kind.slots())
+        assertThat(kind.uses(slotProperties.get(slot))).as(kind + " " + slot).isTrue();
+    }
+    assertThat(NodeKind.REFERENCE.uses(Property.RULE)).isTrue();
+    assertThat(NodeKind.OUTPUT.properties())
+        .containsExactlyInAnyOrder(Property.EXPRESSION, Property.OUTPUT_NAME);
+    assertThat(NodeKind.INPUT.properties()).isEmpty();
   }
 
   @Test

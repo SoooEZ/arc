@@ -8,7 +8,7 @@ import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.Handles;
 import dev.arc.model.NodeKind;
-import dev.arc.model.NodeKind.Slot;
+import dev.arc.model.NodeKind.Property;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -132,21 +132,17 @@ final class DefinitionShape {
             && node.label().length() <= Limits.MAX_LABEL_CHARACTERS,
         declaration,
         "Every node needs a label of 1 to " + Limits.MAX_LABEL_CHARACTERS + " characters");
+    // A property its kind does not use would be ignored silently, so no graph may keep one.
+    for (Property property : Property.values())
+      require(kind.uses(property) || !node.sets(property), declaration, belongsTo(property));
     require(
         node.expression() == null || node.expression().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
         declaration,
         "Expression exceeds " + EXPRESSION_LIMIT);
     require(
-        !kind.storesResult()
-            || node.output() == null
-            || node.output().isEmpty()
-            || Identifiers.isValid(node.output()),
+        node.output() == null || node.output().isEmpty() || Identifiers.isValid(node.output()),
         declaration,
         node.label() + ": provide a valid result variable");
-    require(
-        node.outputName() == null || kind == NodeKind.OUTPUT,
-        declaration,
-        "Output names belong to Output nodes");
     require(
         node.outputName() == null
             || node.outputName().isEmpty()
@@ -154,19 +150,9 @@ final class DefinitionShape {
         declaration,
         node.label() + ": provide a valid output name");
     require(
-        node.cases() == null || kind.owns(Slot.CASES), declaration, "Cases belong to Switch nodes");
-    require(
-        node.selector() == null || kind.owns(Slot.SELECTOR),
-        declaration,
-        "Selectors belong to Switch nodes");
-    require(
         node.selector() == null || node.selector().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
         declaration,
         "Selector expression exceeds " + EXPRESSION_LIMIT);
-    require(
-        node.fields() == null || kind.owns(Slot.FIELDS),
-        declaration,
-        "Fields belong to Transform nodes");
     checkCases(node);
     checkFields(node);
     checkBindings(node);
@@ -283,6 +269,35 @@ final class DefinitionShape {
           connection,
           "Invalid connection handle");
     }
+  }
+
+  /** Where a property may appear, e.g. "Cases belong to Switch nodes". */
+  private static String belongsTo(Property property) {
+    var owners = new ArrayList<String>();
+    for (NodeKind kind : NodeKind.values()) if (kind.uses(property)) owners.add(title(kind));
+    String names =
+        owners.size() == 1
+            ? owners.getFirst()
+            : String.join(", ", owners.subList(0, owners.size() - 1)) + " and " + owners.getLast();
+    return plural(property) + " belong to " + names + " nodes";
+  }
+
+  private static String plural(Property property) {
+    return switch (property) {
+      case EXPRESSION -> "Expressions";
+      case OUTPUT -> "Result variables";
+      case RULE -> "Rule references";
+      case BINDINGS -> "Parameter bindings";
+      case SELECTOR -> "Selectors";
+      case CASES -> "Cases";
+      case FIELDS -> "Fields";
+      case OUTPUT_NAME -> "Output names";
+    };
+  }
+
+  /** A kind as messages name it, e.g. "Formula". */
+  private static String title(NodeKind kind) {
+    return kind.name().charAt(0) + kind.name().substring(1).toLowerCase(Locale.ROOT);
   }
 
   /** A list over its limit is reported at its first extra element. */

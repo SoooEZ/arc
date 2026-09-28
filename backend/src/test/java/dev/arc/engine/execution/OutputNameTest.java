@@ -52,12 +52,24 @@ class OutputNameTest {
   }
 
   @Test
-  void unnamedOutputsAndPreviouslyIgnoredOutputPropertyKeepTheirValues() {
+  void unnamedOutputsKeepTheirValues() {
     for (String name : Arrays.asList(null, ""))
       assertThat(run(graph(output("out", "value", name))).result()).isEqualTo(new BigDecimal("42"));
+  }
+
+  /** An Output's result variable was once ignored; a stored graph that keeps one fails there. */
+  @Test
+  void anOutputThatSetsAResultVariableFailsAtThatNode() {
     var legacy =
         nodeOf("out", "OUTPUT", "out").expression("value").output("previously_ignored").build();
-    assertThat(run(graph(legacy)).result()).isEqualTo(new BigDecimal("42"));
+    assertThatThrownBy(() -> run(graph(legacy)))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage())
+                  .isEqualTo("Result variables belong to Formula, Transform and Reference nodes");
+              assertThat(error.locations().getFirst().nodeId()).isEqualTo("out");
+            });
   }
 
   @Test

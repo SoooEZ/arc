@@ -7,7 +7,6 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.NodeKind;
-import dev.arc.model.NodeKind.Slot;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,7 +43,6 @@ final class NodeValidation {
       if (kind == NodeKind.REFERENCE) referenceParameters = referenceParameters(node, resolver);
 
       for (OwnedExpression expression : expressions(node)) {
-        if (!owned(expression, kind)) continue;
         if (expression.bindingName() != null)
           require(
               referenceParameters.contains(expression.bindingName()),
@@ -120,22 +118,17 @@ final class NodeValidation {
   }
 
   /**
-   * The expressions a node holds, in the order checks visit them. Draft shape lets a node of any
-   * kind hold bindings, but only a Reference owns them: executable checks skip the others (see
-   * {@link #owned}), while the syntax check of a graph without a scope plan still parses them.
+   * The expressions a node holds, in the order checks visit them. Draft shape rejects properties
+   * that the node's kind does not use, so these are all of them.
    */
   static List<OwnedExpression> expressions(Node node) {
     return switch (node.kind()) {
-      case FORMULA, CONDITION, OUTPUT -> join(List.of(whole(node)), bindings(node));
-      case SWITCH -> join(selector(node), bindings(node), cases(node));
-      case TRANSFORM -> join(bindings(node), mapping(node));
-      case INPUT, REFERENCE -> bindings(node);
+      case FORMULA, CONDITION, OUTPUT -> List.of(whole(node));
+      case SWITCH -> join(selector(node), cases(node));
+      case TRANSFORM -> mapping(node);
+      case REFERENCE -> bindings(node);
+      case INPUT -> List.of();
     };
-  }
-
-  /** Whether the node's kind owns this expression; see {@link #expressions}. */
-  private static boolean owned(OwnedExpression expression, NodeKind kind) {
-    return expression.bindingName() == null || kind.owns(Slot.BINDINGS);
   }
 
   private static OwnedExpression whole(Node node) {
@@ -213,12 +206,9 @@ final class NodeValidation {
       if (node.ruleId() != null && node.version() != null)
         dependencies.add(Validator.Dependency.reference(node));
     for (Node node : definition.nodes()) {
-      NodeKind kind = node.kind();
-      var owned = new ArrayList<OwnedExpression>();
-      if (kind == NodeKind.INPUT)
+      var owned = new ArrayList<>(expressions(node));
+      if (node.kind() == NodeKind.INPUT)
         for (var mappings : sourceMappings(definition).values()) owned.addAll(mappings);
-      for (OwnedExpression expression : expressions(node))
-        if (owned(expression, kind)) owned.add(expression);
       try {
         for (OwnedExpression expression : owned)
           for (var call : formulaCalls.apply(expression.source()))

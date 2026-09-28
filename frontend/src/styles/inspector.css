@@ -13,6 +13,10 @@
   scrollbar-width: thin;
   scrollbar-color: #e0e8d9 transparent;
 }
+/* Sits above the node's sections, inset like them. */
+.inspector-unused-properties {
+  margin: 12px 16px 0;
+}
 .inspector-section .MuiInputBase-root {
   font-size: var(--text-md);
   border-radius: 6px;

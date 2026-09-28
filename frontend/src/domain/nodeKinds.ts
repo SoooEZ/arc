@@ -14,6 +14,20 @@ export type NodeExits =
   /** A path ends here. */
   | "none";
 
+/**
+ * An optional node property beyond id, type, label and position. `rule` is a
+ * Reference's pinned rule: its `ruleId` and `version`.
+ */
+export type NodeProperty =
+  | "expression"
+  | "output"
+  | "rule"
+  | "bindings"
+  | "selector"
+  | "cases"
+  | "fields"
+  | "outputName";
+
 /** Kind-specific fields of a newly added node. */
 export interface NewNodeFields {
   expression?: string;
@@ -47,6 +61,11 @@ export interface NodeKind {
   /** Other nodes may connect into it. */
   acceptsIncoming: boolean;
   exits: NodeExits;
+  /**
+   * The optional properties its nodes may set, as on the server
+   * (`NodeKind.properties()`), which rejects a node that sets any other.
+   */
+  properties: readonly NodeProperty[];
   /**
    * Fill of the kind's nodes on the canvas minimap. Every other kind color is
    * in the stylesheets, selected through `className`.
@@ -83,6 +102,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     removable: false,
     acceptsIncoming: false,
     exits: "next",
+    properties: [],
     minimapColor: neutralMinimap,
     newNodeFields: () => ({}),
     summary: (_node, inputCount) =>
@@ -97,6 +117,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     removable: true,
     acceptsIncoming: true,
     exits: "next",
+    properties: ["expression", "output"],
     minimapColor: neutralMinimap,
     newNodeFields: () => ({ expression: "1 + 1" }),
     summary: expressionSummary,
@@ -110,6 +131,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     removable: true,
     acceptsIncoming: true,
     exits: "true-false",
+    properties: ["expression"],
     minimapColor: "#e8d8b2",
     newNodeFields: () => ({ expression: "true" }),
     summary: expressionSummary,
@@ -123,6 +145,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     removable: true,
     acceptsIncoming: true,
     exits: "cases",
+    properties: ["selector", "cases"],
     minimapColor: neutralMinimap,
     newNodeFields: () => ({
       cases: [
@@ -141,6 +164,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     removable: true,
     acceptsIncoming: true,
     exits: "next",
+    properties: ["fields", "expression", "output"],
     minimapColor: neutralMinimap,
     newNodeFields: () => ({ fields: [{ name: "value", expression: "null" }] }),
     summary: (node) =>
@@ -157,6 +181,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     removable: true,
     acceptsIncoming: true,
     exits: "next",
+    properties: ["rule", "bindings", "output"],
     minimapColor: neutralMinimap,
     newNodeFields: () => ({ bindings: {} }),
     summary: (node) =>
@@ -171,6 +196,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     removable: true,
     acceptsIncoming: true,
     exits: "none",
+    properties: ["expression", "outputName"],
     minimapColor: neutralMinimap,
     newNodeFields: () => ({ expression: "0" }),
     summary: (node) =>
@@ -202,4 +228,59 @@ export function storesResult(type: NodeType): boolean {
 /** The one-line detail a canvas card shows under its label. */
 export function nodeSummary(node: RuleNode, inputCount: number): string {
   return nodeKinds[node.type].summary(node, inputCount);
+}
+
+/** The RuleNode keys behind each property. */
+const propertyKeys: Record<
+  NodeProperty,
+  readonly Exclude<keyof RuleNode, "id" | "type" | "label" | "position">[]
+> = {
+  expression: ["expression"],
+  output: ["output"],
+  rule: ["ruleId", "version"],
+  bindings: ["bindings"],
+  selector: ["selector"],
+  cases: ["cases"],
+  fields: ["fields"],
+  outputName: ["outputName"],
+};
+
+function isNodeProperty(value: string): value is NodeProperty {
+  return Object.hasOwn(propertyKeys, value);
+}
+
+const nodeProperties: readonly NodeProperty[] =
+  Object.keys(propertyKeys).filter(isNodeProperty);
+
+/** How messages name a property, e.g. "parameter bindings". */
+export const propertyNames: Record<NodeProperty, string> = {
+  expression: "an expression",
+  output: "a result variable",
+  rule: "a rule reference",
+  bindings: "parameter bindings",
+  selector: "a selector",
+  cases: "cases",
+  fields: "fields",
+  outputName: "an output name",
+};
+
+/**
+ * The properties a node sets although its kind does not use them. The server
+ * rejects such a node wherever it appears, published versions included.
+ */
+export function unusedProperties(node: RuleNode): NodeProperty[] {
+  const used = nodeKinds[node.type].properties;
+  return nodeProperties.filter(
+    (property) =>
+      !used.includes(property) &&
+      propertyKeys[property].some((key) => node[key] != null),
+  );
+}
+
+/** A node patch that clears every property the node's kind does not use. */
+export function clearUnusedProperties(node: RuleNode): Partial<RuleNode> {
+  const patch: Partial<RuleNode> = {};
+  for (const property of unusedProperties(node))
+    for (const key of propertyKeys[property]) patch[key] = undefined;
+  return patch;
 }

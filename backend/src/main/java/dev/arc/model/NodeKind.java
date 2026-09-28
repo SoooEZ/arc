@@ -34,6 +34,30 @@ public enum NodeKind {
     BINDINGS
   }
 
+  /**
+   * An optional node property beyond {@code id}, {@code type}, {@code label} and {@code position}.
+   * Every expression {@link Slot} is one, and so are the result variable, the pinned rule and an
+   * Output's name.
+   */
+  public enum Property {
+    /** {@code expression} */
+    EXPRESSION,
+    /** {@code output}, the result variable. */
+    OUTPUT,
+    /** {@code ruleId} and {@code version}, the pinned rule. */
+    RULE,
+    /** {@code bindings} */
+    BINDINGS,
+    /** {@code selector} */
+    SELECTOR,
+    /** {@code cases} */
+    CASES,
+    /** {@code fields} */
+    FIELDS,
+    /** {@code outputName} */
+    OUTPUT_NAME
+  }
+
   /** The kind a JSON {@code type} names exactly; empty for null, unknown or differently cased. */
   public static Optional<NodeKind> parse(String type) {
     for (NodeKind kind : values()) if (kind.name().equals(type)) return Optional.of(kind);
@@ -89,5 +113,25 @@ public enum NodeKind {
 
   public boolean owns(Slot slot) {
     return slots().contains(slot);
+  }
+
+  /**
+   * The optional properties a node of this kind may set. Draft-shape validation rejects a node that
+   * sets any other, including in stored drafts and published versions.
+   */
+  public Set<Property> properties() {
+    return switch (this) {
+      case INPUT -> Set.of();
+      case FORMULA -> Set.of(Property.EXPRESSION, Property.OUTPUT);
+      case CONDITION -> Set.of(Property.EXPRESSION);
+      case SWITCH -> Set.of(Property.SELECTOR, Property.CASES);
+      case TRANSFORM -> Set.of(Property.FIELDS, Property.EXPRESSION, Property.OUTPUT);
+      case REFERENCE -> Set.of(Property.RULE, Property.BINDINGS, Property.OUTPUT);
+      case OUTPUT -> Set.of(Property.EXPRESSION, Property.OUTPUT_NAME);
+    };
+  }
+
+  public boolean uses(Property property) {
+    return properties().contains(property);
   }
 }

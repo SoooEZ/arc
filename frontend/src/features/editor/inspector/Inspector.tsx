@@ -10,7 +10,7 @@ import type {
 } from "../../../types";
 import type { ReferenceTarget } from "../types";
 import { canRemoveGraphNode } from "../../../domain/graph";
-import { nodeKinds } from "../../../domain/nodeKinds";
+import { clearUnusedProperties, nodeKinds } from "../../../domain/nodeKinds";
 import InputFields from "./InputFields";
 import ReferenceFields from "./ReferenceFields";
 import FormulaFields from "./FormulaFields";
@@ -22,6 +22,7 @@ import TransformFields from "./TransformFields";
 import type { NodeFieldsProps } from "./types";
 import InspectorProblems from "./InspectorProblems";
 import NodeIdentity from "./NodeIdentity";
+import UnusedProperties from "./UnusedProperties";
 import { useNodeVariables } from "./useNodeVariables";
 // Exhaustive registry: every portable node kind has an editor. Other per-kind
 // facts, such as which kinds store a result or can be deleted, are in
@@ -121,6 +122,11 @@ export default function Inspector({
         </div>
       )}
       <div className="inspector-scroll" ref={scroll}>
+        <UnusedProperties
+          node={node}
+          readOnly={readOnly}
+          onRemove={() => patch(clearUnusedProperties(node))}
+        />
         <Fields key={node.id} {...fieldProps} />
         {kind.storesResult && (
           <ResultFields key={`result:${node.id}`} {...fieldProps} />

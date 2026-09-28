@@ -11,7 +11,11 @@ import dev.arc.error.ArcException.Location;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.BranchCase;
 import dev.arc.model.Definition.Edge;
+import dev.arc.model.Definition.Field;
 import dev.arc.model.Definition.Node;
+import dev.arc.model.NodeKind;
+import dev.arc.model.NodeKind.Property;
+import dev.arc.support.GraphFixtures.NodeBuilder;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -94,36 +98,58 @@ class NodeContractsTest {
   }
 
   /**
-   * Stored drafts and published versions may hold bindings on nodes that are not References.
-   * Executable checks ignore them, so such versions keep running; only the syntax check of a graph
-   * without a scope plan parses them.
+   * A property that a node's kind does not use was once ignored. Stored drafts and published
+   * versions are checked again whenever they are saved, published, executed or diagnosed, so one
+   * that still holds such a property fails at that node until it is removed.
    */
   @Test
-  void bindingsOnNodesThatDoNotOwnThemAreParsedOnlyWithoutAScopePlan() {
-    var calc =
-        nodeOf("calc", "FORMULA", "Calc")
-            .expression("1")
-            .output("v")
-            .rule("other-rule", 3)
-            .bindings(Map.of("a", "1 +"))
-            .build();
-    var nodes = List.of(node("in", "INPUT", null), calc, node("out", "OUTPUT", "v"));
-    var acyclic = graph(nodes, List.of(edge("in", "calc", "next"), edge("calc", "out", "next")));
-    var cyclic =
-        graph(
-            nodes,
-            List.of(
-                edge("in", "calc", "next"),
-                edge("calc", "out", "next"),
-                edge("out", "calc", "next")));
+  void aPropertyTheKindDoesNotUseIsRejectedAtItsNode() {
+    var messages =
+        Map.of(
+            Property.EXPRESSION,
+            "Expressions belong to Formula, Condition, Transform and Output nodes",
+            Property.OUTPUT,
+            "Result variables belong to Formula, Transform and Reference nodes",
+            Property.RULE,
+            "Rule references belong to Reference nodes",
+            Property.BINDINGS,
+            "Parameter bindings belong to Reference nodes",
+            Property.SELECTOR,
+            "Selectors belong to Switch nodes",
+            Property.CASES,
+            "Cases belong to Switch nodes",
+            Property.FIELDS,
+            "Fields belong to Transform nodes",
+            Property.OUTPUT_NAME,
+            "Output names belong to Output nodes");
+    for (NodeKind kind : NodeKind.values())
+      for (Property property : Property.values()) {
+        if (kind.uses(property)) continue;
+        Node extra = setting(nodeOf("extra", kind.name(), "Extra"), property).build();
+        var draft = graph(List.of(node("in", "INPUT", null), extra), List.of());
+        String message = messages.get(property);
+        assertThat(validator.diagnostics(draft, noRules))
+            .as(kind + " " + property)
+            .containsExactly(
+                new Validator.Problem(
+                    message, List.of(new Location(null, null, "extra", "Extra"))));
+        assertThatThrownBy(() -> validator.validate(draft, noRules))
+            .as(kind + " " + property)
+            .hasMessage(message);
+      }
+  }
 
-    validator.validate(acyclic, noRules);
-    assertThat(validator.diagnostics(acyclic, noRules)).isEmpty();
-    assertThat(Validator.dependencies(acyclic)).isEmpty();
-    assertThat(validator.diagnostics(cyclic, noRules))
-        .contains(
-            new Validator.Problem(
-                "Calc / a: Incomplete expression",
-                List.of(new Location(null, null, "calc", "Calc"))));
+  /** Sets one property to a value that a kind using it would accept. */
+  private static NodeBuilder setting(NodeBuilder node, Property property) {
+    return switch (property) {
+      case EXPRESSION -> node.expression("1");
+      case OUTPUT -> node.output("value");
+      case RULE -> node.rule("other-rule", 1);
+      case BINDINGS -> node.bindings(Map.of("amount", "1"));
+      case SELECTOR -> node.selector("1");
+      case CASES -> node.cases(List.of(new BranchCase("one", "One", "true")));
+      case FIELDS -> node.fields(List.of(new Field("value", "1")));
+      case OUTPUT_NAME -> node.outputName("total");
+    };
   }
 }
