@@ -92,6 +92,12 @@ Supply the most recently read `revision`. A successful save advances it. A stale
 
 The UI saves any changed draft before publishing. API clients should save explicitly, then publish using the returned revision.
 
+## Delete a rule
+
+`DELETE /rules/{id}` removes the rule with its draft and every published version and returns `204` without a body. Afterwards every request for the rule returns `404`, including execution of a pinned version, and the ID can name a new rule. Data sources cannot be deleted.
+
+A rule that another rule still calls, through a Reference node or an `@id:version` call in any draft or published version, is kept. The request returns `409` "Other rules call this rule: checkout (draft), checkout v3. Remove those calls before deleting it." The message names up to five callers; `issues` lists them all. Delete or change the callers first.
+
 ## Errors
 
 ```json
@@ -104,13 +110,13 @@ The UI saves any changed draft before publishing. API clients should save explic
 | --- | --- |
 | `400` | Malformed JSON or invalid request value |
 | `404` | Missing rule, source or version |
-| `409` | Duplicate rule or source ID (`This rule ID already exists`, `This source ID already exists`), stale revision, or execution of an unpublished rule |
+| `409` | Duplicate rule or source ID (`This rule ID already exists`, `This source ID already exists`), stale revision, execution of an unpublished rule, or deletion of a rule that other rules call |
 | `413` | Request body larger than 1 MiB, for any method or path |
 | `422` | Invalid graph, expression, input, or calculation; exhausted execution limit (steps, nesting, source reads, expression operations); text containing the NUL character (U+0000), which storage cannot hold |
 | `500` | Unexpected internal error (details are logged, not exposed) |
 | `504` | Execution deadline exhausted, including across nested rules and source reads |
 
-The current release has no deletion API, batch endpoint, run-history storage, or authentication. Rules and published versions persist; execution traces are returned to the caller rather than stored.
+The current release has no batch endpoint, run-history storage, or authentication, and data sources cannot be deleted. Rules and published versions persist until the rule is deleted; execution traces are returned to the caller rather than stored.
 
 ## Code studio and external parameters
 
@@ -152,6 +158,7 @@ These changes shipped with [the 2026-09-27 full review](reviews/2026-09-27-full-
 - JSON numbers are written plain: `$POWER(10, 2)` returns `100`, not `1E+2`.
 - Text containing the NUL character (U+0000) returns `422` "Text cannot contain the NUL character (U+0000)"; nothing is written.
 - The API container's JVM runs with the en-US locale.
+- New: `DELETE /rules/{id}` deletes a rule that no other rule calls; see [Delete a rule](#delete-a-rule). CORS allows `DELETE`.
 
 **Drafts, diagnostics and ARC Script**
 
@@ -159,6 +166,7 @@ These changes shipped with [the 2026-09-27 full review](reviews/2026-09-27-full-
 - Source-mapping problems name the mapping key (`rate source / region: …`), cyclic graphs keep their expression labels, and a broken source mapping no longer hides structural problems. Connection shape errors are reported on the connection's source node, also in draft-save `422` responses. Build errors carry the line and column of the statement that caused them.
 - Connection IDs generated for code written without `edge "…"` change only when a node ID contains a hyphen or the ID would exceed 100 characters; such IDs keep a bounded prefix and add `~` and 16 hex digits.
 - A draft node `version` without a `ruleId`, or below 1, returns `422`. An input-cycle message names the first declared input on the cycle.
+- A node that sets a property its kind does not use returns `422` at that node, for example "Parameter bindings belong to Reference nodes" for bindings on a Formula, "Rule references belong to Reference nodes" for a `ruleId`, "Result variables belong to Formula, Transform and Reference nodes" for an Output's `output`, and "Expressions belong to Formula, Condition, Transform and Output nodes" for a Switch's `expression`. Such properties were ignored before. Saving, publishing, preview and execution all check them, so a stored draft or published version that still holds one fails until its draft is fixed and published again.
 
 **Web server (port 3080)**
 

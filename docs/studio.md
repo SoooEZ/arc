@@ -284,10 +284,12 @@ These editor changes shipped with [the 2026-09-27 full review](reviews/2026-09-2
 
 - Save and publish keep the local draft when the server's copy is the same, so test inputs, results and diagnostics are not reset. The Test panel keeps inputs, options, tab and result across view switches and code edits, and moving cards keeps the result and the highlighted path. Arrange no longer waits for the viewport fit.
 - One node dialog opens at a time, with Cancel while it loads and Close if it fails. Version history refreshes after a publish. The selection falls back to the default node when its node disappears. Drafts created through the API without node positions open at (0, 0) without becoming unsaved. Export keeps its download URL valid for 40 s.
+- **Rule settings** can delete the rule. The dialog asks first, and a published rule also asks for its ID, because API clients call it by that ID. Deleting removes the draft and every version and returns to the library without asking about unsaved changes. A rule that other rules call stays, and the dialog names the callers.
 
 **Inspector**
 
 - Binding controls keep the chosen mode and constant type while you edit. Literal detection matches the server: `.5e3`, `1.`, `1.e5`, a backslash before a line break, arrays of objects and no-break-space padding open as expressions, and `and`/`or` or identifiers longer than 64 characters are expressions, not variables. Identifier fields accept deletions in stored invalid names. Parameters named like object members, such as `constructor` or `__proto__`, work everywhere.
+- A node that sets a property its kind does not use, such as parameter bindings on a Formula, shows which ones above its sections, and **Remove** clears them from the draft. The server rejects such nodes when saving, publishing, previewing and executing, so a published version that still holds one fails until a fixed draft is published.
 
 **Code studio and completion**
 

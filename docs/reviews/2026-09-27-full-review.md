@@ -15,7 +15,7 @@ The fixes ran in phases. Packages worked in isolated worktrees and ran browser a
 3. **Integration** of the packages and their cross-package requests.
 4. **Three structural refactors** that preserve behavior: backend node kinds, immutable model and narrow ports; the frontend node-kind descriptor and command gate; CSS tokens and the cascade cleanup.
 
-Each code fix has a regression test that fails before the fix; the web-server settings were checked with curl against the built image instead. Existing assertions were not weakened; where a test asserted the old defect, the change is justified in the package report. Intended behavior changes were recorded explicitly and are listed in the [API](../api.md#behavior-changes-in-this-revision) and [studio](../studio.md#behavior-changes-in-this-revision) guides. The reusable rules are in [the review lessons](../review-lessons.md) as F18–F35, B7–B24, new contract guards and extensions of earlier rows.
+Each code fix has a regression test that fails before the fix; the web-server settings were checked with curl against the built image instead. Existing assertions were not weakened; where a test asserted the old defect, the change is justified in the package report. Intended behavior changes were recorded explicitly and are listed in the [API](../api.md#behavior-changes-in-this-revision) and [studio](../studio.md#behavior-changes-in-this-revision) guides. The reusable rules are in [the review lessons](../review-lessons.md) as F18–F35, B7–B25, new contract guards and extensions of earlier rows.
 
 ## Summary
 
@@ -26,8 +26,8 @@ Each code fix has a regression test that fails before the fix; the web-server se
 | Sweep | SW1–SW5 | 5 | 3 confirmed, 2 plausible | 5 | 0 | 0 |
 | Cleanup | C01–C24 | 24 | Checked by the fixing package | 24 | 0 | 0 |
 | Efficiency | E01–E07, E11–E18 | 15 | Measured by the fixing package | 14 | 1 | 0 |
-| Structure (altitude) | A01–A07, A11–A18 | 15 | Checked by the fixing package | 11 | 4 | 0 |
-| **Total** | | **121** | | **115** | **5** | **1** |
+| Structure (altitude) | A01–A07, A11–A18 | 15 | Checked by the fixing package | 12 | 3 | 0 |
+| **Total** | | **121** | | **116** | **4** | **1** |
 
 Verifiers rated four findings high severity (K01, K02, K16, K30) and 18 medium; the other confirmed or plausible findings are low. K63 was confirmed in the browser by the package that fixed it. K38 was refuted: re-pinning a Reference to another version deliberately resets its bindings, and the existing picker test asserts that behavior.
 
@@ -250,4 +250,4 @@ Fix packages checked that their new regression tests fail on the pre-fix code; p
   - `.inspector-section.inspector-accordion` keeps inert `flex-direction` and `gap` on a block box.
 - **Source read timing.** `Parameters.Read.durationMicros` still includes the time spent resolving the input's dependencies, not only its own read.
 - **Source-contract walk.** Each execution still re-reads child pins and recompiles `@` expressions for the static source-contract check, even when the cached plan already holds them (the second half of E17).
-- **Node field ownership (A04).** Fields on kinds that do not own them are tolerated for stored compatibility; enforcing ownership needs a product decision about already-published versions.
+- **Node field ownership (A04).** Resolved after the review, once the product decision was made: a node that sets a property its kind does not use is rejected at that node when saving, publishing, previewing and executing. Stored drafts and published versions are not rewritten; one that holds such a property fails until the inspector's **Remove** clears it from the draft and the rule is published again (lesson B25).

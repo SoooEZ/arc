@@ -177,6 +177,15 @@ paths:
               schema: {$ref: '#/components/schemas/Rule'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
+    delete:
+      operationId: deleteRule
+      description: >-
+        Deletes the rule with its draft and every published version; later requests for it return
+        404. A rule that another rule's draft or published version calls is kept with 409, whose
+        issues list every caller, such as "checkout (draft)" or "checkout v3".
+      responses:
+        '204': {description: Rule deleted}
+        default: {$ref: '#/components/responses/Error'}
   /rules/{id}/publish:
     parameters: [{$ref: '#/components/parameters/RuleId'}]
     post:
