@@ -40,10 +40,11 @@ Run checks proportional to the changed behavior. All commands below run from the
 | --- | --- |
 | Java or cross-module dependencies | `python3 scripts/check_architecture.py`; `mvn -f backend/pom.xml verify` with Java 21 |
 | Frontend logic/UI | `python3 scripts/check_architecture.py`; `npm --prefix frontend run format:check`; `npm --prefix frontend run test:unit`; `npm --prefix frontend run build`; affected Playwright workflows |
+| Stylesheets | The frontend checks above, `tests/style-cascade.spec.ts` and the affected geometry workflows; for a refactor, the opt-in computed-style comparison in [the maintenance guide](docs/maintaining.md#styles) |
 | API/storage/evaluation or graph/code integration | Relevant checks above plus `scripts/smoke.py`, `scripts/studio_smoke.py`, and affected browser tests against a disposable stack |
 | Instructions/docs only | Validate skill metadata and local links; inspect examples against real paths/commands. App rebuilds are unnecessary unless runtime/build files also change. |
 
-Live smoke/browser tests write fixtures: use a separate Compose project and ports, not the user's working database. Report which checks ran and their results; distinguish static validation from exercised behavior.
+Live smoke/browser tests write fixtures: use a separate Compose project and ports, not the user's working database. Playwright and the smoke scripts default to ports 3080/8080, so set `ARC_WEB_URL`/`ARC_API_URL` for every run that includes browser or API tests. Report which checks ran and their results; distinguish static validation from exercised behavior.
 
 ## Code Review Rules
 

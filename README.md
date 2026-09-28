@@ -287,7 +287,7 @@ The result is `120`, alongside the executed version, phase timing, and a bounded
 - **Backend:** Java 21, [Spring Boot 3.5](https://docs.spring.io/spring-boot/3.5/), JDBC, Flyway.
 - **Storage:** PostgreSQL 17 with JSONB graph documents and immutable version rows.
 - **Execution:** a restricted expression parser using `BigDecimal`/DECIMAL128. No JavaScript evaluation, JVM reflection, SQL expressions, or arbitrary code execution.
-- **Infrastructure:** Docker Compose with health checks, isolated persistent storage, and an Nginx frontend/API proxy.
+- **Infrastructure:** Docker Compose with health checks, isolated persistent storage, and an Nginx frontend/API proxy (a 40 s API timeout above the 30 s execution deadline, per-request DNS for the `api` service, cache headers and gzip).
 
 ## Model and API
 
@@ -363,7 +363,7 @@ cd ..
 COMPOSE_PROJECT_NAME=arc-test ARC_WEB_PORT=3081 ARC_API_PORT=8081 docker compose down -v
 ```
 
-The final command deletes only that test project's containers and database volume. Normal `docker compose down` preserves the development database.
+The final command deletes only that test project's containers and database volume. Normal `docker compose down` preserves the development database. Playwright defaults to `http://localhost:3080` and the smoke scripts to `http://localhost:8080`, your working stack: set `ARC_WEB_URL` and `ARC_API_URL` for every run that should not write fixtures there, including spec files that mix pure and browser tests. Only `npm run test:unit` needs no stack. For stylesheet refactors, see the opt-in computed-style comparison in [the maintenance guide](docs/maintaining.md#styles).
 
 GitHub Actions runs module-boundary and native startup diagnostics checks, Java and frontend formatting checks, unit tests, the frontend build, real PostgreSQL API checks, and Chromium end-to-end tests. To format code before committing, run `mvn -f backend/pom.xml spotless:apply` and `npm --prefix frontend run format`. See [the maintenance guide](docs/maintaining.md) for where to add providers, functions, nodes, and UI behavior.
 

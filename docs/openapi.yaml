@@ -2,7 +2,13 @@ openapi: 3.0.3
 info:
   title: ARC — Rules & Calculations
   version: 0.2.0
-  description: Unauthenticated authoring and execution API. Published graphs and their pinned dependencies are immutable.
+  description: >-
+    Unauthenticated authoring and execution API. Published graphs and their
+    pinned dependencies are immutable. Every request body is limited to 1 MiB
+    (1,048,576 bytes) for any method or path spelling; larger bodies return 413.
+    Responses write decimal numbers in plain notation (20 and 0.0000001, never
+    2E+1). Stored text (names, descriptions, drafts and source definitions)
+    cannot contain the NUL character U+0000; such writes return 422.
 servers:
   - url: http://localhost:8080/api
   - url: http://localhost:3080/api
@@ -11,7 +17,10 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/Offset'}
       - {$ref: '#/components/parameters/Limit'}
-      - {name: search, in: query, schema: {type: string, maxLength: 200}}
+      - name: search
+        in: query
+        description: Trimmed before matching; at most 200 characters after trimming. A blank or whitespace-only search returns every item.
+        schema: {type: string}
       - {name: kind, in: query, schema: {type: string, enum: [DECISION_TREE, FORMULA, RULE]}}
       - {name: publishedOnly, in: query, schema: {type: boolean, default: false}}
     get:
@@ -34,7 +43,10 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/Offset'}
       - {$ref: '#/components/parameters/Limit'}
-      - {name: search, in: query, schema: {type: string, maxLength: 200}}
+      - name: search
+        in: query
+        description: Trimmed before matching; at most 200 characters after trimming. A blank or whitespace-only search returns every item.
+        schema: {type: string}
     get:
       operationId: listSourceSummaries
       responses:
@@ -58,8 +70,8 @@ paths:
       - {$ref: '#/components/parameters/Limit'}
       - name: search
         in: query
-        description: Trimmed literal substring of the version number. For example, 2 matches versions 2, 12 and 20. An empty search returns all versions.
-        schema: {type: string, maxLength: 200, default: ''}
+        description: Trimmed literal substring of the version number, at most 200 characters after trimming. For example, 2 matches versions 2, 12 and 20. An empty search returns all versions.
+        schema: {type: string, default: ''}
     get:
       operationId: listRuleVersionSummaries
       responses:
@@ -129,6 +141,8 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Rule'}
+        '409': {$ref: '#/components/responses/DuplicateRule'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /rules/{id}:
     parameters: [{$ref: '#/components/parameters/RuleId'}]
@@ -161,6 +175,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Rule'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /rules/{id}/publish:
     parameters: [{$ref: '#/components/parameters/RuleId'}]
@@ -181,6 +196,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Rule'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /rules/{id}/execute:
     parameters: [{$ref: '#/components/parameters/RuleId'}]
@@ -203,6 +219,7 @@ paths:
               version: 1
       responses:
         '200': {$ref: '#/components/responses/Execution'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /rules/{id}/versions:
     parameters: [{$ref: '#/components/parameters/RuleId'}]
@@ -236,6 +253,7 @@ paths:
   /variables:
     post:
       operationId: availableVariables
+      description: Invalid structure or cycles return 422; a cycle error lists the nodes of one cycle in locations.
       requestBody:
         required: true
         content:
@@ -251,10 +269,16 @@ paths:
                 additionalProperties:
                   type: array
                   items: {type: string}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /validate:
     post:
       operationId: validateGraph
+      description: >-
+        Invalid graphs return 422 and missing published dependencies 404. Each
+        problem is reported once; expression problems name their position (for
+        example "rate source / region"), and a connection problem is located at
+        the node the connection leaves.
       requestBody:
         required: true
         content:
@@ -269,6 +293,7 @@ paths:
                 type: object
                 properties:
                   valid: {type: boolean, enum: [true]}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /preview:
     post:
@@ -287,6 +312,7 @@ paths:
                 inputs: {type: object, additionalProperties: true}
       responses:
         '200': {$ref: '#/components/responses/Execution'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /functions:
     get:
@@ -329,6 +355,8 @@ paths:
                         id: {type: string, pattern: '^[a-z][a-z0-9-]{0,79}$'}
                         version: {type: integer, minimum: 1}
                         argumentCount: {type: integer, minimum: 0}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
   /studio/build:
     post:
       operationId: buildArcScript
@@ -340,10 +368,14 @@ paths:
               type: object
               required: [source]
               properties:
-                source: {type: string, maxLength: 100000}
+                source: {type: string, maxLength: 1048576, description: ARC Script source; the encoded request body must also fit 1 MiB}
       responses:
         '200':
-          description: Compiled definition or diagnostics with one-based line and column; syntax errors have a null definition
+          description: >-
+            Compiled definition or diagnostics with one-based line and column of
+            the statement that caused them; syntax and draft-shape errors have a
+            null definition. Incomplete drafts build as written (return; when;
+            let total; use "rule-id";) and the canonical source keeps their gaps.
           content:
             application/json:
               schema:
@@ -359,6 +391,8 @@ paths:
                         message: {type: string}
                         line: {type: integer}
                         column: {type: integer}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
   /studio/render:
     post:
       operationId: renderArcScript
@@ -369,10 +403,12 @@ paths:
             schema: {$ref: '#/components/schemas/Definition'}
       responses:
         '200':
-          description: Canonical ARC Script preserving graph identity, layout, bindings, and comments
+          description: Canonical ARC Script preserving graph identity, layout, bindings, and comments. Unset values of an incomplete draft are omitted and empty values are written empty, never replaced by invented code.
           content:
             application/json:
               schema: {type: object, properties: {source: {type: string}}}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
   /sources:
     get:
       operationId: listSources
@@ -401,6 +437,9 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataSource'}
+        '409': {$ref: '#/components/responses/DuplicateSource'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
   /sources/{id}:
     parameters:
       - {name: id, in: path, required: true, schema: {type: string}}
@@ -423,7 +462,9 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataSource'}
-        '409': {description: Stale revision}
+        '409': {description: Stale revision (Source changed in another editor; reload before saving)}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
   /sources/{id}/versions:
     parameters:
       - {name: id, in: path, required: true, schema: {type: string}}
@@ -435,6 +476,8 @@ paths:
           content:
             application/json:
               schema: {type: array, items: {$ref: '#/components/schemas/DataSource'}}
+        '404': {description: Source not found (unknown source ID)}
+        default: {$ref: '#/components/responses/Error'}
   /sources/{id}/versions/{version}:
     parameters:
       - {name: id, in: path, required: true, schema: {type: string}}
@@ -447,6 +490,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataSource'}
+        default: {$ref: '#/components/responses/Error'}
   /sources/{id}/test:
     parameters:
       - {name: id, in: path, required: true, schema: {type: string}}
@@ -468,6 +512,8 @@ paths:
           content:
             application/json:
               schema: {type: object, properties: {result: {nullable: true}}}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
 components:
   parameters:
     Offset:
@@ -485,24 +531,47 @@ components:
       schema: {type: string}
   responses:
     Error:
-      description: 400 malformed request; 404 missing resource; 409 revision conflict, duplicate ID, or unpublished rule; 413 oversized request; 422 invalid graph/input/calculation; 500 server error; 504 execution deadline exceeded
+      description: >-
+        400 malformed request; 404 missing rule, source or version; 409 revision
+        conflict, duplicate rule or source ID, or execution of an unpublished
+        rule; 413 request body over 1 MiB (any method or path); 422 invalid
+        graph, input or calculation, exhausted execution limit (steps, nesting,
+        source reads, expression operations), Excel argument error or text
+        containing U+0000; 500 server error; 504 execution deadline exceeded
       content:
         application/json:
-          schema:
-            type: object
-            properties:
-              status: {type: integer}
-              message: {type: string}
-              issues: {type: array, items: {type: string}}
-              locations:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    ruleId: {type: string, nullable: true}
-                    version: {type: integer, nullable: true}
-                    nodeId: {type: string}
-                    label: {type: string}
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            executionLimit:
+              summary: A shared execution limit is exhausted; error functions and source DEFAULT fallbacks do not catch it
+              value: {status: 422, message: 'Execution exceeds 1,000 steps', issues: ['Execution exceeds 1,000 steps'], locations: [{ruleId: order-pricing, version: 3, nodeId: calculate, label: Calculate}]}
+            excelArgument:
+              summary: An array reached a single-value Excel parameter
+              value: {status: 422, message: 'SQRT: argument 1 must be a single value, not an array', issues: ['SQRT: argument 1 must be a single value, not an array'], locations: [{ruleId: preview, version: null, nodeId: result, label: Result}]}
+            nulText:
+              summary: Text that storage cannot hold
+              value: {status: 422, message: 'Text cannot contain the NUL character (U+0000)', issues: ['Text cannot contain the NUL character (U+0000)'], locations: []}
+            unknownSource:
+              summary: Version reads of an unknown source
+              value: {status: 404, message: Source not found, issues: [Source not found], locations: []}
+    DuplicateRule:
+      description: This rule ID already exists
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          example: {status: 409, message: This rule ID already exists, issues: [This rule ID already exists], locations: []}
+    DuplicateSource:
+      description: This source ID already exists
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          example: {status: 409, message: This source ID already exists, issues: [This source ID already exists], locations: []}
+    PayloadTooLarge:
+      description: The request body exceeds 1 MiB, whatever the method or path spelling (for example /api;x=1/... or /%61pi/...)
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          example: {status: 413, message: Request body exceeds 1 MiB, issues: []}
     Execution:
       description: Complete result, optional bounded trace, and preparation/execution timing
       content:
@@ -548,6 +617,21 @@ components:
                     branch: {type: string, nullable: true, enum: [next, 'true', 'false', null]}
                     depth: {type: integer}
   schemas:
+    Error:
+      type: object
+      properties:
+        status: {type: integer}
+        message: {type: string}
+        issues: {type: array, items: {type: string}}
+        locations:
+          type: array
+          items:
+            type: object
+            properties:
+              ruleId: {type: string, nullable: true}
+              version: {type: integer, nullable: true}
+              nodeId: {type: string}
+              label: {type: string}
     PageMetadata:
       type: object
       required: [items, total, offset, limit]
@@ -653,8 +737,8 @@ components:
                   values 1 and 1.0 compare equal. Null, arrays and objects produce
                   a 422 execution error with the Switch node location.
               output: {type: string, nullable: true}
-              ruleId: {type: string, nullable: true}
-              version: {type: integer, minimum: 1, nullable: true}
+              ruleId: {type: string, nullable: true, description: REFERENCE only; a draft may keep the rule before choosing its version}
+              version: {type: integer, minimum: 1, nullable: true, description: REFERENCE only; requires ruleId}
               cases:
                 type: array
                 nullable: true
@@ -729,7 +813,7 @@ components:
               required: {type: boolean}
               defaultValue: {nullable: true}
         entries: {type: object, maxProperties: 1000, additionalProperties: true}
-        secretHeaders: {type: object, maxProperties: 10, additionalProperties: {type: string}, description: Header names mapped to ARC_SECRET_ environment aliases; never raw credentials}
+        secretHeaders: {type: object, maxProperties: 10, additionalProperties: {type: string}, description: 'Header names mapped to ARC_SECRET_ environment aliases; never raw credentials. HTTP only: LOOKUP definitions omit it or send {}. Names and aliases must not be null.'}
         timeoutMs: {type: integer, minimum: 100, maximum: 10000}
     DataSource:
       type: object
