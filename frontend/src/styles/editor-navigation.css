@@ -16,7 +16,7 @@
   justify-content: space-between;
   padding: 0 3px 7px;
   color: #889d74;
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 .node-outline button:not(.MuiIconButton-root) {
   border: 0;
@@ -26,14 +26,14 @@
   gap: 7px;
   padding: 8px 6px;
   width: 100%;
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #97a885;
   text-align: left;
   border-radius: 4px;
 }
 .node-outline button.selected {
-  background: #edf4e5 !important;
-  color: #658c48 !important;
+  background: #edf4e5;
+  color: #658c48;
 }
 .node-outline button > span {
   overflow: hidden;
@@ -41,7 +41,7 @@
   white-space: nowrap;
 }
 .node-outline small {
-  font-size: 7px;
+  font-size: var(--text-2xs);
   color: #bcc9ac;
 }
 .edge-delete {
@@ -49,7 +49,7 @@
   left: 50%;
   transform: translateX(-50%);
   top: 15px;
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid #ebdbd3;
   border-radius: 7px;
   z-index: 5;
@@ -63,18 +63,18 @@
   background: #f2f7ed;
   border-bottom: 1px solid #dfe8d5;
   color: #93a880;
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 .version-bar button:not(.MuiIconButton-root) {
   border: 1px solid #dce6d1;
   border-radius: 4px;
-  background: #fff;
-  font-size: 10px;
+  background: var(--color-surface);
+  font-size: var(--text-md);
   padding: 4px 8px;
   color: #849c6d;
 }
 .version-bar small {
-  font-size: 8px;
+  font-size: var(--text-xs);
   margin-left: 7px;
   color: #a5b591;
 }

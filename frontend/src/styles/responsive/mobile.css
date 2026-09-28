@@ -1,7 +1,7 @@
 @media (max-width: 760px) {
   .sidebar.is-expanded ~ .main-content {
-    margin-left: 68px;
-    width: calc(100% - 68px);
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
   }
   .sidebar.is-expanded {
     box-shadow: 8px 0 30px #102b2530;
@@ -20,10 +20,10 @@
   }
   .breadcrumbs {
     gap: 8px;
-    font-size: 9px;
+    font-size: var(--text-sm);
   }
   .breadcrumbs button {
-    font-size: 10px;
+    font-size: var(--text-md);
   }
   .breadcrumbs > span:first-child,
   .breadcrumbs > svg:first-of-type {
@@ -33,7 +33,7 @@
     gap: 12px;
   }
   .open-access {
-    font-size: 8px;
+    font-size: var(--text-xs);
   }
   .topbar-divider {
     display: none;
@@ -51,10 +51,10 @@
     font-size: 26px;
   }
   .page-heading p {
-    font-size: 10px;
+    font-size: var(--text-md);
   }
   .page-heading > .MuiButton-root {
-    font-size: 9px;
+    font-size: var(--text-sm);
     white-space: nowrap;
     margin-top: 24px;
     padding: 6px 9px;
@@ -63,7 +63,7 @@
     display: none;
   }
   .eyebrow {
-    font-size: 7px;
+    font-size: var(--text-2xs);
     letter-spacing: 1px;
   }
   .stats-row {
@@ -78,14 +78,14 @@
     display: none;
   }
   .stat > div > span {
-    font-size: 8px;
+    font-size: var(--text-xs);
   }
   .stat strong {
     font-size: 23px;
   }
   .stat small {
     left: 10px;
-    font-size: 7px;
+    font-size: var(--text-2xs);
   }
   .rule-grid {
     grid-template-columns: 1fr;
@@ -99,7 +99,7 @@
   .rule-card-footer {
     margin-left: -20px;
     margin-right: -20px;
-    font-size: 9px;
+    font-size: var(--text-sm);
     padding: 16px;
   }
   .mini-graph {
@@ -116,7 +116,7 @@
   .library-footer {
     margin-top: 26px;
     gap: 12px;
-    font-size: 7px;
+    font-size: var(--text-2xs);
   }
   .library-footer > span:last-child {
     display: none;
@@ -127,7 +127,7 @@
     justify-content: space-between;
   }
   .filter-tabs button {
-    font-size: 9px;
+    font-size: var(--text-sm);
     padding: 7px 8px;
   }
   .editor-main {
@@ -155,10 +155,6 @@
     justify-content: space-between;
     width: 100%;
   }
-  .editor-actions .MuiButton-root {
-    font-size: 10px;
-    padding: 6px 9px;
-  }
   .editor-body {
     flex-direction: column;
   }
@@ -183,22 +179,15 @@
     border-left: 0;
     border-top: 1px solid #dfe6d8;
   }
-  .inspector-section {
-    padding: 23px;
-  }
-  .inspector-node-title > div > span,
   .muted-copy,
   .inspector-section .MuiFormHelperText-root {
-    font-size: 10px;
+    font-size: var(--text-md);
   }
   .inspector-section .MuiInputBase-root {
-    font-size: 12px;
-  }
-  .inspector-section h4 {
-    font-size: 12px;
+    font-size: var(--text-xl);
   }
   .inspector-footer {
-    font-size: 9px;
+    font-size: var(--text-sm);
   }
   .api-intro-cards {
     grid-template-columns: 1fr;
@@ -219,10 +208,10 @@
   }
   .api-console-heading {
     padding: 15px;
-    font-size: 10px;
+    font-size: var(--text-md);
   }
   .api-console-heading > span {
-    font-size: 8px;
+    font-size: var(--text-xs);
   }
   .api-response {
     padding: 18px 15px;
@@ -235,13 +224,13 @@
   }
   .api-intro-cards p,
   .api-notes p {
-    font-size: 11px;
+    font-size: var(--text-lg);
   }
   .test-panel {
     height: 315px;
   }
   .test-panel-heading strong {
-    font-size: 9px;
+    font-size: var(--text-sm);
   }
   .test-panel-content {
     grid-template-columns: 43% 57%;
@@ -253,26 +242,22 @@
     display: none;
   }
   .test-input .MuiTab-root {
-    font-size: 8px;
+    font-size: var(--text-xs);
     min-width: 0;
     padding: 0 9px;
   }
   .test-result > strong {
     font-size: 15px;
   }
-  .test-result > small {
-    width: 100%;
-    margin-left: 0;
-  }
   .trace-list > button {
     gap: 3px;
-    font-size: 7px;
+    font-size: var(--text-2xs);
   }
   .trace-list > button > code {
     max-width: 40px;
   }
   .canvas-hint {
-    font-size: 7px;
+    font-size: var(--text-2xs);
     bottom: 10px;
     left: 50px;
   }

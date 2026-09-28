@@ -1,5 +1,7 @@
 .api-page {
-  padding-bottom: 60px;
+  padding: 39px 39px 60px;
+  max-width: var(--page-max-width);
+  margin: 0 auto;
 }
 .api-page .page-heading h1 {
   font-size: 31px;
@@ -12,7 +14,7 @@
 }
 .api-intro-cards > div {
   border: 1px solid #e0e7d9;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 9px;
   padding: 22px;
   position: relative;
@@ -21,24 +23,24 @@
 .api-intro-cards > div > span {
   position: absolute;
   right: 20px;
-  font-size: 10px;
+  font-size: var(--text-md);
   color: #b6c2a6;
 }
 .api-intro-cards h3 {
-  font-size: 13px;
+  font-size: var(--text-2xl);
   font-weight: 550;
   color: #5c7747;
   margin: 17px 0 9px;
 }
 .api-intro-cards p {
-  font-size: 10px;
+  font-size: var(--text-md);
   line-height: 1.8;
-  color: #98ab83;
+  color: var(--color-api-muted);
 }
 .api-console {
   border: 1px solid #dce6d2;
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-surface);
   overflow: hidden;
 }
 .api-console-heading {
@@ -50,14 +52,14 @@
   color: #8ba471;
 }
 .api-console-heading strong {
-  font-size: 12px;
+  font-size: var(--text-xl);
   font-weight: 550;
   color: #647f4d;
 }
 .api-console-heading > span {
   margin-left: auto;
-  font-size: 9px;
-  color: #a3b48c;
+  font-size: var(--text-sm);
+  color: var(--color-api-muted);
 }
 .api-console-body {
   display: grid;
@@ -80,11 +82,14 @@
   width: 115px;
   flex-shrink: 0;
 }
+.api-select-row .MuiInputLabel-root {
+  color: var(--color-api-strong);
+}
 .api-request .MuiInputBase-root {
-  font-size: 11px;
+  font-size: var(--text-lg);
 }
 .api-request .MuiInputLabel-root {
-  font-size: 12px;
+  font-size: var(--text-xl);
 }
 .endpoint {
   display: flex;
@@ -97,35 +102,35 @@
   overflow: hidden;
 }
 .endpoint > strong {
-  font-size: 8px;
+  font-size: var(--text-xs);
   color: #7da859;
   padding: 2px 4px;
   border-radius: 3px;
   background: #e8f2df;
 }
 .endpoint > code {
-  font-size: 9px;
-  color: #8fa978;
+  font-size: var(--text-sm);
+  color: var(--color-api-strong);
   overflow-wrap: anywhere;
   min-width: 0;
 }
 .field-label {
-  font-size: 10px;
+  font-size: var(--text-md);
   font-weight: 500;
-  color: #889f71;
+  color: var(--color-api-muted);
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: -8px;
 }
 .field-label > span {
-  font-size: 8px;
+  font-size: var(--text-xs);
   font-weight: 400;
   color: #afc096;
 }
 .api-request > .MuiButton-root {
   align-self: flex-start;
-  font-size: 10px;
+  font-size: var(--text-md);
   min-height: 33px;
 }
 .parameter-chips {
@@ -142,12 +147,12 @@
   border-radius: 3px;
 }
 .parameter-chips code {
-  font-size: 8px;
-  color: #93ad75;
+  font-size: var(--text-xs);
+  color: var(--color-api-strong);
 }
 .parameter-chips small {
-  font-size: 7px;
-  color: #b0c496;
+  font-size: var(--text-2xs);
+  color: var(--color-api-muted);
 }
 .api-response {
   background: #f8faf5;
@@ -162,18 +167,18 @@
   justify-content: space-between;
   margin-bottom: 18px;
   min-height: 28px;
-  font-size: 10px;
-  color: #94ae77;
+  font-size: var(--text-md);
+  color: var(--color-api-strong);
 }
 .code-panel-heading > .MuiButton-root {
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #a8bd8b;
   min-height: 26px;
 }
 .api-response pre {
-  font-size: 10px;
+  font-size: var(--text-md);
   line-height: 1.9;
-  color: #749953;
+  color: var(--color-code-text);
   margin: 0;
   max-height: 540px;
   overflow: auto;
@@ -185,7 +190,7 @@
   background: none;
   border: 0;
   color: #88ab65;
-  font-size: 9px;
+  font-size: var(--text-sm);
   padding: 12px 0;
 }
 .api-reference-heading {
@@ -199,16 +204,16 @@
   margin-bottom: 8px;
 }
 .api-reference-heading p {
-  font-size: 10px;
-  color: #a1b589;
+  font-size: var(--text-md);
+  color: var(--color-api-strong);
 }
 .api-reference-heading code {
-  font-size: 10px;
-  color: #88a56b;
+  font-size: var(--text-md);
+  color: var(--color-api-strong);
 }
 .endpoint-table {
   border: 1px solid #e0e8d7;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -218,19 +223,19 @@
   align-items: center;
   gap: 12px;
   padding: 15px 19px;
-  font-size: 10px;
-  color: #a1b58a;
+  font-size: var(--text-md);
+  color: var(--color-api-muted);
 }
 .endpoint-table > div:not(:last-child) {
   border-bottom: 1px solid #ebf0e3;
 }
 .endpoint-table code {
-  font-size: 9px;
-  color: #7f9e62;
+  font-size: var(--text-sm);
+  color: var(--color-api-strong);
   overflow-wrap: anywhere;
 }
 .method {
-  font-size: 8px;
+  font-size: var(--text-xs);
   padding: 3px 4px;
   border-radius: 3px;
   background: #edf3fa;
@@ -253,17 +258,17 @@
   margin-top: 30px;
 }
 .api-notes h3 {
-  font-size: 12px;
+  font-size: var(--text-xl);
   font-weight: 550;
-  color: #8ca771;
+  color: var(--color-api-strong);
   margin-bottom: 9px;
 }
 .api-notes p {
-  font-size: 10px;
-  color: #aabc93;
+  font-size: var(--text-md);
+  color: var(--color-api-muted);
   line-height: 1.9;
 }
 .api-notes code {
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #8fae71;
 }

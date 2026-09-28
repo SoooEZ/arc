@@ -4,7 +4,7 @@
   flex-wrap: wrap;
   gap: 6px 16px;
   padding: 6px 0;
-  font-size: 11px;
+  font-size: var(--text-lg);
   line-height: 1.5;
 }
 .studio-editor > .expression-color-key {
@@ -15,12 +15,12 @@
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr) 180px;
   min-height: 0;
-  background: #fcfdfc;
-  border-top: 1px solid #e4eae6;
+  background: var(--color-code-background);
+  border-top: 1px solid var(--color-studio-border);
 }
 .studio-library {
   padding: 18px 14px;
-  border-right: 1px solid #e4eae6;
+  border-right: 1px solid var(--color-studio-border);
   background: #f7f9f7;
   overflow-y: auto;
   display: flex;
@@ -31,30 +31,33 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 12px;
+  font-size: var(--text-xl);
   color: #3b5146;
 }
 .studio-tabs {
   display: flex;
-  border-bottom: 1px solid #dde5df;
+  border-bottom: 1px solid var(--color-studio-border-strong);
   gap: 5px;
 }
 .studio-tabs button {
   flex: 1;
   padding: 10px 0;
   text-transform: capitalize;
-  font-size: 11px;
+  font-size: var(--text-lg);
   color: #839187;
+  border: 0;
   border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
 }
 .studio-tabs button.active {
-  color: #28654c;
-  border-color: #28654c;
+  color: var(--color-accent);
+  border-color: var(--color-accent);
   font-weight: 600;
 }
 .studio-hint,
 .source-binding p {
-  font-size: 11px;
+  font-size: var(--text-lg);
   line-height: 1.7;
   color: #7a877f;
   margin: 0;
@@ -65,9 +68,12 @@
 }
 .function-scope button {
   padding: 6px 7px;
+  border: 0;
   border-radius: 5px;
-  font-size: 10px;
+  background: transparent;
+  font-size: var(--text-md);
   color: #7a877f;
+  cursor: pointer;
 }
 .function-scope button.active {
   background: #e5ede7;
@@ -80,10 +86,10 @@
   align-content: start;
 }
 .function-chips .MuiChip-root {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
   border-color: #d9e1db;
-  background: #fff;
+  background: var(--color-surface);
   height: 25px;
 }
 .function-tooltip {
@@ -91,14 +97,50 @@
   padding: 7px;
 }
 .function-tooltip strong {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
 }
 .function-tooltip p {
   line-height: 1.6;
 }
 .function-tooltip small {
   opacity: 0.7;
+}
+.function-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.function-group {
+  border: 1px solid var(--color-studio-border-strong);
+  border-radius: 7px;
+  background: var(--color-surface);
+}
+.function-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 12px 9px;
+  border: 0;
+  background: transparent;
+  color: #43604c;
+  font-size: var(--text-lg);
+  text-align: left;
+}
+.function-group-heading > span {
+  margin-left: auto;
+  border-radius: 4px;
+  background: var(--color-badge);
+  padding: 2px 5px;
+  color: #7b8a80;
+  font-size: var(--text-md);
+}
+.function-group-heading .expanded {
+  transform: rotate(90deg);
+}
+.function-group .function-chips {
+  padding: 0 9px 12px;
 }
 .snippet-card {
   display: flex;
@@ -107,9 +149,9 @@
   padding: 13px 10px;
   border: 1px solid #dfe6e1;
   border-radius: 7px;
-  background: #fff;
+  background: var(--color-surface);
   text-align: left;
-  font-size: 12px;
+  font-size: var(--text-xl);
   color: #435b4b;
 }
 .snippet-card > span:nth-child(2) {
@@ -117,7 +159,7 @@
 }
 .snippet-card small {
   display: block;
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #89938b;
   margin-top: 5px;
 }
@@ -173,66 +215,69 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #e4eae6;
+  border-bottom: 1px solid var(--color-studio-border);
   padding: 8px 16px;
-  background: #fff;
+  background: var(--color-surface);
   gap: 8px;
 }
 .studio-filebar > span {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
 }
 .studio-filebar small {
   font-family: Inter, sans-serif;
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #829086;
 }
 .studio-filebar > div {
   display: flex;
 }
 .studio-filebar .MuiButton-root {
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 .studio-problems {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 10px 16px;
-  border-top: 1px solid #e4eae6;
+  border-top: 1px solid var(--color-studio-border);
   background: #f5f8f5;
-  font-size: 10px;
+  font-size: var(--text-md);
   color: #819187;
   flex-wrap: wrap;
   min-height: 38px;
 }
 .studio-problems strong {
   color: #47715c;
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 .studio-problems button {
-  font-size: 11px;
+  border: 0;
+  background: transparent;
+  font-size: var(--text-lg);
   text-align: left;
   color: #a5473c;
+  cursor: pointer;
 }
 .studio-problems.has-errors {
   background: #fff4ef;
 }
 .studio-outline {
   padding: 20px 12px;
-  border-left: 1px solid #e4eae6;
+  border-left: 1px solid var(--color-studio-border);
   overflow: auto;
 }
 .studio-outline h4 {
-  font-size: 9px;
+  font-size: var(--text-sm);
   letter-spacing: 1.5px;
   color: #8c9a90;
   margin: 0 0 8px;
 }
 .studio-outline > span {
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #8c9a90;
 }
 .studio-outline button {
@@ -240,21 +285,30 @@
   gap: 9px;
   align-items: center;
   text-align: left;
-  font-size: 11px;
+  font-size: var(--text-lg);
   color: #526a5a;
   width: 100%;
   padding: 12px 4px;
-  border-bottom: 1px solid #edf0ec;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 .studio-outline small {
   display: block;
   color: #93a096;
-  font-size: 9px;
+  font-size: var(--text-sm);
   margin-top: 4px;
 }
 .studio-outline p {
-  font-size: 10px;
+  font-size: var(--text-md);
   color: #91a096;
   line-height: 1.8;
   margin-top: 24px;
+}
+.studio-tabs button:focus-visible,
+.function-scope button:focus-visible,
+.studio-outline button:focus-visible,
+.snippet-card:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }

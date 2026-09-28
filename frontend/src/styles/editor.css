@@ -18,8 +18,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 21px 24px;
-  background: #fff;
-  border-bottom: 1px solid #e5eae3;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-editor-border);
   gap: 15px;
   flex-shrink: 0;
 }
@@ -48,7 +48,7 @@
 }
 .editor-title > div > span {
   display: block;
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #98a08f;
   margin-top: 5px;
   white-space: nowrap;
@@ -60,7 +60,7 @@
   flex-shrink: 0;
 }
 .editor-actions .MuiButton-root {
-  font-size: 10px;
+  font-size: var(--text-md);
   min-height: 33px;
   padding: 6px 11px;
 }
@@ -82,8 +82,8 @@
 }
 .graph-toolbar {
   height: 56px;
-  background: #fff;
-  border-bottom: 1px solid #e5eae3;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-editor-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -99,12 +99,12 @@
   white-space: nowrap;
 }
 .graph-view-label strong {
-  font-size: 10px;
+  font-size: var(--text-md);
   font-weight: 500;
   color: #637857;
 }
 .graph-view-label > span {
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #9aa68e;
   margin-left: 5px;
 }
@@ -114,7 +114,7 @@
   gap: 4px;
 }
 .graph-tools .MuiButton-root {
-  font-size: 9px;
+  font-size: var(--text-sm);
   min-height: 28px;
   padding: 4px 10px;
 }
@@ -122,8 +122,9 @@
   color: #9aaa8c;
   padding: 6px;
 }
-.routing-warning {
-  border-radius: 0 !important;
+/* The class pair outranks the rounded corners of MUI's Alert. */
+.routing-warning.MuiAlert-root {
+  border-radius: 0;
   flex-shrink: 0;
   max-height: 128px;
   overflow: auto;
@@ -132,6 +133,25 @@
   position: relative;
   flex: 1;
   min-height: 220px;
-  background: #f8faf8;
+  background: var(--color-canvas);
   isolation: isolate;
+}
+/* Rule settings dialog. MUI removes the top padding of dialog content that
+   follows a DialogTitle, so this one needs !important to keep its own. */
+.rule-settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-top: 12px !important;
+}
+.read-only-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: var(--text-sm);
+  color: #a0b28d;
+}
+.read-only-field code {
+  font-size: var(--text-md);
+  color: #8fa676;
 }

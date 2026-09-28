@@ -1,11 +1,9 @@
-.react-flow__node-arc {
-  width: 230px;
-}
+/* Card widths come from nodeWidth() in domain/nodePorts.ts (inline styles);
+   card text sizes below change the measured heights used by routing and Arrange. */
 .graph-node {
   position: relative;
-  width: 230px;
   border: 1px solid #dbe2dc;
-  background: #fff;
+  background: var(--color-surface);
   box-shadow: 0 3px 8px #16281c06;
   border-radius: 8px;
   padding: 12px 15px 14px;
@@ -13,7 +11,7 @@
 }
 .graph-node > strong {
   display: block;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: -0.2px;
@@ -23,8 +21,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 8px;
-  color: #97a18f;
+  font-size: var(--text-md);
+  color: #71816a;
   font-weight: 500;
 }
 .node-header-actions {
@@ -34,18 +32,27 @@
   gap: 4px;
   margin-left: auto;
 }
-.node-header-actions .node-expression-button {
-  margin-left: 0;
-}
 .node-header-actions > svg {
   flex-shrink: 0;
+}
+.node-expression-button {
+  padding: 3px;
+  display: flex;
+  color: #728375;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+.node-expression-button:hover {
+  background: #edf3ee;
+  color: var(--color-accent);
 }
 .node-icon {
   width: 25px;
   height: 25px;
   border-radius: 6px;
   background: #f0f4ef;
-  color: #829276;
+  color: var(--node-kind-input);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -58,24 +65,32 @@
 }
 .node-icon.formula {
   background: #eef1fa;
-  color: #8392b5;
+  color: var(--node-kind-formula);
 }
 .node-icon.condition {
   background: #fcf4e1;
-  color: #b69c59;
+  color: var(--node-kind-condition);
 }
 .node-icon.reference {
   background: #f2eefa;
-  color: #a08abb;
+  color: var(--node-kind-reference);
 }
 .node-icon.output {
   background: #eaf4ea;
-  color: #7b9e72;
+  color: var(--node-kind-output);
+}
+.node-icon.switch {
+  background: #fcf4e1;
+  color: var(--node-kind-switch);
+}
+.node-icon.transform {
+  background: #e7f4f3;
+  color: var(--node-kind-transform);
 }
 .node-detail {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 8px;
-  color: #98a38f;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  color: #6c7e62;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -83,7 +98,6 @@
 }
 .node-input .node-detail {
   font-family: inherit;
-  font-size: 9px;
 }
 .node-selected {
   outline: 2px solid #85b598;
@@ -104,17 +118,56 @@
   border-color: #70ab88;
   box-shadow: 0 0 0 3px #dcece0a6;
 }
+/* After .node-visited: a visited Switch or Transform card keeps its kind
+   border, while visited Condition, Reference and Output cards show the
+   visited border. */
+.node-switch {
+  border-color: #e3d9bd;
+}
+.node-transform {
+  border-color: #bddbdc;
+}
+.graph-node.node-error {
+  border-color: var(--color-danger);
+  box-shadow:
+    inset 0 0 0 1px var(--color-danger),
+    0 0 0 3px #c54d4515;
+}
+.node-error-message {
+  position: absolute;
+  top: -10px;
+  right: 8px;
+  padding: 2px 5px;
+  border: 1px solid #df9d98;
+  border-radius: 4px;
+  background: #fff2f1;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  color: #b83e38;
+  font-size: var(--text-sm);
+}
+.node-error-message svg {
+  flex-shrink: 0;
+}
+.node-error-message span {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
 .node-check {
   color: #529770;
 }
 .node-link-icon {
   color: #b5a3c7;
 }
+/* React Flow's stylesheet loads after the application styles, so rules for
+   its own elements need !important where both set a property. */
 .react-flow__handle {
   height: 7px !important;
   width: 7px !important;
   background: #a0b798 !important;
-  border: 1.5px solid white !important;
+  border: 1.5px solid var(--color-surface) !important;
 }
 .react-flow__handle:hover {
   height: 11px !important;
@@ -124,17 +177,20 @@
 .handle-label {
   position: absolute;
   bottom: -16px;
-  font-size: 7px;
+  font-size: var(--text-2xs);
   color: #7ca174;
-  background: #f8faf8;
+  background: var(--color-canvas);
   padding: 0 4px;
   pointer-events: none;
 }
-.handle-true {
-  left: 19%;
+.handle-caption {
+  transform: translateX(-50%);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.handle-false {
-  right: 18%;
+.handle-fallback {
   color: #ac957a;
 }
 .react-flow__controls {
@@ -173,7 +229,7 @@
   position: absolute;
   bottom: 12px;
   left: 57px;
-  font-size: 8px;
+  font-size: var(--text-xs);
   color: #a3af99;
   display: flex;
   align-items: center;
@@ -183,7 +239,7 @@
 .keyboard-key {
   display: inline-block;
   border: 1px solid #dbe3d5;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 3px;
   padding: 0 3px;
   color: #8e9e80;
@@ -191,13 +247,13 @@
 }
 .editor-status {
   height: 27px;
-  background: #fff;
+  background: var(--color-surface);
   border-top: 1px solid #e4eae0;
   padding: 0 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 8px;
+  font-size: var(--text-xs);
   color: #9ba98f;
   flex-shrink: 0;
 }

@@ -1,6 +1,6 @@
 .test-panel {
   height: 294px;
-  background: #fff;
+  background: var(--color-surface);
   border-top: 1px solid #d8e2d1;
   display: flex;
   flex-direction: column;
@@ -21,12 +21,12 @@
   color: #8ca377;
 }
 .test-panel-heading strong {
-  font-size: 10px;
+  font-size: var(--text-md);
   color: #6f8b56;
   font-weight: 550;
 }
 .test-badge {
-  font-size: 8px;
+  font-size: var(--text-xs);
   border: 1px solid #e4eadc;
   background: #f5f8ef;
   color: #9fb38a;
@@ -34,7 +34,7 @@
   padding: 2px 6px;
 }
 .test-panel-heading .MuiButton-root {
-  font-size: 9px;
+  font-size: var(--text-sm);
   min-height: 27px;
   padding: 3px 11px;
 }
@@ -58,7 +58,7 @@
 .test-input .MuiTab-root {
   min-height: 33px;
   padding: 0 13px;
-  font-size: 9px;
+  font-size: var(--text-sm);
   text-transform: none;
   color: #a0b68a;
 }
@@ -68,7 +68,7 @@
   overflow: hidden;
   border: 1px solid #e5edd9;
   border-radius: 6px;
-  background: #fcfdfc;
+  background: var(--color-code-background);
 }
 .test-input .execution-json-editor {
   flex: 1;
@@ -76,25 +76,6 @@
   height: auto;
   border: 0;
   border-radius: 0;
-}
-.json-input .MuiOutlinedInput-notchedOutline {
-  border: 0 !important;
-}
-.json-input .MuiInputBase-root {
-  height: 100%;
-  align-items: flex-start;
-  padding: 12px 16px;
-  border-radius: 0;
-  background: #fbfcf9;
-  font-size: 11px;
-}
-.json-input textarea {
-  font-family: "JetBrains Mono", monospace;
-  line-height: 1.75;
-  color: #7d9764;
-  font-size: 10px;
-  height: 100% !important;
-  overflow: auto !important;
 }
 .test-output {
   padding: 13px 15px;
@@ -113,7 +94,7 @@
   margin-bottom: 15px;
 }
 .test-result > span {
-  font-size: 9px;
+  font-size: var(--text-sm);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -127,26 +108,37 @@
   overflow-wrap: anywhere;
   min-width: 0;
 }
-.test-result > small {
+.source-reads {
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e8de;
+}
+.source-reads > div {
   display: flex;
+  gap: 10px;
   align-items: center;
-  gap: 4px;
-  font-size: 8px;
-  color: #9eb888;
+  font-size: var(--text-md);
+  padding: 4px 0;
+  color: #74866f;
+}
+.source-reads strong {
+  font-size: var(--text-sm);
+  color: #54734a;
   margin-left: auto;
-  white-space: nowrap;
+}
+.source-reads small {
+  font-size: var(--text-sm);
 }
 .trace-label {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 7px;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
-  color: #a2b78a;
+  color: var(--color-test-muted);
   margin-bottom: 9px;
 }
 .trace-label span {
-  font-size: 8px;
+  font-size: var(--text-xs);
   letter-spacing: 0;
   color: #b4c69e;
 }
@@ -164,8 +156,8 @@
   background: none;
   text-align: left;
   padding: 5px;
-  color: #9ab380;
-  font-size: 8px;
+  color: var(--color-test-muted);
+  font-size: var(--text-xs);
   border-radius: 3px;
 }
 .trace-list > button:not(:disabled):hover {
@@ -178,26 +170,26 @@
   white-space: nowrap;
 }
 .trace-list > button > code {
-  font-size: 8px;
+  font-size: var(--text-xs);
   margin-left: auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 95px;
-  color: #819f64;
+  color: var(--color-test-muted);
 }
 .trace-list small {
-  font-size: 7px;
+  font-size: var(--text-2xs);
   color: #acbf94;
 }
 .trace-number {
   width: 12px;
-  font-size: 7px;
+  font-size: var(--text-2xs);
   color: #b6c99f;
   flex-shrink: 0;
 }
 .trace-branch {
-  font-size: 7px;
+  font-size: var(--text-2xs);
   border-radius: 3px;
   padding: 1px 4px;
   background: #eff6e8;
@@ -227,16 +219,23 @@
   border: 1px solid #e9f0e0;
   border-radius: 10px;
   margin-bottom: 3px;
+  color: var(--color-test-muted);
 }
 .test-empty strong {
-  font-size: 11px;
+  font-size: var(--text-lg);
   font-weight: 500;
-  color: #a3bc89;
+  color: #7d906d;
 }
 .test-empty p {
-  font-size: 9px;
+  font-size: var(--text-sm);
   line-height: 1.7;
-  color: #b4c99d;
+  color: #7d906d;
+}
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
 }
 .curl-preview {
   padding: 10px 13px;
@@ -245,13 +244,13 @@
   flex: 1;
 }
 .curl-preview pre {
-  font-size: 8px;
+  font-size: var(--text-xs);
   color: #9ab381;
   line-height: 1.8;
   margin: 0 0 10px;
 }
 .curl-preview small,
 .curl-preview > span {
-  font-size: 8px;
+  font-size: var(--text-xs);
   color: #b0c298;
 }

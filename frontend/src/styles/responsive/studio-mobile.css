@@ -6,7 +6,7 @@
   }
   .studio-library {
     max-height: 220px;
-    border-bottom: 1px solid #dde5df;
+    border-bottom: 1px solid var(--color-studio-border-strong);
   }
   .studio-editor {
     flex: 1;
@@ -15,10 +15,10 @@
     padding: 6px;
   }
   .studio-filebar > span {
-    font-size: 9px;
+    font-size: var(--text-sm);
   }
   .studio-problems {
-    font-size: 9px;
+    font-size: var(--text-sm);
   }
   .source-form-grid {
     grid-template-columns: 1fr;
@@ -45,6 +45,6 @@
   }
   .source-explainer {
     gap: 10px;
-    font-size: 9px;
+    font-size: var(--text-sm);
   }
 }

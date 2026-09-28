@@ -1,0 +1,59 @@
+/*
+ * Design tokens: values that several rules share by design. A colour that
+ * appears once, or twice by coincidence, stays a literal in its rule.
+ * --color-brand, --color-ink, --color-page and --color-surface mirror the
+ * palette in app/theme.ts; change both together.
+ */
+:root {
+  --font-sans: "Inter Variable", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* The dense workspace type scale. Headings (14px and up) use literal sizes. */
+  --text-2xs: 7px;
+  --text-xs: 8px;
+  --text-sm: 9px;
+  --text-md: 10px;
+  --text-lg: 11px;
+  --text-xl: 12px;
+  --text-2xl: 13px;
+
+  --color-brand: #19735b;
+  --color-ink: #192b28;
+  --color-page: #f7f8fa;
+  --color-surface: #fff;
+  /* The graph canvas; connection labels use it to mask the line behind them. */
+  --color-canvas: #f8faf8;
+  --color-accent: #28654c;
+  --color-accent-hover: #17674f;
+  --color-focus-ring: #72a98c;
+  --color-danger: #c54d45;
+  --color-sidebar-highlight: #c1e7ae;
+  --color-editor-border: #e5eae3;
+  --color-code-background: #fcfdfc;
+  --color-code-text: #486f42;
+  /* Count and type badges in inspector and function-library headings. */
+  --color-badge: #edf2ee;
+  --color-library-muted: #7a8671;
+  --color-inspector-border: #e2e8de;
+  --color-inspector-strong: #526e60;
+  --color-inspector-muted: #778770;
+  --color-test-muted: #718963;
+  --color-api-strong: #657e56;
+  --color-api-muted: #77876f;
+  --color-studio-border: #e4eae6;
+  --color-studio-border-strong: #dde5df;
+
+  /* One colour per node kind: canvas icons, library previews and every other
+     kind-coloured mark. */
+  --node-kind-input: #829276;
+  --node-kind-formula: #8392b5;
+  --node-kind-condition: #b69c59;
+  --node-kind-switch: #b69c59;
+  --node-kind-transform: #538f91;
+  --node-kind-reference: #a08abb;
+  --node-kind-output: #7b9e72;
+
+  --sidebar-width: 68px;
+  --sidebar-expanded-width: 224px;
+  --page-max-width: 1640px;
+}

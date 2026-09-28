@@ -7,8 +7,12 @@
   gap: 20px;
   color: #7a8a76;
 }
+.recoverable-actions {
+  display: flex;
+  gap: 10px;
+}
 .dialog-intro {
-  font-size: 12px;
+  font-size: var(--text-xl);
   color: #899480;
   margin: 0 0 24px;
 }
@@ -20,7 +24,4 @@
 }
 .template-note {
   align-self: flex-start;
-}
-.MuiDialogActions-root {
-  padding: 16px 24px !important;
 }

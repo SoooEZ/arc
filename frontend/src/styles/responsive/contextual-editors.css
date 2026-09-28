@@ -15,6 +15,6 @@
     padding: 8px;
   }
   .reference-breadcrumb {
-    font-size: 10px;
+    font-size: var(--text-md);
   }
 }

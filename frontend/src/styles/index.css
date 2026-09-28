@@ -1,4 +1,12 @@
-/* Import order preserves the existing cascade, including responsive rules and later overrides. */
+/*
+ * Cascade order. Tokens and element defaults come first. Each view or
+ * component stylesheet then owns its selectors, so their order among
+ * themselves does not matter. The responsive layers come last and keep this
+ * order: where two breakpoints set the same property, the later file wins
+ * (studio-wide.css sets the editor action buttons at every width up to
+ * 1350px, including the laptop and mobile widths).
+ */
+@import "./tokens.css";
 @import "./base.css";
 @import "./workspace.css";
 @import "./library.css";
@@ -10,21 +18,17 @@
 @import "./inspector.css";
 @import "./expressions.css";
 @import "./editor-navigation.css";
+@import "./contextual-editors.css";
 @import "./execution.css";
 @import "./api.css";
-@import "./shared-controls.css";
+@import "./studio.css";
+@import "./sources.css";
 @import "./responsive/wide.css";
 @import "./responsive/laptop.css";
 @import "./responsive/compact.css";
 @import "./responsive/mobile.css";
 @import "./responsive/short-height.css";
-@import "./editor-readability.css";
-@import "./studio.css";
-@import "./sources.css";
 @import "./responsive/studio-wide.css";
 @import "./responsive/studio-compact.css";
 @import "./responsive/studio-mobile.css";
-@import "./interaction-controls.css";
-@import "./contextual-editors.css";
 @import "./responsive/contextual-editors.css";
-@import "./contextual-editor-overrides.css";

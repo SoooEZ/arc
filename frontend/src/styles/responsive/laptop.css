@@ -13,13 +13,13 @@
     margin-left: -14px;
     margin-right: -14px;
     padding: 14px 11px;
-    font-size: 8px;
+    font-size: var(--text-xs);
   }
   .published-chip.MuiChip-root {
-    font-size: 8px;
+    font-size: var(--text-xs);
   }
   .rule-card-title h3 {
-    font-size: 13px;
+    font-size: var(--text-2xl);
   }
   .stat {
     padding: 0 17px;
@@ -37,13 +37,6 @@
   .editor-name h1 {
     font-size: 17px;
   }
-  .editor-actions {
-    gap: 6px;
-  }
-  .editor-actions .MuiButton-root {
-    font-size: 9px;
-    padding: 5px 9px;
-  }
   .editor-title {
     gap: 9px;
   }
@@ -51,7 +44,7 @@
     display: none;
   }
   .graph-view-label strong {
-    font-size: 9px;
+    font-size: var(--text-sm);
   }
   .graph-tools .MuiIconButton-root {
     padding: 5px;
@@ -66,15 +59,12 @@
   .graph-tools .MuiButton-startIcon {
     margin-right: 4px;
   }
-  .inspector-section {
-    padding: 20px 15px;
-  }
   .api-console-body {
     grid-template-columns: 1fr 1fr;
   }
   .endpoint-table > div {
     grid-template-columns: 44px 220px 1fr;
-    font-size: 9px;
+    font-size: var(--text-sm);
   }
   .getting-started {
     gap: 17px;
@@ -90,7 +80,7 @@
   }
   .filter-tabs button {
     padding: 8px 9px;
-    font-size: 10px;
+    font-size: var(--text-md);
   }
   .library-toolbar > .MuiTextField-root {
     width: 180px;

@@ -3,24 +3,9 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-left: 1px solid #e2e8de;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-inspector-border);
   min-height: 0;
-}
-.inspector > .MuiTabs-root {
-  min-height: 56px;
-  border-bottom: 1px solid #e6ebe2;
-  flex-shrink: 0;
-}
-.inspector .MuiTab-root {
-  min-height: 56px;
-  font-size: 10px;
-  padding: 0 9px;
-  text-transform: none;
-  color: #9ba78d;
-}
-.inspector .Mui-selected {
-  color: #688457 !important;
 }
 .inspector-scroll {
   overflow-y: auto;
@@ -28,37 +13,22 @@
   scrollbar-width: thin;
   scrollbar-color: #e0e8d9 transparent;
 }
-.inspector-section {
-  padding: 22px 19px;
-  border-bottom: 1px solid #edf0e9;
-  display: flex;
-  flex-direction: column;
-  gap: 19px;
-}
-.inspector-section h3 {
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.5;
-  color: #566a4b;
-}
-.inspector-section h4 {
-  font-size: 10px;
-  font-weight: 550;
-  color: #6b7f5e;
-}
 .inspector-section .MuiInputBase-root {
-  font-size: 10px;
+  font-size: var(--text-md);
   border-radius: 6px;
-  color: #647a56;
+  color: #40533d;
+}
+.inspector-section .MuiInputBase-root.Mui-disabled {
+  background: #f9faf7;
 }
 .inspector-section .MuiInputLabel-root {
-  font-size: 11px;
-  color: #9cae8d;
+  font-size: var(--text-lg);
+  color: var(--color-inspector-muted);
 }
 .inspector-section .MuiFormHelperText-root {
-  font-size: 8px;
+  font-size: var(--text-xs);
   line-height: 1.65;
-  color: #a2b192;
+  color: var(--color-inspector-muted);
   margin-left: 2px;
 }
 .inspector-node-identity {
@@ -68,15 +38,19 @@
   flex: 1 1 0;
   min-width: 0;
 }
-.inspector-sidebar > .inspector-heading {
+/* Only the sidebar presentation has a heading; the node dialog has its own. */
+.inspector-heading {
   display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-start;
   gap: 4px;
+  min-height: 56px;
   padding: 14px 8px;
+  border-bottom: 1px solid #e6ebe2;
   flex-shrink: 0;
+  color: #566a4b;
+  font-size: var(--text-xl);
+  font-weight: 600;
 }
 .inspector-node-kind {
   flex: 0 0 42px;
@@ -91,7 +65,7 @@
   border-radius: 6px;
 }
 .inspector-node-kind > span:last-child {
-  font-size: 8px;
+  font-size: var(--text-xs);
   font-weight: 400;
   line-height: 1;
   color: #71816a;
@@ -102,7 +76,7 @@
   min-width: 0;
 }
 .inspector-node-identity .inspector-node-name .MuiInputBase-root {
-  font-size: 12px;
+  font-size: var(--text-xl);
   color: #405638;
 }
 .inspector-node-identity .inspector-node-name .MuiInputBase-input {
@@ -110,7 +84,7 @@
   text-overflow: ellipsis;
 }
 .inspector-node-identity .inspector-node-name .MuiInputLabel-root {
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 .inspector-heading-actions {
   display: flex;
@@ -141,13 +115,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  font-size: 12px;
+  font-size: var(--text-xl);
   color: #963e38;
 }
 .inspector-error-list {
   margin: 8px 0;
   padding-left: 18px;
-  font-size: 12px;
+  font-size: var(--text-xl);
   font-weight: 400;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -168,20 +142,19 @@
   overflow-wrap: anywhere;
 }
 .expression-preview code {
-  font-size: 8px;
-  color: #91a67c;
+  font-size: var(--text-xs);
+  color: #627a56;
 }
 .output-return-preview {
   display: grid;
   gap: 6px;
 }
 .output-return-preview > span {
-  font-size: 10px;
+  font-size: var(--text-md);
   color: #68776d;
 }
 .output-return-preview > code {
-  font-size: 11px;
-  color: #48705a;
+  font-size: var(--text-lg);
 }
 .output-return-preview > code + span {
   margin-top: 6px;
@@ -196,7 +169,7 @@
 .inline-expression-editor legend {
   padding: 0 4px;
   color: #73856c;
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 .inline-expression-editor:focus-within {
   border-color: #1b7a60;
@@ -211,7 +184,7 @@
   min-height: 24px;
   margin: 4px 12px 0;
   color: #73856c;
-  font-size: 10px;
+  font-size: var(--text-md);
   line-height: 1.5;
 }
 .inline-expression-loading {
@@ -220,7 +193,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--text-lg);
 }
 .branch-explainer {
   display: flex;
@@ -232,8 +205,8 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 8px;
-  color: #a7b699;
+  font-size: var(--text-xs);
+  color: #7d8c72;
 }
 .branch-explainer strong {
   font-weight: 500;
@@ -248,50 +221,10 @@
   width: 4px;
 }
 .muted-copy {
-  font-size: 9px;
+  font-size: var(--text-sm);
   line-height: 1.85;
-  color: #a1b390;
+  color: var(--color-inspector-muted);
   margin-top: -9px;
-}
-.variable-list {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  margin-top: -2px;
-}
-.variable-list > div {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.variable-list code {
-  font-size: 9px;
-  color: #8aa276;
-}
-.variable-list span {
-  font-size: 8px;
-  background: #f3f6ef;
-  color: #a4b591;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-.inspector-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: #a7b896;
-  padding: 12px;
-  background: #f7f9f3;
-  border: 1px solid #e9eedf;
-  border-radius: 6px;
-}
-.inspector-note p {
-  font-size: 9px;
-  line-height: 1.75;
-  color: #9cad8b;
-}
-.inspector-note svg {
-  margin-top: 1px;
 }
 .inspector-footer {
   display: flex;
@@ -300,32 +233,8 @@
   border-top: 1px solid #e8eee0;
   padding: 11px 13px;
   font-size: 7.5px;
-  color: #a2b391;
+  color: var(--color-inspector-muted);
   flex-shrink: 0;
-}
-.expression-toolkit {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-.expression-toolkit code {
-  font-size: 8px;
-  background: #f5f8f0;
-  color: #9bb085;
-  padding: 5px 6px;
-  border: 1px solid #eaf0e0;
-  border-radius: 4px;
-}
-.read-only-field {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-size: 9px;
-  color: #a0b28d;
-}
-.read-only-field code {
-  font-size: 10px;
-  color: #8fa676;
 }
 .input-schema-card {
   border: 1px solid #e3eadb;
@@ -341,8 +250,8 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  color: #526e60;
-  font-size: 11px;
+  color: var(--color-inspector-strong);
+  font-size: var(--text-lg);
 }
 .input-card-title > span,
 .input-card-title .input-required-toggle {
@@ -364,7 +273,7 @@
   margin-left: auto;
 }
 .input-schema-card .MuiFormControlLabel-label {
-  font-size: 9px;
+  font-size: var(--text-sm);
   color: #96aa81;
 }
 .reference-parameter-heading {
@@ -372,8 +281,8 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  color: #526e60;
-  font-size: 11px;
+  color: var(--color-inspector-strong);
+  font-size: var(--text-lg);
 }
 .reference-parameter-heading > strong {
   min-width: 0;
@@ -384,17 +293,36 @@
   margin-left: auto;
   padding: 3px 6px;
   border-radius: 4px;
-  background: #edf2ee;
-  font-size: 10px;
+  background: var(--color-badge);
+  font-size: var(--text-md);
   flex-shrink: 0;
 }
 .reference-parameter-type {
   margin-top: -10px;
   color: #6f8175;
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 .reference-parameter-type code {
   color: #405b4c;
+}
+/* Switch cases and Transform fields. */
+.node-mapping-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid #e1e8e2;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+.mapping-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xl);
+}
+.mapping-card-heading > strong {
+  flex: 1;
 }
 .node-edit-dialog .MuiDialog-paper {
   height: min(820px, calc(100% - 64px));
@@ -412,7 +340,7 @@
   font-size: 16px;
 }
 .node-edit-heading .inspector-node-name .MuiInputLabel-root {
-  font-size: 12px;
+  font-size: var(--text-xl);
 }
 .node-edit-content {
   display: flex;
@@ -422,39 +350,41 @@
 .node-edit-description {
   margin: 0 0 16px;
   color: #647a56;
-  font-size: 13px;
+  font-size: var(--text-2xl);
 }
 .inspector.inspector-dialog {
   width: 100%;
   flex: 1;
-  border: 1px solid #e2e8de;
+  border: 1px solid var(--color-inspector-border);
   border-radius: 8px;
   overflow: hidden;
 }
-.inspector-dialog .inspector-section {
-  padding: 24px;
-}
 .inspector-dialog .inspector-section .MuiInputBase-root,
 .inspector-dialog .inspector-section .MuiInputLabel-root {
-  font-size: 13px;
+  font-size: var(--text-2xl);
 }
-.inspector-dialog .inspector-section h4,
 .inspector-dialog .inspector-section .MuiFormHelperText-root,
 .inspector-dialog .input-schema-card .MuiFormControlLabel-label {
-  font-size: 11px;
+  font-size: var(--text-lg);
 }
 
 /* Section actions stay outside the accordion toggle so each has one clear
-   keyboard target. Expanding content and opening variable help are separate. */
+   keyboard target. Expanding content and opening variable help are separate.
+   Every inspector section is an MUI Accordion; the class pair outranks MUI's
+   own Accordion styles. */
 .inspector-section.inspector-accordion {
   display: block;
+  flex-direction: column;
+  gap: 19px;
   padding: 0;
   margin: 0;
   border: 0;
   border-bottom: 1px solid #e8ede9;
   border-radius: 0;
-  background: #fff;
+  background: var(--color-surface);
 }
+/* MUI draws a divider line above some Accordions, such as a collapsed one
+   after another collapsed one; sections use their bottom border instead. */
 .inspector-accordion::before {
   display: none;
 }
@@ -485,7 +415,7 @@
 }
 .inspector-section.inspector-accordion .inspector-section-heading h4 {
   color: #17211d;
-  font-size: 12px;
+  font-size: var(--text-xl);
   font-weight: 700;
   line-height: 1.45;
 }
@@ -493,8 +423,8 @@
   border-radius: 5px;
   padding: 1px 6px;
   color: #566b5d;
-  background: #edf2ee;
-  font-size: 10px;
+  background: var(--color-badge);
+  font-size: var(--text-md);
   font-weight: 600;
 }
 .inspector-section-actions {
@@ -507,19 +437,19 @@
   min-width: 0;
   min-height: 28px;
   padding: 3px 5px;
-  font-size: 10px;
+  font-size: var(--text-md);
 }
 .inspector-section-actions .inspector-section-help,
 .inspector-section-actions .inspector-reference-action {
   width: 30px;
   height: 30px;
-  color: #526e60;
+  color: var(--color-inspector-strong);
   border-radius: 7px;
 }
 .inspector-section-actions .inspector-section-help:hover,
 .inspector-section-actions .inspector-reference-action:hover {
   background: #eaf2ee;
-  color: #17674f;
+  color: var(--color-accent-hover);
 }
 .inspector-section.inspector-accordion
   > .MuiCollapse-root
@@ -532,7 +462,7 @@
 .inspector-section-caption {
   margin: 0;
   color: #263a30;
-  font-size: 11px;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 .inspector-dialog .inspector-section-heading {
@@ -542,7 +472,7 @@
   .inspector-section.inspector-accordion
   .inspector-section-heading
   h4 {
-  font-size: 13px;
+  font-size: var(--text-2xl);
 }
 .inspector-dialog
   .inspector-section.inspector-accordion
