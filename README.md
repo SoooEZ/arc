@@ -350,6 +350,7 @@ npm run test:e2e
 cd ..
 python3 scripts/smoke.py
 python3 scripts/studio_smoke.py
+python3 scripts/web_smoke.py
 ```
 
 Browser and API tests create identifiable `e2e-formula-*` and `smoke-*` rules. Run them against a disposable Compose project when you want to keep your own workspace clean:
@@ -358,6 +359,7 @@ Browser and API tests create identifiable `e2e-formula-*` and `smoke-*` rules. R
 COMPOSE_PROJECT_NAME=arc-test ARC_WEB_PORT=3081 ARC_API_PORT=8081 docker compose up -d --build --wait
 ARC_API_URL=http://localhost:8081 python3 scripts/smoke.py
 ARC_API_URL=http://localhost:8081 python3 scripts/studio_smoke.py
+ARC_WEB_URL=http://localhost:3081 python3 scripts/web_smoke.py
 cd frontend
 ARC_WEB_URL=http://localhost:3081 npm run test:e2e
 cd ..

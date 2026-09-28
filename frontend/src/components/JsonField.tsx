@@ -14,6 +14,7 @@ export default function JsonField({
   value,
   onChange,
   onValidity,
+  check,
   disabled = false,
   rows = 4,
 }: {
@@ -21,6 +22,11 @@ export default function JsonField({
   value: unknown;
   onChange: (value: unknown) => void;
   onValidity: (valid: boolean) => void;
+  /**
+   * Why a parsed document is still not acceptable, or null. A problem shows as
+   * the field error and keeps the value out of `onChange`, like invalid JSON.
+   */
+  check?: (value: unknown) => string | null;
   disabled?: boolean;
   rows?: number;
 }) {
@@ -58,6 +64,12 @@ export default function JsonField({
           parsed = raw.trim() ? parseJson(raw) : null;
         } catch {
           setError("Enter valid JSON before saving");
+          onValidity(false);
+          return;
+        }
+        const problem = check?.(parsed) ?? null;
+        if (problem) {
+          setError(problem);
           onValidity(false);
           return;
         }

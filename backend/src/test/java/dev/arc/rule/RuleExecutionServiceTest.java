@@ -12,8 +12,10 @@ import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.CompiledGraph;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
+import dev.arc.model.DataSource;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.SourceDefinition;
 import dev.arc.rule.RuleExecutionService.*;
 import dev.arc.source.*;
 import java.util.*;
@@ -133,8 +135,9 @@ class RuleExecutionServiceTest {
                 assertThat(failure.status()).isEqualTo(422);
                 assertThat(failure.getMessage())
                     .contains("Function calls require a $ prefix; use $ROUND(...)");
+                // The root location carried a null rule and version before (published pointer 1).
                 assertThat(failure.locations())
-                    .containsExactly(new ArcException.Location(null, null, "output", "Result"));
+                    .containsExactly(new ArcException.Location("old-rule", 1, "output", "Result"));
               });
     }
     assertThat(service.execute("old-rule", new Execution(inputs, 2)).execution().result())
@@ -259,5 +262,57 @@ class RuleExecutionServiceTest {
             ArcException.class, error -> assertThat(error.status()).isEqualTo(409));
     assertThatThrownBy(() -> service.execute("draft", new Execution(Map.of(), null, true, 99)))
         .hasMessageContaining("100–30,000");
+  }
+
+  @Test
+  void aPublishedExecutionNamesItsVersionInSourceContractFailures() {
+    var remote =
+        new SourceDefinition(
+            "HTTP",
+            "https://example.test/data",
+            List.of(new Input("key", "STRING", true, null)),
+            null,
+            null,
+            500);
+    when(sources.get("remote", 1)).thenReturn(new DataSource("remote", "Remote", 1, remote));
+    var child =
+        new Definition(
+            1,
+            List.of(
+                new Input(
+                    "value",
+                    "NUMBER",
+                    true,
+                    null,
+                    new SourceBinding("remote", 1, Map.of(), "", "FAIL"))),
+            List.of(inputNode("in", "Input"), outputNode("o", "O", "value")),
+            List.of(new Edge("next", "in", "o", "next")));
+    var parent =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                inputNode("input", "Inputs"),
+                nodeOf("ref", "REFERENCE", "Ref").rule("child", 1).output("r").build(),
+                outputNode("out", "Out", "r")),
+            List.of(new Edge("a", "input", "ref", "next"), new Edge("b", "ref", "out", "next")));
+    when(rules.publishedVersion("parent")).thenReturn(1);
+    when(rules.resolve("parent", 1)).thenReturn(parent);
+    when(rules.resolve("child", 1)).thenReturn(child);
+    // The walk's root location was (null, null, ref) before; a preview keeps that form.
+    assertThatThrownBy(() -> service.execute("parent", new Execution(Map.of(), null)))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error ->
+                assertThat(error.locations())
+                    .last()
+                    .isEqualTo(new ArcException.Location("parent", 1, "ref", "Ref")));
+    assertThatThrownBy(() -> service.preview(new Preview(parent, Map.of())))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error ->
+                assertThat(error.locations())
+                    .last()
+                    .isEqualTo(new ArcException.Location(null, null, "ref", "Ref")));
   }
 }

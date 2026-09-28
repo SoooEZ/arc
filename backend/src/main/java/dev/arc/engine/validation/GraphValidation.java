@@ -40,9 +40,9 @@ final class GraphValidation {
     var expressions = new ExpressionCache();
     var inputReads = checkSourceMappings(definition, expressions, resolver, GraphValidation::fail);
     checkInputCycles(definition, inputReads);
-    checkConnections(definition);
+    checkConnections(definition, GraphValidation::fail);
     var plan = new GraphPlan(definition);
-    checkReachability(definition, plan);
+    checkReachability(definition, plan, GraphValidation::fail);
     for (Node node : plan.order()) {
       Set<String> scope = plan.available().get(node.id());
       nodeValidation.validate(definition, node, scope, resolver, expressions);
@@ -77,12 +77,19 @@ final class GraphValidation {
   }
 
   /**
-   * The first input-cycle, connection or reachability problem, in the order validation finds it.
+   * Structure problems in the order validation finds them: the first input cycle, then every
+   * connection problem and, with a scope plan, every unreachable node, each reported through {@code
+   * problems}. A missing or second Input node stops the check, because the connection and
+   * reachability rules need exactly one.
    */
-  void checkStructure(Definition definition, Map<String, Set<String>> inputReads, GraphPlan plan) {
+  void checkStructure(
+      Definition definition,
+      Map<String, Set<String>> inputReads,
+      GraphPlan plan,
+      Consumer<ArcException> problems) {
     checkInputCycles(definition, inputReads);
-    checkConnections(definition);
-    if (plan != null) checkReachability(definition, plan);
+    checkConnections(definition, problems);
+    if (plan != null) checkReachability(definition, plan, problems);
   }
 
   private void checkInputCycles(Definition definition, Map<String, Set<String>> inputReads) {
@@ -109,7 +116,7 @@ final class GraphValidation {
     finished.add(name);
   }
 
-  private void checkConnections(Definition definition) {
+  private void checkConnections(Definition definition, Consumer<ArcException> problems) {
     var nodeIndex = definition.nodes().stream().collect(Collectors.toMap(Node::id, node -> node));
     List<Node> inputs = definition.nodesOf(NodeKind.INPUT);
     require(inputs.size() == 1, "A rule must have exactly one Input node");
@@ -119,31 +126,32 @@ final class GraphValidation {
       outgoing.computeIfAbsent(e.source(), k -> new ArrayList<>()).add(e);
       incoming.computeIfAbsent(e.target(), k -> new ArrayList<>()).add(e);
     }
-    require(
-        incoming.getOrDefault(input.id(), List.of()).isEmpty(),
-        "Input node cannot have incoming connections");
+    if (!incoming.getOrDefault(input.id(), List.of()).isEmpty())
+      problems.accept(problem("Input node cannot have incoming connections", input));
     for (Node node : definition.nodes()) {
       List<Edge> edges = outgoing.getOrDefault(node.id(), List.of());
       Set<String> handles = edges.stream().map(Edge::sourceHandle).collect(Collectors.toSet());
       List<String> expected = node.handles();
-      require(
-          handles.equals(Set.copyOf(expected)),
-          node.label() + ": connect " + (expected.isEmpty() ? "no outgoing branches" : expected),
-          node);
+      if (!handles.equals(Set.copyOf(expected)))
+        problems.accept(
+            problem(
+                node.label()
+                    + ": connect "
+                    + (expected.isEmpty() ? "no outgoing branches" : expected),
+                node));
     }
     Set<String> connections = new HashSet<>();
     for (Edge e : definition.edges())
-      require(
-          connections.add(e.source() + ":" + e.sourceHandle() + ":" + e.target()),
-          "Duplicate connection",
-          nodeIndex.get(e.source()));
+      if (!connections.add(e.source() + ":" + e.sourceHandle() + ":" + e.target()))
+        problems.accept(problem("Duplicate connection", nodeIndex.get(e.source())));
   }
 
   /**
    * The scope plan already rejects cycles, so only nodes Input cannot reach remain to find. The
    * connection check has made sure that the graph has exactly one Input node.
    */
-  private void checkReachability(Definition definition, GraphPlan plan) {
+  private void checkReachability(
+      Definition definition, GraphPlan plan, Consumer<ArcException> problems) {
     Node input = definition.inputNode().orElseThrow();
     Set<String> reached = new HashSet<>(Set.of(input.id()));
     Deque<String> pending = new ArrayDeque<>(reached);
@@ -151,18 +159,18 @@ final class GraphValidation {
       for (Edge edge : plan.outgoing(pending.pop()))
         if (reached.add(edge.target())) pending.push(edge.target());
     for (Node node : definition.nodes())
-      require(
-          reached.contains(node.id()),
-          "Every node must be reachable from Input; connect or remove unused nodes",
-          node);
+      if (!reached.contains(node.id()))
+        problems.accept(
+            problem(
+                "Every node must be reachable from Input; connect or remove unused nodes", node));
   }
 
   private static void fail(ArcException error) {
     throw error;
   }
 
-  private void require(boolean condition, String message, Node node) {
-    if (!condition) throw ArcException.invalid(message).atNode(null, null, node.id(), node.label());
+  private static ArcException problem(String message, Node node) {
+    return ArcException.invalid(message).atNode(null, null, node.id(), node.label());
   }
 
   private static void require(boolean condition, String message) {

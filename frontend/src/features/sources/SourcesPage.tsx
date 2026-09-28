@@ -72,6 +72,22 @@ export default function SourcesPage({
           {editor.loading && (
             <CircularProgress size={20} aria-label="Loading data sources" />
           )}
+          {editor.catalogError && (
+            <Alert
+              severity="error"
+              action={
+                <Button
+                  color="inherit"
+                  size="small"
+                  onClick={editor.retryCatalog}
+                >
+                  Retry
+                </Button>
+              }
+            >
+              Could not load data sources: {editor.catalogError}
+            </Alert>
+          )}
           {editor.sources.map((source) => (
             <button
               className={selected?.id === source.id ? "active" : ""}

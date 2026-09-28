@@ -44,4 +44,29 @@ class StoredTextTest {
     assertThatThrownBy(() -> StoredText.requireStorable("Order", "pri\0cing"))
         .hasMessage(StoredText.NUL_MESSAGE);
   }
+
+  @Test
+  void unpairedSurrogatesAreRejectedInsteadOfBeingStoredAsQuestionMarks() {
+    // The JDBC driver stored "a\ud800b" as "a?b" with 201; a valid pair is ordinary text.
+    for (String text : List.of("a\ud800b", "d\udc00e", "k\ud83d"))
+      assertThatThrownBy(() -> StoredText.requireStorable("Order", text))
+          .as(text)
+          .hasMessage("Text cannot contain an unpaired UTF-16 surrogate");
+    for (Object value :
+        List.of(
+            Map.of("name", "a\ud800b"),
+            Map.of("k\ud83d", 1),
+            Map.of("entries", List.of("d\udc00e"))))
+      assertThatThrownBy(() -> json.encode(value))
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              invalid -> {
+                assertThat(invalid.status()).isEqualTo(422);
+                assertThat(invalid.getMessage())
+                    .isEqualTo("Text cannot contain an unpaired UTF-16 surrogate");
+              });
+    StoredText.requireStorable("smile 😀", "\\ud800");
+    assertThat(json.encode(Map.of("label", "😀 \\ud800")))
+        .isEqualTo("{\"label\":\"😀 \\\\ud800\"}");
+  }
 }

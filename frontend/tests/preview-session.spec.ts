@@ -4,7 +4,7 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import type { Definition } from "../src/types";
+import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
 
 const definition: Definition = {
@@ -180,4 +180,74 @@ test("saving keeps typed test inputs and the current result; an untouched sample
     .getByRole("button", { name: "Add parameter", exact: true })
     .click();
   await expect(editorLines(inputJson(page))).toHaveText(typed);
+});
+
+test("Hide test closes the panel without building, even over unbuildable code", async ({
+  page,
+  request,
+}) => {
+  const id = await openRule(page, request, "preview-hide");
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await expect(inputJson(page)).toBeVisible();
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await code.focus();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type("\nnode broken");
+  await expect(page.getByText("Build to test these changes")).toBeVisible();
+  const builds: string[] = [];
+  page.on("request", (outgoing) => {
+    if (outgoing.url().endsWith("/api/studio/build"))
+      builds.push(outgoing.url());
+  });
+  // "Hide test" built first, failed with the build error and left the panel open.
+  await page.getByRole("button", { name: "Hide test", exact: true }).click();
+  await expect(inputJson(page)).toHaveCount(0);
+  expect(builds).toEqual([]);
+  await expect(page.locator(".studio-filebar")).toContainText("edited");
+  await expect(
+    page.getByRole("button", { name: "Test rule", exact: true }),
+  ).toBeVisible();
+});
+
+test("applying unchanged node code keeps the draft clean and its preview result", async ({
+  page,
+  request,
+}) => {
+  const id = await openRule(page, request, "preview-noop-apply");
+  const revision = async () =>
+    ((await (await request.get(`/api/rules/${id}`)).json()) as Rule).revision;
+  const created = await revision();
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await setEditorText(page, inputJson(page), '{"amount": 4}');
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+  await expect(result(page)).toHaveText("8");
+  const reads: string[] = [];
+  page.on("request", (outgoing) => {
+    if (outgoing.url().endsWith("/api/variables")) reads.push(outgoing.url());
+  });
+  await page
+    .getByRole("button", { name: "Node expression · Inputs", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Node expression · Inputs",
+    exact: true,
+  });
+  await expect(
+    editorLines(dialog.getByLabel("Node code editor", { exact: true })),
+  ).toContainText("inputs");
+  // The build echo (explicit nulls, its own edge order) replaced the draft and dirtied it.
+  await dialog.getByRole("button", { name: "Apply to graph" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  await expect(result(page)).toHaveText("8");
+  await expect(
+    page.getByRole("button", { name: "Save draft", exact: true }),
+  ).toBeDisabled();
+  expect(reads).toEqual([]);
+  expect(await revision()).toBe(created);
 });

@@ -21,6 +21,8 @@ interface Options {
   selectedEdge: string | null;
   setSelectedEdge: (id: string | null) => void;
   onExpression: (id: string) => void;
+  /** Whether a card's node-code button opens now; a running command disables it. */
+  canOpenCode: boolean;
   trace: Execution | null;
   nodeErrors: NodeErrors;
   /** The document's gated edit; dragging and connecting follow its rules. */
@@ -32,6 +34,7 @@ export function useGraphCanvas({
   selectedEdge,
   setSelectedEdge,
   onExpression,
+  canOpenCode,
   trace,
   nodeErrors,
   edit,
@@ -82,6 +85,7 @@ export function useGraphCanvas({
           errors: nodeErrors,
           sizes: measurements,
           onExpression,
+          canOpenCode,
         },
         previousNodes.current,
       ),
@@ -93,6 +97,7 @@ export function useGraphCanvas({
       nodeErrors,
       measurements,
       onExpression,
+      canOpenCode,
     ],
   );
   const previousEdges = useRef<ReadonlyMap<string, Edge>>(new Map());

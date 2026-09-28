@@ -115,11 +115,12 @@ function acknowledgeSave(
 ): DocumentState {
   const edited = ruleSnapshot(state.rule) !== ruleSnapshot(submitted);
   const localDraft = edited ? submitted.draft : state.rule.draft;
+  // The server writes coordinates as 400.0; compared as numbers, the echo of an
+  // unchanged draft is the local draft (see withNodePositions).
+  const echoed = withNodePositions(response.draft);
   const saved: Rule = {
     ...response,
-    draft: sameDefinition(localDraft, response.draft)
-      ? localDraft
-      : withNodePositions(response.draft),
+    draft: sameDefinition(localDraft, echoed) ? localDraft : echoed,
   };
   return {
     ...state,

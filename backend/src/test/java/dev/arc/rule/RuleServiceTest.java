@@ -17,6 +17,7 @@ import dev.arc.model.Rule;
 import dev.arc.rule.RuleRepository.StoredDefinition;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -282,5 +283,64 @@ class RuleServiceTest {
     var creation = inOrder(repository);
     creation.verify(repository).lockCallees(Set.of("callee"));
     creation.verify(repository).create("caller", "Caller", "", "RULE", calling);
+  }
+
+  @Test
+  void namesAreStoredTrimmedAndNeverMadeOfControlCharacters() {
+    when(repository.lock("example")).thenReturn(draft);
+    service.create(new RuleService.Create("padded", "  Padded  ", "", "FORMULA", null));
+    verify(repository).create(eq("padded"), eq("Padded"), eq(""), eq("FORMULA"), any());
+    // Padding no longer counts toward the limit of the stored name.
+    String longest = "n".repeat(160);
+    service.create(new RuleService.Create("longest", "  " + longest + "  ", "", "FORMULA", null));
+    verify(repository).create(eq("longest"), eq(longest), eq(""), eq("FORMULA"), any());
+    // "\u0001\u0000" passed as non-blank, was trimmed to "" and stored empty, past the NUL check.
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new RuleService.Create("control", "\u0001\u0000", "", "FORMULA", null)))
+        .hasMessage("Text cannot contain the NUL character (U+0000)");
+    for (String name : List.of("\u0001", "a\tb", "line\nbreak"))
+      assertThatThrownBy(
+              () -> service.create(new RuleService.Create("control", name, "", "FORMULA", null)))
+          .as(name)
+          .hasMessage("Rule name cannot contain control characters");
+    for (String name : Arrays.asList(null, "", "   ", "n".repeat(161)))
+      assertThatThrownBy(
+              () -> service.create(new RuleService.Create("empty", name, "", "FORMULA", null)))
+          .as(String.valueOf(name))
+          .hasMessage("Rule name must contain 1 to 160 characters");
+    assertThatThrownBy(
+            () -> service.update("example", new RuleService.Update("\u0001", "", 3, draft.draft())))
+        .hasMessage("Rule name cannot contain control characters");
+    verify(repository, never()).create(eq("control"), anyString(), anyString(), anyString(), any());
+    verify(repository, never()).create(eq("empty"), anyString(), anyString(), anyString(), any());
+    verify(repository, never()).update(anyString(), anyString(), anyString(), any());
+  }
+
+  @Test
+  void notesAreStoredAsSingleTrimmedLinesAndBoundedAfterwards() {
+    when(repository.lock("example")).thenReturn(draft);
+    var base = draft.draft();
+    var noted =
+        new Definition(
+            1,
+            base.inputs(),
+            base.nodes(),
+            base.edges(),
+            List.of("first\nsecond", "  padded  ", "a\rb"));
+    service.update("example", new RuleService.Update("Example", "", 3, noted));
+    verify(repository)
+        .update(
+            eq("example"),
+            eq("Example"),
+            eq(""),
+            argThat(d -> d.notes().equals(List.of("first", "second", "padded", "a", "b"))));
+    // One stored note with 600 line breaks rendered more comments than the code could build.
+    var tooMany =
+        new Definition(1, base.inputs(), base.nodes(), base.edges(), List.of("x\n".repeat(600)));
+    assertThatThrownBy(
+            () -> service.update("example", new RuleService.Update("Example", "", 3, tooMany)))
+        .hasMessage("Too many or oversized comments");
   }
 }

@@ -295,3 +295,87 @@ test("Rename focuses the inline name, targets the clicked node, and preserves un
   expect(saved.draft.edges).toEqual(original.draft.edges);
   expect(saved.draft.inputs).toEqual(original.draft.inputs);
 });
+
+test("deleting an unselected node from the context menu keeps the selection", async ({
+  page,
+  request,
+}) => {
+  const id = `node-context-keep-${Date.now()}`;
+  await createRule(request, id);
+  await page.goto(`/#/rules/${id}?node=calc`);
+  const nodeName = page.getByLabel("Node name", { exact: true });
+  await expect(nodeName).toHaveValue("Calculate");
+  // The Inspector jumped to Inputs before.
+  const menu = await openMenu(page, "out");
+  await menu.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await expect(card(page, "out")).toHaveCount(0);
+  await expect(nodeName).toHaveValue("Calculate");
+  // Deleting the selected node from the Inspector still selects the Input node.
+  await page.getByRole("button", { name: "Delete node", exact: true }).click();
+  await expect(card(page, "calc")).toHaveCount(0);
+  await expect(nodeName).toHaveValue("Inputs");
+});
+
+test("an extra Input node can be deleted while the entry Input stays", async ({
+  page,
+  request,
+}) => {
+  const id = `node-context-inputs-${Date.now()}`;
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      {
+        id: "input",
+        type: "INPUT",
+        label: "Inputs",
+        position: { x: 250, y: 0 },
+      },
+      {
+        id: "input2",
+        type: "INPUT",
+        label: "Stray input",
+        position: { x: 550, y: 0 },
+      },
+      {
+        id: "out",
+        type: "OUTPUT",
+        label: "Result",
+        expression: "1",
+        position: { x: 250, y: 360 },
+      },
+    ],
+    edges: [
+      { id: "start", source: "input", sourceHandle: "next", target: "out" },
+      { id: "stray", source: "input2", sourceHandle: "next", target: "out" },
+    ],
+  };
+  const response = await request.post("/api/rules", {
+    data: { id, name: id, kind: "FORMULA", definition },
+  });
+  expect(response.ok()).toBeTruthy();
+  await page.goto(`/#/rules/${id}?node=input`);
+  const nodeErrors = page.getByRole("button", { name: /^Node errors/ });
+  await expect(nodeErrors).toBeVisible();
+  // The entry Input has no delete button and a disabled menu action, as before.
+  await expect(
+    page.getByRole("button", { name: "Delete node", exact: true }),
+  ).toHaveCount(0);
+  let menu = await openMenu(page, "input");
+  await expect(
+    menu.getByRole("menuitem", { name: "Delete", exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(menu).not.toBeVisible();
+  // Every Input was undeletable, so a stray second one kept the graph invalid.
+  menu = await openMenu(page, "input2");
+  await menu.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await expect(card(page, "input2")).toHaveCount(0);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  await expect(nodeErrors).toHaveCount(0);
+  const saved: Rule = await (await request.get(`/api/rules/${id}`)).json();
+  expect(saved.draft.nodes.map((node) => node.id)).toEqual(["input", "out"]);
+  expect(saved.draft.edges.map((edge) => edge.id)).toEqual(["start"]);
+});

@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { editorLines } from "./helpers/editor";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -53,7 +54,7 @@ test("reused rule names remain literal while Monaco placeholders remain editable
   await page
     .getByRole("button", { name: `${name} v1 · formula +`, exact: true })
     .click();
-  await expect(page.locator(".view-lines")).toContainText("reusedResult");
+  await expect(page.locator(".view-lines")).toContainText("result_1");
   // The inserted reference retains its result/target tab stops after literal escaping.
   await page.keyboard.insertText("childResult");
   await page.keyboard.press("Tab");
@@ -113,4 +114,52 @@ test("a late reuse response cannot insert into a newly mounted code editor", asy
   await page.getByRole("button", { name: "Build graph", exact: true }).click();
   await expect(page.getByText("Code built. Graph is valid.")).toBeVisible();
   await expect(page.locator(".view-lines")).not.toContainText("REFERENCE");
+});
+
+test("a reuse insertion is refused when the code changed while the rule loaded", async ({
+  page,
+  request,
+}) => {
+  const suffix = Date.now();
+  const child = `snippet-stale-child-${suffix}`;
+  const parent = `snippet-stale-parent-${suffix}`;
+  const name = `Stale reusable rule ${suffix}`;
+  await createRule(request, child, name, true);
+  await createRule(request, parent, `Stale snippet caller ${suffix}`);
+  let release!: () => void;
+  let started!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const requested = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  await page.route(`**/api/rules/${child}/versions/1`, async (route) => {
+    started();
+    await blocked;
+    await route.continue();
+  });
+
+  await page.goto(`/#/studio/${parent}`);
+  const editor = page.getByLabel("ARC code editor", { exact: true });
+  await expect(editorLines(editor)).toContainText("return 10;");
+  await page.getByRole("button", { name: "reuse", exact: true }).click();
+  await page
+    .getByRole("button", { name: `${name} v1 · formula +`, exact: true })
+    .click();
+  await requested;
+  // Typing while the pinned version loads: the late snippet used to land after it.
+  await page.locator(".view-line", { hasText: "return 10;" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" // note");
+  release();
+  await expect(
+    page.locator(".studio-library").getByRole("alert"),
+  ).toContainText(
+    "The code changed while the rule loaded. Choose the rule again.",
+  );
+  await expect(editorLines(editor)).toContainText("return 10; // note");
+  await expect(editorLines(editor)).not.toContainText("REFERENCE");
+  await page.keyboard.type("d");
+  await expect(editorLines(editor)).toContainText("return 10; // noted");
 });

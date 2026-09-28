@@ -44,12 +44,14 @@ export function useSourceEditor({
   const [catalogRevision, setCatalogRevision] = useState(0);
   // Saves allocate increasing catalog revisions, even when several finish together.
   const lastCatalogRevision = useRef(0);
+  // Retry reloads the shown page after a failed catalog read, keeping its offset.
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
   const catalog = usePagedResource(
     JSON.stringify([query, catalogRevision]),
     (offset, limit, signal) =>
       sourceApi.catalog({ offset, limit, search: query }, { signal }),
     true,
-    { keepPrevious: true },
+    { keepPrevious: true, refresh: catalogAttempt },
   );
   const [savedSources, setSavedSources] = useState<SavedSource[]>([]);
   // The catalog revision of the last successful read; later saves still await listing.
@@ -290,7 +292,10 @@ export function useSourceEditor({
     versions: versions.data.items,
     versionsPage: versions,
     versionsLoading: versions.loading,
-    error: document?.error || listError || catalog.error,
+    // Document and command failures are dismissed; a failed catalog read is retried.
+    error: document?.error || listError,
+    catalogError: catalog.error,
+    retryCatalog: () => setCatalogAttempt((attempt) => attempt + 1),
     versionsError: versions.error,
     displayConfig: document && displayedConfiguration(document),
     select,

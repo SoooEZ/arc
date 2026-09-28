@@ -256,7 +256,9 @@ class ScriptLocationTest {
     expected.put(
         "node s SWITCH \"S\" {\n  case a \"%s\" when true;\n}".formatted(longText),
         new ArcScript.Diagnostic("Every case needs a label of 1 to 160 characters", 2, 3));
-    expected.put("node r REFERENCE \"R\" {\n  use \"%s\" version 1;\n}".formatted(longText), null);
+    expected.put(
+        "node r REFERENCE \"R\" {\n  use \"%s\" version 1;\n}".formatted(longText),
+        new ArcScript.Diagnostic("R: choose a valid rule ID", 1, 1));
 
     var results = new LinkedHashMap<String, List<ArcScript.Diagnostic>>();
     var failure = new AtomicReference<Throwable>();
@@ -286,5 +288,22 @@ class ScriptLocationTest {
     assertThat(built.diagnostics())
         .as(message)
         .containsExactly(new ArcScript.Diagnostic(message, line, column));
+  }
+
+  @Test
+  void aMalformedReferencePinIsReportedAtItsNode() {
+    // The build accepted `use "Bad ID!"` before; the pin failed later as a 404.
+    assertThat(
+            script.build("node r REFERENCE \"R\" {\n  use \"Bad ID!\" version 1;\n}").diagnostics())
+        .containsExactly(new ArcScript.Diagnostic("R: choose a valid rule ID", 1, 1));
+  }
+
+  @Test
+  void implicitDuplicateConnectionsStillFailAtTheSecondStatement() {
+    String source =
+        "node input INPUT \"Input\" {\n  next -> out;\n  next -> out;\n}\n"
+            + "node out OUTPUT \"Out\" { return 1; }";
+    assertThat(script.build(source).diagnostics())
+        .containsExactly(new ArcScript.Diagnostic("Duplicate statement: next:out", 3, 3));
   }
 }

@@ -17,6 +17,9 @@ public record PageRequest(int offset, int limit, String search) {
   public PageRequest {
     if (offset < 0 || limit < 1 || limit > MAX_LIMIT)
       throw new IllegalArgumentException("Use offset >= 0 and limit from 1 to " + MAX_LIMIT);
+    // Checked before trimming: PostgreSQL rejects a NUL parameter with an internal error.
+    String problem = search == null ? null : StorableText.problem(search);
+    if (problem != null) throw new IllegalArgumentException(problem);
     search = search == null ? "" : search.trim();
     if (search.length() > MAX_SEARCH_CHARACTERS)
       throw new IllegalArgumentException(

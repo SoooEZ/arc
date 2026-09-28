@@ -27,6 +27,8 @@ interface Props {
   publishedVersion: number | null;
   /** Code has edits that are not built into the graph that preview runs. */
   buildPending: boolean;
+  /** The shown graph's Input node, where caller-input failures surface. */
+  inputNodeId: string | null;
   onOpenReference: (target: ReferenceTarget) => void;
   onNode: (id: string) => void;
 }
@@ -38,6 +40,7 @@ export default function TestPanel({
   version,
   publishedVersion,
   buildPending,
+  inputNodeId,
   onOpenReference,
   onNode,
 }: Props) {
@@ -124,6 +127,7 @@ export default function TestPanel({
           <PreviewOutput
             preview={preview}
             shown={{ ruleId, version }}
+            inputNodeId={inputNodeId}
             buildPending={buildPending}
             onNode={onNode}
             onOpenReference={onOpenReference}
@@ -141,6 +145,7 @@ export default function TestPanel({
 function PreviewOutput({
   preview,
   shown,
+  inputNodeId,
   buildPending,
   onNode,
   onOpenReference,
@@ -148,6 +153,7 @@ function PreviewOutput({
 }: {
   preview: PreviewExecution;
   shown: { ruleId: string; version: number | null };
+  inputNodeId: string | null;
   buildPending: boolean;
   onNode: (id: string) => void;
   onOpenReference: (target: ReferenceTarget) => void;
@@ -173,6 +179,7 @@ function PreviewOutput({
         error={preview.error}
         problem={preview.problem}
         shown={shown}
+        inputNodeId={inputNodeId}
         onNode={onNode}
         onOpenReference={onOpenReference}
         onEditInputs={onEditInputs}

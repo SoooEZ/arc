@@ -2,6 +2,7 @@ package dev.arc.source;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.error.ArcException;
 import dev.arc.model.CatalogPage;
@@ -11,6 +12,8 @@ import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.SourceDefinition;
 import dev.arc.model.SourceSummary;
 import dev.arc.model.SourceVersionSummary;
+import dev.arc.source.http.HttpSource;
+import dev.arc.source.http.HttpSourceAdapter;
 import dev.arc.source.lookup.LookupSourceAdapter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -23,7 +26,11 @@ import org.junit.jupiter.api.Test;
 /** A configuration either fails when it is saved or behaves the same in Test and in execution. */
 class SourceConfigurationConsistencyTest {
   private final StoredSources repository = new StoredSources();
-  private final SourceAdapters adapters = new SourceAdapters(List.of(new LookupSourceAdapter()));
+  private final SourceAdapters adapters =
+      new SourceAdapters(
+          List.of(
+              new LookupSourceAdapter(),
+              new HttpSourceAdapter(new HttpSource(new ObjectMapper(), "", ""))));
   private final SourceService service =
       new SourceService(repository, new SourceValidator(adapters));
   private final SourceExecutionService execution =
@@ -91,6 +98,33 @@ class SourceConfigurationConsistencyTest {
                 assertThat(error.getMessage())
                     .isEqualTo("Number exceeds supported precision or magnitude");
               });
+    assertThat(repository.stored).isEmpty();
+  }
+
+  @Test
+  void providersRejectConfigurationTheyDoNotUse() {
+    // HTTP entries were stored unbounded: {"a":1E+5000} was inserted, and the read-back of the
+    // new version failed with a 500 that rolled the write back.
+    var http =
+        new SourceDefinition(
+            "HTTP",
+            "https://example.test/rates",
+            List.of(),
+            Map.of("a", new BigDecimal("1E+5000")),
+            null,
+            1000);
+    assertThatThrownBy(() -> service.create(new SourceService.Create("remote", "Remote", http)))
+        .hasMessage("HTTP sources do not use lookup entries");
+    var lookupWithUrl =
+        new SourceDefinition(
+            "LOOKUP",
+            "https://example.test/rates",
+            List.of(new Input("key", "STRING", true, null)),
+            Map.of("US", Map.of("rate", 0.07)),
+            null,
+            3000);
+    assertThatThrownBy(() -> service.create(new SourceService.Create("tax", "Tax", lookupWithUrl)))
+        .hasMessage("Lookup tables do not use a URL");
     assertThat(repository.stored).isEmpty();
   }
 

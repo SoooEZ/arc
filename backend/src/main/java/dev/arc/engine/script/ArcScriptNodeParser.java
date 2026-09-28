@@ -99,8 +99,11 @@ final class ArcScriptNodeParser {
   private String ruleId;
   private Integer version;
 
+  /**
+   * {@code fallback} is the position of a header without {@code at (x, y)}; null keeps it unset.
+   */
   ArcScriptNodeParser(
-      ArcScriptSyntax syntax, Statement header, ArcScriptScanner scanner, int nodeIndex) {
+      ArcScriptSyntax syntax, Statement header, ArcScriptScanner scanner, Position fallback) {
     this.syntax = syntax;
     this.header = header;
     Matcher match = HEADER.matcher(header.text());
@@ -112,7 +115,7 @@ final class ArcScriptNodeParser {
     label = syntax.unquote(match.group(3), header);
     position =
         match.group(4) == null
-            ? new Position((nodeIndex % 3) * 300, (nodeIndex / 3) * 170)
+            ? fallback
             : new Position(Double.parseDouble(match.group(4)), Double.parseDouble(match.group(5)));
   }
 
@@ -150,11 +153,14 @@ final class ArcScriptNodeParser {
   private Edge parseEdge(Matcher match, Statement statement, ScriptLocations locations) {
     String handle = handle(match.group(1));
     String target = syntax.unquote(match.group(2), statement);
-    unique(handle + ":" + target, statement);
-    String edgeId =
-        match.group(3) == null
-            ? connectionId(id, handle, target)
-            : syntax.unquote(match.group(3), statement);
+    String edgeId;
+    if (match.group(3) == null) {
+      // Two such statements would generate the same ID. Explicit IDs are checked by draft shape,
+      // and a duplicate connection stays an executable-validation problem, as for a JSON draft:
+      // the renderer writes every stored edge with its ID, so a saved draft must build back.
+      unique(handle + ":" + target, statement);
+      edgeId = connectionId(id, handle, target);
+    } else edgeId = syntax.unquote(match.group(3), statement);
     var edge = new Edge(edgeId, id, target, handle);
     locations.declared(edge, statement);
     return edge;

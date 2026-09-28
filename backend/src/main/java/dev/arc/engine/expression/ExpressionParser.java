@@ -128,7 +128,9 @@ final class ExpressionParser {
       Expr operand = parse(7);
       return switch (token) {
         case "!" -> context -> !bool(operand.eval(context));
-        case "-" -> context -> number(operand.eval(context)).negate(MATH);
+        // Exact: negation adds no digits, and the operand is already bounded. Rounding to
+        // DECIMAL128 here made -x lose digits that x kept.
+        case "-" -> context -> number(operand.eval(context)).negate();
         default -> context -> number(operand.eval(context));
       };
     }
@@ -160,13 +162,14 @@ final class ExpressionParser {
     // "customer." or "a..b" would otherwise read a field named "" and quietly return null.
     if (path.endsWith(".") || path.contains(".."))
       throw ArcException.invalid("Property path needs a name after every '.': " + path);
-    String root = path.split("\\.")[0];
+    String[] parts = path.split("\\.");
+    String root = parts[0];
+    // Split once at compile time; every evaluation reads the same segments.
+    List<String> fields = List.of(parts).subList(1, parts.length);
     if (!locals.contains(root)) variables.add(root);
     return context -> {
       Object value = context.variable(root);
-      return path.equals(root)
-          ? value
-          : Functions.get(value, path.substring(root.length() + 1), null);
+      return fields.isEmpty() ? value : Functions.get(value, fields, null);
     };
   }
 

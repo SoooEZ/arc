@@ -5,12 +5,7 @@ import {
   propertyNames,
   unusedProperties,
 } from "../../../domain/nodeKinds";
-
-/** "a", "a and b" or "a, b and c". */
-function listed(names: string[]): string {
-  if (names.length === 1) return names[0];
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
+import { listed } from "../../../domain/text";
 
 /**
  * Names the properties a node sets although its kind does not use them. The

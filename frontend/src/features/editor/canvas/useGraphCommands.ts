@@ -19,6 +19,8 @@ interface Options {
   edit: (change: DefinitionChange) => boolean;
   /** The document's Arrange command. */
   arrange: (layout: DraftLayout, onArranged: () => void) => Promise<void>;
+  /** The selected node's ID; deleting another node leaves the selection alone. */
+  selected: string;
   selectNode: (id: string) => void;
   /** Asks the mounted canvas to fit the viewport once it shows the new layout. */
   requestFit: () => void;
@@ -30,6 +32,7 @@ export function useGraphCommands({
   measurements,
   edit,
   arrange: arrangeDocument,
+  selected,
   selectNode,
   requestFit,
 }: Options) {
@@ -53,10 +56,12 @@ export function useGraphCommands({
 
   const removeNode = (id: string) => {
     if (!canRemoveGraphNode(definition, id)) return;
+    // The context menu deletes any node; only deleting the selected one moves the
+    // selection (to the Input node), so the Inspector stays on the node being edited.
     const next =
       definition.nodes.find((node) => node.type === "INPUT") ||
       definition.nodes.find((node) => node.id !== id);
-    if (edit((current) => removeGraphNode(current, id)))
+    if (edit((current) => removeGraphNode(current, id)) && id === selected)
       selectNode(next?.id || "");
   };
 

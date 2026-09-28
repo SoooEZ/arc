@@ -238,4 +238,22 @@ class ParametersTest {
     assertThatThrownBy(() -> new Validator().validate(d, (id, v) -> null))
         .hasMessageContaining("Circular source");
   }
+
+  @Test
+  void mappingArgumentFailuresNameTheMappingWhileFailedReadsNameTheInput() {
+    // A failed mapping argument surfaced as the bare "Division by zero" at the Input node.
+    var rate =
+        new Input(
+            "rate",
+            "NUMBER",
+            true,
+            null,
+            new SourceBinding("country-tax", 2, Map.of("key", "1 / zero"), "/rate", "FAIL"));
+    var inputs = List.of(rate, new Input("zero", "NUMBER", true, 0));
+    assertThatThrownBy(() -> resolve(new Parameters(source), inputs, Map.of()))
+        .hasMessage("rate source / key: Division by zero");
+    var unmatched = List.of(rate("FAIL"), new Input("country", "STRING", true, "XX"));
+    assertThatThrownBy(() -> resolve(new Parameters(source), unmatched, Map.of()))
+        .hasMessage("rate: Missing key");
+  }
 }

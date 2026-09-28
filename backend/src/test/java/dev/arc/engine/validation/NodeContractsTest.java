@@ -152,4 +152,33 @@ class NodeContractsTest {
       case OUTPUT_NAME -> node.outputName("total");
     };
   }
+
+  @Test
+  void referencePinsFollowTheResourceIdPolicy() {
+    // Malformed pins saved and built before, then failed as 404, or as 500 with a NUL in SQL.
+    for (String ruleId : List.of("Bad ID!", "", "x".repeat(81), "a\0b")) {
+      var reference = nodeOf("reuse", "REFERENCE", "Reuse").rule(ruleId, 1).build();
+      var draft = graph(List.of(node("in", "INPUT", null), reference), List.of());
+      assertThatThrownBy(() -> validator.shape(draft))
+          .as(ruleId)
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.getMessage()).isEqualTo("Reuse: choose a valid rule ID");
+                assertThat(error.locations())
+                    .containsExactly(new Location(null, null, "reuse", "Reuse"));
+              });
+    }
+    // No rule chosen yet, or a rule chosen before its version, is a valid draft.
+    validator.shape(
+        graph(
+            List.of(node("in", "INPUT", null), nodeOf("reuse", "REFERENCE", "Reuse").build()),
+            List.of()));
+    validator.shape(
+        graph(
+            List.of(
+                node("in", "INPUT", null),
+                nodeOf("reuse", "REFERENCE", "Reuse").rule("child", null).build()),
+            List.of()));
+  }
 }

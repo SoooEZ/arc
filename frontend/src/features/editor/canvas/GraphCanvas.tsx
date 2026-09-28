@@ -47,6 +47,8 @@ interface Props {
   capabilities: EditorCapabilities;
   /** Arrange is running. */
   arranging: boolean;
+  /** A node focus waits for this mount: the initial fit is skipped in its favor. */
+  initialFocus: boolean;
   selected: string;
   selectedEdge: string | null;
   setSelected: (id: string) => void;
@@ -70,6 +72,7 @@ export default function GraphCanvas({
   readOnly,
   capabilities: can,
   arranging,
+  initialFocus,
   selected,
   selectedEdge,
   setSelected,
@@ -109,15 +112,15 @@ export default function GraphCanvas({
     if (menuNode) onDeleteNode(menuNode.id);
     else if (menuEdge) removeEdge(menuEdge.id);
   };
+  // The selection follows the draft: a removed connection is no longer selected.
   const removeEdge = (id: string) => {
-    const removed = edit((current) => {
+    edit((current) => {
       if (!current.edges.some((edge) => edge.id === id)) return current;
       return {
         ...current,
         edges: current.edges.filter((edge) => edge.id !== id),
       };
     });
-    if (removed && selectedEdge === id) setSelectedEdge(null);
   };
   const {
     nodes,
@@ -130,6 +133,9 @@ export default function GraphCanvas({
     connect,
   } = canvas;
   const flow = useReactFlow<FlowNode>();
+  // Decided once per mount: React Flow would otherwise fit on a later node
+  // measurement once the pending focus has cleared and the prop turns true.
+  const [fitOnMount] = useState(!initialFocus);
   // Fit requests made while this canvas was unmounted were covered by the
   // initial fit, so only requests made while it is mounted run here.
   const handledFit = useRef(fitRequest);
@@ -224,7 +230,7 @@ export default function GraphCanvas({
             nodesConnectable={can.edit}
             edgesReconnectable={false}
             deleteKeyCode={null}
-            fitView
+            fitView={fitOnMount}
             fitViewOptions={initialFit}
             minZoom={0.25}
             maxZoom={1.5}

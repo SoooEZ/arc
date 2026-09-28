@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Alert, Button, TextField, Tooltip } from "@mui/material";
 import { ruleApi } from "../../api/rules";
 import { useAutocompletePages } from "../../hooks/useAutocompletePages";
@@ -46,9 +46,9 @@ export default function PublishedFormulaLibrary({
   useEffect(() => {
     cancel();
   }, [search, readOnly, cancel]);
-  const insert = (rule: RuleSummary) => {
+  const insert = (event: MouseEvent<HTMLButtonElement>, rule: RuleSummary) => {
     if (readOnly) return;
-    void insertion.run(rule.id, (signal) => onInsert(rule, signal));
+    insertion.onCardClick(event, rule.id, (signal) => onInsert(rule, signal));
   };
   return (
     <>
@@ -85,7 +85,7 @@ export default function PublishedFormulaLibrary({
               <button
                 className="snippet-card"
                 disabled={readOnly || insertion.busy === rule.id}
-                onClick={() => insert(rule)}
+                onClick={(event) => insert(event, rule)}
               >
                 <span>
                   {rule.name}

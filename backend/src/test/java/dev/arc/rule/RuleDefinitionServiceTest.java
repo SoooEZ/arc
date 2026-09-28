@@ -243,4 +243,63 @@ class RuleDefinitionServiceTest {
     edges.add(new Edge("to-out", previous, "out", "next"));
     return new Definition(1, List.of(new Input("amount", "NUMBER", true, null)), nodes, edges);
   }
+
+  @Test
+  void validateAndDiagnosticsRefuseAPinnedVersionThatNoLongerPrepares() {
+    var amount = List.of(new Input("amount", "NUMBER", true, null));
+    var next = List.of(new Edge("next", "in", "out", "next"));
+    // Stored before unused properties were rejected: an Output with a result variable.
+    var stale =
+        new Definition(
+            1,
+            amount,
+            List.of(
+                node("in", "INPUT", "Input", null, null),
+                node("out", "OUTPUT", "Out", "amount", "r")),
+            next);
+    when(rules.resolve("child", 1)).thenReturn(stale);
+    when(rules.resolveFormula("child", 1)).thenReturn(stale);
+    var reference =
+        nodeOf("ref", "REFERENCE", "Ref")
+            .at(0, 0)
+            .rule("child", 1)
+            .bindings(Map.of("amount", "amount"))
+            .output("r")
+            .build();
+    String message = "Result variables belong to Formula, Transform and Reference nodes";
+    for (Definition parent : List.of(graph(reference, "r"), graph(null, "@child:1(amount)"))) {
+      // These passed every static check and publish, then failed every execution of the parent.
+      assertThatThrownBy(() -> service.validate(parent))
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.getMessage()).isEqualTo(message);
+                assertThat(error.locations())
+                    .first()
+                    .isEqualTo(new Location("child", 1, "out", "Out"));
+                assertThat(error.locations()).last().extracting(Location::ruleId).isNull();
+              });
+      assertThat(service.diagnostics(parent))
+          .singleElement()
+          .satisfies(
+              problem -> {
+                assertThat(problem.message()).isEqualTo(message);
+                assertThat(problem.locations())
+                    .first()
+                    .isEqualTo(new Location("child", 1, "out", "Out"));
+              });
+    }
+    var healthy =
+        new Definition(
+            1,
+            amount,
+            List.of(
+                node("in", "INPUT", "Input", null, null),
+                node("out", "OUTPUT", "Out", "amount", null)),
+            next);
+    when(rules.resolve("child", 1)).thenReturn(healthy);
+    when(rules.resolveFormula("child", 1)).thenReturn(healthy);
+    service.validate(graph(reference, "r"));
+    assertThat(service.diagnostics(graph(null, "@child:1(amount)"))).isEmpty();
+  }
 }

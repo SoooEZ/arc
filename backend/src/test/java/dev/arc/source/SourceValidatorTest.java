@@ -17,9 +17,9 @@ class SourceValidatorTest {
 
   @Test
   void aMissingDefinitionNamesEveryRegisteredKind() {
-    assertThatThrownBy(() -> validator.validate("Rates", null))
+    assertThatThrownBy(() -> validator.validate(null))
         .hasMessage("Source kind must be HTTP or LOOKUP or MEMORY");
-    assertThatThrownBy(() -> validator.validate("Rates", definition("CSV", null)))
+    assertThatThrownBy(() -> validator.validate(definition("CSV", null)))
         .hasMessage("Source kind must be HTTP or LOOKUP or MEMORY");
   }
 
@@ -31,12 +31,12 @@ class SourceValidatorTest {
     missingName.put(null, "TOKEN");
 
     for (Map<String, String> headers : List.of(missingAlias, missingName))
-      assertThatThrownBy(() -> validator.validate("Memory", definition("MEMORY", headers)))
+      assertThatThrownBy(() -> validator.validate(definition("MEMORY", headers)))
           .hasMessage("Secret headers map header names to uppercase environment aliases");
     verify(memory, never()).validate(any());
 
-    validator.validate("Memory", definition("MEMORY", Map.of("X-Token", "TOKEN")));
-    validator.validate("Memory", definition("MEMORY", null));
+    validator.validate(definition("MEMORY", Map.of("X-Token", "TOKEN")));
+    validator.validate(definition("MEMORY", null));
     verify(memory, times(2)).validate(any());
   }
 

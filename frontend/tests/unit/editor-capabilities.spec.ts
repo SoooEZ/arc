@@ -6,6 +6,7 @@ import {
   invalidDefaultMessage,
   pendingWriteWarning,
   shownView,
+  viewToggleLabel,
   type EditorTask,
 } from "../../src/features/editor/editorCapabilities";
 
@@ -116,4 +117,15 @@ test("unbuilt code stays shown and an invalid default keeps the graph", () => {
   // Code does not open while the Input form holds an invalid default.
   expect(view("code", false, true)).toBe("graph");
   expect(view("graph", false, true)).toBe("graph");
+});
+
+test("the header toggle describes leaving the shown view, not the route", () => {
+  expect(viewToggleLabel("code")).toBe("Graph view");
+  expect(viewToggleLabel("graph")).toBe("Code editor");
+  // Unbuilt code at the graph route keeps the code on screen: the toggle leaves it.
+  expect(
+    viewToggleLabel(
+      shownView("graph", { sourceDirty: true, invalidDefaults: false }),
+    ),
+  ).toBe("Graph view");
 });

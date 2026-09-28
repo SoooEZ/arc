@@ -11,7 +11,11 @@ import {
 import type { Rule } from "../../types";
 import { kindLabel } from "../../types";
 import { KindIcon } from "../../components/Icons";
-import type { EditorCapabilities, EditorTask } from "./editorCapabilities";
+import {
+  viewToggleLabel,
+  type EditorCapabilities,
+  type EditorTask,
+} from "./editorCapabilities";
 
 /** How the draft relates to what is saved, shown beside the rule kind. */
 function saveStatus(dirty: boolean, readOnly: boolean): string {
@@ -22,6 +26,7 @@ function saveStatus(dirty: boolean, readOnly: boolean): string {
 
 interface Props {
   rule: Rule;
+  /** The view on screen (`shownView`), which the toggle leaves. */
   mode: "code" | "graph";
   readOnly: boolean;
   dirty: boolean;
@@ -95,7 +100,7 @@ export default function EditorHeader({
           onClick={() => void switchView()}
           disabled={!can.switchView}
         >
-          {mode === "code" ? "Graph view" : "Code editor"}
+          {viewToggleLabel(mode)}
         </Button>
         <Tooltip title="Version history">
           <IconButton aria-label="Version history" onClick={showHistory}>

@@ -1,6 +1,7 @@
 import { MenuItem, TextField } from "@mui/material";
 import type { Input } from "../../../types";
 import JsonField from "../../../components/JsonField";
+import { inputDefaultProblem } from "../../../domain/inputDefaults";
 import NumericDefaultField from "./NumericDefaultField";
 
 export default function InputDefaultValue({
@@ -19,6 +20,8 @@ export default function InputDefaultValue({
       <JsonField
         label="Default JSON (optional)"
         onValidity={onValidity}
+        // The field refuses what the server's type check and number limits reject.
+        check={(value) => inputDefaultProblem(input.type, value)}
         rows={2}
         value={input.defaultValue}
         disabled={disabled}

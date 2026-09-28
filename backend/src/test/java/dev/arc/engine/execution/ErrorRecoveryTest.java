@@ -72,6 +72,7 @@ class ErrorRecoveryTest {
                 nodeOf("out", "OUTPUT", "Output").expression("amount").output("r").build()),
             List.of(new Edge("next", "in", "out", "next"))));
     definitions.put("unprefixed:1", graph(amount, "ROUND(amount, 2)"));
+    definitions.put("echo:1", graph(amount, "amount"));
     // level-0 calls level-1 ... level-17, one level deeper than the shared nesting limit allows.
     for (int level = 0; level < 18; level++)
       definitions.put(
@@ -240,5 +241,35 @@ class ErrorRecoveryTest {
     // The callee's own value errors stay recoverable.
     assertThat(run(graph(List.of(), "$IFERROR(@broken:1(), -1)")).result())
         .isEqualTo(new BigDecimal("-1"));
+  }
+
+  @Test
+  void bindingFailuresNameTheBindingWhileLimitsKeepTheirMessage() {
+    // A failed binding surfaced as the bare "Division by zero" at the Reference node.
+    var parent =
+        script.parse(
+            "inputs { zero: NUMBER required; }\n"
+                + "node in INPUT \"Input\" { next -> reuse; }\n"
+                + "node reuse REFERENCE \"Reuse\" { use \"echo\" version 1; bind amount = 1 / zero;"
+                + " as r; next -> out; }\n"
+                + "node out OUTPUT \"Output\" { return r; }");
+    assertThatThrownBy(() -> engine.execute("parent", 1, parent, Map.of("zero", 0), formulas))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage()).isEqualTo("amount: Division by zero");
+              assertThat(error.locations())
+                  .last()
+                  .isEqualTo(new ArcException.Location("parent", 1, "reuse", "Reuse"));
+            });
+    var nested =
+        script.parse(
+            "node in INPUT \"Input\" { next -> reuse; }\n"
+                + "node reuse REFERENCE \"Reuse\" { use \"echo\" version 1;"
+                + " bind amount = @level-0:1(); as r; next -> out; }\n"
+                + "node out OUTPUT \"Output\" { return r; }");
+    assertLimit(
+        () -> engine.execute("parent", 1, nested, Map.of(), formulas),
+        "Rule nesting exceeds 16 levels");
   }
 }

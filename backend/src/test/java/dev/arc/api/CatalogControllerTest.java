@@ -162,4 +162,16 @@ class CatalogControllerTest {
     }
     verifyNoMoreInteractions(rules);
   }
+
+  @Test
+  void searchesWithNulNeverReachStorage() throws Exception {
+    // The parameter reached PostgreSQL before and answered 500.
+    for (String endpoint :
+        List.of(
+            "/api/rule-summaries", "/api/source-summaries", "/api/rules/example/version-summaries"))
+      mvc.perform(get(endpoint).param("search", "a\0b"))
+          .andExpect(status().isUnprocessableEntity())
+          .andExpect(jsonPath("$.message").value("Text cannot contain the NUL character (U+0000)"));
+    verifyNoInteractions(rules, sources);
+  }
 }

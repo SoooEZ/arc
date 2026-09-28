@@ -28,8 +28,8 @@ public final class Identifiers {
   }
 
   /**
-   * Rule and data source IDs, including the pins in source bindings and {@code @id:version} Formula
-   * calls: a lowercase letter followed by lowercase letters, digits or hyphens.
+   * Rule and data source IDs, including Reference pins, the pins in source bindings and {@code
+   * @id:version} Formula calls: a lowercase letter followed by lowercase letters, digits or hyphens.
    */
   public static boolean isResourceId(String id) {
     return id != null && RESOURCE_ID.matcher(id).matches();

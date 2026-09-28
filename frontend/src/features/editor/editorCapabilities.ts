@@ -36,7 +36,7 @@ export interface EditorCapabilities {
   publish: boolean;
   /** Validate the shown graph; published versions too. */
   validate: boolean;
-  /** Open or close the Test panel, building pending code first. */
+  /** Open the Test panel, building pending code first; closing never builds. */
   test: boolean;
   /** Switch between the graph and code views. */
   switchView: boolean;
@@ -99,6 +99,11 @@ export function invalidDefaultMessage(action: string): string {
 }
 
 export type EditorView = "graph" | "code";
+
+/** The header toggle describes leaving the shown view, whatever the route says. */
+export function viewToggleLabel(shown: EditorView): string {
+  return shown === "code" ? "Graph view" : "Code editor";
+}
 
 /**
  * The view the editor shows for the requested one. Code with unbuilt edits

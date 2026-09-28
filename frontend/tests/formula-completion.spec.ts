@@ -221,3 +221,74 @@ test("a formula created again under a deleted ID offers its new parameters witho
   await expect(suggestion(page, callee)).toContainText("country: string");
   await page.keyboard.press("Escape");
 });
+
+test("a failed Formula search is reported in every editor and clears with the next search", async ({
+  page,
+  request,
+}) => {
+  const { callee, caller } = await fixtures(request);
+  let failing = true;
+  await page.route("**/api/rule-summaries?*", (route) => {
+    const url = new URL(route.request().url());
+    if (failing && url.searchParams.get("kind") === "FORMULA")
+      return route.fulfill({
+        status: 500,
+        json: { message: "Formula search exploded" },
+      });
+    return route.fallback();
+  });
+  const problem = "Formula suggestions unavailable: Formula search exploded";
+  await page.goto(`/#/rules/${caller}?node=calc`);
+  // The Expression dialog's aside showed only function catalog errors.
+  await page
+    .getByRole("button", { name: "Open in Editor · Expression", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Expression editor · Expression",
+    exact: true,
+  });
+  const expression = dialog.getByLabel("Expression code editor", {
+    exact: true,
+  });
+  await setEditorText(page, expression, "");
+  await page.keyboard.type("@comp");
+  await expect(
+    dialog.getByRole("alert").filter({ hasText: problem }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  // The node code dialog showed build and catalog errors only.
+  await page
+    .locator(".inspector-sidebar")
+    .getByRole("button", { name: "Node expression", exact: true })
+    .click();
+  const nodeDialog = page.getByRole("dialog", {
+    name: "Node expression · Calculate price",
+    exact: true,
+  });
+  const code = nodeDialog.getByLabel("Node code editor", { exact: true });
+  await setEditorText(
+    page,
+    code,
+    'node calc FORMULA "Calculate price" { let price = ',
+  );
+  await page.keyboard.type("@comp");
+  await expect(
+    nodeDialog.getByRole("alert").filter({ hasText: problem }),
+  ).toBeVisible();
+  await nodeDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  // Code studio's library showed insertion and catalog errors only.
+  await page.goto(`/#/studio/${caller}`);
+  const script = page.getByLabel("ARC code editor", { exact: true });
+  await setEditorText(page, script, "let x = ");
+  await page.keyboard.type("@comp");
+  const libraryAlert = page
+    .locator(".studio-library")
+    .getByRole("alert")
+    .filter({ hasText: problem });
+  await expect(libraryAlert).toBeVisible();
+  failing = false;
+  await page.keyboard.type("l");
+  await page.keyboard.press("Control+Space");
+  await expect(suggestion(page, callee)).toBeVisible();
+  await expect(libraryAlert).toHaveCount(0);
+});

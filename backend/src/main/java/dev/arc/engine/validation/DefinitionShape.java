@@ -65,12 +65,14 @@ final class DefinitionShape {
 
   /**
    * Node, case and field problems appear on their node. A connection belongs to the node it leaves,
-   * or to the node it enters when its source is missing. Document and input problems have no node.
+   * or to the node it enters when its source is missing. Document and input problems appear on the
+   * Input node when the draft has one, as /validate and /diagnostics show them.
    */
   static ArcException located(ShapeViolation violation, Definition definition) {
     var error = ArcException.invalid(violation.message());
     Node owner = owner(violation.element(), definition);
-    return owner == null ? error : error.atNode(null, null, owner.id(), owner.label());
+    if (owner == null) return Problems.onInputNode(error, definition);
+    return error.atNode(null, null, owner.id(), owner.label());
   }
 
   private static Node owner(Element element, Definition definition) {
@@ -191,6 +193,12 @@ final class DefinitionShape {
 
   private void checkPin(Node node) {
     var declaration = new NodeDeclaration(node);
+    // Every pin form shares one ID policy (source bindings, @id:version calls); null means no rule
+    // chosen yet. A malformed ID saved and built before, then failed as 404, or as 500 with a NUL.
+    require(
+        node.ruleId() == null || Identifiers.isResourceId(node.ruleId()),
+        declaration,
+        node.label() + ": choose a valid rule ID");
     // A draft may choose a rule before its version (ARC Script `use "rule-id";`), not the reverse.
     require(
         node.version() == null || node.ruleId() != null,

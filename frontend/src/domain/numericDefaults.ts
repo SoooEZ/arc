@@ -4,6 +4,7 @@ import {
   isDecimalNumber,
   sameJsonNumber,
 } from "./json";
+import { MAX_NUMBER_PRECISION, MAX_NUMBER_SCALE } from "./limits";
 
 export type NumericDefault =
   | { valid: true; value: number | DecimalNumber | null }
@@ -22,12 +23,11 @@ const decimalText = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
  * That is also why a stored draft keeps saving: PostgreSQL writes 1e100 out as
  * a 101-digit integer, which is 1e100 again without its trailing zeros.
  */
-const maxPrecision = 100n;
-const maxScale = 100n;
+const maxPrecision = BigInt(MAX_NUMBER_PRECISION);
+const maxScale = BigInt(MAX_NUMBER_SCALE);
 
 const invalidNumber = "Enter a valid number before saving";
-const unsupportedNumber =
-  "This number is too large or too precise. Use at most 100 digits and 100 decimal places.";
+export const unsupportedNumber = `This number is too large or too precise. Use at most ${MAX_NUMBER_PRECISION} digits and ${MAX_NUMBER_SCALE} decimal places.`;
 
 interface DecimalParts {
   negative: boolean;
@@ -67,8 +67,8 @@ function withinLimits(precision: bigint, scale: bigint): boolean {
   return precision <= maxPrecision && -maxScale <= scale && scale <= maxScale;
 }
 
-/** Whether the server accepts `token`, before and after storing it. */
-function withinServerLimits(token: string): boolean {
+/** Whether the server accepts the JSON number `token`, before and after storing it. */
+export function withinServerLimits(token: string): boolean {
   const parts = decimalParts(token);
   if (!parts) return false;
   const digits = (parts.integer + parts.fraction).replace(/^0+/, "");

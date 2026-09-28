@@ -5,6 +5,7 @@ import dev.arc.engine.InputTypes;
 import dev.arc.engine.Limits;
 import dev.arc.engine.SourceReader;
 import dev.arc.engine.expression.Expressions;
+import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.*;
 import java.util.*;
@@ -100,9 +101,18 @@ public final class Parameters {
         arguments.put(binding.getKey(), expressions.apply(binding.getValue()));
       for (Input dependency : dependencies(arguments.values())) resolve(dependency);
       var argumentValues = new LinkedHashMap<String, Object>();
-      for (var argument : arguments.entrySet())
-        argumentValues.put(
-            argument.getKey(), argument.getValue().evaluate(resolved, deadline, formulas));
+      for (var argument : arguments.entrySet()) {
+        try {
+          argumentValues.put(
+              argument.getKey(), argument.getValue().evaluate(resolved, deadline, formulas));
+        } catch (ArcException error) {
+          // Named like the static diagnostic; limits and the deadline keep their plain message.
+          deadline.check();
+          if (!error.recoverable()) throw error;
+          throw error.withContext(
+              Validator.sourceMappingLabel(parameter.name(), argument.getKey()));
+        }
+      }
       if (++fetches > Limits.MAX_SOURCE_READS)
         throw ArcException.limit("Execution exceeds " + Limits.MAX_SOURCE_READS + " source reads");
       Object value;

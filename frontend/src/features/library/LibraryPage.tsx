@@ -137,11 +137,12 @@ export default function Library({
         </div>
       </div>
       <div className="library-toolbar">
-        <div className="filter-tabs">
+        <div className="filter-tabs" role="group" aria-label="Rule kind">
           {kindFilters.map((type) => (
             <button
               key={type}
               className={filter === type ? "active" : ""}
+              aria-pressed={filter === type}
               onClick={() => setFilter(type)}
             >
               {kindFilterLabels[type]}
@@ -150,7 +151,6 @@ export default function Library({
         </div>
         <TextField
           placeholder="Search rules…"
-          aria-label="Search rules"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           slotProps={{
@@ -161,6 +161,8 @@ export default function Library({
                 </InputAdornment>
               ),
             },
+            // On the input itself: a root aria-label lands on MUI's FormControl div.
+            htmlInput: { "aria-label": "Search rules" },
           }}
           sx={{ width: 235 }}
         />

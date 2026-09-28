@@ -103,6 +103,18 @@ export function parseSourceTestInputs(text: string): Record<string, unknown> {
   return parseJsonObject(text, "Test parameters must be a JSON object.");
 }
 
+/** The parameter a provider starts with when it is first chosen for a source. */
+export function providerParameterTemplate(kind: SourceConfig["kind"]): Input[] {
+  return [
+    {
+      name: kind === "LOOKUP" ? "key" : "customerId",
+      type: "STRING",
+      required: true,
+      defaultValue: null,
+    },
+  ];
+}
+
 export const createSourceDraft = (): DataSource => ({
   id: "",
   name: "",

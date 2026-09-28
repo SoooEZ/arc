@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Alert, TextField } from "@mui/material";
 import { Braces, GitBranch, Puzzle } from "lucide-react";
 import { usePagedResource } from "../../hooks/usePagedResource";
@@ -8,6 +8,10 @@ import { ruleApi } from "../../api/rules";
 import type { Definition, FunctionEntry, RuleSummary } from "../../types";
 import { modules, referenceSnippet, reuseNodeId } from "./snippets";
 import { useLibraryInsertion } from "./useLibraryInsertion";
+import { formulaSuggestionProblem } from "./useFormulaSupport";
+import { uniqueName } from "../../domain/ids";
+import { variableNames } from "../../domain/graph";
+import { scriptVariableNames } from "../../domain/expressionSymbols";
 
 type Pane = "functions" | "modules" | "reuse";
 const panes: Pane[] = ["functions", "modules", "reuse"];
@@ -15,18 +19,30 @@ const panes: Pane[] = ["functions", "modules", "reuse"];
 export default function StudioLibrary({
   ruleId,
   definition,
+  source,
   functions,
   catalogError,
+  formulaError,
   readOnly,
   onInsert,
+  onBeginInsert,
   onInsertFormula,
 }: {
   ruleId: string;
   definition: Definition;
+  /** The code buffer, which may declare names the built definition does not have yet. */
+  source: string;
   functions: FunctionEntry[];
   catalogError: string;
+  /** Why `@` completion could not search published Formulas, or "". */
+  formulaError: string;
   readOnly: boolean;
   onInsert: (snippet: string, atEnd?: boolean) => void;
+  /**
+   * Starts an insertion that first reads: the returned function inserts, or
+   * throws when the code changed since the click.
+   */
+  onBeginInsert: () => (snippet: string, atEnd?: boolean) => void;
   onInsertFormula: (rule: RuleSummary, signal?: AbortSignal) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
@@ -42,25 +58,32 @@ export default function StudioLibrary({
   );
   const insertion = useLibraryInsertion();
   const { cancel } = insertion;
-  const latest = useRef({ definition, readOnly, onInsert });
-  latest.current = { definition, readOnly, onInsert };
+  const latest = useRef({ definition, source, readOnly });
+  latest.current = { definition, source, readOnly };
   useEffect(() => {
     if (readOnly) cancel();
   }, [readOnly, cancel]);
 
-  const reuse = (rule: RuleSummary) => {
+  const reuse = (event: MouseEvent<HTMLButtonElement>, rule: RuleSummary) => {
     const pinned = rule.publishedVersion;
     if (readOnly || pinned === null) return;
     const nodeId = reuseNodeId(rule.id);
-    void insertion.run(rule.id, async (signal) => {
+    const insert = onBeginInsert();
+    insertion.onCardClick(event, rule.id, async (signal) => {
       const version = await ruleApi.version(rule.id, pinned, { signal });
       if (signal.aborted || latest.current.readOnly) return;
-      latest.current.onInsert(
-        referenceSnippet(rule, version, latest.current.definition, nodeId),
-        true,
-      );
+      const { definition: built, source: buffer } = latest.current;
+      // A name in use, also one only the unbuilt buffer declares, would be overwritten.
+      const resultName = uniqueName("result_", [
+        ...variableNames(built),
+        ...scriptVariableNames(buffer),
+      ]);
+      insert(referenceSnippet(rule, version, built, nodeId, resultName), true);
     });
   };
+  const formulaProblem = formulaError
+    ? formulaSuggestionProblem(formulaError)
+    : "";
 
   return (
     <aside className="studio-library">
@@ -68,11 +91,12 @@ export default function StudioLibrary({
         <Puzzle size={17} />
         <strong>Build with blocks</strong>
       </div>
-      <div className="studio-tabs">
+      <div className="studio-tabs" role="group" aria-label="Library panes">
         {panes.map((item) => (
           <button
             key={item}
             className={pane === item ? "active" : ""}
+            aria-pressed={pane === item}
             onClick={() => setPane(item)}
           >
             {item}
@@ -128,7 +152,7 @@ export default function StudioLibrary({
                 key={rule.id}
                 className="snippet-card"
                 disabled={readOnly || insertion.busy === rule.id}
-                onClick={() => reuse(rule)}
+                onClick={(event) => reuse(event, rule)}
               >
                 <GitBranch size={17} />
                 <span>
@@ -151,12 +175,12 @@ export default function StudioLibrary({
           />
         </>
       )}
-      {(insertion.error || catalogError || catalog.error) && (
+      {(insertion.error || catalogError || catalog.error || formulaProblem) && (
         <Alert
           severity="error"
           onClose={insertion.error ? insertion.dismissError : undefined}
         >
-          {insertion.error || catalogError || catalog.error}
+          {insertion.error || catalogError || catalog.error || formulaProblem}
         </Alert>
       )}
     </aside>

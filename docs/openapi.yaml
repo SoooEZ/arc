@@ -8,7 +8,8 @@ info:
     (1,048,576 bytes) for any method or path spelling; larger bodies return 413.
     Responses write decimal numbers in plain notation (20 and 0.0000001, never
     2E+1). Stored text (names, descriptions, drafts and source definitions)
-    cannot contain the NUL character U+0000; such writes return 422.
+    cannot contain the NUL character U+0000 or an unpaired UTF-16 surrogate; such
+    writes return 422.
 servers:
   - url: http://localhost:8080/api
   - url: http://localhost:3080/api
@@ -603,7 +604,8 @@ components:
         rule; 413 request body over 1 MiB (any method or path); 422 invalid
         graph, input or calculation, exhausted execution limit (steps, nesting,
         source reads, expression operations), Excel argument error or text
-        containing U+0000; 500 server error; 504 execution deadline exceeded
+        containing U+0000 or an unpaired surrogate; 500 server error; 504 execution
+        deadline exceeded
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}

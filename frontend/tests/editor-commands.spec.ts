@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { editorLines } from "./helpers/editor";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -209,4 +210,112 @@ test("leaving the graph while Arrange waits for its layout module cannot keep th
   } finally {
     release();
   }
+});
+
+test("a graph arrival with unbuilt code applies once the running build ends, and the header names the shown view", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request, "arrival-after-build");
+  await page.goto(`/#/rules/${id}`);
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await code.focus();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("End");
+  await page.keyboard.type("\nnode broken");
+  const pending = await holdRequest(page, "/api/studio/build", "POST");
+  try {
+    await page
+      .getByRole("button", { name: "Build graph", exact: true })
+      .click();
+    await expect.poll(() => pending.state.held).toBe(true);
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`#/rules/${id}$`));
+    // The code stays on screen while the build holds the lock; the header said "Code editor".
+    await expect(code).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Graph view", exact: true }),
+    ).toBeVisible();
+    pending.release();
+    // The arrival rule applies once the lock is free: the failing code returns to its route.
+    await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+    await expect(code).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Graph view", exact: true }),
+    ).toBeEnabled();
+  } finally {
+    pending.release();
+  }
+  await code.focus();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+Home");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.getByRole("button", { name: "Graph view", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`#/rules/${id}$`));
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
+  await expect(
+    page.getByRole("button", { name: "Code editor", exact: true }),
+  ).toBeVisible();
+});
+
+test("node code cannot open while Arrange runs, and opens with the arranged position afterwards", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request, "arrange-node-code");
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let held = false;
+  await page.route(/\/graphLayout[^/]*\.(ts|js)(\?.*)?$/, async (route) => {
+    held = true;
+    await gate;
+    await route.continue();
+  });
+  const codeButton = page.getByRole("button", {
+    name: "Node expression · Calculation",
+    exact: true,
+  });
+  try {
+    await page.goto(`/#/rules/${id}`);
+    await expect(page.locator(".react-flow__node")).toHaveCount(3);
+    await expect(codeButton).toBeEnabled();
+    await page
+      .getByRole("button", { name: "Arrange graph", exact: true })
+      .click();
+    await expect.poll(() => held).toBe(true);
+    // A dialog opened now would render, and later apply, the positions from before the layout.
+    await expect(codeButton).toBeDisabled();
+    release();
+    await expect(codeButton).toBeEnabled();
+  } finally {
+    release();
+  }
+  await codeButton.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Node expression · Calculation",
+    exact: true,
+  });
+  const shown = dialog.getByLabel("Node code editor", { exact: true });
+  await expect(editorLines(shown)).toContainText("at (");
+  await expect(editorLines(shown)).not.toContainText("at (40, 420)");
+  const arranged = /at \((-?\d+(?:\.\d+)?), (-?\d+(?:\.\d+)?)\)/.exec(
+    (await editorLines(shown).innerText()).replace(/\u00a0/g, " "),
+  )!;
+  await dialog.getByRole("button", { name: "Apply to graph" }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  const saved = await readRule(request, id);
+  expect(
+    saved.draft.nodes.find((node) => node.id === "calculate")!.position,
+  ).toEqual({ x: Number(arranged[1]), y: Number(arranged[2]) });
 });

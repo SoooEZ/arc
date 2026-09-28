@@ -216,3 +216,13 @@ export function expressionSymbols(
   }
   return symbols;
 }
+
+/**
+ * The variable names a script buffer declares, whether or not it builds:
+ * parameters in `inputs`, `let` locals, `as` results and `source` parameters.
+ */
+export function scriptVariableNames(source: string): string[] {
+  const names = new Map<string, ExpressionSymbolKind>();
+  scriptNames(tokens(source), names);
+  return [...names.keys()];
+}

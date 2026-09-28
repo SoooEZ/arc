@@ -291,4 +291,71 @@ class DiagnosticsTest {
     }
     throw new AssertionError("Expected a syntax error: " + expression);
   }
+
+  @Test
+  void scopeFreeNodeChecksAndEveryStructureProblemSurviveACycle() {
+    var amount = List.of(new Input("amount", "NUMBER", true, null));
+    var f = nodeOf("f", "FORMULA", "F").at(0, 0).expression("1").output("").build();
+    var w = nodeOf("w", "FORMULA", "W").at(0, 0).expression("1").output("amount").build();
+    var r = nodeOf("r", "REFERENCE", "R").at(0, 0).rule("nope", 3).output("x").build();
+    var s = nodeOf("s", "SWITCH", "S").at(0, 0).cases(List.of()).build();
+    var nodes =
+        List.of(node("input", "INPUT", null, null), f, w, r, s, node("out", "OUTPUT", "1", null));
+    var edges =
+        new ArrayList<>(
+            List.of(
+                edge("input", "f", "next"),
+                edge("f", "w", "next"),
+                edge("w", "r", "next"),
+                edge("r", "s", "next"),
+                edge("s", "out", "default")));
+    var expected =
+        List.of(
+            new Validator.Problem("F: provide a valid result variable", at("f", "F")),
+            new Validator.Problem("W: cannot overwrite input amount", at("w", "W")),
+            new Validator.Problem("Published rule version not found: nope v3", at("r", "R")),
+            new Validator.Problem("S: add at least one case", at("s", "S")));
+    assertThat(validator.diagnostics(new Definition(1, amount, nodes, edges), noRules))
+        .containsExactlyInAnyOrderElementsOf(expected);
+    // Without a scope plan these four vanished until the cycle was fixed.
+    edges.add(edge("out", "f", "next"));
+    var problems = validator.diagnostics(new Definition(1, amount, nodes, edges), noRules);
+    assertThat(problems).anyMatch(problem -> problem.message().contains("cycles"));
+    assertThat(problems).containsAll(expected);
+    assertThat(problems)
+        .contains(new Validator.Problem("out: connect no outgoing branches", at("out", "out")));
+  }
+
+  @Test
+  void everyMissingConnectionAndUnreachableNodeIsReported() {
+    var definition =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("c1", "CONDITION", "true", null),
+                node("c2", "CONDITION", "true", null),
+                node("c3", "CONDITION", "true", null),
+                node("out1", "OUTPUT", "1", null),
+                node("out2", "OUTPUT", "2", null),
+                node("out3", "OUTPUT", "3", null)),
+            List.of(
+                edge("input", "c1", "next"),
+                edge("c1", "c2", "true"),
+                edge("c2", "c3", "true"),
+                edge("c3", "out1", "true")));
+    String unreachable = "Every node must be reachable from Input; connect or remove unused nodes";
+    // Only c1's problem was reported before, so the editor marked one node at a time.
+    assertThat(validator.diagnostics(definition, noRules))
+        .containsExactlyInAnyOrder(
+            new Validator.Problem("c1: connect [true, false]", at("c1", "c1")),
+            new Validator.Problem("c2: connect [true, false]", at("c2", "c2")),
+            new Validator.Problem("c3: connect [true, false]", at("c3", "c3")),
+            new Validator.Problem(unreachable, at("out2", "out2")),
+            new Validator.Problem(unreachable, at("out3", "out3")));
+    // Executable validation still stops at the first problem.
+    assertThatThrownBy(() -> validator.validate(definition, noRules))
+        .hasMessage("c1: connect [true, false]");
+  }
 }

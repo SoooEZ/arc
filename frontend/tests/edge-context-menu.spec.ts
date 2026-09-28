@@ -223,3 +223,36 @@ test("connection context menu obeys historical and pending-save guards", async (
     release();
   }
 });
+
+test("a selected connection is deselected as soon as a node deletion removes it", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto("/#/rules/edge-context-fixture");
+  await page.locator('.react-flow__node[data-id="calc"] .graph-node').click();
+  await clickEdge(page, "finish", "left");
+  await expect(edge(page, "finish")).toHaveClass(/selected/);
+  const deleteConnection = page.getByRole("button", {
+    name: "Delete connection",
+    exact: true,
+  });
+  await expect(deleteConnection).toBeVisible();
+  // The node context menu removes "out" with its connection; the button stayed before.
+  await page
+    .locator('.react-flow__node[data-id="out"] .graph-node')
+    .click({ button: "right" });
+  await page
+    .getByRole("menu", { name: "Node actions" })
+    .getByRole("menuitem", { name: "Delete", exact: true })
+    .click();
+  await expect(edge(page, "finish")).toHaveCount(0);
+  await expect(deleteConnection).toHaveCount(0);
+  await clickEdge(page, "start", "left");
+  await expect(edge(page, "start")).toHaveClass(/selected/);
+  await expect(deleteConnection).toBeVisible();
+  // The Inspector deletes the selected node, the connection's target.
+  await page.getByRole("button", { name: "Delete node", exact: true }).click();
+  await expect(edge(page, "start")).toHaveCount(0);
+  await expect(deleteConnection).toHaveCount(0);
+  await expect(page.locator(".react-flow__node")).toHaveCount(1);
+});

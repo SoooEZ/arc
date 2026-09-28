@@ -1,6 +1,7 @@
 package dev.arc.engine;
 
 import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.nodeOf;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.arc.engine.expression.Expressions;
@@ -25,18 +26,31 @@ class IdentifiersTest {
     for (String id : invalid) assertThat(Identifiers.isResourceId(id)).as(id).isFalse();
   }
 
-  /** Formula calls and source pins accept every ID that rule and source creation accept. */
+  /** Formula calls, source pins and Reference pins accept every ID that creation accepts. */
   @Test
-  void formulaCallsAndSourcePinsFollowTheResourceIdPolicy() {
+  void formulaCallsSourcePinsAndReferencePinsFollowTheResourceIdPolicy() {
     var validator = new Validator();
     Expressions.compile("@" + LONGEST_ID + ":1()");
     validator.shape(sourcedBy(LONGEST_ID));
+    validator.shape(referencing(LONGEST_ID));
     for (String id : List.of(LONGEST_ID + "a", "Rate")) {
       assertThatThrownBy(() -> Expressions.compile("@" + id + ":1()"))
           .hasMessage("Formula call needs a valid rule ID");
       assertThatThrownBy(() -> validator.shape(sourcedBy(id)))
           .hasMessage("Source needs an ID and version");
+      assertThatThrownBy(() -> validator.shape(referencing(id)))
+          .hasMessage("Reuse: choose a valid rule ID");
     }
+  }
+
+  private static Definition referencing(String ruleId) {
+    return new Definition(
+        1,
+        List.of(),
+        List.of(
+            inputNode("in", "Input"),
+            nodeOf("reuse", "REFERENCE", "Reuse").rule(ruleId, 1).build()),
+        List.of());
   }
 
   private static Definition sourcedBy(String sourceId) {

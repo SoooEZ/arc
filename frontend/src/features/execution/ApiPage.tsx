@@ -157,13 +157,15 @@ export default function ApiPage({
               loading={request.history.loading || !id}
               onPage={request.history.setOffset}
             />
-            {!published.length && (
-              <Alert severity="info">
-                {request.search
-                  ? "No published rules match your search."
-                  : "Publish a rule in the library to make your first API call."}
-              </Alert>
-            )}
+            {!request.catalog.loading &&
+              !request.catalog.error &&
+              !published.length && (
+                <Alert severity="info">
+                  {request.search
+                    ? "No published rules match your search."
+                    : "Publish a rule in the library to make your first API call."}
+                </Alert>
+              )}
             <div className="endpoint">
               <strong>POST</strong>
               <code>/api/rules/{id || "{id}"}/execute</code>

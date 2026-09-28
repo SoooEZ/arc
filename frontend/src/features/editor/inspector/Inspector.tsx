@@ -73,6 +73,9 @@ export default function Inspector({
   const patch = (value: Partial<RuleNode>) => onNodeChange(node.id, value);
   const scope = useNodeVariables(rule.draft, node.id);
   const kind = nodeKinds[node.type];
+  const removable = canRemoveGraphNode(rule.draft, node.id);
+  // The entry Input has no delete button; an extra Input, like other kinds, does.
+  const deletable = kind.removable === true || removable;
   const Fields = fieldsByType[node.type];
   const fieldProps: NodeFieldsProps = {
     rule,
@@ -109,10 +112,10 @@ export default function Inspector({
                 </IconButton>
               </Tooltip>
             )}
-            {/* A kind that cannot be deleted keeps an empty slot to align the header. */}
-            {onDelete && kind.removable ? (
+            {/* A node that cannot be deleted keeps an empty slot to align the header. */}
+            {onDelete && deletable ? (
               <DeleteNodeButton
-                removable={canRemoveGraphNode(rule.draft, node.id)}
+                removable={removable}
                 readOnly={readOnly}
                 onDelete={() => onDelete(node.id)}
               />

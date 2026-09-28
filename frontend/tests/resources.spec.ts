@@ -101,7 +101,8 @@ test("a failed published version cannot expose the draft and can be retried", as
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByTestId("test-result")).toHaveText("90");
+  // Results keep the decimal places the server computes.
+  await expect(page.getByTestId("test-result")).toHaveText("90.0");
 });
 
 test("moving a node reuses semantic reads and late diagnostics cannot mark a newer expression", async ({

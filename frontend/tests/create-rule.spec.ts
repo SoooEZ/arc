@@ -190,3 +190,30 @@ test("editing the name keeps a Rule ID the user chose", async ({
   ]);
   expect((await request.get(`/api/rules/${chosenId}`)).ok()).toBeTruthy();
 });
+
+test("a notice survives clicks elsewhere and clears on its own", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Create rule", exact: true })
+    .last()
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Rule name", { exact: true })
+    .fill(`Notice ${Date.now()}`);
+  await dialog
+    .getByRole("button", { name: "Create rule", exact: true })
+    .click();
+  const notice = page.getByText("Rule created. Make it yours.", {
+    exact: true,
+  });
+  await expect(notice).toBeVisible();
+  // MUI reports any click outside the notice as "clickaway", which used to close it at once.
+  const nodeName = page.getByLabel("Node name", { exact: true });
+  await nodeName.click();
+  await expect(nodeName).toBeFocused();
+  await expect(notice).toBeVisible();
+  await expect(notice).toBeHidden({ timeout: 8000 });
+});

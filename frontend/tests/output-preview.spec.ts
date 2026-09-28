@@ -75,10 +75,11 @@ async function create(request: APIRequestContext, definition: Definition) {
   return id;
 }
 
-async function run(page: Page, expected: unknown) {
+/** Runs the preview; `expected` is the result's JSON text, or an object that has no decimal places. */
+async function run(page: Page, expected: string | object) {
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText(
-    JSON.stringify(expected),
+    typeof expected === "string" ? expected : JSON.stringify(expected),
   );
 }
 
@@ -96,13 +97,13 @@ test("multiple Output previews use variable names and aliases as top-level field
     '{ "amount": amount, … }',
   ]);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
-  await run(page, { amount: 100, total: 72 });
+  await run(page, '{"amount":100,"total":72.00}');
   await page.getByLabel("Output name", { exact: true }).fill("original_amount");
   await expect(preview.locator("code")).toHaveText([
     '{ "original_amount": amount }',
     '{ "original_amount": amount, … }',
   ]);
-  await run(page, { original_amount: 100, total: 72 });
+  await run(page, '{"original_amount":100,"total":72.00}');
   await expect(
     page.getByRole("combobox", { name: "Return value", exact: true }),
   ).toHaveText("amount [number] from Test Input");
@@ -152,10 +153,10 @@ test("constant, dotted and computed Output expressions fall back to the node ID 
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   const preview = page.getByLabel("Return value preview", { exact: true });
   for (const [expression, value] of [
-    ["42", 42],
-    ["true", true],
-    ["total + 1", 73],
-    ["customer.amount", 7],
+    ["42", "42"],
+    ["true", "true"],
+    ["total + 1", "73.00"],
+    ["customer.amount", "7"],
   ] as const) {
     await setEditorText(
       page,
@@ -166,7 +167,7 @@ test("constant, dotted and computed Output expressions fall back to the node ID 
       expression,
       `{ "result": ${expression}, … }`,
     ]);
-    await run(page, { amount: 100, result: value });
+    await run(page, `{"amount":100,"result":${value}}`);
   }
   await setEditorText(
     page,
@@ -176,7 +177,7 @@ test("constant, dotted and computed Output expressions fall back to the node ID 
   await expect(preview.locator("code").last()).toHaveText(
     '{ "total":   total  , … }',
   );
-  await run(page, { amount: 100, total: 72 });
+  await run(page, '{"amount":100,"total":72.00}');
 });
 
 test("duplicate reached Output fields fail with both node locations and recover after renaming", async ({
@@ -226,7 +227,7 @@ test("duplicate reached Output fields fail with both node locations and recover 
     .getByRole("button", { name: /Original amount/ })
     .click();
   await page.getByLabel("Output name", { exact: true }).fill("original_amount");
-  await run(page, { original_amount: 100, total: 72 });
+  await run(page, '{"original_amount":100,"total":72.00}');
   await expect(page.locator(".graph-node.node-error")).toHaveCount(0);
 });
 

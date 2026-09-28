@@ -7,6 +7,7 @@ import {
   useArcLanguageSupport,
 } from "../studio/useArcLanguageSupport";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
+import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import type { VariableOption } from "../../domain/graph";
 
 /** Help under the editor; a failed suggestion source explains the missing completions. */
@@ -15,7 +16,7 @@ function helpText(
   catalogError: string,
   helperText: string | undefined,
 ): string {
-  if (formulaError) return `Formula suggestions unavailable: ${formulaError}`;
+  if (formulaError) return formulaSuggestionProblem(formulaError);
   if (catalogError)
     return "Function suggestions unavailable. Reopen this node to retry.";
   return helperText || "ARC expression · Tab completes suggestions or indents.";

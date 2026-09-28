@@ -1,5 +1,6 @@
 package dev.arc.rule;
 
+import dev.arc.engine.DisplayNames;
 import dev.arc.engine.Identifiers;
 import dev.arc.engine.Limits;
 import dev.arc.engine.execution.Engine;
@@ -76,16 +77,20 @@ public class RuleService {
               + " and hyphens (max "
               + Limits.MAX_RESOURCE_ID_CHARACTERS
               + ")");
-    metadata(request.name(), request.description());
+    String name = DisplayNames.normalize("Rule", request.name());
+    description(request.description());
     if (request.kind() == null || !KINDS.contains(request.kind()))
       throw ArcException.invalid("Choose DECISION_TREE, FORMULA, or RULE");
     Definition d =
-        request.definition() == null ? RuleSamples.blank(request.kind()) : request.definition();
+        withNormalizedNotes(
+            request.definition() == null
+                ? RuleSamples.blank(request.kind())
+                : request.definition());
     validator.shape(d);
     holdCallees(d);
     return store.create(
         request.id(),
-        request.name().trim(),
+        name,
         request.description() == null ? "" : request.description(),
         request.kind(),
         d);
@@ -95,14 +100,12 @@ public class RuleService {
   public Rule update(String id, Update request) {
     Rule rule = store.lock(id);
     revision(rule, request.revision());
-    metadata(request.name(), request.description());
-    validator.shape(request.definition());
-    holdCallees(request.definition());
-    return store.update(
-        id,
-        request.name().trim(),
-        request.description() == null ? "" : request.description(),
-        request.definition());
+    String name = DisplayNames.normalize("Rule", request.name());
+    description(request.description());
+    Definition d = withNormalizedNotes(request.definition());
+    validator.shape(d);
+    holdCallees(d);
+    return store.update(id, name, request.description() == null ? "" : request.description(), d);
   }
 
   @Transactional
@@ -193,10 +196,29 @@ public class RuleService {
           "This rule changed in another editor. Reload it before saving, publishing or deleting.");
   }
 
-  private void metadata(String name, String description) {
-    if (name == null || name.isBlank() || name.length() > Limits.MAX_NAME_CHARACTERS)
-      throw ArcException.invalid(
-          "Name must contain 1 to " + Limits.MAX_NAME_CHARACTERS + " characters");
+  /**
+   * A note is one line without surrounding whitespace, the only form an ARC Script comment can
+   * carry, so a draft's notes take that form when they are saved: graph → code → graph then returns
+   * the same draft (lesson B12), and a note that would render more comments than the parser accepts
+   * fails the shape check here instead of making the code unbuildable. Stored drafts and versions
+   * are not rewritten; notes never affect execution.
+   */
+  private static Definition withNormalizedNotes(Definition definition) {
+    if (definition == null || definition.notes() == null) return definition;
+    var notes = new ArrayList<String>();
+    for (String note : definition.notes()) {
+      if (note == null) notes.add(null); // reported by the shape check
+      else for (String line : note.split("\\R", -1)) notes.add(line.strip());
+    }
+    return new Definition(
+        definition.schemaVersion(),
+        definition.inputs(),
+        definition.nodes(),
+        definition.edges(),
+        notes);
+  }
+
+  private static void description(String description) {
     if (description != null && description.length() > Limits.MAX_DESCRIPTION_CHARACTERS)
       throw ArcException.invalid(
           "Description exceeds "

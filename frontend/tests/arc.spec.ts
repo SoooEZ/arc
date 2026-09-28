@@ -23,7 +23,8 @@ test("library, graph preview, reference navigation, and published API execution"
   ).toBeDisabled();
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByTestId("test-result")).toHaveText("120");
+  // Results keep the decimal places the server computes (100 * 1.20).
+  await expect(page.getByTestId("test-result")).toHaveText("120.00");
   await expect(page.locator(".node-visited")).toHaveCount(4);
   await setEditorText(
     page,
@@ -31,7 +32,7 @@ test("library, graph preview, reference navigation, and published API execution"
     '{"orderTotal": 150, "customerTier": "standard"}',
   );
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByTestId("test-result")).toHaveText("135");
+  await expect(page.getByTestId("test-result")).toHaveText("135.00");
   await setEditorText(
     page,
     page.getByLabel("Test input JSON", { exact: true }),

@@ -50,6 +50,22 @@ class NodeEditorTest {
     assertThat(result.definition().nodes().get(2)).isEqualTo(d.nodes().get(2));
     assertThat(result.definition().nodes().get(1).expression()).isEqualTo("amount * 3");
     assertThat(result.definition().edges()).containsExactlyInAnyOrderElementsOf(d.edges());
+    // The fragment's edges take the replaced edges' place, so a no-op build echoes the graph's
+    // order.
+    var branching =
+        script.parse(
+            """
+            node input INPUT "Input" { next -> a; }
+            node a CONDITION "A" { when true; true -> b; false -> c; }
+            node b OUTPUT "B" { return 1; }
+            node c OUTPUT "C" { return 2; }
+            """);
+    assertThat(
+            script
+                .buildNode(branching, "a", script.renderNode(branching, "a"))
+                .definition()
+                .edges())
+        .isEqualTo(branching.edges());
     assertThat(script.buildNode(d, "calc", source.replace("amount * 2", "amount *")).definition())
         .isNull();
     assertThat(
@@ -138,7 +154,7 @@ node out OUTPUT "Output" { return rate; }
             List.of(),
             List.of(
                 nodeOf("input", "INPUT", "Input").at(0, 0).build(),
-                node("transform", "TRANSFORM", null, "data"),
+                nodeOf("transform", "TRANSFORM", "transform").at(300, 0).output("data").build(),
                 nodeOf("out", "OUTPUT", "Output").at(600, 0).expression("data").build()),
             List.of(
                 new Definition.Edge("start", "input", "transform", "next"),
@@ -206,5 +222,35 @@ node out OUTPUT "Output" { return rate; }
     assertThat(issues).hasSize(1);
     assertThat(issues.getFirst().locations().getFirst().nodeId()).isEqualTo("reuse");
     assertThat(issues.getFirst().message()).contains("unknown", "x");
+  }
+
+  @Test
+  void fragmentCommentsAreRefusedVisiblyAndAMissingPositionKeepsTheNodesPlace() {
+    Definition d =
+        script.parse(
+            "node input INPUT \"Input\" { next -> calc; }\n"
+                + "node calc FORMULA \"Calc\" at (700, 500) { let total = 1; next -> out; }\n"
+                + "node out OUTPUT \"Output\" { return total; }");
+    String source = script.renderNode(d, "calc");
+    // The comment was dropped silently and the dialog closed over it.
+    var commented =
+        script.buildNode(d, "calc", "// TODO: confirm the factor with finance\n" + source);
+    assertThat(commented.definition()).isNull();
+    assertThat(commented.diagnostics())
+        .containsExactly(
+            new ArcScript.Diagnostic(
+                "Comments belong to the whole graph; add them in Code studio", 1, 1));
+    // Deleting `at (700.0, 500.0)` moved the node to (0, 0).
+    assertThat(source).contains(" at (700.0, 500.0)");
+    var moved = script.buildNode(d, "calc", source.replace(" at (700.0, 500.0)", ""));
+    assertThat(moved.diagnostics()).isEmpty();
+    assertThat(moved.definition().nodes().get(1).position())
+        .isEqualTo(new Definition.Position(700, 500));
+    // A whole-graph build still places a node written without `at` on the grid.
+    var built =
+        script.build(
+            "node input INPUT \"Input\" { next -> out; }\nnode out OUTPUT \"Out\" { return 1; }");
+    assertThat(built.definition().nodes().get(1).position())
+        .isEqualTo(new Definition.Position(300, 0));
   }
 }

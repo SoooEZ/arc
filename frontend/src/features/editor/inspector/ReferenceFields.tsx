@@ -8,7 +8,12 @@ import { ruleApi } from "../../../api/rules";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
 import { stringifyJson } from "../../../domain/json";
 import { ownValue } from "../../../domain/records";
-import { withBinding } from "../../../domain/valueBinding";
+import {
+  undeclaredBindings,
+  withBinding,
+  withoutBindings,
+} from "../../../domain/valueBinding";
+import UndeclaredBindings from "../../expressions/UndeclaredBindings";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 type RuleChoice = Pick<RuleSummary, "id" | "name" | "publishedVersion">;
@@ -51,6 +56,13 @@ export default function ReferenceFields({
   );
   const child = detail.data;
   const refError = selectedRule.error || detail.error;
+  // Mappings for parameters the pinned version does not declare; validation rejects them.
+  const undeclared = child
+    ? undeclaredBindings(
+        node.bindings,
+        child.definition.inputs.map((input) => input.name),
+      )
+    : [];
   return (
     <>
       <InspectorSection
@@ -184,6 +196,14 @@ export default function ReferenceFields({
               />
             </div>
           ))}
+          <UndeclaredBindings
+            names={undeclared}
+            target={`version ${node.version} of ${node.ruleId}`}
+            readOnly={readOnly}
+            onRemove={() =>
+              patch({ bindings: withoutBindings(node.bindings, undeclared) })
+            }
+          />
         </InspectorSection>
       )}
     </>

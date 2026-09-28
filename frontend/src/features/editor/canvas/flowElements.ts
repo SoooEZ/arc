@@ -45,6 +45,7 @@ export interface FlowNodeInputs {
   errors: ReadonlyMap<string, readonly string[]>;
   sizes: NodeSizes;
   onExpression: (id: string) => void;
+  canOpenCode: boolean;
 }
 
 export function flowNodes(
@@ -61,6 +62,7 @@ export function flowNodes(
       inputCount: inputs.inputCount,
       errors: inputs.errors.get(model.id) ?? noErrors,
       onExpression: inputs.onExpression,
+      canOpenCode: inputs.canOpenCode,
     };
     const earlier = previous.get(model.id);
     if (
@@ -71,7 +73,8 @@ export function flowNodes(
       earlier.data.visited === data.visited &&
       earlier.data.inputCount === data.inputCount &&
       earlier.data.errors === data.errors &&
-      earlier.data.onExpression === data.onExpression
+      earlier.data.onExpression === data.onExpression &&
+      earlier.data.canOpenCode === data.canOpenCode
     )
       return earlier;
     return {

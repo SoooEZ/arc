@@ -15,9 +15,12 @@ import { sourceApi } from "../../api/sources";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import {
   bindSourceVersion,
+  undeclaredSourceBindings,
   withSourceParameterBinding,
+  withoutSourceParameterBindings,
 } from "./sourceBindings";
 import ValueBinding from "../expressions/ValueBinding";
+import UndeclaredBindings from "../expressions/UndeclaredBindings";
 import SourceProviderSelect from "./SourceProviderSelect";
 import type { VariableOption } from "../../domain/graph";
 import type { Input, DataSource, SourceBinding } from "../../types";
@@ -98,6 +101,14 @@ export default function SourceBindingEditor({
   const versions = versionsResource.data.items;
   const error = versionsResource.error || detail.error || selectionError;
   const config = detail.data?.definition;
+  // Known once the pinned version has loaded; the server rejects them at validation.
+  const undeclared =
+    source && config
+      ? undeclaredSourceBindings(
+          source,
+          config.parameters.map((parameter) => parameter.name),
+        )
+      : [];
   return (
     <div className="source-binding">
       <SourceProviderSelect
@@ -168,6 +179,14 @@ export default function SourceBindingEditor({
               }
             />
           ))}
+          <UndeclaredBindings
+            names={undeclared}
+            target={`v${source.version} of ${sourceName || source.id}`}
+            readOnly={readOnly}
+            onRemove={() =>
+              onChange(withoutSourceParameterBindings(source, undeclared))
+            }
+          />
           <TextField
             label="JSON pointer"
             placeholder="/data/rate"

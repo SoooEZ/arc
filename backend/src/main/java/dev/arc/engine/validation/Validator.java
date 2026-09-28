@@ -95,6 +95,11 @@ public class Validator {
     FormulaCallValidation.validate(expression, resolver);
   }
 
+  /** The position of an input's source mapping, named alike by diagnostics and runtime errors. */
+  public static String sourceMappingLabel(String input, String key) {
+    return input + " source / " + key;
+  }
+
   /**
    * Shows a problem of the whole graph or of its declared inputs on the graph's Input node, as the
    * editor does. An error that already has a location, or a draft without an Input node, keeps its

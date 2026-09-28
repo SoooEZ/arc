@@ -275,4 +275,24 @@ class ExcelArgumentsTest {
     assertThatThrownBy(() -> eval("$POWER(10, 101)"))
         .hasMessage("Number exceeds supported precision or magnitude");
   }
+
+  @Test
+  void reptMeasuresTheTextPoiRepeats() {
+    var blank = new HashMap<String, Object>();
+    blank.put("blank", null);
+    // These failed with "REPT result exceeds string limit": the check measured BigDecimal.toString
+    // ("1E+2", "0.3333333333333333333333333333333333", "null") instead of POI's text.
+    for (String expression :
+        List.of(
+            "$LEN($REPT(1E+2, 600))",
+            "$LEN($REPT($ROUND(149, -2), 600))",
+            "$LEN($REPT($TO_NUMBER(\"1e2\"), 600))",
+            "$LEN($REPT(0.50, 600))"))
+      assertThat(eval(expression)).as(expression).isEqualTo(new BigDecimal("1800"));
+    assertThat(eval("$LEN($REPT(1 / 3, 100))")).isEqualTo(new BigDecimal("1700"));
+    assertThat(eval("$LEN($REPT(blank, 600))", blank)).isEqualTo(BigDecimal.ZERO);
+    // "1E+10" measured 5 characters, so POI built 4,389 before the generic string bound.
+    assertThatThrownBy(() -> eval("$REPT(1e10, 399)"))
+        .hasMessage("REPT result exceeds string limit");
+  }
 }

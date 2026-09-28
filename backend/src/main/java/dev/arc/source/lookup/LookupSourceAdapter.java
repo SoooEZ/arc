@@ -30,6 +30,8 @@ public final class LookupSourceAdapter implements SourceAdapter {
       throw ArcException.invalid("Lookup tables require exactly one parameter named key");
     if (definition.secretHeaders() != null && !definition.secretHeaders().isEmpty())
       throw ArcException.invalid("Lookup tables do not use secret headers");
+    if (definition.url() != null && !definition.url().isBlank())
+      throw ArcException.invalid("Lookup tables do not use a URL");
     if (definition.entries() == null || definition.entries().size() > Limits.MAX_COLLECTION_ITEMS)
       throw ArcException.invalid(
           "Provide a JSON object with at most "

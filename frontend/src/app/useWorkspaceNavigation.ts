@@ -30,7 +30,8 @@ export function useWorkspaceNavigation() {
   const dirty = useRef(ruleDirty);
   dirty.current = ruleDirty;
   // Listeners read the shown route and its history position without re-subscribing.
-  const shown = useRef({ route, position: 0 });
+  // `pushed` tells a fresh entry (link, typed URL) from one reached by Back or Forward.
+  const shown = useRef({ route, position: 0, pushed: false });
   // navigate() has already confirmed this route; its hashchange must not ask again.
   const confirmed = useRef<string | null>(null);
 
@@ -48,7 +49,11 @@ export function useWorkspaceNavigation() {
   useEffect(() => {
     const position = recordedPosition();
     if (position === null) recordPosition(0);
-    shown.current = { route: currentRoute(), position: position ?? 0 };
+    shown.current = {
+      route: currentRoute(),
+      position: position ?? 0,
+      pushed: false,
+    };
   }, []);
 
   useEffect(() => {
@@ -71,7 +76,7 @@ export function useWorkspaceNavigation() {
       const alreadyConfirmed = confirmed.current === next;
       confirmed.current = null;
       if (next === from) {
-        shown.current = { route: next, position };
+        shown.current = { route: next, position, pushed: recorded === null };
         return;
       }
       const warning = alreadyConfirmed ? null : warningFor(next);
@@ -80,7 +85,7 @@ export function useWorkspaceNavigation() {
         return;
       }
       if (!sameRuleDocument(from, next)) setRuleDirty(false);
-      shown.current = { route: next, position };
+      shown.current = { route: next, position, pushed: recorded === null };
       setRoute(next);
     };
     window.addEventListener("hashchange", changed);
@@ -120,5 +125,32 @@ export function useWorkspaceNavigation() {
     },
     [warningFor],
   );
-  return { route, navigate, setDirty };
+  /**
+   * Corrects an arrival the shown document refuses (unbuilt code at the graph
+   * route, an invalid default at the code route): never asks and never adds an
+   * entry. A just-pushed entry is undone with history.go(-1), as a cancelled
+   * traversal is (lesson F24); the previous entry is the document's other view,
+   * because the refusing state only exists inside that document's session. An
+   * entry reached by Back or Forward is rewritten to `path` in place, so the
+   * next Back continues past the rule instead of returning to the refused view.
+   */
+  const redirect = useCallback((path: string) => {
+    const { route, position, pushed } = shown.current;
+    if (route === path) return;
+    if (pushed && position > 0) {
+      confirmed.current = path;
+      window.history.go(-1);
+      return;
+    }
+    const state: unknown = window.history.state;
+    const kept = typeof state === "object" && state !== null ? state : {};
+    window.history.replaceState(
+      { ...kept, arcEntry: position },
+      "",
+      `#${path}`,
+    );
+    shown.current = { route: path, position, pushed };
+    setRoute(path);
+  }, []);
+  return { route, navigate, redirect, setDirty };
 }

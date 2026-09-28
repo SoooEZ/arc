@@ -68,6 +68,26 @@ test("saving from a published code editor cannot replace the current draft", asy
       mutations.push(`${outgoing.method()} ${outgoing.url()}`);
   });
 
+  // Whether each Ctrl/Cmd+S press reached the browser: an unhandled one opens Save Page.
+  await page.addInitScript(() => {
+    const record = window as unknown as { __savePresses: boolean[] };
+    record.__savePresses = [];
+    window.addEventListener(
+      "keydown",
+      (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s")
+          setTimeout(
+            () => record.__savePresses.push(event.defaultPrevented),
+            0,
+          );
+      },
+      true,
+    );
+  });
+  const savePresses = () =>
+    page.evaluate(
+      () => (window as unknown as { __savePresses: boolean[] }).__savePresses,
+    );
   await page.goto(`/#/studio/${id}?version=1`);
   await expect(page.getByText("Immutable published version")).toBeVisible();
   await expect(page.locator(".view-lines")).toContainText("return 10;");
@@ -80,6 +100,8 @@ test("saving from a published code editor cannot replace the current draft", asy
   await page.getByRole("button", { name: "Build graph", exact: true }).click();
   await expect(page.getByText("Code built. Graph is valid.")).toBeVisible();
   expect(mutations).toEqual([]);
+  // The read-only press used to fall through to the browser's Save Page dialog.
+  await expect.poll(savePresses).toEqual([true]);
   const after: Rule = await (await request.get(`/api/rules/${id}`)).json();
   expect(after.revision).toBe(saved.revision);
   expect(after.draft).toEqual(saved.draft);
@@ -95,8 +117,22 @@ inputs {}
 node input INPUT "Input" { next -> out; }
 node out OUTPUT "Current result" { return 30; }`,
   );
+  // A second press while the save holds the editor read-only is swallowed, not the browser's.
+  let releaseSave!: () => void;
+  const saveHeld = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  await page.route(`**/api/rules/${id}`, async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    await saveHeld;
+    await route.fallback();
+  });
   await page.keyboard.press("ControlOrMeta+s");
+  await page.keyboard.press("ControlOrMeta+s");
+  releaseSave();
   await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await expect.poll(savePresses).toEqual([true, true, true]);
+  expect(mutations.filter((entry) => entry.startsWith("PUT"))).toHaveLength(1);
   const editable: Rule = await (await request.get(`/api/rules/${id}`)).json();
   expect(editable.revision).toBeGreaterThan(saved.revision);
   expect(

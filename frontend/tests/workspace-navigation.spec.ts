@@ -314,3 +314,86 @@ test("a pending draft save guards leaving the rule but not its graph/code switch
     release();
   }
 });
+
+test("the section crumb names the shown view without leading away", async ({
+  page,
+  request,
+}) => {
+  // Every crumb led to the Rule library, whatever it said.
+  for (const [hash, label] of [
+    ["/sources", "Data sources"],
+    ["/playground", "API playground"],
+    ["/docs", "API reference"],
+  ] as const) {
+    await page.goto(`/#${hash}`);
+    const crumbs = page.locator(".breadcrumbs");
+    await expect(crumbs.getByText(label, { exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(crumbs.getByRole("button", { name: label })).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`#${hash}$`));
+  }
+  const id = await createRule(request, "crumb");
+  const nodeName = await openDirtyRule(page, id);
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  await expect(
+    page.locator(".breadcrumbs").getByText("Code studio", { exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  // The graph view's "Rule library" crumb still leads away, asking first.
+  await page.getByRole("button", { name: "Graph view", exact: true }).click();
+  const prompts: string[] = [];
+  page.once("dialog", (dialog) => {
+    prompts.push(dialog.message());
+    void dialog.dismiss();
+  });
+  await page
+    .locator(".breadcrumbs")
+    .getByRole("button", { name: "Rule library" })
+    .click();
+  expect(prompts).toEqual([expect.stringContaining("Leave this rule")]);
+  await expect(nodeName).toHaveValue("Inputs edited");
+});
+
+test("a refused arrival is corrected in place and never adds a history entry", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request, "refused-arrival");
+  await page.goto("/#/library");
+  await expect(
+    page.getByRole("heading", { name: "Rule library" }),
+  ).toBeVisible();
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await code.focus();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("End");
+  await page.keyboard.type("\nnode broken");
+  const before = await sessionHistory(page);
+  expect(before.entries.slice(-3)).toEqual([
+    "#/library",
+    `#/rules/${id}`,
+    `#/studio/${id}`,
+  ]);
+  // Back reaches the graph route with code that does not build: the bounce
+  // used to push a new studio entry, so Back never got past the rule.
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  await expect(code).toBeVisible();
+  const bounced = await sessionHistory(page);
+  expect(bounced.entries).toHaveLength(before.entries.length);
+  expect(bounced.index).toBe(before.index - 1);
+  expect(bounced.entries[bounced.index]).toBe(`#/studio/${id}`);
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/library$/);
+});

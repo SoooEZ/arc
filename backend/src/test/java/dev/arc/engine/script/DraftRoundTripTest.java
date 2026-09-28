@@ -273,4 +273,45 @@ class DraftRoundTripTest {
   private static String unset(String name) {
     return name == null || name.isEmpty() ? null : name;
   }
+
+  @Test
+  void aDraftWithDuplicateSameHandleConnectionsBuildsBackAndStillFailsValidation() {
+    // The renderer wrote both statements with their IDs, and the parser refused the second, so
+    // the code view of a saved draft could not build back.
+    var draft =
+        new Definition(
+            1,
+            List.of(),
+            List.of(inputNode("in", "Input"), outputNode("out", "Out", "1")),
+            List.of(new Edge("e1", "in", "out", "next"), new Edge("e2", "in", "out", "next")));
+    validator.shape(draft);
+    var built = script.build(script.render(draft));
+    assertThat(built.diagnostics()).isEmpty();
+    assertThat(built.definition().edges()).containsExactlyElementsOf(draft.edges());
+    var fragment = script.buildNode(draft, "in", script.renderNode(draft, "in"));
+    assertThat(fragment.diagnostics()).isEmpty();
+    assertThat(fragment.definition().edges()).containsExactlyElementsOf(draft.edges());
+    assertThatThrownBy(() -> validator.validate(built.definition(), resolver))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage()).isEqualTo("Duplicate connection");
+              assertThat(error.locations())
+                  .containsExactly(new ArcException.Location(null, null, "in", "Input"));
+            });
+  }
+
+  @Test
+  void notesRoundTripAsTheSingleTrimmedLinesSavesStoreThem() {
+    var nodes = List.of(inputNode("in", "Input"), outputNode("out", "Out", "1"));
+    var edges = List.of(new Edge("e", "in", "out", "next"));
+    var stored =
+        new Definition(1, List.of(), nodes, edges, List.of("first", "second line", "", "padded"));
+    assertThat(script.build(script.render(stored)).definition().notes()).isEqualTo(stored.notes());
+    // A raw note renders as one comment per line and builds back split and trimmed: the form a
+    // save normalizes to, so the draft no longer changes on the next build after an edit.
+    var raw = new Definition(1, List.of(), nodes, edges, List.of("first\nsecond", "  padded  "));
+    assertThat(script.build(script.render(raw)).definition().notes())
+        .isEqualTo(List.of("first", "second", "padded"));
+  }
 }

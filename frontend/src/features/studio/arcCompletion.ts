@@ -99,3 +99,39 @@ export function refreshOpenSuggestions(
   if (completionWord(model, position).word.startsWith("@")) return;
   suggest.model.trigger({ auto: suggest.model.state === 2, retrigger: true });
 }
+
+/** The model, text version and selection of an editor at one moment. */
+export interface EditorState {
+  model: monaco.editor.ITextModel | null;
+  version: number;
+  selection: monaco.Selection | null;
+}
+
+/** Captures what an insertion that starts with a read must find unchanged when it completes. */
+export function captureEditorState(
+  editor: monaco.editor.IStandaloneCodeEditor | null,
+): EditorState {
+  const model = editor?.getModel() ?? null;
+  return {
+    model,
+    version: model?.getVersionId() ?? -1,
+    selection: editor?.getSelection() ?? null,
+  };
+}
+
+/** Whether `editor` still shows the captured model with the same text version and selection. */
+export function unchangedSince(
+  editor: monaco.editor.IStandaloneCodeEditor | null,
+  state: EditorState,
+): boolean {
+  const model = editor?.getModel();
+  if (!editor || !model || model !== state.model || model.isDisposed())
+    return false;
+  if (model.getVersionId() !== state.version) return false;
+  const selection = editor.getSelection();
+  return (
+    !!selection &&
+    !!state.selection &&
+    selection.equalsSelection(state.selection)
+  );
+}

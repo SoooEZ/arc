@@ -10,6 +10,8 @@ import { editorLines, setEditorText } from "./helpers/editor";
 
 const colors = {
   function: "rgb(139, 104, 47)",
+  keyword: "rgb(135, 82, 149)",
+  type: "rgb(50, 121, 102)",
   input: "rgb(32, 95, 166)",
   result: "rgb(123, 63, 152)",
   local: "rgb(82, 102, 93)",
@@ -316,4 +318,71 @@ node out OUTPUT "Result" { return total; as total; }`,
   await expectColor(editor, "total", colors.input);
   await expectColor(editor, "total", colors.input, 1);
   await expectUnclassified(editor, "total", 2);
+});
+
+test("dotted paths take no keyword, type or constant color while standalone words keep theirs", async ({
+  page,
+  request,
+}) => {
+  const id = `expression-colors-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const paths =
+    "customer.format + customer.lowercase + customer.reuse + customer.isnull + customer.ACCOUNT_NUMBER + customer.wallet + customer.plain == null";
+  // The inline editor renders only its visible lines, so it gets a short expression.
+  const shortPaths = "customer.plain + customer.wallet + customer.isnull";
+  const draft = definition(true);
+  draft.nodes = draft.nodes.map((node) =>
+    node.id === "choose"
+      ? {
+          ...node,
+          cases: [
+            { ...node.cases![0], expression: paths },
+            { ...node.cases![1], expression: shortPaths },
+          ],
+        }
+      : node,
+  );
+  const created = await request.post("/api/rules", {
+    data: { id, name: id, kind: "DECISION_TREE", definition: draft },
+  });
+  expect(created.status()).toBe(201);
+  const properties = [
+    "format",
+    "lowercase",
+    "reuse",
+    "isnull",
+    "ACCOUNT_NUMBER",
+    "wallet",
+  ];
+  // Monarch painted the "at" of format, the "case" of lowercase, the "use" of reuse, the
+  // "null" of isnull, the "NUMBER" of ACCOUNT_NUMBER and the "let" of wallet.
+  const expectPlainProperties = async (
+    editor: Locator,
+    checked: string[] = properties,
+  ) => {
+    await expectColor(editor, "customer", colors.input);
+    const plain = await paintedColors(editor, "plain");
+    expect(plain).toHaveLength("plain".length);
+    for (const property of checked)
+      await expect
+        .poll(() => paintedColors(editor, property), property)
+        .toEqual(Array<string>(property.length).fill(plain[0]));
+    return plain[0];
+  };
+  // The inline inspector editor first: a node request applies when the editor opens.
+  await page.goto(`/#/rules/${id}?node=choose`);
+  await expectPlainProperties(
+    page.getByLabel("Case 2 condition", { exact: true }),
+    ["wallet", "isnull"],
+  );
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  const script = page.getByLabel("ARC code editor", { exact: true });
+  await expect(editorLines(script)).toContainText("customer.wallet");
+  const plain = await expectPlainProperties(script);
+  await expectColor(script, "let", colors.keyword);
+  await expectColor(script, "case", colors.keyword);
+  await expectColor(script, "NUMBER", colors.type);
+  // The standalone null after "==" is the second "null" of the script (isnull holds the first).
+  await expect
+    .poll(() => paintedColors(script, "null", 1))
+    .not.toEqual(Array<string>("null".length).fill(plain));
 });

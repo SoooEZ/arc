@@ -209,3 +209,32 @@ test("cURL examples show only object inputs and keep every digit of the buffer",
   await expect(command).toContainText('"a": 9007199254740993');
   await expect(command).toContainText(`/api/rules/${id}/execute'`);
 });
+
+test("a failure at the Input node offers both the node and editing the test inputs", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request);
+  await page.goto(`/#/rules/${id}`);
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  const input = page.getByLabel("Test input JSON", { exact: true });
+  const editInputs = page.getByRole("button", {
+    name: "Edit test inputs",
+    exact: true,
+  });
+  const showProblem = page.getByRole("button", {
+    name: "Show problem · Inputs",
+    exact: true,
+  });
+  // A mistyped input is located at the Input node, which hid the input action.
+  for (const text of ['{"hello": "text"}', '{"hello": 5}']) {
+    await setEditorText(page, input, text);
+    await page.getByRole("button", { name: "Run test", exact: true }).click();
+    await expect(showProblem).toBeVisible();
+    await expect(editInputs).toBeVisible();
+  }
+  await page.getByRole("tab", { name: "cURL", exact: true }).click();
+  await editInputs.click();
+  await expect(input).toBeFocused();
+  await expect(editorLines(input)).toHaveText('{"hello": 5}');
+});

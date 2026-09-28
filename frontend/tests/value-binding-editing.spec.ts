@@ -373,3 +373,209 @@ test("Reference parameters named like Object.prototype members show, bind and ru
   await expect(page.getByTestId("test-result")).toHaveText("111");
   expect(errors).toEqual([]);
 });
+
+test("an ARRAY constant refuses a list the server's tokenizer cannot read", async ({
+  page,
+  request,
+}) => {
+  const child = await create(
+    request,
+    {
+      schemaVersion: 1,
+      inputs: [
+        { name: "items", type: "ARRAY", required: false, defaultValue: [] },
+      ],
+      nodes: [
+        node("input", "INPUT"),
+        node("sum", "OUTPUT", { expression: "$SUM(items)" }, 170),
+      ],
+      edges: [edge("input", "sum")],
+    },
+    "array-child",
+  );
+  expect(
+    (
+      await request.post(`/api/rules/${child.id}/publish`, {
+        data: { revision: child.revision },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  const parent = await create(request, {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      node("input", "INPUT"),
+      node(
+        "reuse",
+        "REFERENCE",
+        {
+          label: "Reuse",
+          ruleId: child.id,
+          version: 1,
+          bindings: {},
+          output: "result",
+        },
+        170,
+      ),
+      node("out", "OUTPUT", { expression: "result" }, 340),
+    ],
+    edges: [edge("input", "reuse"), edge("reuse", "out")],
+  });
+  await page.goto(`/#/rules/${parent.id}?node=reuse`);
+  const inspector = page.locator(".inspector-sidebar");
+  await select(inspector, "items · value source", "Constant");
+  const field = inspector.getByLabel("items", { exact: true });
+  const list = (count: number) =>
+    `[${Array.from({ length: count }, (_, index) => index).join(",")}]`;
+  // 128 numbers are 257 tokens: the field offered the list, and validation failed later.
+  await field.fill(list(128));
+  await expect(field).toHaveAttribute("aria-invalid", "true");
+  await expect(
+    inspector.getByText(/Array literals are limited to 256 tokens/),
+  ).toBeVisible();
+  await field.fill(list(127));
+  await expect(field).toHaveAttribute("aria-invalid", "false");
+  await save(page);
+  expect((await savedNode(request, parent.id, "reuse")).bindings).toEqual({
+    items: list(127),
+  });
+});
+
+test("a Reference mapping for a parameter the pinned version does not declare is named and removable", async ({
+  page,
+  request,
+}) => {
+  const child = await create(
+    request,
+    {
+      schemaVersion: 1,
+      inputs: [{ name: "a", type: "NUMBER", required: false, defaultValue: 1 }],
+      nodes: [
+        node("input", "INPUT"),
+        node("sum", "OUTPUT", { expression: "a + 1" }, 170),
+      ],
+      edges: [edge("input", "sum")],
+    },
+    "undeclared-child",
+  );
+  expect(
+    (
+      await request.post(`/api/rules/${child.id}/publish`, {
+        data: { revision: child.revision },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  const parent = await create(request, {
+    schemaVersion: 1,
+    inputs: [amount],
+    nodes: [
+      node("input", "INPUT"),
+      node(
+        "reuse",
+        "REFERENCE",
+        {
+          label: "Reuse",
+          ruleId: child.id,
+          version: 1,
+          // "ghost" was mapped for another pin; the cards show declared parameters only.
+          bindings: { a: "amount", ghost: "1" },
+          output: "result",
+        },
+        170,
+      ),
+      node("out", "OUTPUT", { expression: "result" }, 340),
+    ],
+    edges: [edge("input", "reuse"), edge("reuse", "out")],
+  });
+  await page.goto(`/#/rules/${parent.id}?node=reuse`);
+  const nodeErrors = page.getByRole("button", { name: /^Node errors/ });
+  await expect(nodeErrors).toBeVisible();
+  const alert = page.getByRole("alert").filter({ hasText: "Also maps ghost" });
+  await expect(alert).toContainText(
+    `version 1 of ${child.id} does not declare`,
+  );
+  await alert.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(alert).toHaveCount(0);
+  await save(page);
+  await expect(nodeErrors).toHaveCount(0);
+  expect((await savedNode(request, parent.id, "reuse")).bindings).toEqual({
+    a: "amount",
+  });
+});
+
+test("Transform field editors keep their mode and partial text across additions and removals", async ({
+  page,
+  request,
+}) => {
+  const rule = await create(request, {
+    schemaVersion: 1,
+    inputs: [amount],
+    nodes: [
+      node("input", "INPUT"),
+      node(
+        "shape",
+        "TRANSFORM",
+        {
+          label: "Shape",
+          fields: [
+            { name: "a", expression: "amount" },
+            { name: "b", expression: "5" },
+          ],
+          output: "shaped",
+        },
+        170,
+      ),
+      node("out", "OUTPUT", { expression: "shaped" }, 340),
+    ],
+    edges: [edge("input", "shape"), edge("shape", "out")],
+  });
+  await page.goto(`/#/rules/${rule.id}?node=shape`);
+  const inspector = page.locator(".inspector-sidebar");
+  const source = (index: number) =>
+    inspector.getByRole("combobox", {
+      name: `Field ${index} value · value source`,
+      exact: true,
+    });
+  await select(inspector, "Field 1 value · value source", "Expression");
+  await expect(source(1)).toHaveText("Expression");
+  const second = inspector.getByLabel("Field 2 value", { exact: true });
+  await expect(source(2)).toHaveText("Constant");
+  await second.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("-");
+  // Adding a field remounted every row's editor: Field 1 fell back to the
+  // variable picker and Field 2 lost its unfinished number.
+  await inspector
+    .getByRole("button", { name: "Add field", exact: true })
+    .click();
+  await expect(
+    inspector.getByLabel("Field 3 name", { exact: true }),
+  ).toHaveValue("field_3");
+  await expect(source(1)).toHaveText("Expression");
+  await expect(source(2)).toHaveText("Constant");
+  await second.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("5");
+  await expect(second).toHaveValue("-5");
+  await inspector
+    .getByRole("button", { name: "Remove field 3", exact: true })
+    .click();
+  await expect(source(1)).toHaveText("Expression");
+  await expect(second).toHaveValue("-5");
+  // Removing the first field moves the second row up with its editor state.
+  await inspector
+    .getByRole("button", { name: "Remove field 1", exact: true })
+    .click();
+  await expect(
+    inspector.getByLabel("Field 1 name", { exact: true }),
+  ).toHaveValue("b");
+  await expect(source(1)).toHaveText("Constant");
+  await expect(
+    inspector.getByLabel("Field 1 value", { exact: true }),
+  ).toHaveValue("-5");
+  await save(page);
+  expect((await savedNode(request, rule.id, "shape")).fields).toEqual([
+    { name: "b", expression: "-5" },
+  ]);
+});

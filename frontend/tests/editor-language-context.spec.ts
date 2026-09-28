@@ -169,3 +169,53 @@ test("Input node declarations keep their colors and whole-script editors retain 
     }),
   ).toBeVisible();
 });
+
+test("Code studio lists a variable that several nodes assign once, naming every producer", async ({
+  page,
+  request,
+}) => {
+  const id = `editor-context-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const [input, calc, out] = definition.nodes;
+  const twoProducers: Definition = {
+    ...definition,
+    nodes: [
+      input,
+      { ...calc, id: "left", label: "Left price", output: "price" },
+      {
+        ...calc,
+        id: "right",
+        label: "Right price",
+        output: "price",
+        position: { x: 500, y: 180 },
+      },
+      { ...out, expression: "price" },
+    ],
+    edges: [
+      { id: "a", source: "input", target: "left", sourceHandle: "next" },
+      { id: "b", source: "input", target: "right", sourceHandle: "next" },
+      { id: "c", source: "left", target: "out", sourceHandle: "next" },
+      { id: "d", source: "right", target: "out", sourceHandle: "next" },
+    ],
+  };
+  const response = await request.post("/api/rules", {
+    data: { id, name: id, kind: "FORMULA", definition: twoProducers },
+  });
+  expect(response.ok()).toBeTruthy();
+  await page.goto(`/#/studio/${id}`);
+  const script = page.getByLabel("ARC code editor", { exact: true });
+  await expect(editorLines(script)).toContainText("Right price");
+  await setEditorText(page, script, "let x = pric");
+  await page.keyboard.press("Control+Space");
+  const suggestions = page.locator(".suggest-widget.visible");
+  // price was listed twice, once per producing node.
+  await expect(
+    suggestions.getByRole("option", { name: /^price,/ }),
+  ).toHaveCount(1);
+  await page.keyboard.press("Tab");
+  await expect(editorLines(script)).toHaveText("let x = price");
+  await editorLines(script).getByText("price", { exact: true }).hover();
+  // Monaco keeps a second, glyph-margin hover widget; the content hover names the producers.
+  await expect(
+    page.locator(".monaco-hover-content").filter({ hasText: "From:" }),
+  ).toContainText("From: Left price / Right price");
+});

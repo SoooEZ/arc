@@ -337,8 +337,9 @@ test("condition string builder quotes text and graph connections retain multiple
   await expect(page.locator(".react-flow__edge")).toHaveCount(3);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
+  // Decimal places are kept: the Transform's 5.00 and 10.0 answer as written.
   await expect(page.getByTestId("test-result")).toHaveText(
-    '{"shipping":5,"tax":10}',
+    '{"shipping":5.00,"tax":10.0}',
   );
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(
@@ -428,4 +429,64 @@ test("errors inside reused rules open the failing published node in a modal", as
   ).toHaveClass(/node-error/);
   await viewer.getByRole("button", { name: "Close all", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/rules/${id}`));
+});
+
+test("a problem jump from the studio centers a far node however the canvas was mounted before", async ({
+  page,
+  request,
+}) => {
+  const id = `editor-far-${Date.now()}`;
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      node("input", "INPUT"),
+      node("near", "FORMULA", "1", "x", 300, 180),
+      node("far", "OUTPUT", "x / 0", undefined, 3000, 2400),
+    ],
+    edges: [edge("input", "near"), edge("near", "far")],
+  };
+  expect(
+    (
+      await request.post("/api/rules", {
+        data: { id, name: "Far focus", kind: "FORMULA", definition },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  // The graph mounts first, so its measurements outlive the canvas.
+  await page.goto(`/#/rules/${id}`);
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page.locator(".monaco-editor")).toBeVisible();
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Show problem · far", exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/rules/${id}`));
+  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
+    /selected/,
+  );
+  // The remounted canvas used to fit the whole graph over the focus, leaving the node off screen.
+  const inside = async () => {
+    const flow = await page.locator(".react-flow").boundingBox();
+    const card = await page
+      .locator('.react-flow__node[data-id="far"]')
+      .boundingBox();
+    if (!flow || !card) return false;
+    return (
+      card.x >= flow.x &&
+      card.y >= flow.y &&
+      card.x + card.width <= flow.x + flow.width &&
+      card.y + card.height <= flow.y + flow.height
+    );
+  };
+  await expect.poll(inside, { timeout: 5000 }).toBe(true);
+  await expect
+    .poll(() =>
+      page
+        .locator(".react-flow__viewport")
+        .evaluate((viewport) => getComputedStyle(viewport).transform),
+    )
+    .toMatch(/^matrix\(1, 0, 0, 1, /);
 });

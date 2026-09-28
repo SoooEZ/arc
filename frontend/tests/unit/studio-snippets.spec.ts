@@ -50,3 +50,14 @@ test("reference snippets declare the generated node ID as an escaped ARC literal
   expect(snippet).toContain(`node "${nodeId}" REFERENCE "Costs \\$5" {`);
   expect(snippet).toContain(`use "${"x".repeat(80)}" version 2;`);
 });
+
+test("reference snippets take the generated result name as their first tab stop", () => {
+  const snippet = referenceSnippet(
+    { id: "child", name: "Child" },
+    { ruleId: "child", version: 1, definition, publishedAt: "" },
+    definition,
+    "reuse-child-1234",
+    "result_3",
+  );
+  expect(snippet).toContain("as ${1:result_3};");
+});

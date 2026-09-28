@@ -31,11 +31,17 @@ export function reuseNodeId(ruleId: string): string {
   );
 }
 
+/**
+ * The Reference node for a reused rule. `resultName` is the generated result
+ * variable (`result_N`, unique among the caller's variables and the names the
+ * unbuilt buffer declares, lesson F19); the tab stop lets the user rename it.
+ */
 export function referenceSnippet(
   rule: Pick<Rule, "id" | "name">,
   version: Version,
   caller: Definition,
   nodeId: string,
+  resultName = "reusedResult",
 ): string {
   const callerInputs = new Set(caller.inputs.map((input) => input.name));
   const bindings = version.definition.inputs
@@ -53,7 +59,7 @@ export function referenceSnippet(
     `node ${snippetStringLiteral(nodeId)} REFERENCE ${snippetStringLiteral(rule.name)} {`,
     `  use ${snippetStringLiteral(rule.id)} version ${version.version};`,
     ...bindings,
-    "  as ${1:reusedResult};",
+    `  as \${1:${escapeSnippetText(resultName)}};`,
     '  next -> "${2:output}";',
     "}",
     "",

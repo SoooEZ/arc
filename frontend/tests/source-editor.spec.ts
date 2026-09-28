@@ -852,3 +852,80 @@ test("a new draft that takes a pending create's ID stays its own and receives th
     gate.release();
   }
 });
+
+test("switching the provider away and back leaves an unchanged source clean", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  const country: DataSource = {
+    ...first,
+    definition: {
+      ...first.definition,
+      parameters: [
+        { name: "country", type: "STRING", required: true, defaultValue: null },
+      ],
+    },
+  };
+  await page.route("**/api/sources/source-a/versions/*", (route) =>
+    route.fulfill({ json: country }),
+  );
+  await page.goto("/#/sources");
+  await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
+  const parameters = page.getByLabel("Source parameters · JSON");
+  await expect(parameters).toHaveValue(/country/);
+  const save = page.getByRole("button", { name: "Save new version" });
+  await expect(save).toBeDisabled();
+  const provider = page.getByRole("combobox", { name: "Provider" });
+  await provider.click();
+  await page.getByRole("option", { name: "HTTP GET · JSON response" }).click();
+  await expect(parameters).toHaveValue(/customerId/);
+  await expect(save).toBeEnabled();
+  // The round trip used to leave the LOOKUP template, an edit the user never made.
+  await provider.click();
+  await page.getByRole("option", { name: "Local lookup table" }).click();
+  await expect(parameters).toHaveValue(/country/);
+  await expect(save).toBeDisabled();
+});
+
+test("a failed catalog read offers Retry without a close button, while document errors stay dismissible", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  let failures = 1;
+  await page.route("**/api/source-summaries?*", (route) => {
+    if (failures > 0) {
+      failures -= 1;
+      return route.fulfill({
+        status: 500,
+        json: { message: "Catalog is down" },
+      });
+    }
+    return route.fallback();
+  });
+  await page.goto("/#/sources");
+  const catalogAlert = page
+    .getByRole("alert")
+    .filter({ hasText: "Could not load data sources: Catalog is down" });
+  await expect(catalogAlert).toBeVisible();
+  // The one dismissible alert hid the failure behind its close button, with no way to retry.
+  await expect(catalogAlert.getByRole("button", { name: "Close" })).toHaveCount(
+    0,
+  );
+  await catalogAlert
+    .getByRole("button", { name: "Retry", exact: true })
+    .click();
+  await expect(page.getByRole("button", { name: /Source A/ })).toBeVisible();
+  await expect(catalogAlert).toHaveCount(0);
+  await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
+  await page.route("**/api/sources/source-a", (route) =>
+    route.fulfill({ status: 500, json: { message: "Save exploded" } }),
+  );
+  await page.getByLabel("Name", { exact: true }).fill("Source A renamed");
+  await page.getByRole("button", { name: "Save new version" }).click();
+  const saveAlert = page
+    .getByRole("alert")
+    .filter({ hasText: "Save exploded" });
+  await expect(saveAlert).toBeVisible();
+  await saveAlert.getByRole("button", { name: "Close" }).click();
+  await expect(saveAlert).toHaveCount(0);
+});

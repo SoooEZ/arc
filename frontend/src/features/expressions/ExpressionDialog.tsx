@@ -18,6 +18,7 @@ import {
   insertSnippet,
 } from "../studio/useArcLanguageSupport";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
+import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { studioApi } from "../../api/studio";
 import { variableOptionLabel, type VariableOption } from "../../domain/graph";
@@ -54,10 +55,12 @@ export default function ExpressionDialog({
     250,
   );
   const names = variables.map((variable) => variable.name);
-  const { insertFormula } = useArcLanguageSupport(editor, model, functions, {
-    kind: "expression",
-    variables,
-  });
+  const { insertFormula, formulaError } = useArcLanguageSupport(
+    editor,
+    model,
+    functions,
+    { kind: "expression", variables },
+  );
   // An unknown scope cannot judge a variable unavailable, so it does not block Apply.
   const missing = scopeKnown
     ? (check?.variables.filter((name) => !names.includes(name)) ?? [])
@@ -108,6 +111,11 @@ export default function ExpressionDialog({
               onInsertFormula={insertFormula}
             />
             {catalogError && <Alert severity="error">{catalogError}</Alert>}
+            {formulaError && (
+              <Alert severity="error">
+                {formulaSuggestionProblem(formulaError)}
+              </Alert>
+            )}
           </aside>
           <MonacoEditor
             language="arc"

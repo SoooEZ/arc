@@ -49,7 +49,15 @@ public class RuleDefinitionService {
 
   public void validate(Definition definition, RuleResolver resolver) {
     validator.validate(definition, resolver);
-    sources.validate(definition, resolver);
+    sources.validate(definition, resolver, this::prepareCallee);
+  }
+
+  /**
+   * A reached pin's version must still compile: one holding a property its kind does not use, or an
+   * unprefixed call, passed every static check and then failed every execution of the parent.
+   */
+  private void prepareCallee(Definition callee, RuleResolver resolver) {
+    validator.compile(callee, resolver);
   }
 
   public void validateSources(
@@ -75,7 +83,7 @@ public class RuleDefinitionService {
     var problems = new ArrayList<>(diagnosis.problems());
     if (diagnosis.shaped() && hasOneInputNode(definition)) {
       try {
-        sources.validate(definition, resolver, diagnosis.dependencies());
+        sources.validate(definition, resolver, diagnosis.dependencies(), this::prepareCallee);
       } catch (ArcException error) {
         problems.add(Validator.Problem.from(error));
       }

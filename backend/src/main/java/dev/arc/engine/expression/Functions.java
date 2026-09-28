@@ -6,6 +6,7 @@ import dev.arc.error.ArcException;
 import java.math.*;
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 /** Stable expression-facing facade: decimal built-ins, catalog, and Excel adapter. */
 public final class Functions {
@@ -63,7 +64,7 @@ public final class Functions {
     functions.put("XOR", args -> args.stream().filter(Expressions::bool).count() % 2 == 1);
     functions.put("CONTAINS", args -> contains(args.get(0), args.get(1)));
     functions.put("CONCAT", Functions::concat);
-    functions.put("GET", args -> get(args.get(0), path("GET", args.get(1)), fallback(args)));
+    functions.put("GET", args -> get(args.get(0), segments("GET", args.get(1)), fallback(args)));
     functions.put("PLUCK", Functions::pluck);
     return Map.copyOf(functions);
   }
@@ -130,18 +131,23 @@ public final class Functions {
   }
 
   private static List<Object> pluck(List<Object> args) {
-    String path = path("PLUCK", args.get(1));
+    List<String> path = segments("PLUCK", args.get(1));
     Object fallback = fallback(args);
     var values = new ArrayList<Object>();
     for (Object item : array(args.getFirst())) values.add(get(item, path, fallback));
     return values;
   }
 
-  /** A field path, or a number naming an array index or field; equal numbers name the same one. */
-  private static String path(String function, Object path) {
+  /**
+   * The segments of a path. Dotted text keeps every segment, so "name." and "." have an empty one
+   * that misses (String.split would drop it and read the prefix). A number names one array index or
+   * field, and equal numbers name the same one: 1.5 is the field "1.5", never a nested path.
+   */
+  private static List<String> segments(String function, Object path) {
     if (path == null || !ValueText.isScalar(path))
       throw ArcException.invalid(function + " needs a text or number path");
-    return ValueText.key(path);
+    if (path instanceof String text) return List.of(text.split("\\.", -1));
+    return List.of(ValueText.key(path));
   }
 
   private static Object fallback(List<Object> args) {
@@ -153,11 +159,15 @@ public final class Functions {
     return list;
   }
 
-  public static Object get(Object value, String path, Object fallback) {
-    for (String part : path.split("\\.")) {
+  /** An array index: at most six digits, so it always fits an int. */
+  private static final Pattern INDEX = Pattern.compile("\\d{1,6}");
+
+  /** Follows {@code segments} into nested objects and arrays; a missing one gives the fallback. */
+  public static Object get(Object value, List<String> segments, Object fallback) {
+    for (String part : segments) {
       if (value instanceof Map<?, ?> m && m.containsKey(part)) value = m.get(part);
       else if (value instanceof List<?> a
-          && part.matches("\\d{1,6}")
+          && INDEX.matcher(part).matches()
           && Integer.parseInt(part) < a.size()) value = a.get(Integer.parseInt(part));
       else return fallback;
     }

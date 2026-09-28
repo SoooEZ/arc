@@ -26,6 +26,9 @@ export function usePagedResource<T>(
   { refresh = 0, keepPrevious = false }: PagedOptions = {},
 ) {
   const [position, setPosition] = useState({ key, offset: 0 });
+  // A new key starts at the first page, and stays there when the key comes back (React's
+  // adjust-state-while-rendering pattern); the derivation covers the render the reset lands in.
+  if (position.key !== key) setPosition({ key, offset: 0 });
   const offset = position.key === key ? position.offset : 0;
   const limit = 20;
   const emptyPage: Page<T> = { items: [], total: 0, offset, limit };

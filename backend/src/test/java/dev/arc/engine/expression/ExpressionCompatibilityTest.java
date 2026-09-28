@@ -98,6 +98,14 @@ class ExpressionCompatibilityTest {
     }
     String preciseLiteral = "1234567890123456789012345678901234567890.123456789";
     assertThat(eval(preciseLiteral)).isEqualTo(new BigDecimal(preciseLiteral));
+    // Negation rounded to 34 digits before, while the positive literal stayed exact.
+    var negated = new BigDecimal("-" + preciseLiteral);
+    assertThat(eval("-" + preciseLiteral)).isEqualTo(negated);
+    assertThat(eval("[-" + preciseLiteral + "]")).isEqualTo(List.of(negated));
+    assertThat(eval("-0.12345678901234567890123456789012345"))
+        .isEqualTo(new BigDecimal("-0.12345678901234567890123456789012345"));
+    assertThat(Expressions.evaluate("negative == -" + preciseLiteral, Map.of("negative", negated)))
+        .isEqualTo(true);
     assertThat(eval("0.1 + 0.2")).isEqualTo(new BigDecimal("0.3"));
     assertThat(eval("-2^2")).isEqualTo(new BigDecimal("-4"));
     assertThat(eval("2^3^2")).isEqualTo(new BigDecimal("512"));

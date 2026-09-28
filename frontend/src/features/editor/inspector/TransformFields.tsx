@@ -6,6 +6,9 @@ import { quoteText } from "../../../domain/expressions";
 import { uniqueName } from "../../../domain/ids";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
+import { useRowIdentities } from "./useRowIdentities";
+
+type Field = NonNullable<NodeFieldsProps["node"]["fields"]>[number];
 
 export default function TransformFields({
   node,
@@ -16,6 +19,13 @@ export default function TransformFields({
 }: NodeFieldsProps) {
   const fields = node.fields ?? [];
   const fieldMode = node.expression == null;
+  // Rows keep their editors across edits, additions and removals (lesson F6).
+  const rows = useRowIdentities<Field>("transform-field");
+  const replaceField = (index: number, patch: Partial<Field>) =>
+    patch &&
+    fields.map((field, i) =>
+      i === index ? rows.carry(field, { ...field, ...patch }) : field,
+    );
   return (
     <InspectorSection
       title="Transform data"
@@ -28,7 +38,7 @@ export default function TransformFields({
       {fieldMode ? (
         <>
           {fields.map((field, index) => (
-            <div key={index} className="node-mapping-card">
+            <div key={rows.identity(field)} className="node-mapping-card">
               <div className="mapping-card-heading">
                 <strong>Field {index + 1}</strong>
                 <Tooltip title="Remove field">
@@ -52,14 +62,12 @@ export default function TransformFields({
                 disabled={readOnly}
                 onChange={(e) =>
                   patch({
-                    fields: fields.map((f, i) =>
-                      i === index ? { ...f, name: e.target.value } : f,
-                    ),
+                    fields: replaceField(index, { name: e.target.value }),
                   })
                 }
               />
               <ValueBinding
-                key={`${index}:${fields.length}`}
+                key={rows.identity(field)}
                 label={`Field ${index + 1} value`}
                 type="ANY"
                 optional={false}
@@ -69,9 +77,7 @@ export default function TransformFields({
                 disabled={readOnly}
                 onChange={(value) =>
                   patch({
-                    fields: fields.map((f, i) =>
-                      i === index ? { ...f, expression: value ?? "" } : f,
-                    ),
+                    fields: replaceField(index, { expression: value ?? "" }),
                   })
                 }
               />

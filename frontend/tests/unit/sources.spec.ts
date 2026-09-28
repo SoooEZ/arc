@@ -415,3 +415,52 @@ test("a stored copy reopened during its save adopts the revision and keeps its e
   expect(document!.source.name).toBe("Edited again");
   expect(sourceIsDirty(document!)).toBe(true);
 });
+
+test("switching the provider away and back restores the parameters text and a clean document", () => {
+  const original = source("first");
+  original.definition.parameters = [
+    { name: "country", type: "STRING", required: true, defaultValue: null },
+  ];
+  const opened = openSource(original, 1);
+  let document = sourceDocumentReducer(opened, {
+    type: "provider",
+    kind: "HTTP",
+  });
+  expect(document!.buffers.parameters).toContain("customerId");
+  expect(sourceIsDirty(document!)).toBe(true);
+  // The round trip left the LOOKUP template behind, an edit the user never made.
+  document = sourceDocumentReducer(document, {
+    type: "provider",
+    kind: "LOOKUP",
+  });
+  expect(document!.buffers.parameters).toBe(opened.buffers.parameters);
+  expect(sourceIsDirty(document!)).toBe(false);
+  expect(
+    sourceDocumentReducer(document, { type: "provider", kind: "LOOKUP" }),
+  ).toBe(document);
+
+  const http = source("remote");
+  http.definition = {
+    kind: "HTTP",
+    url: "https://example.com",
+    parameters: ["customerId", "region", "tier"].map((name) => ({
+      name,
+      type: "STRING",
+      required: true,
+      defaultValue: null,
+    })),
+    secretHeaders: {},
+    timeoutMs: 3000,
+  };
+  let remote = sourceDocumentReducer(openSource(http, 2), {
+    type: "provider",
+    kind: "LOOKUP",
+  });
+  remote = sourceDocumentReducer(remote, { type: "provider", kind: "HTTP" });
+  expect(
+    sourceCandidate(remote!.source, remote!.buffers).definition.parameters.map(
+      (parameter) => parameter.name,
+    ),
+  ).toEqual(["customerId", "region", "tier"]);
+  expect(sourceIsDirty(remote!)).toBe(false);
+});

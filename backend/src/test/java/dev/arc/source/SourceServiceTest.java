@@ -89,4 +89,29 @@ class SourceServiceTest {
     service.create(new SourceService.Create("memory", "Memory", valid));
     verify(repository).create("memory", "Memory", valid);
   }
+
+  @Test
+  void sourceNamesFollowTheRuleNamePolicy() {
+    var repository = mock(SourceRepository.class);
+    var adapter = mock(SourceAdapter.class);
+    when(adapter.kind()).thenReturn("MEMORY");
+    var service =
+        new SourceService(repository, new SourceValidator(new SourceAdapters(List.of(adapter))));
+    var definition =
+        new SourceDefinition(
+            "MEMORY", null, List.of(new Input("key", "NUMBER", true, 12)), null, null, 0);
+    // Sources kept their padding and accepted control characters, unlike rules.
+    service.create(new SourceService.Create("memory", "  Memory  ", definition));
+    verify(repository).create("memory", "Memory", definition);
+    service.update("memory", new SourceService.Update("  Renamed  ", 1, definition));
+    verify(repository).update("memory", "Renamed", 1, definition);
+    for (String name : List.of("", "   ", "n".repeat(161)))
+      assertThatThrownBy(() -> service.create(new SourceService.Create("memory", name, definition)))
+          .as(name)
+          .hasMessage("Source name must contain 1 to 160 characters");
+    assertThatThrownBy(
+            () -> service.update("memory", new SourceService.Update("\u0001", 1, definition)))
+        .hasMessage("Source name cannot contain control characters");
+    verifyNoMoreInteractions(repository);
+  }
 }

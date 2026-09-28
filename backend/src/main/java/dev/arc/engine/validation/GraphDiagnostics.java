@@ -37,11 +37,10 @@ final class GraphDiagnostics {
     var expressions = new ExpressionCache();
     GraphPlan plan = scopePlan(definition, problems);
     for (Node node : definition.nodes()) {
+      // Without a scope plan (a cycle, a too complex graph) only the variable check is skipped.
+      Set<String> scope = plan == null ? null : plan.available().get(node.id());
       try {
-        if (plan == null) nodeValidation.syntax(node, pins, expressions);
-        else
-          nodeValidation.validate(
-              definition, node, plan.available().get(node.id()), pins, expressions);
+        nodeValidation.validate(definition, node, scope, pins, expressions);
       } catch (ArcException error) {
         problems.add(error);
       }
@@ -49,7 +48,7 @@ final class GraphDiagnostics {
     var inputReads =
         graphValidation.checkSourceMappings(definition, expressions, pins, problems::add);
     try {
-      graphValidation.checkStructure(definition, inputReads, plan);
+      graphValidation.checkStructure(definition, inputReads, plan, problems::add);
     } catch (ArcException error) {
       problems.add(error);
     }
@@ -60,7 +59,7 @@ final class GraphDiagnostics {
     return new Validator.Diagnosis(problems.list(), true, dependencies);
   }
 
-  /** A cyclic or too complex graph has no scope plan; its nodes still get syntax checks. */
+  /** A cyclic or too complex graph has no scope plan; its nodes still get every other check. */
   private static GraphPlan scopePlan(Definition definition, Problems problems) {
     try {
       return new GraphPlan(definition);

@@ -3,6 +3,7 @@ package dev.arc.engine;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** Strict declared value types; the caller owns required, missing and default semantics. */
@@ -23,7 +24,9 @@ public final class InputTypes {
           case "OBJECT" -> value instanceof Map<?, ?>;
           default -> false;
         };
-    if (!valid) throw ArcException.invalid("Input '" + name + "' must be " + type.toLowerCase());
+    // Locale.ROOT: the JVM default turns STRING into "strıng" under tr and az.
+    if (!valid)
+      throw ArcException.invalid("Input '" + name + "' must be " + type.toLowerCase(Locale.ROOT));
     return value instanceof Number ? Expressions.number(value) : Expressions.bounded(value);
   }
 }

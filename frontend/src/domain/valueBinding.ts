@@ -1,5 +1,6 @@
 import type { InputType } from "../types";
 import {
+  arrayLiteralProblem,
   isArrayLiteral,
   isNumberLiteral,
   literalText,
@@ -75,6 +76,8 @@ export function constantTextError(
 ): string | null {
   const format = constantFormats[type];
   if (!format || !text.trim() || inferConstantType(text) === type) return null;
+  // A well-formed array that is too long for the server gets its own reason.
+  if (type === "ARRAY") return arrayLiteralProblem(text) ?? format;
   return format;
 }
 
@@ -140,4 +143,26 @@ export function withBinding(
   }
   if (value !== undefined && !replaced) entries.push([name, value]);
   return Object.fromEntries(entries);
+}
+
+/**
+ * The mapped names that `declared` does not list, in stored order: own keys
+ * only, so "constructor" or "__proto__" counts exactly when it is mapped.
+ */
+export function undeclaredBindings(
+  bindings: Readonly<Record<string, string>> | null | undefined,
+  declared: Iterable<string>,
+): string[] {
+  const names = new Set(declared);
+  return Object.keys(bindings ?? {}).filter((name) => !names.has(name));
+}
+
+/** The mappings without `names`, keeping the others in order. */
+export function withoutBindings(
+  bindings: Readonly<Record<string, string>> | null | undefined,
+  names: Iterable<string>,
+): Record<string, string> {
+  let remaining = withBinding(bindings, "", undefined);
+  for (const name of names) remaining = withBinding(remaining, name, undefined);
+  return remaining;
 }

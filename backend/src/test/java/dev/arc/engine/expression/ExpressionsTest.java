@@ -9,7 +9,9 @@ import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -252,5 +254,28 @@ class ExpressionsTest {
           .isInstanceOf(ArcException.class)
           .hasMessageContaining("Unicode escape");
     }
+  }
+
+  @Test
+  void typeErrorsNameArcTypesWhateverTheValuesOrigin() {
+    // The message named JDK classes before: UnmodifiableMap, LinkedHashMap, ListN, BigDecimal.
+    for (Object value :
+        List.of(
+            new LinkedHashMap<String, Object>(),
+            Collections.unmodifiableMap(Map.of("a", 1)),
+            Map.of()))
+      assertThatThrownBy(() -> Expressions.bool(value))
+          .hasMessage("Expected a boolean, got object");
+    for (Object value :
+        List.of(List.of(1, 2), new ArrayList<>(), Collections.unmodifiableList(List.of(1))))
+      assertThatThrownBy(() -> Expressions.bool(value)).hasMessage("Expected a boolean, got array");
+    for (Object value : List.of(BigDecimal.ONE, 1, 1.5))
+      assertThatThrownBy(() -> Expressions.bool(value))
+          .hasMessage("Expected a boolean, got number");
+    assertThatThrownBy(() -> Expressions.bool("x")).hasMessage("Expected a boolean, got string");
+    assertThatThrownBy(() -> Expressions.bool(null)).hasMessage("Expected a boolean, got null");
+    assertThatThrownBy(() -> Expressions.number(Map.of()))
+        .hasMessage("Expected a number, got object");
+    assertThatThrownBy(() -> Expressions.number(true)).hasMessage("Expected a number, got boolean");
   }
 }

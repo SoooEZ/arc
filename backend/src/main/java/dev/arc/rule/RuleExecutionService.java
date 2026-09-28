@@ -101,16 +101,22 @@ public class RuleExecutionService {
       long start) {
     var sourceSession = sources.openSession();
     var execution = engine.session(resolver, deadline);
-    var prepared = execution.prepare(id, version, definition);
-    definitions.validateSources(
-        prepared.definition(),
-        resolver,
-        (sourceId, sourceVersion) -> {
-          deadline.check();
-          var source = sourceSession.definition(sourceId, sourceVersion);
-          deadline.check();
-          return source;
-        });
+    try {
+      var prepared = execution.prepare(id, version, definition);
+      definitions.validateSources(
+          prepared.definition(),
+          resolver,
+          (sourceId, sourceVersion) -> {
+            deadline.check();
+            var source = sourceSession.definition(sourceId, sourceVersion);
+            deadline.check();
+            return source;
+          });
+    } catch (ArcException error) {
+      // A published version names itself in its root location, as its runtime failures do; a
+      // preview (null version) keeps the shown graph's locations unnamed.
+      throw version == null ? error : error.inRule(id, version);
+    }
     deadline.check();
     long preparationMicros = (System.nanoTime() - start) / 1000;
     var result =

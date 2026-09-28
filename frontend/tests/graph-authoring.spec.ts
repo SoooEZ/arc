@@ -106,7 +106,8 @@ test("Graph condition and formula editors expose functions, insertion, validatio
   ).toHaveText("$SUM($MAP(items, item, $ROUND(item * 1.25, 2)))");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByTestId("test-result")).toHaveText("37.5");
+  // Results keep the decimal places the server computes.
+  await expect(page.getByTestId("test-result")).toHaveText("37.50");
   await page
     .getByRole("button", {
       name: "Open in Editor · Expression",
@@ -314,7 +315,7 @@ test("Transform mappings can become a whole array expression without losing the 
   ).toHaveText("$MAP(items, item, $TO_NUMBER(item))");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByTestId("test-result")).toHaveText("[1.25,2.5]");
+  await expect(page.getByTestId("test-result")).toHaveText("[1.25,2.50]");
   const definition = await save(page, request, id);
   expect(
     definition.nodes.find((node) => node.id === "transform")?.fields,

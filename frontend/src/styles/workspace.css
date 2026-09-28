@@ -148,6 +148,9 @@
   color: #929a95;
   min-width: 0;
 }
+.breadcrumbs .breadcrumb-current {
+  color: #45574d;
+}
 .breadcrumbs button {
   background: none;
   border: 0;

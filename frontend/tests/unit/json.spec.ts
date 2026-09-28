@@ -121,6 +121,10 @@ test("valid documents parse like JSON.parse, including whitespace, escapes and u
       JSON.stringify(expected),
     );
   }
+  // The documented order: integer-like keys first, ascending, then the rest as written.
+  expect(
+    Object.keys(parseJson('{"b":1,"10":2,"a":3,"2":4}') as object),
+  ).toEqual(["2", "10", "b", "a"]);
 });
 
 test("__proto__ keys become own properties, as with JSON.parse", () => {

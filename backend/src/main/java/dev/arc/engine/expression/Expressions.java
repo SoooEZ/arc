@@ -200,7 +200,18 @@ public final class Expressions {
     return true;
   }
 
+  /**
+   * The ARC type of a value, in the words of {@code InputTypes.NAMES} (this package may not import
+   * it): a message named JDK classes before, such as UnmodifiableMap, LinkedHashMap or ListN,
+   * depending on where the same value came from.
+   */
   private static String type(Object o) {
-    return o == null ? "null" : o.getClass().getSimpleName();
+    if (o == null) return "null";
+    if (o instanceof Number) return "number";
+    if (o instanceof String) return "string";
+    if (o instanceof Boolean) return "boolean";
+    if (o instanceof List<?>) return "array";
+    if (o instanceof Map<?, ?>) return "object";
+    return o.getClass().getSimpleName();
   }
 }

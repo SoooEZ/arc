@@ -240,8 +240,14 @@ final class GraphExecution {
     private Object reference(Node node, Map<String, Object> scope) {
       var inputs = new LinkedHashMap<String, Object>();
       if (node.bindings() != null) {
-        for (var binding : node.bindings().entrySet())
-          inputs.put(binding.getKey(), eval(binding.getValue(), scope));
+        for (var binding : node.bindings().entrySet()) {
+          try {
+            inputs.put(binding.getKey(), eval(binding.getValue(), scope));
+          } catch (ArcException error) {
+            // Names the failed binding, as fields and cases are named; limits keep their message.
+            throw inContext(error, binding.getKey());
+          }
+        }
       }
       Definition child = pinned(() -> resolver.resolve(node.ruleId(), node.version()));
       return run(node.ruleId(), node.version(), () -> child, inputs, depth + 1);

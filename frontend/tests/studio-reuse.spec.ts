@@ -54,7 +54,7 @@ test("reusing a rule with an 80-character ID inserts a node ID that builds", asy
   await page
     .getByRole("button", { name: `${name} v1 · formula +`, exact: true })
     .click();
-  await expect(page.locator(".view-lines")).toContainText("reusedResult");
+  await expect(page.locator(".view-lines")).toContainText("result_1");
   await page.keyboard.insertText("childResult");
   await page.keyboard.press("Tab");
   await page.keyboard.insertText("out");
@@ -75,7 +75,7 @@ test("reusing a rule with an 80-character ID inserts a node ID that builds", asy
   expect(reused?.id.length).toBeLessThanOrEqual(80);
 });
 
-test("double-clicking a reuse card inserts one Reference node", async ({
+test("the repeated click of a double click never inserts a second Reference node", async ({
   page,
   request,
 }) => {
@@ -100,11 +100,20 @@ test("double-clicking a reuse card inserts one Reference node", async ({
   await page.goto(`/#/studio/${parent}`);
   await expect(page.locator(".monaco-editor")).toBeVisible();
   await page.getByRole("button", { name: "reuse", exact: true }).click();
-  await page
-    .getByRole("button", { name: `${name} v1 · formula +`, exact: true })
-    .dblclick();
-  await expect(page.locator(".view-lines")).toContainText("reusedResult");
+  const card = page.getByRole("button", {
+    name: `${name} v1 · formula +`,
+    exact: true,
+  });
+  const box = (await card.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(page.locator(".view-lines")).toContainText("result_1");
   await expect.poll(() => started > 0 && started === settled).toBe(true);
+  // The second click arrives once the first read has answered, so aborting a
+  // pending read protects nothing; only the click count tells the two apart.
+  await page.mouse.down({ clickCount: 2 });
+  await page.mouse.up({ clickCount: 2 });
   await page.keyboard.press("Escape");
   const build = page.waitForRequest((outgoing) =>
     outgoing.url().endsWith("/api/studio/build"),
@@ -112,4 +121,43 @@ test("double-clicking a reuse card inserts one Reference node", async ({
   await page.getByRole("button", { name: "Build graph", exact: true }).click();
   const source = (await build).postDataJSON().source as string;
   expect(source.match(/ REFERENCE /g)).toHaveLength(1);
+  expect(started).toBe(1);
+});
+
+test("each inserted Reuse card gets its own result name", async ({
+  page,
+  request,
+}) => {
+  const suffix = Date.now().toString(36);
+  const first = `reuse-names-a-${suffix}`;
+  const second = `reuse-names-b-${suffix}`;
+  const parent = `reuse-names-parent-${suffix}`;
+  await createRule(request, first, `Reuse names A ${suffix}`, true);
+  await createRule(request, second, `Reuse names B ${suffix}`, true);
+  await createRule(request, parent, `Reuse names caller ${suffix}`);
+  await page.goto(`/#/studio/${parent}`);
+  await expect(page.locator(".monaco-editor")).toBeVisible();
+  await page.getByRole("button", { name: "reuse", exact: true }).click();
+  const insert = async (name: string, result: string) => {
+    await page
+      .getByRole("button", { name: `${name} v1 · formula +`, exact: true })
+      .click();
+    await expect(page.locator(".view-lines")).toContainText(`as ${result};`);
+    await page.keyboard.press("Tab");
+    await page.keyboard.type("out");
+    await page.keyboard.press("Escape");
+  };
+  await insert(`Reuse names A ${suffix}`, "result_1");
+  // Both snippets named their result reusedResult, and the second overwrote the first.
+  await insert(`Reuse names B ${suffix}`, "result_2");
+  const built = page.waitForResponse((response) =>
+    response.url().endsWith("/api/studio/build"),
+  );
+  await page.getByRole("button", { name: "Build graph", exact: true }).click();
+  const build: Build = await (await built).json();
+  expect(
+    build.definition?.nodes
+      .filter((node) => node.type === "REFERENCE")
+      .map((node) => node.output),
+  ).toEqual(["result_1", "result_2"]);
 });

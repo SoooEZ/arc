@@ -16,6 +16,7 @@ import FunctionLibrary from "../studio/FunctionLibrary";
 import ExpressionColorKey from "../studio/ExpressionColorKey";
 import { useArcEditor, arcEditorOptions } from "../studio/useArcEditor";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
+import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import { useNodeExpressionDraft } from "./useNodeExpressionDraft";
 import type { Definition, RuleNode } from "../../types";
 
@@ -46,10 +47,15 @@ export default function NodeExpressionDialog({
     });
   const { data: functions, error: catalogError } = useFunctionCatalog();
   const { editor, model, onMount } = useArcEditor(diagnostics, "arc-node");
-  const { insertFormula } = useArcLanguageSupport(editor, model, functions, {
-    kind: "node",
-    definition,
-  });
+  const { insertFormula, formulaError } = useArcLanguageSupport(
+    editor,
+    model,
+    functions,
+    { kind: "node", definition },
+  );
+  const formulaProblem = formulaError
+    ? formulaSuggestionProblem(formulaError)
+    : "";
   const insert = (snippet: string) => {
     if (!readOnly) insertSnippet(editor.current, snippet);
   };
@@ -106,8 +112,10 @@ export default function NodeExpressionDialog({
             Line {d.line}: {d.message}
           </Alert>
         ))}
-        {(error || catalogError) && (
-          <Alert severity="error">{error || catalogError}</Alert>
+        {(error || catalogError || formulaProblem) && (
+          <Alert severity="error">
+            {error || catalogError || formulaProblem}
+          </Alert>
         )}
       </DialogContent>
       <DialogActions>

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.script.ArcScriptParser.Parsed;
 import dev.arc.engine.script.ArcScriptScanner.SyntaxException;
+import dev.arc.engine.validation.ShapeViolation;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
@@ -73,7 +74,7 @@ public class ArcScript {
     try {
       validator.shape(definition);
       Node original = findNode(definition, nodeId);
-      Parsed fragment = parser.parse(source);
+      Parsed fragment = parser.parseFragment(source, original.position());
       Definition merged = replaceNode(definition, original, fragment);
       rejectShapeViolation(merged, fragment.locations());
       return new Build(merged, renderer.render(merged, nodeId), List.of());
@@ -114,14 +115,28 @@ public class ArcScript {
           .locations()
           .error("Edit parameters in the Input node.", fragment.inputs().getFirst());
     }
+    // Comments render only at the top of the whole graph's code; dropping them silently lost
+    // what the user typed, so the refusal is a diagnostic at the first comment.
+    if (fragment.notes() != null && !fragment.notes().isEmpty()) {
+      throw parsed
+          .locations()
+          .error(
+              new ShapeViolation(
+                  "Comments belong to the whole graph; add them in Code studio",
+                  new ShapeViolation.Note(0)));
+    }
 
     // A fragment owns only its node and outgoing edges. Incoming edges and notes
     // belong to the containing graph; an Input fragment also owns its parameters.
+    // The fragment's edges take the place of the first replaced edge, so an
+    // unchanged fragment echoes the edges in their stored order.
     var edges = new ArrayList<Edge>();
+    int replacedAt = -1;
     for (Edge edge : definition.edges()) {
       if (!edge.source().equals(original.id())) edges.add(edge);
+      else if (replacedAt < 0) replacedAt = edges.size();
     }
-    edges.addAll(fragment.edges());
+    edges.addAll(replacedAt < 0 ? edges.size() : replacedAt, fragment.edges());
     Node replacement = fragment.nodes().getFirst();
     List<Node> nodes =
         definition.nodes().stream()

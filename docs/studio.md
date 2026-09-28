@@ -198,7 +198,7 @@ $GET(customer, "address.country", "US")
 $REDUCE(items, item, acc, 0, acc + item.price)
 ```
 
-Function names are case insensitive. Variable names are case sensitive. Arithmetic supports `+ - * / % ^`; comparisons support `== = != <> < <= > >=`; boolean operators support `&& || !` and uppercase infix `AND OR`. The exponent operator accepts integers from -100 to 100. Strings use single or double quotes. Arrays use brackets. Core aggregates require numeric elements. Core `$FLOOR`/`$CEIL` take one argument; `$ROUND`, `$ROUNDDOWN`, `$ROUNDUP` accept -12…12 places. Empty or missing object paths return null (`$GET`/`$PLUCK` accept a fallback). A property path needs a name after every dot (`customer.` is a syntax error).
+Function names are case insensitive. Variable names are case sensitive. Arithmetic supports `+ - * / % ^`; comparisons support `== = != <> < <= > >=`; boolean operators support `&& || !` and uppercase infix `AND OR`. The exponent operator accepts integers from -100 to 100. Strings use single or double quotes. Arrays use brackets. Core aggregates require numeric elements. Core `$FLOOR`/`$CEIL` take one argument; `$ROUND`, `$ROUNDDOWN`, `$ROUNDUP` accept -12…12 places. Empty or missing object paths return null (`$GET`/`$PLUCK` accept a fallback); a text path keeps every segment, so `"name."` or `"."` misses, and a number path names one index or field (`1.5` is the field "1.5"). A property path needs a name after every dot (`customer.` is a syntax error).
 
 `$COMBIN` limits n to 10,000; `$FIXED`/`$DOLLAR`/`$TRUNC` limit decimal places to -100…100 to bound work and output allocation. Wildcard criteria are limited to 10,000,000 character comparisons per call, so a pattern such as `"*a*a*a*b"` over long text fails like an invalid argument instead of running indefinitely. The same budget covers the numeric text that `$COUNTIF`/`$SUMIF` with a numeric criterion, `$CORREL`, `$COVAR`, `$PEARSON` and `$FORECAST` parse, so a range of long digit strings fails the same way. `$CHOOSE` evaluates only the chosen value, like Excel.
 
@@ -241,7 +241,7 @@ Input cards’ **Value provider** dropdown searches source names and IDs as you 
 
 Reference nodes use **Select Rule** for the published rule and version. Its heading contains an open icon for viewing the selected pin and an info icon explaining version pinning. **Parameters for Rule** shows one card per declared input, with its required/optional status and type. Both Input and Reuse rule cards show the parameter name in bold without a decorative icon; mapping controls still accept an upstream variable, constant, expression, or the callee’s default/source.
 
-Right-click a canvas node and choose **Edit** to open its settings in a wider form dialog. **Apply to graph** applies the form changes to the draft; **Cancel** discards them. **Delete** removes the node and its connections. Choose **Rename** to focus and select the name in the inspector header. The Input node can be renamed but cannot be deleted. Mutating menu actions are disabled for read-only versions.
+Right-click a canvas node and choose **Edit** to open its settings in a wider form dialog. **Apply to graph** applies the form changes to the draft; **Cancel** discards them. **Delete** removes the node and its connections. Choose **Rename** to focus and select the name in the inspector header. The Input node can be renamed but cannot be deleted; an extra Input node, which validation rejects, can. Mutating menu actions are disabled for read-only versions.
 
 Node errors are grouped behind one header icon. Hover to inspect all messages, or click to keep the list open until you close it. The list floats over the editor so diagnostics do not move the form.
 
@@ -270,8 +270,16 @@ These editor changes shipped with [the second full review](reviews/2026-09-27-se
 **Numbers**
 
 - Decimal places are kept: `2.50`, `0.070` and `1.0` stay exactly that in lookup entries, numeric defaults, the Test panel and the playground, where a JavaScript double used to turn them into `2.5`, `0.07` and `1`. A lookup source renamed and saved in **Data sources** stores the same numbers as the version it came from, and a Test run with `{"price": 2.50}` shows the same `$CONCAT` text as an API client. Only exponent spelling may change (`1E2` becomes `100`); a numeric default such as `0e-101` is refused like the server refuses it.
+- A save whose echo respells a number (`1.23456789012345678901e5` comes back as `123456.789012345678901`) keeps the local draft, its test inputs and its result; a different scale is another number. Displayed JSON objects follow the browser's key order (integer-like keys first), not the stored order. Node positions the server writes as `400.0` are plain numbers again in the editor, so **Add default return**, focus and edge routing place cards where they belong (the decimal-place change had turned `400.0 + 50` into text).
+- A JSON default refuses a value of the wrong type (`{}` for an ARRAY, `[]` for an OBJECT) and any nested number beyond the server's limits, as a field error that blocks saving, instead of accepting it and failing at save. An ARRAY constant refuses a list the server cannot read (more than 256 tokens, about 127 numbers) with a message that names the limit.
 
 **Inspector**
+
+- Deleting a node from the context menu keeps the selected node in the inspector; only deleting the selected node selects the Input node. A selected connection is deselected as soon as a node deletion, a build or a version load removes it, so **Delete connection** never stays for a connection that is gone.
+- An extra Input node, which validation rejects, can be deleted from the context menu and the inspector; the entry Input (the first in the graph) still cannot.
+- **Add parameter** never takes the name of a node result: a rule with a result `input2` gets `input3`.
+- A Reference node or an Input value provider that maps a parameter the pinned version does not declare shows an alert naming it, with **Remove** in an editable draft; a published version only names it.
+- Transform field rows keep their editors across **Add field** and **Remove field**: a field in Expression mode stays in Expression mode, and an unfinished number such as `-` stays in its row.
 
 - The Condition builder parenthesizes an operand that contains `||`, `&&`, `and`, `or` or a comparison, so choosing `flag` Equals `a || b` stores `flag == (a || b)` instead of `flag == a || b`, which meant `(flag == a) || b`. Stored expressions are not rewritten; the builder reads its parenthesized operand back.
 - A node's variable scope no longer depends on the rest of the draft being complete: a blank label, an invalid default or a property a node kind does not use elsewhere in the graph keeps every inspector's variables. While a scope read is pending or has failed, the Expression editor says "Variable scope unavailable" instead of "Unavailable variables" and still allows Apply, and switching a value source to **Upstream variable** keeps the current value instead of erasing it.
@@ -279,10 +287,41 @@ These editor changes shipped with [the second full review](reviews/2026-09-27-se
 **Code studio**
 
 - Build (Ctrl/⌘+Enter or the button), Save and Publish keep the caret and the undo history when the server rewrites the code into canonical form (a trailing comment hoisted into the header, an edge ID added): Ctrl/⌘+Z returns to the text before the command.
+- Ctrl/⌘+S in a published version's code is swallowed instead of opening the browser's Save Page dialog; the draft's Save runs once per press, even while a save holds the editor read-only.
+- A Reuse card inserts only while the code and selection are unchanged since the click; typing while its pinned version loads shows "The code changed while the rule loaded. Choose the rule again." on the card, as a published Formula card does. A double or triple click on a Reuse or Formula card inserts once, however fast the read answers. Each Reuse snippet names its result `result_N`, unique among the built definition's variables and the names the unbuilt code declares, so two inserted cards no longer both write `reusedResult`.
+- A variable that several nodes assign is listed once in completion, and its hover names every producer ("From: High fee / Low fee"). Property paths such as `order.format`, `order.lowercase`, `order.isnull`, `order.ACCOUNT_NUMBER` or `order.wallet` take no keyword, type or constant color; standalone `let`, `NUMBER`, `null` and `case` keep theirs.
+- A failed `@` Formula search shows "Formula suggestions unavailable: …" in Code studio's library, in the Expression editor and in the node code dialog, not only under inline fields, and clears with the next successful search.
+- Node code refuses comments ("Comments belong to the whole graph; add them in Code studio") instead of dropping them, and a node fragment without `at (x, y)` keeps the node's stored position. Rule notes are stored as single trimmed lines.
+- The editor marks every broken node, also in a cyclic graph, and reports every missing connection and unreachable node.
+
+**Test panel**
+
+- **Hide test** closes the panel without building the code; only opening it builds pending code. A failure at the Input node (a missing or mistyped test input, a source read) offers both **Show problem · Inputs** and **Edit test inputs**.
+- **Show problem** from Code studio centers the failing node at zoom 1 however the canvas was mounted before; the remounted canvas no longer fits the whole graph over the focus.
+- Node code cannot be opened while a command runs (its card button is disabled, like the context menu's actions), and an untouched node-code buffer follows its node's current code, so a dialog opened around Arrange shows and applies the arranged position. **Apply to graph** for unchanged node code keeps the draft clean, its preview result and its diagnostics.
+
+**Navigation**
+
+- A graph/code arrival the document refuses (unbuilt code at the graph route, an invalid default at the code route) is corrected without adding a history entry: Back then continues past the rule instead of bouncing again, and a sidebar click that bounced leaves history as it was. The arrival rule also applies once a running command ends, and the header toggle always names the view on screen ("Graph view" while the code editor is visible).
+- The breadcrumb names the shown section and leads away only from a rule's graph view ("Rule library"); "Data sources", "API playground", "API reference" and "Code studio" are plain text.
+- Notices such as "Rule created" stay until they time out; a click elsewhere no longer closes them.
+
+**Library**
+
+- The rule-kind filters expose their pressed state, and the search field is labelled "Search rules". Changing a filter or search starts at page 1 and stays there when you switch back.
 
 **Data sources**
 
 - A new source draft that takes the ID of a create that is still pending stays its own draft: its fields stay editable, it does not become "v1 · edited" when the create completes, and its own Create receives "This source ID already exists". The HTTP URL field refuses raw non-ASCII characters and ports outside 1–65535 before Save, as the server does.
+- Switching the provider away and back restores the parameters text you had, and an otherwise unchanged source is clean again. A failed list read shows "Could not load data sources" with **Retry** and no close button; document and save errors stay dismissible.
+
+**Playground**
+
+- "Publish a rule in the library to make your first API call" appears only after the catalog read has succeeded and found nothing, not while it loads or after it failed.
+
+**Canvas**
+
+- **Arrange graph** gives the same layout in every browser locale: node IDs are ordered by code unit, not by `localeCompare`.
 
 ## Behavior changes in this revision
 

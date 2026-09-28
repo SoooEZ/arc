@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.IntFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,7 +42,25 @@ final class ArcScriptParser {
     this.syntax = new ArcScriptSyntax(json);
   }
 
+  /** A whole graph: a node written without {@code at (x, y)} takes a grid position. */
   Parsed parse(String source) {
+    return parse(source, ArcScriptParser::gridPosition);
+  }
+
+  /**
+   * One node's code: a header without {@code at (x, y)} keeps {@code position}, the node's place in
+   * the containing graph, instead of the grid's first cell.
+   */
+  Parsed parseFragment(String source, Position position) {
+    return parse(source, index -> position);
+  }
+
+  /** A whole graph places nodes written without a position in three columns of cards. */
+  private static Position gridPosition(int index) {
+    return new Position((index % 3) * 300, (index / 3) * 170);
+  }
+
+  private Parsed parse(String source, IntFunction<Position> fallbackPositions) {
     // HTTP also bounds the encoded request bytes. Keep a separate bound for embedded callers;
     // the former 100,000-character limit rejected otherwise valid graph/code round trips.
     if (source == null || source.length() > Limits.MAX_SCRIPT_CHARACTERS)
@@ -66,7 +85,8 @@ final class ArcScriptParser {
         scanner.expect('{');
         parseInputs(scanner.body(), inputs, sources);
       } else {
-        var nodeParser = new ArcScriptNodeParser(syntax, header, scanner, nodes.size());
+        var nodeParser =
+            new ArcScriptNodeParser(syntax, header, scanner, fallbackPositions.apply(nodes.size()));
         nodes.add(nodeParser.parse(scanner, edges, locations));
       }
     }

@@ -6,6 +6,7 @@ import { monaco } from "./arcLanguage";
 import type { Definition, Diagnostic, Rule } from "../../types";
 import { useFunctionCatalog } from "./useFunctionCatalog";
 import { useArcLanguageSupport, insertSnippet } from "./useArcLanguageSupport";
+import { captureEditorState, unchangedSince } from "./arcCompletion";
 import { adoptSource, useArcEditor, arcEditorOptions } from "./useArcEditor";
 import StudioLibrary from "./StudioLibrary";
 import StudioOutline from "./StudioOutline";
@@ -55,10 +56,28 @@ export default function CodeStudio({
   const insert = (snippet: string, atEnd = false) => {
     if (!latest.current.readOnly) insertSnippet(editor.current, snippet, atEnd);
   };
-  const { insertFormula } = useArcLanguageSupport(editor, model, functions, {
-    kind: "script",
-    definition,
-  });
+  /**
+   * An insertion that starts with a read: the returned function inserts only
+   * while the code and the selection are as they were when the read started,
+   * the rule Formula insertion applies (lesson F3).
+   */
+  const beginInsert = () => {
+    const state = captureEditorState(editor.current);
+    return (snippet: string, atEnd = false) => {
+      if (latest.current.readOnly) return;
+      if (!unchangedSince(editor.current, state))
+        throw new Error(
+          "The code changed while the rule loaded. Choose the rule again.",
+        );
+      insertSnippet(editor.current, snippet, atEnd);
+    };
+  };
+  const { insertFormula, formulaError } = useArcLanguageSupport(
+    editor,
+    model,
+    functions,
+    { kind: "script", definition },
+  );
 
   const mount = (instance: monaco.editor.IStandaloneCodeEditor) => {
     onMount(instance);
@@ -74,7 +93,8 @@ export default function CodeStudio({
       id: "arc-save",
       label: "Save ARC draft",
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
-      precondition: "!editorReadonly",
+      // No read-only precondition: an unmatched keybinding let the browser open its Save
+      // Page dialog; the guard below refuses the press instead (lesson F4).
       run: () => {
         if (!latest.current.readOnly) latest.current.onSave();
       },
@@ -94,10 +114,13 @@ export default function CodeStudio({
       <StudioLibrary
         ruleId={rule.id}
         definition={definition}
+        source={source}
         functions={functions}
         catalogError={catalogError}
+        formulaError={formulaError}
         readOnly={readOnly}
         onInsert={insert}
+        onBeginInsert={beginInsert}
         onInsertFormula={insertFormula}
       />
       <div className="studio-editor">

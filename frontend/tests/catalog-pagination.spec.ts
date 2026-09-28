@@ -311,3 +311,37 @@ test("Code studio opens a rule whatever the library filter shows", async ({
     .click();
   await expect(page).toHaveURL(/#\/studio\/catalog-44$/);
 });
+
+test("a filter or search round trip starts at page 1, and the filters expose their pressed state", async ({
+  page,
+}) => {
+  await mocks(page);
+  await page.goto("/#/library");
+  const cards = page.locator(".rule-card");
+  await expect(cards).toHaveCount(20);
+  const next = page
+    .getByRole("navigation", { name: "Library rules pages" })
+    .getByRole("button", { name: "Next" });
+  await next.click();
+  await next.click();
+  await expect(cards.first()).toContainText("Catalog rule 40");
+  await page.getByRole("button", { name: "Formulas", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Formulas", pressed: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "All rules", pressed: false }),
+  ).toBeVisible();
+  await expect(cards.first()).toContainText("Catalog rule 0");
+  // Returning to the earlier filter showed its old page 3 before.
+  await page.getByRole("button", { name: "All rules", exact: true }).click();
+  await expect(cards.first()).toContainText("Catalog rule 0");
+  await next.click();
+  await expect(cards.first()).toContainText("Catalog rule 20");
+  // The label lives on the input now; it used to land on MUI's FormControl div.
+  const search = page.getByLabel("Search rules");
+  await search.fill("Catalog rule 44");
+  await expect(cards).toHaveCount(1);
+  await search.fill("");
+  await expect(cards.first()).toContainText("Catalog rule 0");
+});

@@ -154,4 +154,12 @@ export const literalCases: readonly LiteralCase[] = [
   // accepted by the server, but only JSON arrays become constants
   { text: "[.5]", constant: null, server: "literal" },
   { text: "[1, 'two']", constant: null, server: "literal" },
+  // the server reads at most 256 tokens: 127 numbers, 126 commas and 2 brackets
+  { text: numberList(127), constant: "ARRAY", server: "literal" },
+  { text: numberList(128), constant: null, server: "error" },
 ];
+
+/** "[0,1,…]" with `count` numbers. */
+export function numberList(count: number): string {
+  return `[${Array.from({ length: count }, (_, index) => index).join(",")}]`;
+}

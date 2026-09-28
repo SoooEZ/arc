@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { monaco } from "./arcLanguage";
 import type { Definition, FunctionEntry } from "../../types";
 import { modules } from "./snippets";
-import { inputVariables, type VariableOption } from "../../domain/graph";
+import { declaredVariables, type VariableOption } from "../../domain/graph";
 import {
   expressionSymbols,
   type ExpressionSymbol,
@@ -66,17 +66,6 @@ function semanticTokenData(
     previousColumn = column;
   }
   return new Uint32Array(data);
-}
-
-function declaredVariables(definition: Definition): VariableOption[] {
-  return [
-    ...inputVariables(definition),
-    ...definition.nodes.flatMap((node): VariableOption[] =>
-      node.output
-        ? [{ name: node.output, type: "RESULT", label: node.label }]
-        : [],
-    ),
-  ];
 }
 
 /**

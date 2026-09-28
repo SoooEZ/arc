@@ -27,6 +27,10 @@ public final class HttpSourceAdapter implements SourceAdapter {
 
   @Override
   public void validate(SourceDefinition definition) {
+    // A provider rejects configuration it does not use: unbounded entries were stored as is and
+    // made the read-back of the new version fail with a 500.
+    if (definition.entries() != null && !definition.entries().isEmpty())
+      throw ArcException.invalid("HTTP sources do not use lookup entries");
     http.validate(definition);
     if (definition.timeoutMs() < MIN_TIMEOUT_MS || definition.timeoutMs() > MAX_TIMEOUT_MS)
       throw ArcException.invalid(

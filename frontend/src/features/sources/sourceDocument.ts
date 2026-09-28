@@ -1,12 +1,22 @@
 import type { DataSource, SourceConfig } from "../../types";
 import { stringifyJson } from "../../domain/json";
 import { isResourceId, resourceIdGuidance } from "../../domain/resourceIds";
-import { sourceBuffers, sourceSample, type SourceBuffers } from "./model";
+import {
+  providerParameterTemplate,
+  sourceBuffers,
+  sourceSample,
+  type SourceBuffers,
+} from "./model";
 
 export interface SourceDocument {
   selection: number;
   source: DataSource;
   buffers: SourceBuffers;
+  /**
+   * The parameters text of each provider the user switched away from, so a
+   * switch back restores it instead of the provider's template (lesson F7).
+   */
+  parametersByKind: Partial<Record<SourceConfig["kind"], string>>;
   /** Raw HTTP timeout text; the definition keeps its last valid value. */
   timeout: string;
   baseline: string;
@@ -74,6 +84,7 @@ export function openSource(
     selection,
     source,
     buffers,
+    parametersByKind: {},
     timeout,
     baseline: sourceSnapshot({ source, buffers, timeout }),
     viewedVersion: source.version,
@@ -223,24 +234,26 @@ export function sourceDocumentReducer(
       };
     }
     case "provider": {
-      const parameters = [
-        {
-          name: action.kind === "LOOKUP" ? "key" : "customerId",
-          type: "STRING",
-          required: true,
-          defaultValue: null,
-        },
-      ];
+      const current = document.source.definition.kind;
+      if (action.kind === current) return document;
+      // The text typed for the current provider waits under its kind; the target
+      // gets its own text back, or the template on its first visit. A round
+      // trip therefore ends with the original text and a clean document.
+      const parametersByKind = {
+        ...document.parametersByKind,
+        [current]: document.buffers.parameters,
+      };
+      const parameters =
+        parametersByKind[action.kind] ??
+        stringifyJson(providerParameterTemplate(action.kind), 2);
       return {
         ...invalidateTest(document),
         source: {
           ...document.source,
           definition: { ...document.source.definition, kind: action.kind },
         },
-        buffers: {
-          ...document.buffers,
-          parameters: stringifyJson(parameters, 2),
-        },
+        buffers: { ...document.buffers, parameters },
+        parametersByKind,
       };
     }
     case "version":

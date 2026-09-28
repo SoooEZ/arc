@@ -150,7 +150,8 @@ test("at completion pins a formula and hover explains input, formula and result 
   await expect(page.getByText("All changes saved")).toBeVisible();
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByTestId("test-result")).toHaveText("110");
+  // $ROUND(price, 2) answers with its two decimal places kept.
+  await expect(page.getByTestId("test-result")).toHaveText("110.00");
   await page
     .getByRole("button", { name: "Close test panel", exact: true })
     .click();
@@ -337,4 +338,39 @@ test("formula runtime errors open the pinned child node and preserve unsaved cal
   await expect(
     editorLines(page.getByLabel("Expression", { exact: true })),
   ).toHaveText(`@${callee}:2(amount)`);
+});
+
+test("the repeated click of a double click on a published Formula card inserts one call", async ({
+  page,
+  request,
+}) => {
+  const { callee, caller, suffix } = await fixtures(request);
+  await page.goto(`/#/rules/${caller}?node=calc`);
+  await page
+    .getByRole("button", { name: "Open in Editor · Expression", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Expression editor · Expression",
+    exact: true,
+  });
+  const expression = dialog.getByLabel("Expression code editor", {
+    exact: true,
+  });
+  await setEditorText(page, expression, "");
+  await dialog.getByRole("button", { name: "@ Formulas", exact: true }).click();
+  await dialog.getByLabel("Find published formula").fill(suffix);
+  const card = dialog.getByRole("button", {
+    name: new RegExp(`Tax formula ${suffix}`),
+  });
+  const box = (await card.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(editorLines(expression)).toHaveText(`@${callee}:1(amount)`);
+  // The second click arrives after the first insertion; the metadata is cached, so
+  // it inserted again at once before.
+  await page.mouse.down({ clickCount: 2 });
+  await page.mouse.up({ clickCount: 2 });
+  await page.waitForTimeout(300);
+  await expect(editorLines(expression)).toHaveText(`@${callee}:1(amount)`);
 });

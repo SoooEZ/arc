@@ -25,6 +25,8 @@ export type FlowNode = Node<
     errors: readonly string[];
     /** Shared by every card, so an unchanged card keeps its data object. */
     onExpression: (id: string) => void;
+    /** False while a document command runs, like the context menu's actions. */
+    canOpenCode: boolean;
   },
   "arc"
 >;
@@ -59,6 +61,7 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
             <button
               className="node-expression-button nodrag nopan"
               aria-label={`Node expression · ${n.label}`}
+              disabled={!data.canOpenCode}
               onClick={(e) => {
                 e.stopPropagation();
                 data.onExpression(n.id);

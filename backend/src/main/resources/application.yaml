@@ -16,6 +16,11 @@ spring:
     formcontent:
       filter:
         enabled: false
+logging:
+  level:
+    # ARC turns POI's error values into ArcExceptions, so POI's own ERROR with a stack trace per
+    # failed RATE call and WARN per failed IRR call, even under $IFERROR, would only flood the log.
+    org.apache.poi.ss.formula.functions: "off"
 server:
   port: 8080
   error:

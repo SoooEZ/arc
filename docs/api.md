@@ -116,7 +116,7 @@ Revisions come from one sequence for all rules, so they advance but are not cons
 | `404` | Missing rule, source or version |
 | `409` | Duplicate rule or source ID (`This rule ID already exists`, `This source ID already exists`), stale revision, execution of an unpublished rule, or deletion of a rule that other rules call |
 | `413` | Request body larger than 1 MiB, for any method or path |
-| `422` | Invalid graph, expression, input, or calculation; exhausted execution limit (steps, nesting, source reads, expression operations); text containing the NUL character (U+0000), which storage cannot hold |
+| `422` | Invalid graph, expression, input, or calculation; exhausted execution limit (steps, nesting, source reads, expression operations); text containing the NUL character (U+0000) or an unpaired UTF-16 surrogate, which storage cannot hold as written |
 | `500` | Unexpected internal error (details are logged, not exposed) |
 | `504` | Execution deadline exhausted, including across nested rules and source reads |
 
@@ -149,14 +149,36 @@ These changes shipped with [the second full review](reviews/2026-09-27-second-re
 
 - Arrays in the reference-class parameters that Excel reads as one value fail with `422` "NAME: argument N must be a single value, not an array", like value-class parameters: the index of `$VLOOKUP` and `$HLOOKUP`, `$MATCH`'s match type, the field of every database function (`$DSUM`, `$DGET`, …) and `$T`'s value. They silently used the array's first element before, so a published version that relied on that fails now.
 
+**Node code and diagnostics**
+
+- `POST /studio/node/build` refuses a fragment that contains a `//` comment with a diagnostic at the comment ("Comments belong to the whole graph; add them in Code studio") instead of dropping it silently, and a fragment header without `at (x, y)` keeps the node's position instead of moving it to (0, 0).
+- `POST /diagnostics` runs every node check that needs no scope plan (a Switch without cases, Reference pins and parameter names, result variables, overwritten inputs) in a cyclic or too complex graph, and reports every missing connection and unreachable node instead of the first one; `POST /validate` still stops at the first problem.
+
 **Data sources**
 
 - An HTTP source URL with raw non-ASCII characters (`…/cities/Zürich?q=東京`) or a port outside 1–65535 is refused at save and at every read with `422` "Percent-encode non-ASCII characters in the URL as UTF-8 (Zürich → Z%C3%BCrich)" or "Use a port from 1 to 65535". Such URLs were sent with Latin-1 bytes and `?` characters, that is to another resource; a stored version that holds one fails its Test and executions (or uses its `DEFAULT` fallback) until it is saved percent-encoded.
+- An HTTP definition with non-empty `entries` returns `422` "HTTP sources do not use lookup entries" (such entries were stored unbounded, and `{"a":1e5000}` made the create or update fail with `500`), and a LOOKUP definition with a non-blank `url` returns `422` "Lookup tables do not use a URL".
 
 **Errors and limits**
 
 - A zero written with more than 100 decimal places or an exponent beyond ±100 (`0e-101`, `0.00 ^ 100`) fails with `422` "Number exceeds supported precision or magnitude" like any other out-of-range number, wherever numbers are bounded: literals, `$TO_NUMBER`, operator results, inputs, defaults, lookup entries and HTTP responses. Such zeros passed every bound before; `$TO_STRING` of one could allocate gigabytes, and one with more than 9,999 decimal places answered `500`. Integers with more than 100 significant digits in ARRAY/OBJECT values, lookup entries and HTTP responses fail the same way at save, Test or read, as decimals already did; `1E+100` and its 101-digit stored spelling keep working. A stored draft or version holding such a value fails until it is fixed.
 - POI's number parsing is bounded like its wildcard matching: `$COUNTIF`/`$SUMIF` with a numeric criterion (`5`, `"5"`, `"=5"`), `$CORREL`, `$COVAR`, `$PEARSON` and `$FORECAST` over text cells that would need more than 10,000,000 character comparisons to parse fail with `422` "NAME: numeric text needs more than 10,000,000 character comparisons; use shorter text" before POI runs, instead of holding a request thread past the deadline.
+- Type errors name ARC types instead of JDK classes: "Expected a boolean, got object" (or array, number, string, null), whatever the value's origin (a default, a supplied value or a literal).
+- Unary minus is exact: negative literals, NUMBER constants and `-x` keep every digit instead of being rounded to 34 significant digits; binary arithmetic keeps DECIMAL128.
+- `$GET` and `$PLUCK` text paths keep every segment, so a path with an empty segment (`"name."`, `"."`, `"a..b"`) returns the fallback instead of reading the prefix or the whole value, and a number path names one index or field (`3 / 2` is the field `"1.5"`, never `grid[1][5]`).
+- `$REPT` measures the text POI repeats, so `$REPT(1E+2, 600)`, `$REPT(1 / 3, 100)` and `$REPT(blank, 600)` succeed whenever the result fits 2,000 characters, and `$REPT(1e10, 399)` fails with "REPT result exceeds string limit" instead of the generic string bound.
+- Error responses are JSON with their documented status whatever the `Accept` header (they were an empty `500` for clients that accept only text); the body's fields keep one order (`status`, `message`, `issues`, `locations`), and `400` and `500` bodies carry an empty `locations` array too.
+- Text with an unpaired UTF-16 surrogate (half of an escaped emoji, `"a\ud800b"`) is refused with `422` "Text cannot contain an unpaired UTF-16 surrogate" wherever U+0000 is, instead of being stored as `?`; a paged `search` containing U+0000 or such a surrogate returns `422` instead of `500`.
+- Rule and source names share one policy: both are trimmed before validation and storage (a source name kept its padding), a name that is empty after trimming returns `422` "Rule name must contain 1 to 160 characters" (or "Source name …"), and a name holding a control character returns `422` "Rule name cannot contain control characters".
+- A Reference node's `ruleId` must be a valid resource ID, like source pins and `@id:version` calls: a malformed one (`"Bad ID!"`, `""`, a NUL) fails with `422` at the node on save, build, validate, preview and diagnostics instead of saving and failing later as `404` or `500`; a stored draft that holds one fails until the rule is chosen again.
+- Input and whole-document shape problems (a duplicate input, an invalid default, an over-limit input list) are located on the Input node from draft save and create, `/studio/render`, `/studio/node/render` and `/variables`, as `/validate` already did.
+- A published execution that fails while preparing its version or checking source contracts names the rule and version in its root location, as runtime failures do; previews keep a null version.
+- Input type errors read the same under every JVM default locale ("must be string", never "strıng").
+- Validation, diagnostics and publishing check that every pinned version a graph reaches can still be prepared: a Reference or `@id:version` call to a version whose stored definition fails draft shape or compilation (a property its node kind does not use, an unprefixed function call) now fails with that version's `422` at the calling node, where it passed every static check and then failed every execution.
+- The static nesting check walks a pin again when a longer call path reaches it, so a graph whose deepest reference chain exceeds 16 levels is rejected by validation, diagnostics and publishing whatever the order of its Reference nodes; such a graph was accepted before and failed every execution with "Rule nesting exceeds 16 levels". Published versions are unchanged and still fail at run time.
+- A failed Reference binding or source-mapping argument names its position like the static diagnostics do: "amount: Division by zero" at the Reference node and "rate source / region: Division by zero" at the Input node; limits and the deadline keep their plain message.
+- A draft's notes are stored as single trimmed lines, the only form an ARC Script comment can carry: a note with line breaks becomes one note per line, and a note that would render more than 500 comments fails with `422` "Too many or oversized comments" instead of making the code unbuildable. Stored drafts and versions are not rewritten.
+- A draft saved through the API with two connections from the same handle to the same target (distinct edge IDs) now builds back from its Code studio text; "Duplicate connection" stays a validation problem at the node the connections leave.
 
 ## Behavior changes in this revision
 
@@ -192,7 +214,7 @@ These changes shipped with [the 2026-09-27 full review](reviews/2026-09-27-full-
 - `GET /sources/{id}/versions` for an unknown source returns `404` "Source not found" instead of `200 []`.
 - Catalog searches are trimmed: a whitespace-only search returns every item, and the 200-character limit applies after trimming.
 - JSON numbers are written plain: `$POWER(10, 2)` returns `100`, not `1E+2`.
-- Text containing the NUL character (U+0000) returns `422` "Text cannot contain the NUL character (U+0000)"; nothing is written.
+- Text containing the NUL character (U+0000) returns `422` "Text cannot contain the NUL character (U+0000)", and text with an unpaired UTF-16 surrogate `422` "Text cannot contain an unpaired UTF-16 surrogate"; nothing is written.
 - The API container's JVM runs with the en-US locale.
 - New: `DELETE /rules/{id}` deletes a rule that no other rule calls; see [Delete a rule](#delete-a-rule). CORS allows `DELETE`.
 
@@ -207,3 +229,4 @@ These changes shipped with [the 2026-09-27 full review](reviews/2026-09-27-full-
 **Web server (port 3080)**
 
 - nginx waits 40 s for the API, so the API's JSON `504` arrives instead of an nginx HTML `504`. It resolves the api container on each request, which survives an api container restart. `index.html` is not cached, hashed assets are cached as immutable, a missing asset returns `404` instead of `index.html`, and responses are gzip-compressed.
+- A request body over 1 MiB answers a JSON `413` (`{"status":413,"message":"Request body exceeds 1 MiB","issues":[]}`) with `Access-Control-Allow-Origin: *`, so a browser client reads the error instead of an opaque CORS failure; a body of exactly 1 MiB reaches the API. Redirects from `/api` and `/assets` to their slash forms are relative (no `Location` with the container's port), and `/health` sends a single `Content-Type`. `scripts/web_smoke.py` checks these against a running web container.

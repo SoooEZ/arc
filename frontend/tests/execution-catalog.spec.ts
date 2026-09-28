@@ -64,6 +64,8 @@ async function mockCatalog(
     deleted: false,
     historyVersion: null as number | null,
     failCatalogOnce: false,
+    /** Holds every published-catalog read until resolved. */
+    holdCatalog: null as Promise<void> | null,
     executionError: false,
     executions: [] as { version: number; inputs: Record<string, unknown> }[],
     /** Raw request bodies, which keep number tokens that postDataJSON would round. */
@@ -85,6 +87,7 @@ async function mockCatalog(
     const limit = Number(url.searchParams.get("limit") ?? 20);
     if (url.pathname === "/api/rule-summaries") {
       const publishedOnly = url.searchParams.get("publishedOnly") === "true";
+      if (publishedOnly && state.holdCatalog) await state.holdCatalog;
       if (publishedOnly && state.failCatalogOnce) {
         state.failCatalogOnce = false;
         await route.fulfill({
@@ -485,5 +488,52 @@ test("exact decimals survive the sample buffer, cURL and response without JSON.r
   await expect(response).toContainText(
     '"result": 0.3333333333333333333333333333333333',
   );
+  expect(state.unexpected).toEqual([]);
+});
+
+test("the empty-catalog notice waits for a settled, successful catalog read", async ({
+  page,
+}) => {
+  const state = await mockCatalog(page, false, 1);
+  const notice = page.getByText("Publish a rule in the library", {
+    exact: false,
+  });
+  let release!: () => void;
+  state.holdCatalog = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.goto("/#/playground");
+  await expect(
+    page.getByLabel("Find published rules", { exact: true }),
+  ).toBeVisible();
+  // While the read is pending the page said "Publish a rule in the library".
+  await expect(notice).toHaveCount(0);
+  release();
+  await expect(
+    page.getByRole("button", { name: "Execute rule", exact: true }),
+  ).toBeEnabled();
+  await expect(notice).toHaveCount(0);
+
+  // A failed read shows its error and Retry, never a notice about the (unknown) catalog.
+  state.holdCatalog = null;
+  state.failCatalogOnce = true;
+  await page
+    .getByLabel("Find published rules", { exact: true })
+    .fill("Catalog pricing");
+  await expect(
+    page.getByText("Catalog temporarily unavailable", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Publish a rule in the library|No published rules match/),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Retry loading", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Execute rule", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText(/Publish a rule in the library|No published rules match/),
+  ).toHaveCount(0);
   expect(state.unexpected).toEqual([]);
 });

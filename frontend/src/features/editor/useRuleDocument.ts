@@ -40,6 +40,8 @@ interface Options {
   /** Told once the rule is deleted, before the editor leaves for the library. */
   onDeleted?: (id: string) => void;
   navigate: (path: string) => void;
+  /** Corrects a refused arrival without adding a history entry. */
+  redirect: (path: string) => void;
   notify: (message: string) => void;
   /** Receives located failures of save, validate, publish and build commands. */
   reportCommandProblem: (problem: GraphProblem | null) => void;
@@ -71,6 +73,7 @@ export function useRuleDocument({
   onDirty,
   onDeleted,
   navigate,
+  redirect,
   notify,
   reportCommandProblem,
 }: Options) {
@@ -272,8 +275,8 @@ export function useRuleDocument({
     // Code cannot open while a default is invalid: return to the graph.
     if (mode !== "code" || !hasInvalidDefaults) return;
     setError(invalidDefaultMessage("changing views"));
-    navigate(`/rules/${rule.id}`);
-  }, [mode, hasInvalidDefaults, navigate, rule.id]);
+    redirect(`/rules/${rule.id}`);
+  }, [mode, hasInvalidDefaults, redirect, rule.id]);
   // The code view shows the draft rendered as ARC Script.
   useEffect(() => {
     if (
@@ -300,40 +303,56 @@ export function useRuleDocument({
     return () => controller.abort();
   }, [mode, source, rule.draft, versionUnavailable, hasInvalidDefaults, fail]);
   const current = useRef({
+    source,
     sourceDirty,
     buildCode,
     ruleId: rule.id,
-    navigate,
+    redirect,
     runTask,
   });
   current.current = {
+    source,
     sourceDirty,
     buildCode,
     ruleId: rule.id,
-    navigate,
+    redirect,
     runTask,
   };
+  // The buffer whose arrival build failed: arriving again with the same text
+  // returns to the code without building it once more.
+  const failedArrival = useRef<string | null>(null);
   useEffect(() => {
-    // Unbuilt code builds before the graph shows; a failure returns to the code.
-    if (mode !== "graph" || !current.current.sourceDirty) return;
+    // Unbuilt code builds before the graph shows; a failure returns to the
+    // code. The rule applies whenever it is due: a graph arrival during a
+    // command waits for the lock and then builds, and never stays half-applied.
+    if (mode !== "graph" || busy !== "" || !current.current.sourceDirty) return;
     const latest = current.current;
+    if (latest.source !== null && latest.source === failedArrival.current) {
+      latest.redirect(`/studio/${latest.ruleId}`);
+      return;
+    }
     void latest.runTask("switch", async (signal) => {
       try {
         await latest.buildCode();
       } catch (failure) {
-        if (!signal.aborted) latest.navigate(`/studio/${latest.ruleId}`);
+        if (!signal.aborted) {
+          failedArrival.current = latest.source;
+          latest.redirect(`/studio/${latest.ruleId}`);
+        }
         throw failure;
       }
     });
-  }, [mode]);
+  }, [mode, busy]);
+  // The header toggle leaves the shown view, which is the route's view except
+  // while unbuilt code or an invalid default keeps the other one on screen.
   const switchView = () =>
     runTask("switch", async (signal) => {
       if (hasInvalidDefaults)
         throw new Error(invalidDefaultMessage("changing views"));
-      if (mode === "code") await buildCode();
+      if (view === "code") await buildCode();
       signal.throwIfAborted();
       navigate(
-        `/${mode === "code" ? "rules" : "studio"}/${rule.id}${requestedVersion ? `?version=${requestedVersion}` : ""}`,
+        `/${view === "code" ? "rules" : "studio"}/${rule.id}${requestedVersion ? `?version=${requestedVersion}` : ""}`,
       );
     });
   const acknowledge = (submitted: Rule, response: Rule) => {
@@ -402,12 +421,25 @@ export function useRuleDocument({
       dispatch({ type: "graph/arranged", before, definition });
       onArranged();
     });
-  /** Opens or closes the Test panel once pending code is built, since preview runs the graph. */
-  const toggleTest = (toggle: () => void) =>
-    runTask("test", async () => {
+  /**
+   * Opens the Test panel once pending code is built, since preview runs the
+   * graph. Closing runs nothing, so it never builds: unbuildable code kept the
+   * panel open, and buildable code was committed to the graph as a side effect.
+   */
+  const toggleTest = (preview: {
+    open: boolean;
+    close: () => void;
+    toggle: () => void;
+  }) => {
+    if (preview.open) {
+      preview.close();
+      return Promise.resolve();
+    }
+    return runTask("test", async () => {
       await buildCode();
-      toggle();
+      preview.toggle();
     });
+  };
   /**
    * Deletes the rule and leaves for the library. Unsaved changes go with the
    * rule, so leaving does not ask about them. Resolves to why the server kept

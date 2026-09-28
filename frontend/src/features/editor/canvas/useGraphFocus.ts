@@ -70,5 +70,7 @@ export function useGraphFocus({
     return () => cancelAnimationFrame(frame);
   }, [mode, unavailable, pendingFocus, measurements, focusNode]);
 
-  return { focusNode, jumpToNode };
+  // A canvas that mounts with a focus pending skips its initial fit (lesson F8):
+  // the fit and the focus would otherwise race, whatever the frame order.
+  return { focusNode, jumpToNode, focusPending: pendingFocus !== null };
 }

@@ -604,6 +604,8 @@ test("source manager creates, versions and tests providers without losing the pa
     },
   });
   expect(created.status()).toBe(201);
+  // Revisions come from a sequence shared by every rule, so the created value is the baseline.
+  const createdRevision = ((await created.json()) as Rule).revision;
   await page.goto(`/#/rules/${ruleId}?node=input`);
   await page
     .getByLabel("Default JSON (optional)", { exact: true })
@@ -724,7 +726,7 @@ test("source manager creates, versions and tests providers without losing the pa
     card.getByRole("combobox", { name: "Source version", exact: true }),
   ).toHaveText("v1");
   const unchanged = await (await request.get(`/api/rules/${ruleId}`)).json();
-  expect(unchanged.revision).toBe(1);
+  expect(unchanged.revision).toBe(createdRevision);
   expect(unchanged.draft.inputs[0].defaultValue).toEqual([]);
   expect(unchanged.draft.inputs[1].source.version).toBe(1);
 });

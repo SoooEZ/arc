@@ -12,10 +12,17 @@ import {
 } from "./formulaCalls";
 import { formulaMetadata } from "./formulaMetadata";
 import {
+  captureEditorState,
   completionWord,
   insertSnippet,
   isStringOrComment,
+  unchangedSince,
 } from "./arcCompletion";
+
+/** The help or alert text for a failed `@` search, the same in every editor. */
+export function formulaSuggestionProblem(formulaError: string): string {
+  return `Formula suggestions unavailable: ${formulaError}`;
+}
 
 /** How long typing must pause before `@` completion searches the catalog. */
 const searchDelayMs = 150;
@@ -253,7 +260,7 @@ export function useFormulaSupport(
       instance.getOption(monaco.editor.EditorOption.readOnly)
     )
       return;
-    const revision = model.getVersionId();
+    const state = captureEditorState(instance);
     const controller = new AbortController();
     for (const previous of pending.current) previous.abort();
     pending.current.add(controller);
@@ -268,11 +275,8 @@ export function useFormulaSupport(
       );
       if (controller.signal.aborted) return;
       if (
-        model.isDisposed() ||
         editor.current !== instance ||
-        instance.getModel() !== model ||
-        model.getVersionId() !== revision ||
-        !instance.getSelection()?.equalsSelection(selection) ||
+        !unchangedSince(instance, state) ||
         instance.getOption(monaco.editor.EditorOption.readOnly)
       )
         throw new Error(

@@ -132,8 +132,45 @@ try:
     nul = request("POST", "/api/rules", {"id": PREFIX + "-nul", "name": "Bad\u0000name",
                   "description": "", "kind": "RULE", "definition": None}, 422)
     assert nul["message"] == "Text cannot contain the NUL character (U+0000)", nul
+    # Searches and Reference pins follow the stored-text and resource-ID rules before any SQL runs.
+    for path in ["/api/rule-summaries?search=a%00b", "/api/source-summaries?search=a%00b",
+                 "/api/rules/order-pricing/version-summaries?search=1%002"]:
+        request("GET", path, expected=422)
+    nul_pin = {"schemaVersion": 1, "inputs": [],
+               "nodes": [{"id": "input", "type": "INPUT", "label": "Inputs"},
+                         {"id": "ref", "type": "REFERENCE", "label": "Ref", "ruleId": "a\u0000b", "version": 1}],
+               "edges": [{"id": "e", "source": "input", "target": "ref", "sourceHandle": "next"}]}
+    request("POST", "/api/validate", nul_pin, 422)
+    request("POST", "/api/preview", {"definition": nul_pin, "inputs": {}}, 422)
+    problems = request("POST", "/api/diagnostics", nul_pin)
+    assert any(problem["message"] == "Ref: choose a valid rule ID" for problem in problems), problems
+    # Errors are JSON with their status whatever the client accepts.
+    request("GET", "/api/rules/not-a-rule", expected=404, headers={"Accept": "text/plain"})
+    # Malformed UTF-16 and control characters are refused before storage; names are stored trimmed.
+    request("POST", "/api/rules", {"id": PREFIX + "-surrogate", "name": "a\ud800b", "description": "",
+            "kind": "RULE", "definition": None}, 422)
+    request("POST", "/api/rules", {"id": PREFIX + "-control", "name": "\u0001\u0000", "description": "",
+            "kind": "RULE", "definition": None}, 422)
+    emoji = request("POST", "/api/rules", {"id": PREFIX + "-emoji", "name": "  Smile 😀  ", "description": "",
+                    "kind": "RULE", "definition": None}, 201)
+    created.append(emoji["id"])
+    assert emoji["name"] == "Smile 😀", emoji
+    # Notes are stored as single trimmed lines, the form ARC Script comments carry (graph → code → graph).
+    noted = save(dict(emoji, draft={**emoji["draft"], "notes": ["first\nsecond", "  padded  ", "a\rb"]}))
+    assert noted["draft"]["notes"] == ["first", "second", "padded", "a", "b"], noted["draft"]["notes"]
+    # An HTTP definition rejects the entries it does not use, and nothing is stored.
+    status, text = raw_text_request("POST", "/api/sources", '{"id":"%s-http-entries","name":"Entries","definition":'
+                                    '{"kind":"HTTP","url":"https://example.com/a","parameters":[],"entries":{"a":1e5000},'
+                                    '"timeoutMs":1000}}' % PREFIX)
+    assert status == 422 and "do not use lookup entries" in text, (status, text[:200])
+    request("GET", f"/api/sources/{PREFIX}-http-entries/versions", expected=404)
 
     child = create("child")
+    # Input problems are located on the Input node from a save too, as /validate reports them.
+    duplicated = dict(child, draft={**child["draft"], "inputs": child["draft"]["inputs"] * 2})
+    located = save(duplicated, 422)
+    input_node = next(node for node in child["draft"]["nodes"] if node["type"] == "INPUT")
+    assert located["locations"] and located["locations"][0]["nodeId"] == input_node["id"], located
     execute(child["id"], {"amount": 100}, expected=409)
     child = publish(child)
     assert execute(child["id"], {"amount": 100})["result"] == 90
@@ -162,7 +199,8 @@ try:
     assert request("GET", f"/api/rules/{child['id']}/version-summaries?limit=1&offset=1")["items"][0]["version"] == 1
     first = request("GET", f"/api/rule-summaries?search={PREFIX}&limit=1&offset=0")
     second = request("GET", f"/api/rule-summaries?search={PREFIX}&limit=1&offset=1")
-    assert first["total"] == 2 and len(first["items"]) == 1
+    # Every rule created so far carries the prefix; the emoji rule joined the child and parent.
+    assert first["total"] == len(created) and len(first["items"]) == 1, (first["total"], created)
     assert first["items"][0]["id"] != second["items"][0]["id"]
     assert "draft" not in first["items"][0] and "nodeCount" in first["items"][0]
     assert request("GET", f"/api/rule-summaries?search={PREFIX}&limit=1&offset=99")["items"] == []

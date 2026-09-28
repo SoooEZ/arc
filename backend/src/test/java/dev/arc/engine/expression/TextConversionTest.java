@@ -87,4 +87,39 @@ class TextConversionTest {
     assertThatThrownBy(() -> eval("$PLUCK(items, [\"10\"])"))
         .hasMessage("PLUCK needs a text or number path");
   }
+
+  @Test
+  void emptyPathSegmentsAndFractionalNumbersMissInsteadOfReadingAnotherEntry() {
+    // "name." read the prefix, "." the whole object and 3 / 2 the nested grid[1][5] before.
+    Map<String, Object> customer =
+        Map.of("name", "Ada", "address", Map.of("city", "Paris"), "tier", "gold");
+    Map<String, Object> scope =
+        Map.of(
+            "customer",
+            customer,
+            "grid",
+            List.of(List.of(1, 2), List.of(10, 15, 20, 25, 30, 35)),
+            "field",
+            "");
+    for (String path :
+        List.of(
+            "\"name.\"",
+            "\".\"",
+            "\"..\"",
+            "\".name\"",
+            "\"address..city\"",
+            "$CONCAT(\"address.\", field)"))
+      assertThat(Expressions.evaluate("$GET(customer, " + path + ", \"missing\")", scope))
+          .as(path)
+          .isEqualTo("missing");
+    assertThat(Expressions.evaluate("$GET(grid, 3 / 2, \"missing\")", scope)).isEqualTo("missing");
+    assertThat(Expressions.evaluate("$PLUCK([customer], \"tier.\", \"missing\")", scope))
+        .isEqualTo(List.of("missing"));
+    assertThat(Expressions.evaluate("$GET(customer, \"address.city\")", scope)).isEqualTo("Paris");
+    assertThat(eval("$GET($OBJECT(\"1.5\", \"x\"), 1.5)")).isEqualTo("x");
+    assertThat(
+            Expressions.evaluate(
+                "$GET(blank, \"\", \"missing\")", Map.of("blank", Map.of("", "empty"))))
+        .isEqualTo("empty");
+  }
 }

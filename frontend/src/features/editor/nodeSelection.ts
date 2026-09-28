@@ -22,3 +22,18 @@ export function selectedNode(
     defaultSelection(definition)
   );
 }
+
+/**
+ * The selected connection, only while the current draft still has it. A node
+ * deletion, a code build or a version load removes edges without passing
+ * through the canvas, so the selection is derived rather than cleared.
+ */
+export function selectedEdgeId(
+  definition: Definition,
+  requestedId: string | null,
+): string | null {
+  if (requestedId === null) return null;
+  return definition.edges.some((edge) => edge.id === requestedId)
+    ? requestedId
+    : null;
+}

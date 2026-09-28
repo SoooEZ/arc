@@ -44,6 +44,7 @@ jobs:
         run: |
           python3 scripts/smoke.py
           python3 scripts/studio_smoke.py
+          python3 scripts/web_smoke.py
       - name: Install Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium

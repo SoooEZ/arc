@@ -5,10 +5,25 @@ import type { ReferenceTarget } from "../editor/types";
 
 type ReferencedLocation = ErrorLocation & { ruleId: string; version: number };
 
+/**
+ * Whether editing the test inputs is a way out of the failure: nothing was
+ * located, or it surfaced at this graph's Input node, where caller inputs are
+ * checked (source reads and mappings land there too, so the node action stays).
+ */
+export function offersInputEditing(
+  local: { nodeId: string }[],
+  locatedAnywhere: boolean,
+  inputNodeId: string | null,
+): boolean {
+  if (!locatedAnywhere) return true;
+  return local.some((location) => location.nodeId === inputNodeId);
+}
+
 export default function ExecutionError({
   error,
   problem,
   shown,
+  inputNodeId,
   onNode,
   onOpenReference,
   onEditInputs,
@@ -17,6 +32,8 @@ export default function ExecutionError({
   problem: GraphProblem | null;
   /** The rule version the editor shows; null version for the draft. */
   shown: { ruleId: string; version: number | null };
+  /** The shown graph's Input node, or null when the draft has none. */
+  inputNodeId: string | null;
   onNode: (id: string) => void;
   onOpenReference: (target: ReferenceTarget) => void;
   onEditInputs: () => void;
@@ -63,7 +80,7 @@ export default function ExecutionError({
             Open problem · {location.label}
           </Button>
         ))}
-        {!locations.length && (
+        {offersInputEditing(local, locations.length > 0, inputNodeId) && (
           <Button size="small" color="inherit" onClick={onEditInputs}>
             Edit test inputs
           </Button>

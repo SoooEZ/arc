@@ -39,15 +39,16 @@ final class NodeValidation {
             node.cases() != null && !node.cases().isEmpty(),
             node.label() + ": add at least one case");
 
-      Set<String> referenceParameters = Set.of();
-      if (kind == NodeKind.REFERENCE) referenceParameters = referenceParameters(node, resolver);
-
-      for (OwnedExpression expression : expressions(node)) {
-        if (expression.bindingName() != null)
-          require(
-              referenceParameters.contains(expression.bindingName()),
-              node.label() + ": unknown parameter " + expression.bindingName());
+      // Expressions first: a broken binding is reported before its pin, with or without a plan.
+      for (OwnedExpression expression : expressions(node))
         check(expression, scope, expressions, resolver);
+      if (kind == NodeKind.REFERENCE) {
+        Set<String> referenceParameters = referenceParameters(node, resolver);
+        for (OwnedExpression expression : expressions(node))
+          if (expression.bindingName() != null)
+            require(
+                referenceParameters.contains(expression.bindingName()),
+                node.label() + ": unknown parameter " + expression.bindingName());
       }
 
       if (kind.storesResult()) {
@@ -57,19 +58,6 @@ final class NodeValidation {
             definition.inputs().stream().noneMatch(input -> input.name().equals(node.output())),
             node.label() + ": cannot overwrite input " + node.output());
       }
-    } catch (ArcException error) {
-      throw error.atNode(null, null, node.id(), node.label());
-    }
-  }
-
-  /**
-   * A cyclic graph has no scope plan. Its expressions still receive syntax and Formula checks,
-   * labelled like executable validation labels them.
-   */
-  void syntax(Node node, RuleResolver resolver, ExpressionCache expressions) {
-    try {
-      for (OwnedExpression expression : expressions(node))
-        check(expression, null, expressions, resolver);
     } catch (ArcException error) {
       throw error.atNode(null, null, node.id(), node.label());
     }
@@ -188,7 +176,7 @@ final class NodeValidation {
       for (var mapping : input.source().bindings().entrySet())
         owned.add(
             new OwnedExpression(
-                mapping.getValue(), input.name() + " source / " + mapping.getKey()));
+                mapping.getValue(), Validator.sourceMappingLabel(input.name(), mapping.getKey())));
       mappings.put(input.name(), owned);
     }
     return mappings;

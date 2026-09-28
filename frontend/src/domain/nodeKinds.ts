@@ -56,8 +56,11 @@ export interface NodeKind {
   storesResult: boolean;
   /** Offered by the Add node menu. */
   addable: boolean;
-  /** The user may delete it (a draft still keeps at least one node). */
-  removable: boolean;
+  /**
+   * The user may delete it: every node of the kind, or with "extra" only a node
+   * after the draft's first of the kind (a draft still keeps at least one node).
+   */
+  removable: boolean | "extra";
   /** Other nodes may connect into it. */
   acceptsIncoming: boolean;
   exits: NodeExits;
@@ -96,10 +99,11 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     newNodeLabel: "Input",
     className: "input",
     storesResult: false,
-    // The graph's single entry: it comes with the rule, is never deleted and
-    // nothing connects into it.
+    // The graph's single entry: it comes with the rule and nothing connects
+    // into it. The first Input stays; an extra one, which validation rejects
+    // ("exactly one Input node"), can be deleted.
     addable: false,
-    removable: false,
+    removable: "extra",
     acceptsIncoming: false,
     exits: "next",
     properties: [],

@@ -3,7 +3,12 @@ import { Alert, Button, CircularProgress } from "@mui/material";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { GraphProblem } from "../../api/errors";
 import { LazyBoundary } from "../../components/LazyBoundary";
-import { isCurrentGraphLocation, semanticGraphKey } from "../../domain/graph";
+import {
+  applyNodeFragment,
+  isCurrentGraphLocation,
+  semanticGraphKey,
+  withNodePositions,
+} from "../../domain/graph";
 import Inspector from "./inspector/Inspector";
 import TestPanel from "../execution/TestPanel";
 import RuleSettings from "./RuleSettings";
@@ -20,7 +25,11 @@ import { exportDefinition } from "./exportDefinition";
 import { usePreviewExecution } from "./usePreviewExecution";
 import { useNodeDialog } from "./useNodeDialog";
 import LazyNodeDialog from "./LazyNodeDialog";
-import { defaultSelection, selectedNode } from "./nodeSelection";
+import {
+  defaultSelection,
+  selectedEdgeId,
+  selectedNode,
+} from "./nodeSelection";
 import type { EditorProps, ReferenceTarget } from "./types";
 const CodeStudio = lazy(() => import("../studio/CodeStudio"));
 const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
@@ -50,6 +59,7 @@ function EditorContent({
   onDirty,
   onDeleted,
   navigate,
+  redirect = navigate,
   notify,
   embedded = false,
   onOpenReference,
@@ -67,6 +77,7 @@ function EditorContent({
     onDirty,
     onDeleted,
     navigate,
+    redirect,
     notify,
     reportCommandProblem: setCommandProblem,
   });
@@ -114,15 +125,20 @@ function EditorContent({
     },
     [selected, blockedByInvalidDefault],
   );
-  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  const [requestedEdge, setSelectedEdge] = useState<string | null>(null);
+  const selectedEdge = selectedEdgeId(rule.draft, requestedEdge);
   const nodeNameInput = useRef<HTMLInputElement>(null);
   const nodeDialog = useNodeDialog(rule.draft.nodes);
   const { openCode, openEdit, active: activeDialog } = nodeDialog;
+  // Published versions open node code read-only, so the gate is the command
+  // lock (as for Validate), not editability: a dialog opened while Arrange
+  // runs would show and apply the positions from before the layout.
   const openNodeCode = useCallback(
     (id: string) => {
+      if (!can.validate) return;
       if (!blockedByInvalidDefault("opening node code")) openCode(id);
     },
-    [blockedByInvalidDefault, openCode],
+    [can.validate, blockedByInvalidDefault, openCode],
   );
   const [referenceTarget, setReferenceTarget] =
     useState<ReferenceTarget | null>(null);
@@ -148,6 +164,7 @@ function EditorContent({
     selectedEdge,
     setSelectedEdge,
     onExpression: openNodeCode,
+    canOpenCode: can.validate,
     trace: preview.result,
     nodeErrors,
     edit,
@@ -158,10 +175,11 @@ function EditorContent({
     measurements,
     edit,
     arrange: document.arrange,
+    selected,
     selectNode,
     requestFit,
   });
-  const { focusNode, jumpToNode } = useGraphFocus({
+  const { focusNode, jumpToNode, focusPending } = useGraphFocus({
     definition: rule.draft,
     ruleId: rule.id,
     requestedVersion,
@@ -214,6 +232,9 @@ function EditorContent({
       version={requestedVersion}
       publishedVersion={requestedVersion ?? rule.publishedVersion}
       buildPending={sourceDirty}
+      inputNodeId={
+        rule.draft.nodes.find((node) => node.type === "INPUT")?.id ?? null
+      }
       onOpenReference={openReference}
       onNode={jumpToNode}
     />
@@ -243,7 +264,7 @@ function EditorContent({
     <div className="editor">
       <EditorHeader
         rule={rule}
-        mode={mode}
+        mode={view}
         readOnly={readOnly}
         dirty={dirty}
         busy={busy}
@@ -256,7 +277,7 @@ function EditorContent({
         showHistory={() => setHistory((value) => !value)}
         setSettingsOpen={setSettingsOpen}
         action={action}
-        onToggleTest={() => void toggleTest(preview.toggle)}
+        onToggleTest={() => void toggleTest(preview)}
       />
       {error && (
         <Alert severity="error" onClose={() => setError("")}>
@@ -310,6 +331,7 @@ function EditorContent({
             readOnly={readOnly}
             capabilities={can}
             arranging={busy === "layout"}
+            initialFocus={focusPending}
             selected={selected}
             selectedEdge={selectedEdge}
             setSelected={selectNode}
@@ -381,7 +403,15 @@ function EditorContent({
             node={activeDialog.node}
             readOnly={!can.edit}
             onProblems={nodeDialog.reportCodeProblems}
-            onApply={(built) => edit(() => built)}
+            onApply={(built) =>
+              edit((current) =>
+                applyNodeFragment(
+                  current,
+                  activeDialog.node.id,
+                  withNodePositions(built),
+                ),
+              )
+            }
             onClose={nodeDialog.close}
           />
         </LazyNodeDialog>

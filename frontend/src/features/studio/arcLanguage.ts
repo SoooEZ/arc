@@ -39,20 +39,53 @@ monaco.languages.setLanguageConfiguration("arc", {
   },
 });
 monaco.languages.setMonarchTokensProvider("arc", {
+  keywords: [
+    "schema",
+    "inputs",
+    "node",
+    "at",
+    "let",
+    "when",
+    "select",
+    "case",
+    "equals",
+    "field",
+    "return",
+    "use",
+    "version",
+    "bind",
+    "as",
+    "next",
+    "edge",
+    "source",
+    "required",
+    "optional",
+    "default",
+  ],
+  typeNames,
+  constants: ["true", "false", "null"],
   tokenizer: {
     root: [
       [/\/\/.*$/, "comment"],
       [/"/, "string", "@doubleQuotedString"],
       [/'/, "string", "@singleQuotedString"],
       [/@[a-z][a-z0-9-]*(?::[1-9]\d*)?/, "formula"],
-      [
-        /\b(schema|inputs|node|at|let|when|select|case|equals|field|return|use|version|bind|as|next|edge|source|required|optional|default)\b/,
-        "keyword",
-      ],
-      [new RegExp(`\\b(${typeNames.join("|")})\\b`), "type"],
-      [/\b(true|false|null)\b/, "constant"],
       [/\$[A-Za-z_][\w.]*/, "function"],
       [/[A-Za-z_][\w.]*(?=\s*\()/, "function"],
+      // One token per name or dotted path. Monarch retries an unmatched position
+      // one character on, where \b-bounded word lists matched keywords inside
+      // words: the "at" of order.format, the "let" of order.wallet.
+      [
+        /[A-Za-z_]\w*(?:\.\w+)*/,
+        {
+          cases: {
+            "@keywords": "keyword",
+            "@typeNames": "type",
+            "@constants": "constant",
+            "@default": "identifier",
+          },
+        },
+      ],
       [/\d+(\.\d+)?/, "number"],
       [/[{}()[\]]/, "@brackets"],
       [/[+\-*/=><!&|^]+/, "operator"],

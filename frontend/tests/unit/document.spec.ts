@@ -5,8 +5,11 @@ import {
   initialDocument,
 } from "../../src/features/editor/documentState";
 import {
+  applyNodeFragment,
   availableVariables,
   connectGraphNodes,
+  declaredVariables,
+  groupVariablesByName,
   inputVariables,
   isCurrentGraphLocation,
   isPreviewRoot,
@@ -16,10 +19,15 @@ import {
   sameDefinition,
   semanticGraphKey,
   variableOptionLabel,
+  withNodePositions,
 } from "../../src/domain/graph";
 import { sampleInputsJson } from "../../src/domain/executionInputs";
+import { nodeWidth } from "../../src/domain/nodePorts";
 import { setSwitchDefaultReturn } from "../../src/domain/switchBranches";
-import { selectedNode } from "../../src/features/editor/nodeSelection";
+import {
+  selectedEdgeId,
+  selectedNode,
+} from "../../src/features/editor/nodeSelection";
 import { nodeErrorsOf } from "../../src/features/editor/useGraphProblems";
 import {
   literalText,
@@ -27,6 +35,7 @@ import {
   simpleComparison,
 } from "../../src/domain/expressions";
 import { sameRuleDocument } from "../../src/app/routing";
+import { DecimalNumber } from "../../src/domain/json";
 
 const rule = (): Rule => ({
   id: "example",
@@ -555,3 +564,192 @@ test("node errors use own keys for prototype-named node IDs and ignore child loc
   expect(errors.get("toString")).toBeUndefined();
   expect(errors.get("hasOwnProperty")).toBeUndefined();
 });
+
+test("a save echo that respells a number keeps the local draft, one that rescales it does not", () => {
+  const submitted = editedRule();
+  const withDefault = (value: unknown): Definition => ({
+    ...submitted.draft,
+    inputs: submitted.draft.inputs.map((input, index) =>
+      index === 0 ? { ...input, defaultValue: value } : input,
+    ),
+  });
+  const local = {
+    ...submitted,
+    draft: withDefault(new DecimalNumber("1.23456789012345678901e5")),
+  };
+  const start = initialDocument(local);
+  // The server echoes plain notation, which used to replace the local draft object.
+  const saved = documentReducer(start, {
+    type: "rule/saved",
+    submitted: local,
+    rule: {
+      ...local,
+      revision: 2,
+      draft: withDefault(new DecimalNumber("123456.789012345678901")),
+    },
+  });
+  expect(saved.rule.draft).toBe(start.rule.draft);
+  expect(semanticGraphKey(saved.rule.draft)).toBe(
+    semanticGraphKey(start.rule.draft),
+  );
+  expect(
+    sameDefinition(
+      withDefault(new DecimalNumber("1e400")),
+      withDefault(new DecimalNumber("1" + "0".repeat(400))),
+    ),
+  ).toBe(true);
+  expect(
+    sameDefinition(withDefault(2.5), withDefault(new DecimalNumber("2.5"))),
+  ).toBe(true);
+  // A different scale is another number to the server.
+  expect(
+    sameDefinition(withDefault(new DecimalNumber("2.50")), withDefault(2.5)),
+  ).toBe(false);
+});
+
+test("declared variables list a name assigned by several nodes once, with every producer", () => {
+  // Code studio completion listed price twice, once per producing node.
+  expect(declaredVariables(rule().draft)).toEqual([
+    { name: "amount", type: "NUMBER", label: "Input" },
+    {
+      name: "price",
+      type: "RESULT",
+      label: "First calculation / Second calculation",
+    },
+  ]);
+  expect(
+    groupVariablesByName([
+      { name: "fee", type: "RESULT", label: "High fee" },
+      { name: "fee", type: "RESULT", label: "Low fee" },
+      { name: "fee", type: "RESULT", label: "High fee" },
+    ]),
+  ).toEqual([{ name: "fee", type: "RESULT", label: "High fee / Low fee" }]);
+});
+
+test("the selected connection is derived from the current draft", () => {
+  const draft = rule().draft;
+  expect(selectedEdgeId(draft, "a")).toBe("a");
+  expect(selectedEdgeId(draft, null)).toBeNull();
+  // A node deletion, a build or a version load can remove the selected edge.
+  expect(selectedEdgeId(removeGraphNode(draft, "left"), "a")).toBeNull();
+  expect(selectedEdgeId(draft, "missing")).toBeNull();
+});
+
+test("a node fragment build applies only what the fragment owns and keeps an unchanged draft", () => {
+  const start = initialDocument(rule());
+  const draft = start.rule.draft;
+  // The server echoes explicit nulls, its own key order and the fragment's edges last.
+  const echo: Definition = {
+    schemaVersion: 1,
+    inputs: draft.inputs.map((input) => ({ ...input, source: null })),
+    nodes: draft.nodes.map((node) => ({
+      ...node,
+      output: node.output ?? null,
+      ruleId: null,
+      bindings: null,
+    })) as Definition["nodes"],
+    edges: [draft.edges[1], draft.edges[0]],
+    notes: null,
+  };
+  expect(applyNodeFragment(draft, "input", echo)).toBe(draft);
+  const applied = documentReducer(start, {
+    type: "graph/change",
+    change: (current) => applyNodeFragment(current, "input", echo),
+  });
+  expect(applied).toBe(start);
+  expect(ruleSnapshot(applied.rule)).toBe(applied.baseline);
+  // A changed fragment replaces its node and outgoing edges, keeping every other object.
+  const changed = applyNodeFragment(draft, "left", {
+    ...echo,
+    nodes: echo.nodes.map((node) =>
+      node.id === "left" ? { ...node, expression: "amount * 0.7" } : node,
+    ),
+    edges: [
+      draft.edges[0],
+      { id: "b2", source: "left", sourceHandle: "next", target: "output" },
+    ],
+  });
+  expect(changed.nodes[1].expression).toBe("amount * 0.7");
+  expect(changed.nodes[0]).toBe(draft.nodes[0]);
+  expect(changed.nodes[2]).toBe(draft.nodes[2]);
+  expect(changed.edges).toEqual([
+    draft.edges[0],
+    { id: "b2", source: "left", sourceHandle: "next", target: "output" },
+  ]);
+  expect(changed.edges[0]).toBe(draft.edges[0]);
+  expect(changed.inputs).toBe(draft.inputs);
+  // Only an Input fragment brings parameters, and only changed ones.
+  const parameters = applyNodeFragment(draft, "input", {
+    ...echo,
+    inputs: [
+      ...echo.inputs,
+      { name: "rate", type: "NUMBER", required: true, defaultValue: null },
+    ],
+  });
+  expect(parameters.inputs.map((input) => input.name)).toEqual([
+    "amount",
+    "rate",
+  ]);
+  expect(parameters.nodes).toBe(draft.nodes);
+  expect(applyNodeFragment(draft, "left", { ...echo, inputs: [] }).inputs).toBe(
+    draft.inputs,
+  );
+});
+
+test("coordinates the server writes as 400.0 become numbers before any position arithmetic", () => {
+  // The lossless codec keeps 400.0 as a DecimalNumber; "400.0" + 50 concatenated text, so a
+  // default return landed on top of its Switch and the Input connection was blocked.
+  const echoed = {
+    ...rule().draft,
+    nodes: rule().draft.nodes.map((node) => ({
+      ...node,
+      position: {
+        x: new DecimalNumber(`${node.position.x}.0`),
+        y: new DecimalNumber(`${node.position.y}.0`),
+      },
+    })) as unknown as Definition["nodes"],
+  };
+  const placed = withNodePositions(echoed);
+  expect(placed.nodes.map((node) => node.position)).toEqual(
+    rule().draft.nodes.map((node) => node.position),
+  );
+  expect(
+    placed.nodes.every((node) => typeof node.position.x === "number"),
+  ).toBe(true);
+  expect(withNodePositions(placed)).toBe(placed);
+  const opened = initialDocument({ ...rule(), draft: echoed });
+  expect(opened.rule.draft.nodes[1].position).toEqual({ x: 0, y: 100 });
+  // A save echo with such coordinates is the local draft, so the preview result survives the save.
+  const start = initialDocument(rule());
+  const saved = documentReducer(start, {
+    type: "rule/saved",
+    submitted: start.rule,
+    rule: { ...start.rule, revision: 2, draft: echoed },
+  });
+  expect(saved.rule.draft).toBe(start.rule.draft);
+  expect(saved.rule.revision).toBe(2);
+  expect(
+    setSwitchDefaultReturn(
+      { ...placed, nodes: [...placed.nodes, switchNode] },
+      "choose",
+      "0",
+      "fallback",
+      "fallback-edge",
+    ).nodes.at(-1)?.position,
+  ).toEqual({
+    x: Math.max(
+      ...[...placed.nodes, switchNode].map(
+        (node) => node.position.x + nodeWidth(node) + 50,
+      ),
+    ),
+    y: 720,
+  });
+});
+
+const switchNode: Definition["nodes"][number] = {
+  id: "choose",
+  type: "SWITCH",
+  label: "Choose",
+  position: { x: 300, y: 500 },
+  cases: [{ id: "one", label: "One", expression: "amount > 1" }],
+};

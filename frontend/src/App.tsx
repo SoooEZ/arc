@@ -57,7 +57,7 @@ function unknownPage(route: never): never {
 }
 
 export default function App() {
-  const { route, navigate, setDirty } = useWorkspaceNavigation();
+  const { route, navigate, redirect, setDirty } = useWorkspaceNavigation();
   const view = parseRoute(route);
   const library = useRuleLibrary(view.page === "library");
   const [savedRule, setSavedRule] = useState<Rule | null>(null);
@@ -128,6 +128,7 @@ export default function App() {
             onDirty={setDirty}
             onDeleted={forgetDeletedRule}
             navigate={navigate}
+            redirect={redirect}
             notify={setNotice}
           />
         </LazyBoundary>
@@ -209,7 +210,11 @@ export default function App() {
       <Snackbar
         open={!!notice}
         autoHideDuration={4000}
-        onClose={() => setNotice("")}
+        // Only the timeout or Escape closes a notice: MUI also reports any click elsewhere
+        // as "clickaway", which made error notices vanish at once.
+        onClose={(_event, reason) => {
+          if (reason !== "clickaway") setNotice("");
+        }}
         message={notice}
       />
     </div>

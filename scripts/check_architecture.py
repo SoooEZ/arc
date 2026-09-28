@@ -38,6 +38,8 @@ HAND_WRITTEN_NODE_VOCABULARY = re.compile(
     + r'|next\|true\|false'  # a hand-written regex alternation of handles
     + r'|"case:"'  # a hand-built Switch case handle
 )
+# Case conversion must name a Locale: the JVM default is host state ("STRING" is "strıng" under tr).
+DEFAULT_LOCALE_CASE = re.compile(r"\.to(?:Lower|Upper)Case\(\)")
 PURE_FRONTEND = {
     "domain/": ("types", "domain/"),
     "app/routing.ts": (),
@@ -78,6 +80,9 @@ for path in sorted(JAVA.rglob("*.java")):
     if module != "model" and HAND_WRITTEN_NODE_VOCABULARY.search(source):
         reject(path, HAND_WRITTEN_NODE_VOCABULARY.search(source).group(0),
                "use NodeKind (Node.kind(), exhaustive switches) and Handles instead of node-type or handle strings")
+    if DEFAULT_LOCALE_CASE.search(source):
+        reject(path, DEFAULT_LOCALE_CASE.search(source).group(0),
+               "pass a Locale (Locale.ROOT) to case conversion; the JVM default locale is host state")
     imports = re.findall(r"^import\s+(?:static\s+)?([\w.*]+);", source, re.M)
     for dependency in imports:
         if dependency.startswith("dev.arc."):

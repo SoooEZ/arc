@@ -24,6 +24,10 @@ export function useNodeExpressionDraft({
   onClose,
 }: Options) {
   const [source, setSource] = useState<string | null>(null);
+  // An untouched buffer follows its node's current code (lesson F25): a graph
+  // change while the dialog is open, such as a finishing Arrange, would
+  // otherwise be overwritten by the stale text on Apply.
+  const edited = useRef(false);
   const [busy, setBusy] = useState(false);
   const [applyError, setApplyError] = useState("");
   const [applyDiagnostics, setApplyDiagnostics] = useState<Diagnostic[]>([]);
@@ -37,7 +41,7 @@ export function useNodeExpressionDraft({
   useEffect(() => {
     const renderedSource = rendered.data?.source;
     if (renderedSource !== undefined)
-      setSource((current) => current ?? renderedSource);
+      setSource((current) => (edited.current ? current : renderedSource));
   }, [rendered.data]);
   const checked = useAsyncResource(
     JSON.stringify([definition, nodeId, source]),
@@ -76,6 +80,7 @@ export function useNodeExpressionDraft({
     onProblems(reportedProblems);
   }, [reportedProblems, onProblems]);
   const changeSource = (value: string) => {
+    edited.current = true;
     setSource(value);
     setApplyError("");
     setApplyDiagnostics([]);

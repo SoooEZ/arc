@@ -10,6 +10,11 @@
  * stringifyJson writes their original tokens back. Only exponent spelling may
  * change: 1E2 becomes 100 and -0 becomes 0, as with JSON.parse and
  * JSON.stringify.
+ *
+ * Parsed objects follow JavaScript property order, as with JSON.parse:
+ * integer-like keys first in ascending order, then the others as written.
+ * Stored order is JSONB's, so displays show the browser's order, not the
+ * server's.
  */
 
 const numberGrammar = String.raw`-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?`;

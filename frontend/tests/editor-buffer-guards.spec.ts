@@ -66,12 +66,26 @@ test("unfinished defaults survive canvas, outline, node-code and sidebar view ch
     .filter({ hasText: "before changing views" });
   await expect(blockedView).toBeVisible();
   await blockedView.getByRole("button").click();
+  const cdp = await page.context().newCDPSession(page);
+  const position = async () => {
+    const history = await cdp.send("Page.getNavigationHistory");
+    return {
+      index: history.currentIndex,
+      hash: new URL(history.entries[history.currentIndex].url).hash,
+    };
+  };
+  const before = await position();
   await page
     .getByRole("navigation", { name: "Workspace" })
     .getByRole("button", { name: "Code studio", exact: true })
     .click();
   await expect(blockedView).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`#/rules/${id}$`));
+  // The bounce undoes the pushed entry instead of pushing the graph route again,
+  // so the session is back at the entry it showed before the click.
+  await expect.poll(position).toEqual(before);
+  expect(before.hash).toBe(`#/rules/${id}`);
+  await cdp.detach();
   await expect(field).toHaveValue("[");
   await expect(name).toHaveValue("Inputs");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();

@@ -11,7 +11,10 @@ import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
-/** Checks the kind-independent source contract, then the registered adapter's configuration. */
+/**
+ * Checks the kind-independent source contract, then the registered adapter's configuration. The
+ * name follows {@code DisplayNames}, the one policy rules share.
+ */
 @Component
 public final class SourceValidator {
   private static final Set<String> PARAMETER_TYPES = Set.of("NUMBER", "STRING", "BOOLEAN");
@@ -22,10 +25,7 @@ public final class SourceValidator {
     this.adapters = adapters;
   }
 
-  public void validate(String name, SourceDefinition definition) {
-    if (name == null || name.isBlank() || name.length() > Limits.MAX_NAME_CHARACTERS)
-      throw ArcException.invalid(
-          "Source name must contain 1–" + Limits.MAX_NAME_CHARACTERS + " characters");
+  public void validate(SourceDefinition definition) {
     // A missing definition gets the same "Source kind must be ..." message as an unknown kind.
     var adapter = adapters.require(definition == null ? null : definition.kind());
     if (definition.parameters() == null

@@ -107,3 +107,43 @@ test("a JSON default shows values applied from outside and keeps a cleared buffe
     '"name":"limits","type":"ARRAY","required":false,"defaultValue":null',
   );
 });
+
+test("wrong-type and out-of-limit JSON defaults show a field error and block saving", async ({
+  page,
+  request,
+}) => {
+  const { id, field } = await openArrayDefault(page, request, [1]);
+  const writes: string[] = [];
+  page.on("request", (outgoing) => {
+    if (
+      outgoing.method() === "PUT" &&
+      outgoing.url().endsWith(`/api/rules/${id}`)
+    )
+      writes.push(outgoing.url());
+  });
+  const typeMessage = "An ARRAY default must be a JSON array such as [1, 2].";
+  const limitMessage =
+    "This number is too large or too precise. Use at most 100 digits and 100 decimal places.";
+  // These reached the draft and failed only at save, with the server's 422.
+  for (const [text, message] of [
+    ["{}", typeMessage],
+    ["5", typeMessage],
+    ["[1e400]", limitMessage],
+  ] as const) {
+    await field.fill(text);
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByText(message, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await expect(
+      page.getByText(
+        "Fix the invalid parameter default before saving or changing views",
+      ),
+    ).toBeVisible();
+  }
+  expect(writes).toEqual([]);
+  await field.fill("[1, 2]");
+  await expect(field).toHaveAttribute("aria-invalid", "false");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(await storedDraft(request, id)).toContain('"defaultValue":[1,2]');
+});

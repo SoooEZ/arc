@@ -11,9 +11,11 @@ const idle: InsertionState = { busy: "", error: "" };
 
 /**
  * One pending insertion from a studio library card. A new choice aborts the
- * previous read, so a double click inserts once and a late response cannot
- * insert after a newer choice. Unmounting or `cancel` aborts it too. Only the
- * current choice reports its busy card or its error.
+ * previous read, so a late response cannot insert after a newer choice, and
+ * `onCardClick` ignores the repeated clicks of a double or triple click, so a
+ * click sequence inserts once however fast the read answers (lesson F30).
+ * Unmounting or `cancel` aborts the read too. Only the current choice reports
+ * its busy card or its error.
  */
 export function useLibraryInsertion() {
   const [state, setState] = useState(idle);
@@ -49,6 +51,26 @@ export function useLibraryInsertion() {
     pending.current = null;
     setState(error ? { busy: "", error } : idle);
   };
+  /**
+   * A card's click handler: the second and later clicks of a double or triple
+   * click (event.detail above 1) are ignored; keyboard activation (detail 0)
+   * and a first click insert.
+   */
+  const onCardClick = (
+    event: { detail: number },
+    key: string,
+    insert: (signal: AbortSignal) => Promise<void>,
+  ) => {
+    if (event.detail > 1) return;
+    void run(key, insert);
+  };
   const dismissError = () => setState(idle);
-  return { busy: state.busy, error: state.error, run, cancel, dismissError };
+  return {
+    busy: state.busy,
+    error: state.error,
+    run,
+    onCardClick,
+    cancel,
+    dismissError,
+  };
 }

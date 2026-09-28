@@ -13,8 +13,16 @@ import {
 
 const elk = new ELK();
 const portId = (nodeId: string, handle: string) => `${nodeId}:${handle}`;
-const compareId = (a: { id: string }, b: { id: string }) =>
-  a.id.localeCompare(b.id);
+/**
+ * Code-unit order: IDs are ASCII, and localeCompare made the layout depend on the browser
+ * locale (da-DK sorts "aa" after "z"; th-TH ignores '-' and '_'), so collaborators rewrote each
+ * other's card positions.
+ */
+function compareId(a: { id: string }, b: { id: string }): number {
+  if (a.id < b.id) return -1;
+  if (a.id > b.id) return 1;
+  return 0;
+}
 const isFiniteNumber = (value: number | undefined): value is number =>
   value !== undefined && Number.isFinite(value);
 

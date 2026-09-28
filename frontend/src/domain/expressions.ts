@@ -1,6 +1,8 @@
 // Literal syntax mirrors the server tokenizer (ExpressionParser.TOKEN). A looser
 // pattern would show text the server rejects as a valid typed constant.
 
+import { MAX_EXPRESSION_TOKENS } from "./limits";
+
 // JSON escapes are part of ARC's string contract.
 export const quoteText = (text: string) => JSON.stringify(text);
 
@@ -43,15 +45,56 @@ export function isNumberLiteral(text: string): boolean {
   return numberToken.test(text);
 }
 
-/** JSON arrays of numbers, strings, booleans, null and nested arrays; ARC has no object literal. */
+// The server's token classes, in its order: a number, a name or call (a unary
+// minus is its own token), a quoted string, then an operator or punctuation.
+const expressionToken =
+  /[\u0000-\u0020]*(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\.\d+|\$?[A-Za-z_][A-Za-z_0-9.]*|@[A-Za-z_][A-Za-z_0-9-]*(?::[0-9]+)?|"[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'|&&|\|\||==|!=|<>|<=|>=|[=^[\]+*/%<>()!,\-])/y;
+
+/**
+ * How many tokens the server reads from `text` before it stops, or Infinity
+ * once the text holds something it cannot read.
+ */
+export function expressionTokenCount(text: string): number {
+  const source = trimExpression(text);
+  let count = 0;
+  expressionToken.lastIndex = 0;
+  while (expressionToken.lastIndex < source.length) {
+    if (!expressionToken.exec(source)) return Infinity;
+    count++;
+  }
+  return count;
+}
+
+/** Whether the server's tokenizer refuses `text` for its length alone. */
+export function exceedsTokenLimit(text: string): boolean {
+  return expressionTokenCount(text) > MAX_EXPRESSION_TOKENS;
+}
+
+/**
+ * JSON arrays of numbers, strings, booleans, null and nested arrays, within
+ * the server's token limit; ARC has no object literal.
+ */
 export function isArrayLiteral(text: string): boolean {
+  return jsonArray(text) !== null && !exceedsTokenLimit(text);
+}
+
+/**
+ * Why the server refuses the JSON array `text` as one literal, or null when it
+ * reads it as one or when the text is no JSON array at all.
+ */
+export function arrayLiteralProblem(text: string): string | null {
+  if (jsonArray(text) === null || !exceedsTokenLimit(text)) return null;
+  return `Array literals are limited to ${MAX_EXPRESSION_TOKENS} tokens (about 127 numbers); pass a longer list as an input parameter or a data source.`;
+}
+
+function jsonArray(text: string): unknown[] | null {
   let value: unknown;
   try {
     value = JSON.parse(text);
   } catch {
-    return false;
+    return null;
   }
-  return Array.isArray(value) && !containsObject(value);
+  return Array.isArray(value) && !containsObject(value) ? value : null;
 }
 
 function containsObject(value: unknown): boolean {

@@ -1,5 +1,6 @@
 package dev.arc.source;
 
+import dev.arc.engine.DisplayNames;
 import dev.arc.engine.Identifiers;
 import dev.arc.error.ArcException;
 import dev.arc.model.*;
@@ -46,13 +47,15 @@ public class SourceService {
   @Transactional
   public DataSource create(Create request) {
     if (!Identifiers.isResourceId(request.id())) throw ArcException.invalid("Invalid source ID");
-    validator.validate(request.name(), request.definition());
-    return repository.create(request.id(), request.name(), request.definition());
+    String name = DisplayNames.normalize("Source", request.name());
+    validator.validate(request.definition());
+    return repository.create(request.id(), name, request.definition());
   }
 
   @Transactional
   public DataSource update(String id, Update request) {
-    validator.validate(request.name(), request.definition());
-    return repository.update(id, request.name(), request.revision(), request.definition());
+    String name = DisplayNames.normalize("Source", request.name());
+    validator.validate(request.definition());
+    return repository.update(id, name, request.revision(), request.definition());
   }
 }

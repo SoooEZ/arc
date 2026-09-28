@@ -3,6 +3,7 @@ package dev.arc.engine.validation;
 import static dev.arc.support.GraphFixtures.*;
 import static org.assertj.core.api.Assertions.*;
 
+import dev.arc.engine.Limits;
 import dev.arc.engine.RuleResolver;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
@@ -114,6 +115,49 @@ class ValidatorTest {
     assertThatThrownBy(
             () -> validator.shape(new Definition(2, base.inputs(), base.nodes(), base.edges())))
         .hasMessageContaining("schemaVersion");
+  }
+
+  @Test
+  void inputAndDocumentProblemsAppearOnTheInputNodeWhereverTheShapeIsChecked() {
+    // Save, render and /variables returned them unlocated, unlike /validate and /diagnostics.
+    var base = RuleSamples.blank("FORMULA");
+    var input = base.inputNode().orElseThrow();
+    var amount = new Input("amount", "NUMBER", true, null);
+    var duplicated = new Definition(1, List.of(amount, amount), base.nodes(), base.edges());
+    var emptySourceId =
+        new Definition(
+            1,
+            List.of(
+                new Input(
+                    "rate", "NUMBER", false, null, new SourceBinding("", 1, Map.of(), "", "FAIL"))),
+            base.nodes(),
+            base.edges());
+    var tooMany = new ArrayList<Input>();
+    for (int index = 0; index <= Limits.MAX_INPUTS; index++)
+      tooMany.add(new Input("input" + index, "NUMBER", true, null));
+    var overLimit = new Definition(1, tooMany, base.nodes(), base.edges());
+    for (var problem :
+        Map.of(
+                duplicated, "Duplicate input: amount",
+                emptySourceId, "Source needs an ID and version",
+                overLimit, "Provide at most " + Limits.MAX_INPUTS + " inputs")
+            .entrySet())
+      assertThatThrownBy(() -> validator.shape(problem.getKey()))
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.getMessage()).isEqualTo(problem.getValue());
+                assertThat(error.locations())
+                    .containsExactly(
+                        new ArcException.Location(null, null, input.id(), input.label()));
+              });
+    // A draft without an Input node keeps the problem unlocated.
+    var noInput =
+        new Definition(
+            1, List.of(amount, amount), List.of(outputNode("out", "Out", "1")), List.of());
+    assertThatThrownBy(() -> validator.shape(noInput))
+        .isInstanceOfSatisfying(
+            ArcException.class, error -> assertThat(error.locations()).isEmpty());
   }
 
   @Test

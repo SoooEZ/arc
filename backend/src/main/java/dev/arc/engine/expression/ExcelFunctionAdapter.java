@@ -154,10 +154,13 @@ final class ExcelFunctionAdapter {
   /** REPT must not build a string that the value bounds reject afterwards. */
   private static void checkRepeatedLength(List<Object> args) {
     BigDecimal count = Expressions.number(args.get(1));
-    double length = String.valueOf(args.getFirst()).length() * count.doubleValue();
-    if (count.signum() < 0
-        || count.compareTo(BigDecimal.valueOf(Limits.MAX_STRING_CHARACTERS)) > 0
-        || length > Limits.MAX_STRING_CHARACTERS)
+    if (count.signum() < 0 || count.compareTo(BigDecimal.valueOf(Limits.MAX_STRING_CHARACTERS)) > 0)
+      throw ArcException.invalid("REPT result exceeds string limit");
+    // Measure the text POI repeats ("" for a blank, "100" for 1E+2), count times truncated to an
+    // int as POI does; BigDecimal.toString refused $REPT(1E+2, 600) and let $REPT(1e10, 399)
+    // through.
+    String text = OperandResolver.coerceValueToString(value(args.getFirst()));
+    if ((long) text.length() * (int) count.doubleValue() > Limits.MAX_STRING_CHARACTERS)
       throw ArcException.invalid("REPT result exceeds string limit");
   }
 

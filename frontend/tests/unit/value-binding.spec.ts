@@ -7,9 +7,11 @@ import {
   constantTextError,
   inferBindingMode,
   inferConstantType,
+  undeclaredBindings,
   withBinding,
+  withoutBindings,
 } from "../../src/domain/valueBinding";
-import { literalCases } from "./literal-cases";
+import { literalCases, numberList } from "./literal-cases";
 
 test("typed bindings recognize compatible literals without changing their expression", () => {
   for (const [value, type] of [
@@ -103,6 +105,11 @@ test("typed constant fields name partial or rejected text without flagging an em
     expect(constantTextError("NUMBER", text), text).toContain("number");
   for (const text of ["[1, 2,", '[{"a": 1}]', "[.5]", "1"])
     expect(constantTextError("ARRAY", text), text).toContain("array");
+  // A well-formed list beyond the server's 256 tokens names the limit, not the format.
+  expect(constantTextError("ARRAY", numberList(128))).toBe(
+    "Array literals are limited to 256 tokens (about 127 numbers); pass a longer list as an input parameter or a data source.",
+  );
+  expect(constantTextError("ARRAY", numberList(127))).toBeNull();
   for (const [type, text] of [
     ["NUMBER", "-0.5"],
     ["NUMBER", "1e3"],
@@ -156,4 +163,30 @@ test("parameter mappings named like Object.prototype members stay own entries in
   expect(withBinding(removed, "missing", undefined)).toEqual(removed);
   expect(withBinding(null, "amount", undefined)).toEqual({});
   expect(bindings.amount).toBe("1");
+});
+
+test("undeclared mappings are the own keys a pinned version does not declare, in stored order", () => {
+  const bindings = withBinding(
+    withBinding(
+      withBinding({ region: "1" }, "constructor", "2"),
+      "__proto__",
+      "3",
+    ),
+    "key",
+    "4",
+  );
+  expect(undeclaredBindings(bindings, ["key"])).toEqual([
+    "region",
+    "constructor",
+    "__proto__",
+  ]);
+  expect(
+    undeclaredBindings(bindings, ["key", "region", "constructor", "__proto__"]),
+  ).toEqual([]);
+  // Inherited members are never "mapped": an empty record maps nothing.
+  expect(undeclaredBindings({}, [])).toEqual([]);
+  expect(undeclaredBindings(null, ["key"])).toEqual([]);
+  const remaining = withoutBindings(bindings, ["region", "__proto__"]);
+  expect(Object.keys(remaining)).toEqual(["constructor", "key"]);
+  expect(remaining.constructor).toBe("2");
 });
