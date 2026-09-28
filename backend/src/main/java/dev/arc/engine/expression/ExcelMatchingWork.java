@@ -37,7 +37,8 @@ final class ExcelMatchingWork {
 
   private static final Pattern NUMBER = Pattern.compile(POI_NUMBER_PATTERN);
 
-  private static final Set<String> DATABASE_FUNCTIONS =
+  /** The database functions: a database range, one field and a criteria range. */
+  static final Set<String> DATABASE_FUNCTIONS =
       Set.of(
           "DAVERAGE",
           "DCOUNT",

@@ -791,3 +791,64 @@ test("the HTTP timeout keeps typed text and blocks values the server rejects", a
   await expect.poll(() => saved.length).toBe(1);
   expect(saved[0].definition).toMatchObject({ kind: "HTTP", timeoutMs: 250 });
 });
+
+test("a new draft that takes a pending create's ID stays its own and receives the server's 409", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  const gate = deferredResponse();
+  const posts: string[] = [];
+  let puts = 0;
+  await page.route("**/api/sources", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const payload = route.request().postDataJSON();
+    posts.push(payload.name);
+    if (posts.length === 1) {
+      await gate.promise;
+      await route.fulfill({ json: { ...payload, version: 1 } });
+      return;
+    }
+    await route.fulfill({
+      status: 409,
+      json: { message: "This source ID already exists" },
+    });
+  });
+  await page.route("**/api/sources/held-create", (route) => {
+    puts++;
+    return route.fulfill({ json: {} });
+  });
+  page.on("dialog", (dialog) => dialog.accept());
+  try {
+    await page.goto("/#/sources");
+    await page.getByRole("button", { name: "New source" }).click();
+    await page.getByLabel("Source ID").fill("held-create");
+    await page.getByLabel("Name", { exact: true }).fill("First table");
+    await page.getByRole("button", { name: "Create source" }).click();
+    await expect.poll(() => posts.length).toBe(1);
+    // A second New source while the create is pending: unrelated content, the same ID.
+    await page.getByRole("button", { name: "New source" }).click();
+    await page.getByLabel("Name", { exact: true }).fill("Other table");
+    await page.getByLabel("Lookup entries · JSON object").fill('{"FR":1}');
+    await page.getByLabel("Source ID").fill("held-create");
+    // The pending create belongs to the discarded draft, not to this one.
+    await expect(page.getByLabel("Source ID")).toBeEnabled();
+    gate.release();
+    await expect(
+      page.locator(".source-list > button").filter({ hasText: "First table" }),
+    ).toBeVisible();
+    // Before, this draft became "v1 · edited" here and Save sent a PUT for first v2.
+    await expect(page.getByText("Unsaved", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Source ID")).toBeEnabled();
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
+      "Other table",
+    );
+    await page.getByRole("button", { name: "Create source" }).click();
+    await expect(
+      page.getByText("This source ID already exists", { exact: true }),
+    ).toBeVisible();
+    expect(posts).toEqual(["First table", "Other table"]);
+    expect(puts).toBe(0);
+  } finally {
+    gate.release();
+  }
+});

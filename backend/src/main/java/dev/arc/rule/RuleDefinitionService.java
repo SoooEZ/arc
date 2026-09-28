@@ -59,8 +59,9 @@ public class RuleDefinitionService {
     sources.validate(definition, resolver, lookup);
   }
 
+  /** Scopes depend on the graph's structure alone: invalid structure or a cycle still fails. */
   public Map<String, Set<String>> variables(Definition definition) {
-    validator.shape(definition);
+    validator.structure(definition);
     return new GraphPlan(definition).available();
   }
 

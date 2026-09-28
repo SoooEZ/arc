@@ -9,6 +9,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import java.util.*;
+import java.util.function.IntFunction;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
@@ -113,5 +114,80 @@ class GraphPlanTest {
                 edge("e", "c", "next"),
                 edge("e", "after", "next")));
     assertThat(planCycle(longer)).containsExactly("e", "c", "d");
+  }
+
+  /**
+   * "Approve if any of `pairs` two-part checks passes": Input → check_i; check_i.true → confirm_i;
+   * confirm_i.true → approve (a shared Formula, then an Output); both false exits → reject.
+   */
+  private Definition pairedChecks(
+      int pairs, IntFunction<String> check, IntFunction<String> confirm) {
+    var nodes = new ArrayList<Node>();
+    var edges = new ArrayList<Edge>();
+    nodes.add(node("input", "INPUT", null, null));
+    nodes.add(node("approve", "FORMULA", "1", "approved"));
+    nodes.add(node("result", "OUTPUT", "approved", null));
+    nodes.add(node("reject", "OUTPUT", "0", null));
+    edges.add(edge("approve", "result", "next"));
+    for (int pair = 0; pair < pairs; pair++) {
+      String first = check.apply(pair), second = confirm.apply(pair);
+      nodes.add(node(first, "CONDITION", "amount > " + pair, null));
+      nodes.add(node(second, "CONDITION", "amount < " + (1000 + pair), null));
+      edges.add(edge("input", first, "next"));
+      edges.add(edge(first, second, "true"));
+      edges.add(edge(first, "reject", "false"));
+      edges.add(edge(second, "approve", "true"));
+      edges.add(edge(second, "reject", "false"));
+    }
+    return new Definition(1, amount, nodes, edges);
+  }
+
+  @Test
+  void branchAnalysisDoesNotDependOnNodeNames() {
+    // Grouped names ordered every check before every confirm, which made the decision diagram of
+    // "any pair passes" exponential: the same graph was too complex under one naming only.
+    var grouped =
+        pairedChecks(14, i -> "check_%02d".formatted(i), i -> "confirm_%02d".formatted(i));
+    var paired = pairedChecks(14, i -> "rule_%02d_a".formatted(i), i -> "rule_%02d_b".formatted(i));
+    Map<String, Set<String>> groupedScopes = new GraphPlan(grouped).available();
+    Map<String, Set<String>> pairedScopes = new GraphPlan(paired).available();
+    for (String shared : List.of("input", "approve", "result", "reject"))
+      assertThat(groupedScopes.get(shared)).as(shared).isEqualTo(pairedScopes.get(shared));
+    for (int pair = 0; pair < 14; pair++) {
+      assertThat(groupedScopes.get("check_%02d".formatted(pair)))
+          .isEqualTo(pairedScopes.get("rule_%02d_a".formatted(pair)));
+      assertThat(groupedScopes.get("confirm_%02d".formatted(pair)))
+          .isEqualTo(pairedScopes.get("rule_%02d_b".formatted(pair)));
+    }
+    assertThat(groupedScopes.get("result")).isEqualTo(Set.of("amount", "approved"));
+  }
+
+  @Test
+  void randomNodeIdsCannotMakeAValidGraphTooComplex() {
+    // The editor names nodes shortId("node-"); at 82 nodes, 51 of 60 random namings failed.
+    var random = new Random(20260927);
+    for (int attempt = 0; attempt < 60; attempt++) {
+      var names = new LinkedHashSet<String>();
+      while (names.size() < 78) names.add("node-%08x".formatted(random.nextInt()));
+      var ids = List.copyOf(names);
+      var definition = pairedChecks(39, i -> ids.get(2 * i), i -> ids.get(2 * i + 1));
+      assertThatCode(() -> validator.validate(definition, noReferences))
+          .as("attempt " + attempt)
+          .doesNotThrowAnyException();
+    }
+  }
+
+  @Test
+  void aGenuinelyExponentialAnalysisStillReportsTooComplex() {
+    // "Any of 20 pairs passes" with every first test numbered before every second test.
+    var logic = new BooleanConditions();
+    assertThatThrownBy(
+            () -> {
+              int any = 0;
+              for (int pair = 0; pair < 20; pair++)
+                any = logic.or(any, logic.and(logic.variable(pair), logic.variable(20 + pair)));
+            })
+        .isInstanceOf(ArcException.class)
+        .hasMessage("Branch analysis is too complex; split this graph into reusable rules");
   }
 }

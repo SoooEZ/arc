@@ -64,6 +64,13 @@ final class HttpDestinationPolicy implements DnsResolver {
         || uri.getFragment() != null
         || uri.toString().length() > MAX_URL_CHARACTERS)
       throw ArcException.invalid("Use an HTTP(S) URL without credentials or fragment");
+    // The transport sends the configured text as written (lesson B21), so what it could not send as
+    // written is refused: HttpClient writes a non-ASCII character as one Latin-1 byte or as '?'.
+    if (!uri.toString().equals(uri.toASCIIString()))
+      throw ArcException.invalid(
+          "Percent-encode non-ASCII characters in the URL as UTF-8 (Zürich → Z%C3%BCrich)");
+    if (uri.getPort() != -1 && (uri.getPort() < 1 || uri.getPort() > 65535))
+      throw ArcException.invalid("Use a port from 1 to 65535");
     if (!allowedHosts.isEmpty() && !allowedHosts.contains(host))
       throw ArcException.invalid("HTTP host is not in the configured allowlist");
     validateSecretHeaders(host, definition.secretHeaders());

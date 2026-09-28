@@ -14,7 +14,7 @@ import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 
 export default function SwitchFields(props: NodeFieldsProps) {
-  const { node, patch, variables, readOnly } = props;
+  const { node, patch, variables, scopeKnown, readOnly } = props;
   const cases = node.cases ?? [];
   const matchingValue = node.selector != null;
   const move = (index: number, direction: number) => {
@@ -50,6 +50,7 @@ export default function SwitchFields(props: NodeFieldsProps) {
             type="SCALAR"
             value={node.selector ?? ""}
             variables={variables}
+            scopeKnown={scopeKnown}
             disabled={readOnly}
             optional={false}
             onChange={(selector) => patch({ selector: selector ?? "" })}
@@ -127,6 +128,7 @@ export default function SwitchFields(props: NodeFieldsProps) {
                 type="SCALAR"
                 value={option.expression}
                 variables={variables}
+                scopeKnown={scopeKnown}
                 disabled={readOnly}
                 optional={false}
                 onChange={(expression) =>
@@ -144,6 +146,7 @@ export default function SwitchFields(props: NodeFieldsProps) {
                 label={`Case ${index + 1} condition`}
                 value={option.expression}
                 variables={variables}
+                scopeKnown={scopeKnown}
                 disabled={readOnly}
                 helperText="Must return true or false. Functions can be nested."
                 onChange={(expression) =>

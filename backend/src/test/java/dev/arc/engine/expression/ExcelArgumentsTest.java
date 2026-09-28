@@ -5,6 +5,11 @@ import static org.assertj.core.api.Assertions.*;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.util.*;
+import org.apache.poi.ss.formula.eval.*;
+import org.apache.poi.ss.formula.function.FunctionMetadata;
+import org.apache.poi.ss.formula.function.FunctionMetadataRegistry;
+import org.apache.poi.ss.formula.functions.Function;
+import org.apache.poi.ss.formula.ptg.Ptg;
 import org.junit.jupiter.api.Test;
 
 /** Arrays reach POI only as ranges, and POI's numbers come back as plain decimals. */
@@ -15,6 +20,165 @@ class ExcelArgumentsTest {
 
   private static Object eval(String expression, Map<String, Object> scope) {
     return Expressions.evaluate(expression, scope);
+  }
+
+  @Test
+  void referenceParametersThatExcelReadsAsOneValueRejectArrays() {
+    // POI marks these parameters as references, so the value-class check did not cover them, and
+    // an array there silently used its first element: this VLOOKUP read column 3 and answered 200.
+    String database = "[[\"qty\", \"price\"], [1, 10], [2, 20]]";
+    String criteria = "[[\"qty\"], [\">0\"]]";
+    for (var sample :
+        Map.of(
+                "$VLOOKUP(2, [[1, 10, 100], [2, 20, 200]], [3, 2], false)",
+                "VLOOKUP: argument 3",
+                "$HLOOKUP(2, [[1, 2], [10, 20], [100, 200]], [3, 2], false)",
+                "HLOOKUP: argument 3",
+                "$MATCH(\"b\", [\"a\", \"b\"], [0, 1])",
+                "MATCH: argument 3",
+                "$DSUM(" + database + ", [\"qty\", \"price\"], " + criteria + ")",
+                "DSUM: argument 2",
+                "$DGET(" + database + ", [3, 2], " + criteria + ")",
+                "DGET: argument 2",
+                "$T([\"a\", \"b\"])",
+                "T: argument 1")
+            .entrySet()) {
+      assertThatThrownBy(() -> eval(sample.getKey()))
+          .as(sample.getKey())
+          .isInstanceOf(ArcException.class)
+          .hasMessage(sample.getValue() + " must be a single value, not an array");
+    }
+    // The scalar forms and the range parameters keep their results.
+    assertThat(eval("$VLOOKUP(2, [[1, 10, 100], [2, 20, 200]], 3, false)"))
+        .isEqualTo(new BigDecimal("200"));
+    assertThat(eval("$HLOOKUP(2, [[1, 2], [10, 20], [100, 200]], 3, false)"))
+        .isEqualTo(new BigDecimal("200"));
+    assertThat(eval("$MATCH(\"b\", [\"a\", \"b\"], 0)")).isEqualTo(new BigDecimal("2"));
+    assertThat(eval("$DSUM(" + database + ", \"price\", " + criteria + ")"))
+        .isEqualTo(new BigDecimal("30"));
+    assertThat(eval("$DGET(" + database + ", 2, [[\"qty\"], [2]])"))
+        .isEqualTo(new BigDecimal("20"));
+    assertThat(eval("$T(\"a\")")).isEqualTo("a");
+  }
+
+  /**
+   * Reference parameters whose probe outcomes never differ between an array and its first cell
+   * although Excel reads a range there, because the probe's generic arguments cannot exercise them:
+   * the database and criteria of the database functions need headed tables; SUMIF's sum range and
+   * LOOKUP's result vector are read in step with a range the probe passes as one cell; CORREL,
+   * COVAR and PEARSON need two ranges of one size; and AREAS counts areas, of which any array is
+   * one.
+   */
+  private static final Set<String> RANGES_THE_PROBE_CANNOT_TELL = rangesTheProbeCannotTell();
+
+  private static Set<String> rangesTheProbeCannotTell() {
+    var parameters =
+        new HashSet<>(
+            Set.of(
+                "SUMIF:3",
+                "LOOKUP:3",
+                "CORREL:1",
+                "CORREL:2",
+                "COVAR:1",
+                "COVAR:2",
+                "PEARSON:1",
+                "PEARSON:2",
+                "AREAS:1"));
+    for (String function : ExcelMatchingWork.DATABASE_FUNCTIONS) {
+      parameters.add(function + ":1");
+      parameters.add(function + ":3");
+    }
+    return Set.copyOf(parameters);
+  }
+
+  /** An array in a probed parameter, and the first cell POI would read instead. */
+  private record Probe(Object array, Object firstCell) {}
+
+  private static final List<Probe> PROBES =
+      List.of(
+          new Probe(List.of(1, 2), 1),
+          new Probe(List.of(2, 1), 2),
+          new Probe(List.of(List.of(1, 2)), 1),
+          new Probe(List.of(-1, 2), -1),
+          new Probe(List.of("a", "b"), "a"),
+          new Probe(Arrays.asList(1, null), 1));
+
+  @Test
+  void everyReferenceParameterThatReadsOneValueIsListed() {
+    // A parameter the adapter's table misses would silently use an array's first cell again.
+    var readAsOneValue = new TreeSet<String>();
+    for (String name : poiEvaluatedFunctions()) {
+      FunctionMetadata metadata = FunctionMetadataRegistry.getFunctionByName(name);
+      byte[] classes = metadata.getParameterClassCodes();
+      for (int index = 0; index < classes.length; index++)
+        if (classes[index] != Ptg.CLASS_VALUE && firstCellDecides(metadata, index))
+          readAsOneValue.add(name + ":" + (index + 1));
+    }
+    var expected = new TreeSet<>(RANGES_THE_PROBE_CANNOT_TELL);
+    for (var parameter : ExcelFunctionAdapter.SINGLE_VALUE_REFERENCES)
+      expected.add(parameter.function() + ":" + (parameter.index() + 1));
+    assertThat(readAsOneValue).isEqualTo(expected);
+  }
+
+  /** The Excel functions ARC hands to POI, without the ones it evaluates itself. */
+  private static Set<String> poiEvaluatedFunctions() {
+    var names = new TreeSet<>(FunctionCatalog.excelFunctions());
+    names.removeAll(Functions.arcFunctionNames());
+    names.removeAll(ExpressionRuntime.lazyFunctionNames());
+    return names;
+  }
+
+  /**
+   * Whether POI answers the same for an array in the parameter as for that array's first cell, for
+   * every probe and every combination of 1 and 2 in the (first four) other parameters.
+   */
+  private static boolean firstCellDecides(FunctionMetadata metadata, int parameter) {
+    Function function = FunctionEval.getBasicFunction(metadata.getIndex());
+    int count = Math.max(metadata.getMinParams(), parameter + 1);
+    int varied = Math.min(count - 1, 4);
+    for (Probe probe : PROBES) {
+      for (int combination = 0; combination < 1 << varied; combination++) {
+        Object[] args = new Object[count];
+        int position = 0;
+        for (int index = 0; index < count; index++) {
+          if (index == parameter) continue;
+          args[index] = position < varied && (combination >> position & 1) == 1 ? 2 : 1;
+          position++;
+        }
+        args[parameter] = probe.array();
+        String withArray = outcome(function, args);
+        args[parameter] = probe.firstCell();
+        if (!withArray.equals(outcome(function, args))) return false;
+      }
+    }
+    return true;
+  }
+
+  private static String outcome(Function function, Object[] args) {
+    ValueEval[] values =
+        Arrays.stream(args).map(ExcelFunctionAdapter::value).toArray(ValueEval[]::new);
+    try {
+      return describe(function.evaluate(values, 0, 0));
+    } catch (RuntimeException error) {
+      return "throws " + error.getClass().getSimpleName();
+    }
+  }
+
+  private static String describe(ValueEval value) {
+    if (value instanceof ErrorEval error) return error.getErrorString();
+    if (value instanceof NumberEval number) return "number " + number.getNumberValue();
+    if (value instanceof StringEval text) return "text " + text.getStringValue();
+    if (value instanceof BoolEval flag) return "boolean " + flag.getBooleanValue();
+    if (value instanceof RefEval reference)
+      return describe(reference.getInnerValueEval(reference.getFirstSheetIndex()));
+    if (value instanceof AreaEval area) {
+      var cells = new ArrayList<String>();
+      for (int row = 0; row < area.getHeight(); row++)
+        for (int column = 0; column < area.getWidth(); column++)
+          cells.add(describe(area.getRelativeValue(row, column)));
+      return "area " + area.getHeight() + "x" + area.getWidth() + " " + cells;
+    }
+    return value == null ? "null" : value.getClass().getSimpleName();
   }
 
   @Test

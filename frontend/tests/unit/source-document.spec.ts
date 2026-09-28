@@ -198,3 +198,24 @@ test("a new source needs an API resource ID before it can be saved", () => {
     }),
   ).toBeNull();
 });
+
+test("an HTTP URL the server could not send as written blocks saving", () => {
+  // The transport sends the configured text byte for byte, so the server refuses these.
+  const draft = openSource({ ...httpSource(), version: 0, id: "remote" }, 1);
+  const withUrl = (url: string) =>
+    sourceSaveProblem(apply(draft, { type: "configuration", patch: { url } }));
+  expect(withUrl("https://api.example.com/cities/Zürich?q=東京")).toMatch(
+    /^HTTP URL: Percent-encode non-ASCII/,
+  );
+  for (const port of ["0", "65536", "99999"])
+    expect(withUrl(`https://api.example.com:${port}/x`), port).toBe(
+      "HTTP URL: Use a port from 1 to 65535.",
+    );
+  for (const url of [
+    "https://api.example.com/cities/Z%C3%BCrich?q=%E6%9D%B1%E4%BA%AC",
+    "https://api.example.com:65535/x",
+    "http://[::1]:8080/x",
+    "https://api.example.com/customer",
+  ])
+    expect(withUrl(url), url).toBeNull();
+});

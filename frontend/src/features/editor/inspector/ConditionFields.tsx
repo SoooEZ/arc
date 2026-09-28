@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 import ValueBinding from "../../expressions/ValueBinding";
 import ExpressionField from "../../expressions/ExpressionField";
 import { useEditingPin } from "../../expressions/useEditingPin";
-import { simpleComparison } from "../../../domain/expressions";
+import { comparisonText, simpleComparison } from "../../../domain/expressions";
 import { comparisonBindingType } from "../../../domain/valueBinding";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
@@ -34,10 +34,6 @@ function parseComparison(expression: string): Comparison | null {
   return { left, operator, right };
 }
 
-function comparisonExpression({ left, operator, right }: Comparison): string {
-  return [left.trim(), operator, right.trim()].join(" ");
-}
-
 /**
  * A single comparison opens in the builder, anything else in the expression
  * editor. Editing keeps the chosen editor even when the text passes through
@@ -50,6 +46,7 @@ export default function ConditionFields({
   readOnly,
   patch,
   variables,
+  scopeKnown,
 }: NodeFieldsProps) {
   const expression = node.expression ?? "";
   const [editing, keepEditor] = useEditingPin<ConditionEditor>(expression);
@@ -90,9 +87,15 @@ export default function ConditionFields({
           comparison={editor.comparison}
           expression={expression}
           variables={variables}
+          scopeKnown={scopeKnown}
           readOnly={readOnly}
           onEdit={(comparison) => {
-            const next = comparisonExpression(comparison);
+            // The builder keeps the operands as typed; the stored text parenthesizes them.
+            const next = comparisonText(
+              comparison.left,
+              comparison.operator,
+              comparison.right,
+            );
             keepEditor({ kind: "builder", comparison }, next);
             patch({ expression: next });
           }}
@@ -105,6 +108,7 @@ export default function ConditionFields({
           value={expression}
           onChange={editExpression}
           variables={variables}
+          scopeKnown={scopeKnown}
           disabled={readOnly}
           helperText="Combine checks with &&, ||, and parentheses."
         />
@@ -132,10 +136,11 @@ function ComparisonBuilder({
   comparison,
   expression,
   variables,
+  scopeKnown,
   readOnly,
   onEdit,
   onReplace,
-}: Pick<NodeFieldsProps, "rule" | "variables" | "readOnly"> & {
+}: Pick<NodeFieldsProps, "rule" | "variables" | "scopeKnown" | "readOnly"> & {
   comparison: Comparison;
   expression: string;
   onEdit: (comparison: Comparison) => void;
@@ -179,6 +184,7 @@ function ComparisonBuilder({
         type={comparisonBindingType(comparison.right.trim(), declaredType)}
         value={comparison.right}
         variables={variables}
+        scopeKnown={scopeKnown}
         disabled={readOnly}
         optional={false}
         onChange={(value) => edit({ right: value ?? "" })}
@@ -190,6 +196,7 @@ function ComparisonBuilder({
         label="Condition"
         value={expression}
         variables={variables}
+        scopeKnown={scopeKnown}
         disabled={readOnly}
         hideInput
         onChange={onReplace}

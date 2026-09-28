@@ -12,6 +12,9 @@ import { editorLines, setEditorText } from "./helpers/editor";
 const beyondDouble = "9007199254740993";
 const longInteger = "12345678901234567890";
 const longDecimal = "0.07000000000000000001";
+// Numbers a double carries, but without their decimal places; the server keeps them.
+const scaledPrice = "10.50";
+const scaledRate = "0.070";
 
 /** Creates a rule from raw JSON so that exact number tokens reach the server. */
 async function createRule(
@@ -100,7 +103,7 @@ test("an API-created lookup source saves a new version without rounding its entr
   const stamp = Date.now();
   const id = `exact-lookup-${stamp}`;
   const name = `Exact lookup ${stamp}`;
-  const entries = `{"US":{"accountId":${longInteger},"rate":${longDecimal},"limit":${beyondDouble}}}`;
+  const entries = `{"US":{"accountId":${longInteger},"rate":${longDecimal},"limit":${beyondDouble},"price":${scaledPrice},"fee":${scaledRate}}}`;
   const created = await request.post("/api/sources", {
     headers: { "Content-Type": "application/json" },
     data: `{"id":"${id}","name":"${name}","definition":{"kind":"LOOKUP","parameters":[{"name":"key","type":"STRING","required":true,"defaultValue":null}],"entries":${entries},"timeoutMs":3000}}`,
@@ -114,7 +117,13 @@ test("an API-created lookup source saves a new version without rounding its entr
   const shown = await page
     .getByLabel("Lookup entries · JSON object", { exact: true })
     .inputValue();
-  for (const token of [longInteger, longDecimal, beyondDouble])
+  for (const token of [
+    longInteger,
+    longDecimal,
+    beyondDouble,
+    scaledPrice,
+    scaledRate,
+  ])
     expect(shown).toContain(token);
 
   await page.getByLabel("Name", { exact: true }).fill(`${name} renamed`);
@@ -131,6 +140,9 @@ test("an API-created lookup source saves a new version without rounding its entr
     `"accountId":${longInteger}`,
     `"rate":${longDecimal}`,
     `"limit":${beyondDouble}`,
+    // A rule pinned to v2 must print the same "$10.50" as one pinned to v1.
+    `"price":${scaledPrice}`,
+    `"fee":${scaledRate}`,
   ]) {
     expect(puts[0]).toContain(field);
     expect(saved).toContain(field);
@@ -142,40 +154,38 @@ test("preview sends exact inputs and shows every digit of defaults and results",
   request,
 }) => {
   const id = `exact-preview-${Date.now()}`;
-  await createRule(
-    request,
-    id,
-    outputRule(
-      '$OBJECT("id", id, "limit", limit, "third", 10 / 3)',
-      [
-        { name: "id", type: "NUMBER", required: true, defaultValue: null },
-        {
-          name: "limit",
-          type: "NUMBER",
-          required: false,
-          defaultValue: "{{exact}}",
-        },
-      ],
-      longInteger,
-    ),
+  const definition = outputRule(
+    '$OBJECT("id", id, "limit", limit, "third", 10 / 3, "price", $CONCAT("Price ", price))',
+    [
+      { name: "id", type: "NUMBER", required: true, defaultValue: null },
+      {
+        name: "limit",
+        type: "NUMBER",
+        required: false,
+        defaultValue: "{{exact}}",
+      },
+      { name: "price", type: "NUMBER", required: true, defaultValue: null },
+    ],
+    longInteger,
   );
+  await createRule(request, id, definition);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   const input = page.getByLabel("Test input JSON", { exact: true });
   await expect(editorLines(input)).toContainText(`"limit": ${longInteger}`);
-  await setEditorText(
-    page,
-    input,
-    `{"id": ${beyondDouble}, "limit": ${longInteger}}`,
-  );
+  const inputs = `{"id":${beyondDouble},"limit":${longInteger},"price":${scaledPrice}}`;
+  await setEditorText(page, input, inputs);
   const sent = page.waitForRequest((outgoing) =>
     outgoing.url().endsWith("/api/preview"),
   );
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  expect((await sent).postData()).toContain(
-    `"inputs":{"id":${beyondDouble},"limit":${longInteger}}`,
-  );
-  await expect(page.getByTestId("test-result")).toHaveText(
-    `{"id":${beyondDouble},"limit":${longInteger},"third":3.333333333333333333333333333333333}`,
-  );
+  expect((await sent).postData()).toContain(`"inputs":${inputs}`);
+  const result = `{"id":${beyondDouble},"limit":${longInteger},"third":3.333333333333333333333333333333333,"price":"Price ${scaledPrice}"}`;
+  await expect(page.getByTestId("test-result")).toHaveText(result);
+  // The Test panel shows what a raw API client gets: the scale of 10.50 survived the buffer.
+  const raw = await request.post("/api/preview", {
+    headers: { "Content-Type": "application/json" },
+    data: `{"definition":${definition},"inputs":${inputs}}`,
+  });
+  expect(await raw.text()).toContain(`"result":${result}`);
 });

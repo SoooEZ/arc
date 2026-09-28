@@ -89,20 +89,20 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [X127](#x127) | 1 | CONFIRMED | high | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/Expressions.java:129` | zero of any scale passes bounds → $TO_STRING(0e-2000000000) ~200-byte request allocates ~4 GB (OOM DoS on open API); 0e-2147483647 → 500; \|scale\|>9999 → 500 on preview/execute/save; 1001–9999 → stored but unreadable (500) | G1 | ☑ |
 | [X147](#x147) | 1 | CONFIRMED | high | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:33` | POI number-parse regex backtracks quadratically; COUNTIF/SUMIF numeric criterion, CORREL, FORECAST over long digit text uninterruptible → 512-byte preview with timeoutMs 100 takes 1.7 s; 5 KB ~75 s; grid ~12 min (DoS, B14 class) | G1 | ☑ |
-| [X41](#x41) | 2 | CONFIRMED | high | bug | Frontend | `frontend/src` | `frontend/src/App.tsx:78` | stale savedRule preferred by revision only → after delete+recreate elsewhere, tab shows deleted rule and Save silently overwrites the new rule (browser, PUT 200) | G5 | ☐ |
-| [X09](#x09) | 2 | CONFIRMED | medium | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleService.java:122` | delete vs concurrent publish race → immutable version pins deleted rule; reused ID runs new logic (live, 3+ independent repros) | G3 | ☐ |
-| [X42](#x42) | 2 | CONFIRMED | medium | bug | Frontend | `features/editor` | `frontend/src/features/editor/useRuleDocument.ts:409` | leave during pending DELETE: fetch aborted, server deletes, onDeleted never runs (library lists deleted rule, stale Code studio target) | G5 | ☐ |
-| [X44](#x44) | 2 | CONFIRMED | medium | bug | Frontend | `features/studio` | `frontend/src/features/studio/formulaMetadata.ts:36` | formula metadata cache survives delete+recreate: wrong parameter list on completion/hover/insert; kind check skipped | G5 | ☐ |
-| [X81](#x81) | 2 | CONFIRMED | medium | bug | Frontend | `features/editor` | `frontend/src/features/editor/RuleSettings.tsx:128` | delete dialog uses stale publishedVersion; DELETE has no revision → published versions deleted behind draft-only confirmation | G5 | ☐ |
-| [X01](#x01) | 2 | CONFIRMED | low | bug | Frontend | `features/library` | `frontend/src/features/library/previewCache.ts:7` | preview cache id:revision shows deleted rule's graph on re-created rule's card | G5 | ☐ |
-| [X02](#x02) | 2 | CONFIRMED | low | bug | Frontend | `features/execution` | `frontend/src/features/execution/usePublishedExecution.ts:38` | playground stuck on nonexistent version after delete+recreate elsewhere; retry can't recover | G5 | ☐ |
-| [X11](#x11) | 2 | PLAUSIBLE | low | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleService.java:132` | forget only evicts local JVM plan cache (multi-process not a shipped config) | G3 | ☐ |
-| [X13](#x13) | 2 | CONFIRMED | low | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleSamples.java:101` | deleting every rule → next restart re-seeds and republishes samples | G3 | ☐ |
-| [X28](#x28) | 2 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:210` | caller check misses source-mapping @calls in drafts without Input node → delete 204 (live) | G3 | ☐ |
-| [X45](#x45) | 2 | CONFIRMED | low | bug | Frontend | `api` | `frontend/src/api/http.ts:49` | ApiError drops issues → callers beyond 5 never shown | G5 | ☐ |
-| [X51](#x51) | 2 | CONFIRMED | low | bug | Frontend | `frontend/src` | `frontend/src/App.tsx:125` | 404 rule shown as retryable failure; Back to library branch dead | G5 | ☐ |
-| [X91](#x91) | 2 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/RuleSettings.tsx:36` | settings closable during pending delete; refusal shown nowhere | G5 | ☐ |
-| [X107](#x107) | 2 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:206` | caller check skips version-less Reference → delete 204; reused ID rebinds draft (live) | G3 | ☐ |
+| [X41](#x41) | 2 | CONFIRMED | high | bug | Frontend | `frontend/src` | `frontend/src/App.tsx:78` | stale savedRule preferred by revision only → after delete+recreate elsewhere, tab shows deleted rule and Save silently overwrites the new rule (browser, PUT 200) | G5 | ☑ |
+| [X09](#x09) | 2 | CONFIRMED | medium | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleService.java:122` | delete vs concurrent publish race → immutable version pins deleted rule; reused ID runs new logic (live, 3+ independent repros) | G3 | ☑ |
+| [X42](#x42) | 2 | CONFIRMED | medium | bug | Frontend | `features/editor` | `frontend/src/features/editor/useRuleDocument.ts:409` | leave during pending DELETE: fetch aborted, server deletes, onDeleted never runs (library lists deleted rule, stale Code studio target) | G5 | ☑ |
+| [X44](#x44) | 2 | CONFIRMED | medium | bug | Frontend | `features/studio` | `frontend/src/features/studio/formulaMetadata.ts:36` | formula metadata cache survives delete+recreate: wrong parameter list on completion/hover/insert; kind check skipped | G5 | ☑ |
+| [X81](#x81) | 2 | CONFIRMED | medium | bug | Frontend | `features/editor` | `frontend/src/features/editor/RuleSettings.tsx:128` | delete dialog uses stale publishedVersion; DELETE has no revision → published versions deleted behind draft-only confirmation | G5 | ☑ |
+| [X01](#x01) | 2 | CONFIRMED | low | bug | Frontend | `features/library` | `frontend/src/features/library/previewCache.ts:7` | preview cache id:revision shows deleted rule's graph on re-created rule's card | G5 | ☑ |
+| [X02](#x02) | 2 | CONFIRMED | low | bug | Frontend | `features/execution` | `frontend/src/features/execution/usePublishedExecution.ts:38` | playground stuck on nonexistent version after delete+recreate elsewhere; retry can't recover | G5 | ☑ |
+| [X11](#x11) | 2 | PLAUSIBLE | low | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleService.java:132` | forget only evicts local JVM plan cache (multi-process not a shipped config) | G3 | ☑ |
+| [X13](#x13) | 2 | CONFIRMED | low | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleSamples.java:101` | deleting every rule → next restart re-seeds and republishes samples | G3 | ☑ |
+| [X28](#x28) | 2 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:210` | caller check misses source-mapping @calls in drafts without Input node → delete 204 (live) | G3 | ☑ |
+| [X45](#x45) | 2 | CONFIRMED | low | bug | Frontend | `api` | `frontend/src/api/http.ts:49` | ApiError drops issues → callers beyond 5 never shown | G5 | ☑ |
+| [X51](#x51) | 2 | CONFIRMED | low | bug | Frontend | `frontend/src` | `frontend/src/App.tsx:125` | 404 rule shown as retryable failure; Back to library branch dead | G5 | ☑ |
+| [X91](#x91) | 2 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/RuleSettings.tsx:36` | settings closable during pending delete; refusal shown nowhere | G5 | ☑ |
+| [X107](#x107) | 2 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:206` | caller check skips version-less Reference → delete 204; reused ID rebinds draft (live) | G3 | ☑ |
 | [X25](#x25) | 3 | CONFIRMED | medium | bug | Backend | `source.http` | `backend/src/main/java/dev/arc/source/http/HttpDestinationPolicy.java:56` | raw non-ASCII URL accepted: Latin-1 bytes / '?' sent (東京 path → different resource), port > 65535 saves then always fails | G3 | ☐ |
 | [X32](#x32) | 3 | CONFIRMED | medium | bug | Frontend | `domain` | `frontend/src/domain/json.ts:285` | codec drops trailing fraction zeros → UI save of unchanged lookup source/defaults and Test inputs change $CONCAT/$TO_STRING results ("$10.50"→"$10.5"); contradicts "saves with every digit" | G3 | ☐ |
 | [X35](#x35) | 3 | CONFIRMED | medium | bug | Frontend | `features/sources` | `frontend/src/features/sources/sourceDocument.ts:265` | save/success matched by source ID only → unrelated new draft adopts pending create's source; next Save overwrites it as v2 (browser) | G3 | ☐ |
@@ -741,7 +741,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x09"></a>
 
 ### X09 · medium · bug · Rule deletion races a concurrent publish of a new caller, so an immutable version pins a deleted rule
-- **Status:** CONFIRMED — record: `verdicts/v-del-be.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-be.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Backend / rule (RuleService), persistence (JdbcRuleRepository) / rule deletion and publication
 - **Location:** `backend/src/main/java/dev/arc/rule/RuleService.java:122` (+ `backend/src/main/java/dev/arc/rule/RuleService.java:123`, `backend/src/main/java/dev/arc/rule/RuleService.java:131`, `backend/src/main/java/dev/arc/rule/RuleService.java:108`, `backend/src/main/java/dev/arc/rule/RuleService.java:98`, `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:52`, `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:55`, `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:251`, `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:277`, `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:285`)
 - **Problem:** `RuleService.delete` locks only the rule being deleted (`store.lock(id)`, `SELECT … FOR UPDATE`) and then finds callers with an unlocked text scan (`definitionsMentioning`, plain SELECTs over `rules.draft` and `rule_versions.definition`). `publish` locks only the rule being published (:108) and validates its pins with plain SELECTs (`resolveFormula` JOIN at JdbcRuleRepository.java:285, `version` at :251); draft save runs only `validator.shape` (:98). No code locks a dependency, so under READ COMMITTED a caller saved and published between the deletion's scan and its commit is invisible to the scan, while its own validation still sees the callee whose deletion has not committed yet.
@@ -754,7 +754,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x11"></a>
 
 ### X11 · low · bug · Engine.forget evicts a deleted rule's cached plans only in the API process that served the DELETE
-- **Status:** PLAUSIBLE — record: `verdicts/v-del-be.md`
+- **Status:** PLAUSIBLE — record: `verdicts/v-del-be.md` — Fixed in `b75aca3` (documented the single-process plan cache; no code change)
 - **Area / module / feature:** Backend / engine.execution (ExecutionPlans, Engine), rule (RuleService, RuleExecutionService) / rule deletion and the published-plan cache
 - **Location:** `backend/src/main/java/dev/arc/rule/RuleService.java:132` (+ `backend/src/main/java/dev/arc/engine/execution/ExecutionPlans.java:26`, `backend/src/main/java/dev/arc/engine/execution/ExecutionPlans.java:59`, `backend/src/main/java/dev/arc/engine/execution/ExecutionPlans.java:116`, `backend/src/main/java/dev/arc/rule/RuleExecutionService.java:61`, `backend/src/main/java/dev/arc/engine/execution/Engine.java:51`, `docs/maintaining.md:38`)
 - **Problem:** The published-plan cache is a per-JVM field of the singleton Engine and treats `(ruleId, version)` as immutable; deletion ends that, and `afterCommit(() -> engine.forget(id))` edits only the local map. A cached pin runs without any database read (`if (plan == null && cachePublished) plan = cached(pin);`), so another API process on the same database never learns of the deletion. Multi-process deployment is not a shipped or documented configuration (compose.yaml:26 has one `api` service with the fixed host port `"${ARC_API_PORT:-8080}:8080"`, so `--scale api=2` cannot bind; README.md:375 lists production deployment under Next phases), but maintaining.md:38 states the guarantee without a single-process caveat ("so an ID used again never runs a deleted rule's plan"), and lesson B9 mentions replicas.
@@ -767,7 +767,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x13"></a>
 
 ### X13 · low · bug · Deleting every rule makes the next API start re-seed and republish the sample rules
-- **Status:** CONFIRMED — record: `verdicts/v-del-be.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-be.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Backend / rule (RuleSamples), persistence (JdbcRuleRepository) / sample rule seeding after rule deletion
 - **Location:** `backend/src/main/java/dev/arc/rule/RuleSamples.java:101` (+ `backend/src/main/java/dev/arc/rule/RuleSamples.java:97`, `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:114`, `README.md:161`, `docs/maintaining.md:38`)
 - **Problem:** `RuleSamples.run`, an ApplicationRunner on every start that no setting in application.yaml gates, treats an empty `rules` table as a new database (`if (store.hasRules()) return;` → `SELECT EXISTS (SELECT 1 FROM rules)`). Since b8aa4ff a user can empty that table with DELETE, and no marker records that seeding already happened. The stated intent is a fresh database (RuleSamples Javadoc, maintaining.md:38 "seeded only into an empty database", RuleSamplesTest `anEmptyDatabaseReceivesThePublishedExamples`); README.md:161 ("only if the `rules` table is empty") was written 2026-09-17 (8daccce), before deletion existed.
@@ -780,7 +780,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x28"></a>
 
 ### X28 · low · bug · Deletion caller check ignores source-mapping @calls in drafts without an Input node
-- **Status:** CONFIRMED — record: `verdicts/v-del-be.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-be.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Backend / engine.validation (NodeValidation, Validator), rule (RuleService) / rule deletion caller check
 - **Location:** `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:210` (+ `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:202`, `backend/src/main/java/dev/arc/engine/validation/Validator.java:68`, `backend/src/main/java/dev/arc/rule/RuleService.java:136`)
 - **Problem:** `RuleService.callersOf` → `Validator.draftDependencies` → `NodeValidation.dependencies` adds input source-mapping calls only while visiting a node of kind INPUT (`if (node.kind() == NodeKind.INPUT) for (var mappings : sourceMappings(definition).values()) owned.addAll(mappings);`). That attribution suits validation locations, but the deletion check reuses the same list, so a stored draft without an Input node (allowed for unfinished drafts) does not count as a caller of the rules its source mappings call.
@@ -793,7 +793,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x107"></a>
 
 ### X107 · low · bug · Deletion caller check skips a Reference that chose the rule without a version
-- **Status:** CONFIRMED — record: `verdicts/v-del-be.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-be.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Backend / engine.validation (NodeValidation, Validator), rule (RuleService) / rule deletion caller check
 - **Location:** `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:206` (+ `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:198`, `backend/src/main/java/dev/arc/engine/validation/Validator.java:108`, `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:159`, `backend/src/main/java/dev/arc/rule/RuleService.java:139`)
 - **Problem:** `NodeValidation.dependencies` counts a Reference only when it has both `ruleId` and `version` (`Validator.Dependency.version` is an `int`), because it was written for source-contract checks that need a version ("complete Reference pins", NodeValidation.java:198, which predates deletion: c307729). The deletion check reuses it, yet a version-less Reference is a well-formed, documented draft state (DefinitionShape.java:159 "A draft may choose a rule before its version (ARC Script `use "rule-id";`)"; studio.md:252), and api.md:99 says a rule called "through a Reference node … in any draft … is kept". RuleServiceTest only exempts malformed `@example:1(` text, so this is not an intended exclusion.
@@ -1291,7 +1291,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x41"></a>
 
 ### X41 · high · bug · A stale saved copy of a deleted rule opens instead of the re-created rule, and Save overwrites the new rule
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe1.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / app shell (`App.tsx` rule-session selection) / reopening a rule after rule deletion (saved copy versus detail read)
 - **Location:** `frontend/src/App.tsx:78` (+ `frontend/src/App.tsx:82`, `frontend/src/App.tsx:95`, `frontend/src/types.ts:63`, `backend/src/main/java/dev/arc/rule/RuleService.java:177`, `backend/src/main/resources/db/migration/V1__rules.sql:7`)
 - **Problem:** App keeps the last saved or created rule (`savedRule`, set by `acknowledgeSave`) and prefers it over the fresh detail read whenever `savedRule.id === ruleId && savedRule.revision >= detail.data.revision`. Since rule deletion (b8aa4ff) an ID can be deleted and created again, and the new rule restarts at revision 1, so ID + revision no longer identifies one rule. `forgetDeletedRule` (App.tsx:95-99) clears the copy only for deletions made in this tab, and the server's `revision(...)` check compares only the number, so a stale copy at an equal revision passes it.
@@ -1304,7 +1304,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x01"></a>
 
 ### X01 · low · bug · Library card previews of a re-created rule show the deleted rule's graph
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe1.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / features/library (`previewCache`, `RuleCard`) / rule library card previews
 - **Location:** `frontend/src/features/library/previewCache.ts:7` (+ `frontend/src/features/library/previewCache.ts:11`, `frontend/src/features/library/RuleCard.tsx:20`, `frontend/src/features/library/RuleCard.tsx:31`, `frontend/src/App.tsx:95`)
 - **Problem:** Card previews are cached for the whole page session under `${rule.id}:${rule.revision}`, on the stated premise (previewCache.ts:11-12) "A saved draft gets a new revision, so a cached preview never outlives the draft it shows". A deleted rule's ID can be created again and its revision restarts at 1, so a new rule can hit the old entry. RuleCard skips its fetch on a hit (`enabled = !cached`), and nothing evicts an entry: not `forgetDeletedRule`, and not a deletion made elsewhere.
@@ -1317,7 +1317,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x44"></a>
 
 ### X44 · medium · bug · The page-wide Formula metadata cache serves a deleted Formula's parameter contract after its ID is re-created
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe1.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / features/studio (`formulaMetadata`, `useFormulaSupport`) / `@` Formula completion, hover and Published formulas insertion
 - **Location:** `frontend/src/features/studio/formulaMetadata.ts:36` (+ `frontend/src/features/studio/formulaMetadata.ts:17`, `frontend/src/features/studio/formulaMetadata.ts:43`, `frontend/src/features/studio/formulaMetadata.ts:84`, `frontend/src/features/studio/useFormulaSupport.ts:210`, `frontend/src/features/studio/useFormulaSupport.ts:263`, `frontend/src/App.tsx:95`)
 - **Problem:** The module-level singleton (`formulaMetadata`, line 84) treats an `id:version` pin as immutable (line 17) and keeps each pin's name and inputs for the page session. Deletion ends that immutability; docs/maintaining.md:38 ("Deleting a rule is the one end of a pin's immutability") handles it only on the backend (`Engine.forget`), and nothing evicts a frontend entry. The cached branch (34-41) returns before the `rule.kind !== "FORMULA"` check (43), and a catalog summary refreshes only the display name. Correction from verification: hover names are not frozen for good; hover alone (it passes no summary) never refreshes a name, but the next completion search or picker insertion rewrites the cached name.
@@ -1330,7 +1330,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x02"></a>
 
 ### X02 · low · bug · The API playground stays on a version that no longer exists after the selected rule is deleted and re-created elsewhere
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe1.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / features/execution (`usePublishedExecution`) / API playground (published execution)
 - **Location:** `frontend/src/features/execution/usePublishedExecution.ts:38` (+ `frontend/src/features/execution/usePublishedExecution.ts:81`, `frontend/src/features/execution/usePublishedExecution.ts:100`, `frontend/src/features/execution/usePublishedExecution.ts:167`, `frontend/src/app/useRuleLibrary.ts:28`)
 - **Problem:** The playground's implicit version only ever moves upward, from three places: `selectionAfterCatalogPage` adopts a listed summary only if it is newer (38-40); `listedVersion` takes the max with App's hidden library page (81-84), which never reloads while hidden (useRuleLibrary.ts:28-32 reloads only `if (visible && stale)`); and `historyNewest` only grows (100). Lesson F5 ("must not move it backwards") predates deletion. After the selected rule is deleted, created again and republished as v1 elsewhere, the playground stays on a version that no longer exists, and Retry cannot recover. Without re-creation, the deleted rule stays listed through the `published` prepend (167-170) and stays executable.
@@ -1343,7 +1343,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x42"></a>
 
 ### X42 · medium · bug · Leaving during a pending deletion aborts the DELETE client-side, so the deleted rule is never forgotten
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / features/editor (`useRuleDocument.deleteRule`) and app (`App.forgetDeletedRule`, `useCodeStudioTarget.forget`, `useRuleLibrary.markChanged`) / rule deletion from Rule settings
 - **Location:** `frontend/src/features/editor/useRuleDocument.ts:409` (+ `frontend/src/features/editor/useRuleDocument.ts:75`, `frontend/src/features/editor/useRuleDocument.ts:414`, `frontend/src/features/editor/editorCapabilities.ts:82`, `frontend/src/App.tsx:95`, `docs/maintaining.md:131`)
 - **Problem:** The DELETE request carries the editor-session signal, and a pending deletion registers no navigation guard (`pendingWriteWarning` returns null for "delete": "A deletion does not ask"). Leaving the editor unmounts it, which aborts the session (75-79) and with it the fetch, while the server still deletes the rule. The catch returns early (410-412), so `onDeleted` (App's `forgetDeletedRule`) never runs. The comment at 414-415 ("The rule is gone even when the user has left the editor meanwhile") and docs/maintaining.md:131 ("Once the server has deleted it, the editor reports `onDeleted` … `App` forgets the rule's saved copy, library page and Code studio target") promise the opposite; the branch they describe cannot run in practice.
@@ -1356,7 +1356,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x81"></a>
 
 ### X81 · medium · bug · The delete confirmation uses a stale `publishedVersion`, and DELETE has no precondition, so a rule published elsewhere is deleted behind the draft-only confirmation
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / features/editor (`RuleSettings` `DeleteRule`), with backend `rule.RuleService` and `api.RuleController` / rule deletion (confirmation and write precondition)
 - **Location:** `frontend/src/features/editor/RuleSettings.tsx:128` (+ `frontend/src/features/editor/RuleSettings.tsx:158`, `frontend/src/features/editor/RuleSettings.tsx:179`, `frontend/src/api/rules.ts:58`, `backend/src/main/java/dev/arc/rule/RuleService.java:120`, `backend/src/main/java/dev/arc/rule/RuleService.java:95`, `backend/src/main/java/dev/arc/rule/RuleService.java:108`, `backend/src/main/java/dev/arc/api/RuleController.java:63`)
 - **Problem:** The delete dialog takes "published" from the editor's document copy of `rule.publishedVersion`, which nothing refreshes except this editor's own save and publish acknowledgements. That value decides the versions warning and the "Type X to confirm" field (158-170) and whether a typed ID is required (179). `DELETE /api/rules/{id}` carries no revision or other precondition: `RuleService.delete` locks, checks callers and deletes (120-131) without `revision(...)`, unlike update (95-96) and publish (108-109). The client therefore cannot make its confirmation match what the server will delete.
@@ -1369,7 +1369,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x91"></a>
 
 ### X91 · low · bug · Rule settings can be closed while a deletion is pending, and a refusal is then shown nowhere
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / features/editor (`RuleSettings`, `useRuleDocument.deleteRule`) / rule deletion from Rule settings
 - **Location:** `frontend/src/features/editor/RuleSettings.tsx:36` (+ `frontend/src/features/editor/RuleSettings.tsx:87`, `frontend/src/features/editor/RuleSettings.tsx:151`, `frontend/src/features/editor/RuleSettings.tsx:173`, `frontend/src/features/editor/useRuleDocument.ts:410`, `frontend/src/features/editor/Editor.tsx:392`, `frontend/src/features/editor/NodeExpressionDialog.tsx:61`)
 - **Problem:** The dialog's `onClose` (Escape, backdrop) and its footer button stay enabled while DeleteRule's request runs; only "Keep rule" is disabled (173). `deleteRule` catches every failure itself and returns it only to the dialog (`refusal`), so it never reaches `runTask`'s `fail()` or the editor's error banner. Once the dialog has closed, a server refusal (409 callers, 500, network error) is written into the unmounted DeleteRule (151-153) and shown nowhere. While the deletion is pending, `readOnly={!can.edit}` (Editor.tsx:392) even relabels Cancel to "Close". NodeExpressionDialog blocks closing while busy (line 61).
@@ -1382,7 +1382,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x45"></a>
 
 ### X45 · low · bug · ApiError drops the error body's `issues`, so a refused deletion never shows callers beyond the first five
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / api (`http.ts`, `errors.ts`) and features/editor (`RuleSettings`) / rule deletion refused because other rules call the rule
 - **Location:** `frontend/src/api/http.ts:49` (+ `frontend/src/api/errors.ts:11`, `frontend/src/features/editor/useRuleDocument.ts:411`, `backend/src/main/java/dev/arc/rule/RuleService.java:29`, `docs/api.md:99`)
 - **Problem:** `requestFailure` builds ApiError from `message`, `locations` and the status only, and ApiError(message, locations, status) has no `issues` field; no code in frontend/src reads an error body's `issues`. The server deliberately names at most five callers in the message and lists all of them in `issues` (RuleService.java:29, "How many callers a refused deletion names in its message; `issues` lists them all"; docs/api.md:99). Library search covers only id, name and description (JdbcRuleRepository.java:17-19), so the remaining callers cannot be found in the UI.
@@ -1395,7 +1395,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x51"></a>
 
 ### X51 · low · bug · A missing or deleted rule is shown as a retryable load failure; the "Rule not found / Back to library" branch is dead
-- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-del-fe2.md` — Fixed in `b75aca3`
 - **Area / module / feature:** Frontend / app (`App.tsx` `ruleContent`) and hooks (`useAsyncResource`) / opening a rule route for a deleted or unknown rule
 - **Location:** `frontend/src/App.tsx:125` (+ `frontend/src/App.tsx:134`, `frontend/src/hooks/useAsyncResource.ts:53`, `frontend/src/api/errors.ts:15`, `frontend/src/app/routing.ts:28`, `frontend/tests/style-equivalence.spec.ts:360`)
 - **Problem:** useAsyncResource reduces every failure to a string (`errorMessage(error)`), and no production code reads `ApiError.status`. App checks `detail.error` before the not-found branch, so a 404 renders "Could not load rule: …" with a "Retry rule" button that can never succeed. The "Rule not found / Back to library" branch (134-139) renders only if GET answers 2xx with a null or empty body, which the backend never does, and the route regex `([^/]+)` never yields an empty ruleId. This dates back to the baseline (the same error-before-not-found order existed at 49bb365), but deletion now makes 404 routes common: Back after deleting, stale cards and Code studio targets (X42).

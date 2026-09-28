@@ -2,21 +2,32 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
 
-async function createCondition(request: APIRequestContext, when: string) {
+const number = (name: string, defaultValue: number) => ({
+  name,
+  type: "NUMBER" as const,
+  required: false,
+  defaultValue,
+});
+const boolean = (name: string, defaultValue: boolean) => ({
+  name,
+  type: "BOOLEAN" as const,
+  required: false,
+  defaultValue,
+});
+
+async function createCondition(
+  request: APIRequestContext,
+  when: string,
+  inputs: Definition["inputs"] = [
+    number("amount", 150),
+    number("order_total", 120),
+    number("android", 5),
+  ],
+) {
   const id = `condition-builder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const number = (name: string, defaultValue: number) => ({
-    name,
-    type: "NUMBER" as const,
-    required: false,
-    defaultValue,
-  });
   const definition: Definition = {
     schemaVersion: 1,
-    inputs: [
-      number("amount", 150),
-      number("order_total", 120),
-      number("android", 5),
-    ],
+    inputs,
     nodes: [
       {
         id: "input",
@@ -136,4 +147,44 @@ test("the full condition editor stays open when an edit makes the expression a s
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
   expect(await savedCondition(request, rule.id)).toBe("amount > 2");
+});
+
+test("an operand that contains || is parenthesized, so the stored comparison means what the builder shows", async ({
+  page,
+  request,
+}) => {
+  const rule = await createCondition(request, "flag == true", [
+    boolean("flag", false),
+    boolean("a", false),
+    boolean("b", true),
+  ]);
+  await page.goto(`/#/rules/${rule.id}?node=check`);
+  const inspector = page.locator(".inspector-sidebar");
+  const preview = inspector.locator(".condition-builder .expression-preview");
+  await expect(inspector.getByLabel("When", { exact: true })).toHaveValue(
+    "flag",
+  );
+  await inspector
+    .getByRole("combobox", {
+      name: "Comparison value · value source",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("option", { name: "Expression", exact: true }).click();
+  const value = inspector.getByLabel("Comparison value", { exact: true });
+  await setEditorText(page, value, "a || b");
+  // Stored as flag == a || b before, which the server read as (flag == a) || b.
+  await expect(preview).toHaveText("flag == (a || b)");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(await savedCondition(request, rule.id)).toBe("flag == (a || b)");
+  const saved: Rule = await (await request.get(`/api/rules/${rule.id}`)).json();
+  const run = await request.post("/api/preview", {
+    data: {
+      definition: saved.draft,
+      inputs: { flag: false, a: false, b: true },
+    },
+  });
+  // flag == (a || b) is false here; flag == a || b was true and took the Yes branch.
+  expect((await run.json()).result).toBe(0);
 });

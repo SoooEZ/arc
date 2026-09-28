@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import { setEditorText } from "./helpers/editor";
+import { editorLines, setEditorText } from "./helpers/editor";
 
 async function replaceCode(
   page: import("@playwright/test").Page,
@@ -192,7 +192,8 @@ node zero OUTPUT "Below minimum" { return 0; }
   await expect(page.locator(".studio-filebar")).toContainText("graph synced");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByTestId("test-result")).toHaveText("96.3");
+  // The response text as the server writes it: 96.30 keeps its decimal places.
+  await expect(page.getByTestId("test-result")).toHaveText("96.30");
   await page.getByRole("button", { name: "Close test panel" }).click();
   await page.getByRole("button", { name: "Graph view", exact: true }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(6);
@@ -331,4 +332,129 @@ test("code studio and sources adapt to a narrow viewport", async ({ page }) => {
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(392);
+});
+
+/** The buffer's lines in document order; Monaco renders them out of order. */
+async function editorText(page: import("@playwright/test").Page) {
+  return page.locator(".view-lines .view-line").evaluateAll((elements) =>
+    elements
+      .map((element) => ({
+        top: parseFloat((element as HTMLElement).style.top || "0"),
+        text: (element.textContent ?? "").replace(/ /g, " "),
+      }))
+      .sort((a, b) => a.top - b.top)
+      .map((line) => line.text)
+      .join("\n"),
+  );
+}
+
+async function createFormula(
+  request: import("@playwright/test").APIRequestContext,
+  id: string,
+) {
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      { id: "input", type: "INPUT", label: "Input", position: { x: 0, y: 0 } },
+      {
+        id: "out",
+        type: "OUTPUT",
+        label: "Result",
+        expression: "10",
+        position: { x: 0, y: 200 },
+      },
+    ],
+    edges: [
+      { id: "next", source: "input", target: "out", sourceHandle: "next" },
+    ],
+  };
+  const response = await request.post("/api/rules", {
+    data: { id, name: `Canonical ${id}`, kind: "FORMULA", definition },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+}
+
+const commands = {
+  "Ctrl/Cmd+Enter": {
+    run: (page: import("@playwright/test").Page) =>
+      page.keyboard.press("ControlOrMeta+Enter"),
+    notice: "Code built. Graph is valid.",
+  },
+  "Ctrl/Cmd+S": {
+    run: (page: import("@playwright/test").Page) =>
+      page.keyboard.press("ControlOrMeta+s"),
+    notice: "Draft saved",
+  },
+  "Build graph": {
+    run: (page: import("@playwright/test").Page) =>
+      page.getByRole("button", { name: "Build graph", exact: true }).click(),
+    notice: "Code built. Graph is valid.",
+  },
+  Publish: {
+    run: (page: import("@playwright/test").Page) =>
+      page.getByRole("button", { name: "Publish", exact: true }).click(),
+    notice: /published and ready to call/,
+  },
+};
+
+for (const [name, command] of Object.entries(commands)) {
+  test(`${name} keeps the caret and undo history when the code is rewritten into canonical form`, async ({
+    page,
+    request,
+  }) => {
+    const id = `studio-canonical-${name.replace(/\W+/g, "-").toLowerCase()}-${Date.now()}`;
+    await createFormula(request, id);
+    await page.goto(`/#/studio/${id}`);
+    const code = page.getByLabel("ARC code editor", { exact: true });
+    await expect(editorLines(code)).toContainText("return 10;");
+    // A trailing comment is hoisted into the header by the canonical renderer.
+    await page.locator(".monaco-editor").click({ position: { x: 300, y: 60 } });
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End",
+    );
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("// note");
+    await expect(page.locator(".studio-filebar")).toContainText("edited");
+    const typed = await editorText(page);
+    await command.run(page);
+    await expect(page.getByText(command.notice)).toBeVisible();
+    await expect(page.locator(".studio-filebar")).toContainText("graph synced");
+    expect(await editorText(page)).not.toBe(typed);
+    // Undo returns to the text before the command; before, it could not reach it.
+    await page.locator(".monaco-editor textarea").focus();
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect.poll(() => editorText(page)).toBe(typed);
+    // The caret follows the edit instead of resetting to line 1, column 1.
+    await page.keyboard.type("QQ");
+    await expect(editorLines(code)).toContainText("QQ");
+    const lines = (await editorText(page)).split("\n");
+    expect(lines[0]).toBe("schema 1;");
+    expect(lines.at(-1)).toBe("// noteQQ");
+  });
+}
+
+test("a build that leaves the code canonical still keeps undo", async ({
+  page,
+  request,
+}) => {
+  const id = `studio-canonical-control-${Date.now()}`;
+  await createFormula(request, id);
+  await page.goto(`/#/studio/${id}`);
+  const code = page.getByLabel("ARC code editor", { exact: true });
+  await expect(editorLines(code)).toContainText("return 10;");
+  // One edit that keeps the text canonical, so the build has nothing to rewrite.
+  const canonical = await editorText(page);
+  await setEditorText(
+    page,
+    code,
+    canonical.replace("return 10;", "return 12;"),
+  );
+  await expect(editorLines(code)).toContainText("return 12;");
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await expect(page.getByText("Code built. Graph is valid.")).toBeVisible();
+  await expect(editorLines(code)).toContainText("return 12;");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(editorLines(code)).toContainText("return 10;");
 });

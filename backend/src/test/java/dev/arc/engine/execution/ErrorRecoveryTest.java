@@ -59,6 +59,19 @@ class ErrorRecoveryTest {
     definitions.put("read:1", graph(List.of(sourced), "value"));
     definitions.put("broken:1", graph(List.of(), "1 / 0"));
     definitions.put("lookup:1", graph(List.of(), "$MATCH(\"zz\", [\"a\"], 0)"));
+    var amount = List.of(new Input("amount", "NUMBER", true, null));
+    // Stored versions that no longer prepare: an Output with a result variable (lesson B25) and an
+    // unprefixed function call.
+    definitions.put(
+        "stale:1",
+        new Definition(
+            1,
+            amount,
+            List.of(
+                inputNode("in", "Input"),
+                nodeOf("out", "OUTPUT", "Output").expression("amount").output("r").build()),
+            List.of(new Edge("next", "in", "out", "next"))));
+    definitions.put("unprefixed:1", graph(amount, "ROUND(amount, 2)"));
     // level-0 calls level-1 ... level-17, one level deeper than the shared nesting limit allows.
     for (int level = 0; level < 18; level++)
       definitions.put(
@@ -188,5 +201,44 @@ class ErrorRecoveryTest {
     assertThat(run(graph(List.of(), "$IFERROR(@lookup:1(), \"none\")")).result()).isEqualTo("none");
     assertThat(run(graph(List.of(), "$ISNA(@broken:1())")).result()).isEqualTo(false);
     assertThat(run(graph(List.of(), "$ISERR(@broken:1())")).result()).isEqualTo(true);
+  }
+
+  @Test
+  void errorFunctionsCannotHideACalledVersionThatCannotBePrepared() {
+    // $IFERROR answered -1 and the $IS… functions true for these calls before, so a published
+    // caller changed its result silently once the callee's stored definition stopped preparing.
+    for (String expression :
+        List.of(
+            "$IFERROR(@stale:1(3), -1)",
+            "$ISERROR(@stale:1(3))",
+            "$ISERR(@stale:1(3))",
+            "$ISNA(@stale:1(3))")) {
+      assertThatThrownBy(() -> run(graph(List.of(), expression)))
+          .as(expression)
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(422);
+                assertThat(error.kind()).isEqualTo(ArcException.Kind.DEFINITION);
+                assertThat(error.getMessage())
+                    .isEqualTo("Result variables belong to Formula, Transform and Reference nodes");
+                assertThat(error.locations())
+                    .containsExactly(
+                        new ArcException.Location("stale", 1, "out", "Output"),
+                        new ArcException.Location("parent", 1, "out", "Output"));
+              });
+    }
+    assertThatThrownBy(() -> run(graph(List.of(), "$IFERROR(@unprefixed:1(3), -1)")))
+        .hasMessageContaining("Function calls require a $ prefix; use $ROUND(...)");
+    assertThatThrownBy(() -> run(graph(List.of(), "$IFERROR(@missing:1(), -1)")))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(404);
+              assertThat(error.kind()).isEqualTo(ArcException.Kind.DEFINITION);
+            });
+    // The callee's own value errors stay recoverable.
+    assertThat(run(graph(List.of(), "$IFERROR(@broken:1(), -1)")).result())
+        .isEqualTo(new BigDecimal("-1"));
   }
 }

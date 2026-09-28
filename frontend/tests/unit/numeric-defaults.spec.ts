@@ -10,13 +10,13 @@ test("numeric defaults retain values across decimal and JSON notation", () => {
     ["", null],
     ["  ", null],
     ["0.1", 0.1],
-    ["+001.2300", 1.23],
-    [".50", 0.5],
+    ["+001.23", 1.23],
+    [".5", 0.5],
     ["5.", 5],
-    ["1.2500e+3", 1250],
-    // Every zero is the double 0, so the draft saves the token 0 whatever the exponent.
+    ["1.25e+3", 1250],
+    // A zero whose exponent leaves no decimal places is the double 0 and saves as the token 0.
     ["-0.00e1000000", -0],
-    ["0e-101", 0],
+    ["0e5", 0],
     ["9007199254740992", 9007199254740992],
     ["100000000000000000000", 1e20],
     ["1e-7", 1e-7],
@@ -32,9 +32,16 @@ test("numeric defaults retain values across decimal and JSON notation", () => {
     expect(parseNumericDefault(text), text).toEqual({ valid: true, value });
 });
 
-test("numeric defaults keep every digit of values a double would round", () => {
+test("numeric defaults keep every digit of values a double would round or rescale", () => {
   for (const [text, token] of [
     ["9007199254740993", "9007199254740993"],
+    // The server keeps decimal places, so 2.50 must not reach it as 2.5.
+    ["2.50", "2.50"],
+    ["1.0", "1.0"],
+    ["+001.2300", "1.2300"],
+    [".50", "0.50"],
+    ["1.2500e+3", "1.2500e3"],
+    ["0.000", "0.000"],
     ["-9007199254740993", "-9007199254740993"],
     ["100000000000000000001", "100000000000000000001"],
     ["0.10000000000000001", "0.10000000000000001"],
@@ -75,6 +82,9 @@ test("numeric defaults reject values the server cannot store and incomplete inpu
     "1e101",
     "1".padEnd(102, "0"),
     `0.${"0".repeat(100)}1`,
+    // A zero keeps its written decimal places, which the server bounds like any other number.
+    "0e-101",
+    `0.${"0".repeat(101)}`,
     "1.25e-99",
     `${"1".repeat(51)}.${"1".repeat(50)}`,
   ])

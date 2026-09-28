@@ -279,6 +279,32 @@ class HttpDestinationPolicyTest {
   }
 
   @Test
+  void rejectsUrlsThatTheTransportCouldNotSendAsWritten() {
+    // HttpClient would send each non-ASCII character as one Latin-1 byte or as '?', changing the
+    // configured path and query; a port outside TCP's range never connects.
+    assertThatThrownBy(
+            () ->
+                publicDestinations.validate(
+                    config("https://api.example.com/cities/Zürich?q=東京", Map.of())))
+        .hasMessage(
+            "Percent-encode non-ASCII characters in the URL as UTF-8 (Zürich → Z%C3%BCrich)");
+    for (String port : List.of("0", "65536", "99999"))
+      assertThatThrownBy(
+              () ->
+                  publicDestinations.validate(
+                      config("https://api.example.com:" + port + "/x", Map.of())))
+          .as("port " + port)
+          .hasMessage("Use a port from 1 to 65535");
+    for (String url :
+        List.of(
+            "https://api.example.com/cities/Z%C3%BCrich?q=%E6%9D%B1%E4%BA%AC",
+            "https://api.example.com:1/x", "https://api.example.com:65535/x"))
+      assertThatCode(() -> publicDestinations.validate(config(url, Map.of())))
+          .as(url)
+          .doesNotThrowAnyException();
+  }
+
+  @Test
   void rejectsMalformedUrlsAndUnsafeSecretHeaders() {
     assertThatThrownBy(() -> publicDestinations.validate(config("http://bad host", Map.of())))
         .hasMessage("Provide an absolute HTTP(S) URL");

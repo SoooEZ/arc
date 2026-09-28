@@ -186,6 +186,33 @@ class HttpSourceTest {
   }
 
   @Test
+  void percentEncodedUrlsReachTheServerByteForByteWhileRawNonAsciiIsRefused() throws Exception {
+    var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext("/", HttpSourceTest::echoRequestTarget);
+    server.start();
+    String base = "http://127.0.0.1:" + server.getAddress().getPort();
+    try (var http = new HttpSource(new ObjectMapper(), "", "127.0.0.1")) {
+      var encoded = config(base + "/cities/Z%C3%BCrich?q=%E6%9D%B1%E4%BA%AC", 1000);
+      assertThat(fetch(http, encoded, Map.of()))
+          .isEqualTo(Map.of("path", "/cities/Z%C3%BCrich", "query", "q=%E6%9D%B1%E4%BA%AC"));
+      assertThat(fetch(http, encoded, Map.of("city", "東京")))
+          .isEqualTo(
+              Map.of(
+                  "path",
+                  "/cities/Z%C3%BCrich",
+                  "query",
+                  "q=%E6%9D%B1%E4%BA%AC&city=%E6%9D%B1%E4%BA%AC"));
+      // The same characters written raw were sent as Latin-1 bytes and '?' before.
+      var raw = config(base + "/cities/Zürich?q=東京", 1000);
+      assertThatThrownBy(() -> fetch(http, raw, Map.of()))
+          .hasMessage(
+              "Percent-encode non-ASCII characters in the URL as UTF-8 (Zürich → Z%C3%BCrich)");
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
   void numberParametersUsePlainDecimalTextLikeToString() throws Exception {
     var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext("/price", HttpSourceTest::echoQuery);
@@ -431,6 +458,21 @@ class HttpSourceTest {
         exchange,
         200,
         new ObjectMapper().writeValueAsString(Map.of("query", raw == null ? "<none>" : raw)));
+  }
+
+  /** The request target as received, before any decoding. */
+  private static void echoRequestTarget(HttpExchange exchange) throws IOException {
+    URI target = exchange.getRequestURI();
+    respond(
+        exchange,
+        200,
+        new ObjectMapper()
+            .writeValueAsString(
+                Map.of(
+                    "path",
+                    target.getRawPath(),
+                    "query",
+                    target.getRawQuery() == null ? "<none>" : target.getRawQuery())));
   }
 
   private static void respond(HttpExchange exchange, int status, String json) throws IOException {

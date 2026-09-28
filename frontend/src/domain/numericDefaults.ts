@@ -1,7 +1,7 @@
 import {
   DecimalNumber,
+  doubleKeepsDecimal,
   isDecimalNumber,
-  sameDecimalValue,
   sameJsonNumber,
 } from "./json";
 
@@ -87,10 +87,11 @@ function withinServerLimits(token: string): boolean {
 }
 
 /**
- * Parses a NUMBER default. A value that a double carries exactly becomes a
- * number, and any other value becomes a DecimalNumber with the entered digits,
- * so the draft never rounds what the field shows. Values outside the server's
- * number limits are rejected before they reach the graph.
+ * Parses a NUMBER default. A value that a double carries exactly, decimal
+ * places included, becomes a number, and any other value becomes a
+ * DecimalNumber with the entered digits, so the draft never rounds or rescales
+ * what the field shows. Values outside the server's number limits are rejected
+ * before they reach the graph.
  */
 export function parseNumericDefault(raw: string): NumericDefault {
   const text = raw.trim();
@@ -98,8 +99,8 @@ export function parseNumericDefault(raw: string): NumericDefault {
   const parts = decimalParts(text);
   if (!parts) return { valid: false, error: invalidNumber };
   const double = Number(text);
-  // Compare decimal values at the JSON boundary, not binary floating-point precision.
-  const value = sameDecimalValue(text, double)
+  // Compare what the server would read from the JSON, not binary floating-point precision.
+  const value = doubleKeepsDecimal(text, double)
     ? double
     : new DecimalNumber(jsonNumberToken(parts));
   // The server checks the token that the save request carries.

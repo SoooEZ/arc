@@ -304,6 +304,28 @@ paths:
                   valid: {type: boolean, enum: [true]}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
+  /diagnostics:
+    post:
+      operationId: diagnoseGraph
+      description: >-
+        Every problem of a draft, each reported once with its locations, as the
+        editor shows them: graph checks, branch-sensitive variable analysis and
+        source-mapping expressions. Connection problems appear on the node the
+        connection leaves; graph-level and input problems on the Input node.
+        Nothing is executed and no source is fetched.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Definition'}
+      responses:
+        '200':
+          description: The draft's problems; an empty array when the static checks pass
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Problem'}}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
   /preview:
     post:
       operationId: previewGraph
@@ -387,19 +409,7 @@ paths:
             let total; use "rule-id";) and the canonical source keeps their gaps.
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  definition: {$ref: '#/components/schemas/Definition'}
-                  source: {type: string}
-                  diagnostics:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        message: {type: string}
-                        line: {type: integer}
-                        column: {type: integer}
+              schema: {$ref: '#/components/schemas/Build'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /studio/render:
@@ -416,6 +426,53 @@ paths:
           content:
             application/json:
               schema: {type: object, properties: {source: {type: string}}}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
+  /studio/node/render:
+    post:
+      operationId: renderNodeArcScript
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [definition, nodeId]
+              properties:
+                definition: {$ref: '#/components/schemas/Definition'}
+                nodeId: {type: string}
+      responses:
+        '200':
+          description: The selected node's ARC Script; an Input node's also carries the input schema and source mappings
+          content:
+            application/json:
+              schema: {type: object, properties: {source: {type: string}}}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
+  /studio/node/build:
+    post:
+      operationId: buildNodeArcScript
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [definition, nodeId, source]
+              properties:
+                definition: {$ref: '#/components/schemas/Definition'}
+                nodeId: {type: string}
+                source: {type: string, maxLength: 1048576, description: ARC Script of exactly one node with the same ID and type}
+      responses:
+        '200':
+          description: >-
+            The definition with the node's code merged in (its outgoing
+            connections and, for an Input node, its parameters), or diagnostics
+            without a partial edit. Other nodes, incoming edges and notes are
+            preserved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Build'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /sources:
@@ -623,7 +680,11 @@ components:
                     label: {type: string}
                     type: {type: string}
                     value: {nullable: true}
-                    branch: {type: string, nullable: true, enum: [next, 'true', 'false', null]}
+                    branch:
+                      type: string
+                      nullable: true
+                      pattern: '^(next|true|false|default|case:[A-Za-z0-9_-]{1,64})$'
+                      description: 'The handle the step left through: next, a Condition''s true or false, a Switch''s case:<id> or default; null for an Output'
                     depth: {type: integer}
   schemas:
     Error:
@@ -632,15 +693,35 @@ components:
         status: {type: integer}
         message: {type: string}
         issues: {type: array, items: {type: string}}
-        locations:
+        locations: {type: array, items: {$ref: '#/components/schemas/Location'}}
+    Location:
+      type: object
+      description: A node of a rule version; the preview root has ruleId "preview" and a null version
+      properties:
+        ruleId: {type: string, nullable: true}
+        version: {type: integer, nullable: true}
+        nodeId: {type: string}
+        label: {type: string}
+    Problem:
+      type: object
+      required: [message, locations]
+      properties:
+        message: {type: string, description: The problem, prefixed with its expression position such as "Route / Case Premium" or "rate source / region"}
+        locations: {type: array, items: {$ref: '#/components/schemas/Location'}}
+    Build:
+      type: object
+      description: The built definition, its canonical source and the diagnostics; syntax and draft-shape errors leave the definition null
+      properties:
+        definition: {$ref: '#/components/schemas/Definition'}
+        source: {type: string}
+        diagnostics:
           type: array
           items:
             type: object
             properties:
-              ruleId: {type: string, nullable: true}
-              version: {type: integer, nullable: true}
-              nodeId: {type: string}
-              label: {type: string}
+              message: {type: string}
+              line: {type: integer}
+              column: {type: integer}
     PageMetadata:
       type: object
       required: [items, total, offset, limit]
@@ -746,6 +827,7 @@ components:
                   values 1 and 1.0 compare equal. Null, arrays and objects produce
                   a 422 execution error with the Switch node location.
               output: {type: string, nullable: true}
+              outputName: {type: string, nullable: true, pattern: '^([A-Za-z_][A-Za-z_0-9]{0,63})?$', description: 'OUTPUT only; wraps a single reached Output''s value as {outputName: value} and names its key among several'}
               ruleId: {type: string, nullable: true, description: REFERENCE only; a draft may keep the rule before choosing its version}
               version: {type: integer, minimum: 1, nullable: true, description: REFERENCE only; requires ruleId}
               cases:

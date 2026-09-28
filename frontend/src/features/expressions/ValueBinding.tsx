@@ -33,6 +33,7 @@ export default function ValueBinding({
   type,
   value,
   variables,
+  scopeKnown = true,
   disabled,
   onChange,
   optional = true,
@@ -42,6 +43,8 @@ export default function ValueBinding({
   type: BindingType;
   value?: string;
   variables: VariableOption[];
+  /** False while the node's scope read is pending or failed (see NodeFieldsProps). */
+  scopeKnown?: boolean;
   disabled: boolean;
   onChange: (value: string | undefined) => void;
   optional?: boolean;
@@ -77,7 +80,12 @@ export default function ValueBinding({
       keepEditor({ mode: next, constantType: null }, undefined);
       onChange(undefined);
     } else if (next === "variable") {
-      const kept = choices.some((v) => v.name === value) ? value : undefined;
+      // While the scope is unknown the value stays: the picker shows it as unavailable
+      // until the read answers, instead of erasing an expression the editor cannot undo.
+      const kept =
+        !scopeKnown || choices.some((v) => v.name === value)
+          ? value
+          : undefined;
       keepEditor({ mode: next, constantType: null }, kept);
       if (kept === undefined) onChange(undefined);
     } else if (next === "constant") {
@@ -185,6 +193,7 @@ export default function ValueBinding({
           label={label}
           value={value ?? ""}
           variables={variables}
+          scopeKnown={scopeKnown}
           disabled={disabled}
           onChange={(expression) => edit(expression || undefined)}
           helperText="ARC expression · quote literal text here"

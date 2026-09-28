@@ -59,7 +59,12 @@ function containsObject(value: unknown): boolean {
   return value !== null && typeof value === "object";
 }
 
-export function simpleComparison(expression: string): string[] | null {
+/**
+ * The expression with quoted text and bracketed or parenthesized spans blanked
+ * out (each character becomes a space, so offsets are kept), leaving only the
+ * operators that apply at the top level. Null while a quote is unterminated.
+ */
+export function topLevelText(expression: string): string | null {
   let masked = "",
     quote = "",
     escaped = false,
@@ -81,7 +86,38 @@ export function simpleComparison(expression: string): string[] | null {
       masked += " ".repeat(c.length);
     } else masked += depth ? " " : c;
   }
-  if (quote || /&&|\|\||\b(?:and|or)\b/i.test(masked)) return null;
+  return quote ? null : masked;
+}
+
+// Server priorities: ||/or, then &&/and, then equality, then ordering. An operand
+// that carries any of them binds no tighter than the comparison it sits in.
+const logicalOrComparison = /&&|\|\||\b(?:and|or)\b|==|!=|<>|<=|>=|=|<|>/i;
+
+/**
+ * A stored comparison from the builder's operands. An operand that contains a
+ * logical or comparison operator at its top level is parenthesized, so that
+ * `flag == (a || b)` is stored where `flag == a || b` would mean
+ * `(flag == a) || b`. Text with an open quote is still being typed and is left
+ * as it is.
+ */
+export function comparisonText(
+  left: string,
+  operator: string,
+  right: string,
+): string {
+  const operand = (text: string) => {
+    const trimmed = text.trim();
+    const top = topLevelText(trimmed);
+    return top !== null && logicalOrComparison.test(top)
+      ? `(${trimmed})`
+      : trimmed;
+  };
+  return [operand(left), operator, operand(right)].join(" ");
+}
+
+export function simpleComparison(expression: string): string[] | null {
+  const masked = topLevelText(expression);
+  if (masked === null || /&&|\|\||\b(?:and|or)\b/i.test(masked)) return null;
   const operators = [...masked.matchAll(/==|!=|>=|<=|>|</g)];
   if (operators.length !== 1) return null;
   const operator = operators[0],

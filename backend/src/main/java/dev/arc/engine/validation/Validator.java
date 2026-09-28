@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class Validator {
   private final DefinitionShape documentShape = new DefinitionShape();
+  private final DefinitionShape graphStructure = DefinitionShape.structureOnly();
   private final NodeValidation nodeValidation = new NodeValidation();
   private final GraphValidation graphValidation =
       new GraphValidation(documentShape, nodeValidation);
@@ -24,6 +25,15 @@ public class Validator {
   /** Drafts may be incomplete; shape and size limits always apply. */
   public void shape(Definition definition) {
     documentShape.validate(definition);
+  }
+
+  /**
+   * The structure a scope plan reads: node IDs and kinds, Switch cases, connections and input
+   * names. Labels, expressions, properties, defaults and sources are not checked, so a draft with
+   * such a problem still reports every node's variables.
+   */
+  public void structure(Definition definition) {
+    graphStructure.validate(definition);
   }
 
   /**

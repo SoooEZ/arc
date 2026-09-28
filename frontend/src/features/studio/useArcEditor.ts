@@ -69,3 +69,39 @@ export function useArcEditor(diagnostics = noDiagnostics, owner = "arc") {
 
   return { editor, model, onMount, reveal };
 }
+
+/**
+ * Makes the editor's text `text` through one undoable edit of only the changed
+ * span, so the caret and the undo history survive a rewrite into canonical
+ * form; `editor.setValue` would reset both. Model edits are allowed while the
+ * editor is read-only during a command.
+ */
+export function adoptSource(
+  editor: monaco.editor.IStandaloneCodeEditor,
+  text: string,
+) {
+  const model = editor.getModel();
+  if (!model || model.isDisposed()) return;
+  const current = model.getValue();
+  if (current === text) return;
+  const shortest = Math.min(current.length, text.length);
+  let prefix = 0;
+  while (prefix < shortest && current[prefix] === text[prefix]) prefix++;
+  let suffix = 0;
+  while (
+    suffix < shortest - prefix &&
+    current[current.length - 1 - suffix] === text[text.length - 1 - suffix]
+  )
+    suffix++;
+  const range = monaco.Range.fromPositions(
+    model.getPositionAt(prefix),
+    model.getPositionAt(current.length - suffix),
+  );
+  model.pushStackElement();
+  model.pushEditOperations(
+    editor.getSelections() ?? [],
+    [{ range, text: text.slice(prefix, text.length - suffix) }],
+    () => null,
+  );
+  model.pushStackElement();
+}

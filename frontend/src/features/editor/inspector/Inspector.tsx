@@ -71,7 +71,7 @@ export default function Inspector({
     scroll.current?.scrollTo({ top: 0 });
   }, [node.id]);
   const patch = (value: Partial<RuleNode>) => onNodeChange(node.id, value);
-  const variables = useNodeVariables(rule.draft, node.id);
+  const scope = useNodeVariables(rule.draft, node.id);
   const kind = nodeKinds[node.type];
   const Fields = fieldsByType[node.type];
   const fieldProps: NodeFieldsProps = {
@@ -80,7 +80,8 @@ export default function Inspector({
     rules,
     readOnly,
     patch,
-    variables,
+    variables: scope.variables,
+    scopeKnown: scope.known,
     onDefinitionChange,
     onInvalidDefault,
     onOpenReference,

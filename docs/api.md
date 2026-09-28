@@ -12,7 +12,7 @@ Base URL: `http://localhost:8080/api` (also proxied by the workspace at `http://
 
 `version` is optional: omit it to run the latest published version. Only published versions can be executed by rule ID. Editing a draft has no effect on this endpoint.
 
-The response includes `ruleId`, `version`, `result`, `durationMicros`, and `trace`. A trace step contains `ruleId`, `version`, `nodeId`, `label`, `type`, `value`, `branch`, and `depth`. A condition's branch is `"true"` or `"false"`; ordinary progression is `"next"`; an Output has `null`. Nested rules have `depth > 0` and their own pinned versions.
+The response includes `ruleId`, `version`, `result`, `durationMicros`, and `trace`. A trace step contains `ruleId`, `version`, `nodeId`, `label`, `type`, `value`, `branch`, and `depth`. A condition's branch is `"true"` or `"false"`; a Switch's is `"case:<id>"` for the case it matched or `"default"`; ordinary progression is `"next"`; an Output has `null`. Nested rules have `depth > 0` and their own pinned versions.
 
 Both execute and preview accept optional `trace` and `timeoutMs` fields:
 
@@ -26,7 +26,7 @@ Both execute and preview accept optional `trace` and `timeoutMs` fields:
 
 Responses add `timing: {preparationMicros, executionMicros, totalMicros}`. Preparation includes root-version lookup and static checks; execution includes parameter reads and graph evaluation. Server timing ends before HTTP response serialization/transfer. Existing `durationMicros` retains engine timing. The UI separately measures the browser request round trip, including response download and JSON parsing; it is not sent as a server response field.
 
-Expressions can call a published Formula with `@rule-id:version(arguments)`. Arguments follow the pinned input order, and omitted trailing inputs use the callee's normal default/source rules. The callee must be a published `FORMULA`; the positive version is mandatory. Calls share the execution deadline, step/read/depth limits and trace with their parent. `$IFERROR` and the `$IS…` error functions handle value errors only: an exhausted shared limit fails the request with `422`, and the deadline with `504`. See [Formula calls in the editor](studio.md) for completion, hover and null/omission behavior.
+Expressions can call a published Formula with `@rule-id:version(arguments)`. Arguments follow the pinned input order, and omitted trailing inputs use the callee's normal default/source rules. The callee must be a published `FORMULA`; the positive version is mandatory. Calls share the execution deadline, step/read/depth limits and trace with their parent. `$IFERROR` and the `$IS…` error functions handle value errors only: an exhausted shared limit fails the request with `422`, the deadline with `504`, and a called version that cannot be prepared (a missing or non-Formula pin, or a stored definition that no longer passes draft shape or compilation) with the callee's own error and location. See [Formula calls in the editor](studio.md) for completion, hover and null/omission behavior.
 
 Each source handle may have multiple downstream connections. Active nodes execute once after their predecessors are resolved. A single reached Output returns its value, wrapped as `{outputName: value}` when its optional Output name is set. Multiple reached Outputs return one object of raw values keyed by nonempty `outputName`, otherwise a trimmed bare variable name, otherwise node ID; for example `"result":{"amount":100,"discounted":72}`. Constants, property paths and compound expressions need an explicit Output name to avoid the node-ID fallback. A named Output adds no extra wrapper within this aggregate. Duplicate keys among reached Outputs return `422` with both node locations, even for null values. Conditional branches that are skipped do not produce keys or collisions. This naming policy applies to existing published versions too; their stored definitions and pins are unchanged. Shared joins combine upstream values before calculating their expression.
 
@@ -80,7 +80,7 @@ Supply the most recently read `revision`. A successful save advances it. A stale
 
 `POST /preview` accepts `{"definition": {...}, "inputs": {...}}`. It runs an unsaved graph and returns the same execution structure, with `ruleId: "preview"` and `version: null`. A published rule may also use the ID `preview`, but its locations always carry a version, so recognize the preview root by `ruleId: "preview"` together with `version: null`. Referenced rules must still be published and explicitly versioned.
 
-`POST /variables` accepts a graph document and returns node IDs mapped to arrays of variable names guaranteed to be available at that node. It accepts incomplete acyclic drafts; it does not execute expressions, fetch sources or resolve referenced rules. The editor uses it for parameter mapping choices. Invalid structure or cycles return `422`; a cycle error lists the nodes of one cycle in `locations`.
+`POST /variables` accepts a graph document and returns node IDs mapped to arrays of variable names guaranteed to be available at that node. It accepts incomplete acyclic drafts; it does not execute expressions, fetch sources or resolve referenced rules. The editor uses it for parameter mapping choices. Invalid structure or cycles return `422`; a cycle error lists the nodes of one cycle in `locations`. Only the structure a scope plan reads is checked (node IDs and kinds, Switch cases, connections and input names): a blank label, an oversized expression, a property a node kind does not use or an invalid default elsewhere in the draft does not fail the read.
 
 ## Publish and inspect versions
 
@@ -136,6 +136,23 @@ These changes shipped with [the second full review](reviews/2026-09-27-second-re
 - `DELETE /rules/{id}` accepts an optional `revision` query parameter and answers `409` when the rule changed since that revision was read. The caller check now also counts a Reference without a version and `@id:version` calls in the source mappings of a draft without an Input node, and a caller saved or published concurrently can no longer slip past it.
 - The sample rules are seeded once per workspace (recorded in the `workspace_seeds` table); deleting every rule and restarting the API no longer re-creates them.
 
+**Graph checks and scopes**
+
+- `POST /variables` checks only the structure a scope plan reads (node IDs and kinds, Switch cases, connections and input names). A draft whose only problems are content — a blank label, an oversized or unprefixed expression, a property its node kind does not use, an invalid default — reports every node's variables instead of failing, so one such problem no longer blanks every inspector. Invalid structure and cycles still return `422`.
+- Branch analysis numbers its tests in an order derived from the graph's connections instead of the sort order of node IDs, so renaming or regenerating node IDs can no longer decide whether a graph is "too complex". Graphs that were rejected only because of their node IDs are accepted; the "Branch analysis is too complex" limit itself is unchanged.
+
+**Formula calls**
+
+- `$IFERROR`, `$ISERROR`, `$ISERR` and `$ISNA` no longer turn a called version that cannot be prepared into a fallback. A callee whose stored definition fails draft shape or compilation (a property its node kind does not use, an unprefixed function call), a missing pin or a pinned rule that is not a published Formula fails the request with the callee's own `422` or `404` and location, as a bare call already did; only the callee's value errors (`1 / 0`, `#N/A`) stay recoverable. A published caller that has answered its fallback since those checks tightened fails until the callee is republished.
+
+**Excel functions**
+
+- Arrays in the reference-class parameters that Excel reads as one value fail with `422` "NAME: argument N must be a single value, not an array", like value-class parameters: the index of `$VLOOKUP` and `$HLOOKUP`, `$MATCH`'s match type, the field of every database function (`$DSUM`, `$DGET`, …) and `$T`'s value. They silently used the array's first element before, so a published version that relied on that fails now.
+
+**Data sources**
+
+- An HTTP source URL with raw non-ASCII characters (`…/cities/Zürich?q=東京`) or a port outside 1–65535 is refused at save and at every read with `422` "Percent-encode non-ASCII characters in the URL as UTF-8 (Zürich → Z%C3%BCrich)" or "Use a port from 1 to 65535". Such URLs were sent with Latin-1 bytes and `?` characters, that is to another resource; a stored version that holds one fails its Test and executions (or uses its `DEFAULT` fallback) until it is saved percent-encoded.
+
 **Errors and limits**
 
 - A zero written with more than 100 decimal places or an exponent beyond ±100 (`0e-101`, `0.00 ^ 100`) fails with `422` "Number exceeds supported precision or magnitude" like any other out-of-range number, wherever numbers are bounded: literals, `$TO_NUMBER`, operator results, inputs, defaults, lookup entries and HTTP responses. Such zeros passed every bound before; `$TO_STRING` of one could allocate gigabytes, and one with more than 9,999 decimal places answered `500`. Integers with more than 100 significant digits in ARRAY/OBJECT values, lookup entries and HTTP responses fail the same way at save, Test or read, as decimals already did; `1E+100` and its 101-digit stored spelling keep working. A stored draft or version holding such a value fails until it is fixed.
@@ -156,7 +173,7 @@ These changes shipped with [the 2026-09-27 full review](reviews/2026-09-27-full-
 
 - Wildcard criteria whose matching would read more than 10,000,000 characters in one call fail with `422` "NAME: wildcard criteria need more than 10,000,000 character comparisons; use fewer * or shorter text".
 - Excel functions use the en-US locale and UTC regardless of the server's settings. `$TEXT` no longer depends on earlier calls; a multi-section format whose selected section cannot be applied returns `#VALUE!`.
-- An array passed to a single-value Excel parameter fails with `422` "NAME: argument N must be a single value, not an array". Empty arrays count as `0` for `ROWS`, `COLUMNS`, `COUNTA`, `COUNTBLANK`, `COUNTIF` and `SUMIF`, return `#N/A` from `MATCH`, `VLOOKUP`, `HLOOKUP` and `LOOKUP`, and fail elsewhere with `422` "NAME: Excel ranges cannot be empty". Excel results are plain numbers without a negative scale.
+- An array passed to a single-value Excel parameter fails with `422` "NAME: argument N must be a single value, not an array" (since [the second review](#behavior-changes-from-the-second-review), the reference-class parameters Excel reads as one value included). Empty arrays count as `0` for `ROWS`, `COLUMNS`, `COUNTA`, `COUNTBLANK`, `COUNTIF` and `SUMIF`, return `#N/A` from `MATCH`, `VLOOKUP`, `HLOOKUP` and `LOOKUP`, and fail elsewhere with `422` "NAME: Excel ranges cannot be empty". Excel results are plain numbers without a negative scale.
 - `$CONCAT`, `$CONTAINS`, `$GET` and `$PLUCK` use canonical text: numbers are written plain, as `$TO_STRING` does (`Year 2020`, not `Year 2.02E+3`). `$CONCAT` skips nulls and rejects objects; `$CONTAINS` is false when either side is null; `$GET` and `$PLUCK` reject null or structured path keys.
 - `==`, `!=`, `$SWITCH` and `$CONTAINS` compare nested lists and objects by value, so `[1] == [1.0]`. `$CHOOSE` evaluates only the chosen option and returns an array option whole. A property path ending in a dot, such as `customer.`, is a syntax error.
 - A direct `@id:version` Formula call returns the same multi-Output aggregate as a Reference node. Decimal bounds are checked by value, so a stored `1E+100` default keeps working.

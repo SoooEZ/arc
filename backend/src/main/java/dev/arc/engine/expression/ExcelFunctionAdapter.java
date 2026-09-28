@@ -22,6 +22,29 @@ final class ExcelFunctionAdapter {
   private static final Set<String> LOOKUPS_IN_SECOND_RANGE =
       Set.of("MATCH", "VLOOKUP", "HLOOKUP", "LOOKUP");
 
+  /** A function's parameter, by zero-based index. */
+  record ReferenceParameter(String function, int index) {}
+
+  /**
+   * Reference-class parameters that Excel reads as one value. POI's metadata marks them as
+   * references, so the value-class check does not cover them, and POI would use the first cell of
+   * an array there ({@code $VLOOKUP(2, table, [3, 2], false)} read column 3): the index of VLOOKUP
+   * and HLOOKUP, MATCH's match type, the field of every database function, and T's value, which
+   * Excel would spill and ARC cannot.
+   */
+  static final Set<ReferenceParameter> SINGLE_VALUE_REFERENCES = singleValueReferences();
+
+  private static Set<ReferenceParameter> singleValueReferences() {
+    var parameters = new HashSet<ReferenceParameter>();
+    parameters.add(new ReferenceParameter("VLOOKUP", 2));
+    parameters.add(new ReferenceParameter("HLOOKUP", 2));
+    parameters.add(new ReferenceParameter("MATCH", 2));
+    parameters.add(new ReferenceParameter("T", 0));
+    for (String function : ExcelMatchingWork.DATABASE_FUNCTIONS)
+      parameters.add(new ReferenceParameter(function, 1));
+    return Set.copyOf(parameters);
+  }
+
   static Object evaluate(String name, List<Object> args) {
     try {
       FunctionMetadata metadata = FunctionMetadataRegistry.getFunctionByName(name);
@@ -74,16 +97,19 @@ final class ExcelFunctionAdapter {
   }
 
   /**
-   * Parameters of Excel's value class take one value. POI would quietly use the first cell of an
-   * array there ({@code $SQRT([4, 9])} was 2), so arrays may only reach range parameters.
+   * Parameters of Excel's value class, and the listed reference-class parameters, take one value.
+   * POI would quietly use the first cell of an array there ({@code $SQRT([4, 9])} was 2), so arrays
+   * may only reach range parameters.
    */
   private static void checkSingleValues(String name, FunctionMetadata metadata, List<Object> args) {
     byte[] parameterClasses = metadata.getParameterClassCodes();
     for (int index = 0; index < args.size() && parameterClasses.length > 0; index++) {
       // Variable-length functions repeat the class of their last declared parameter.
       byte parameterClass = parameterClasses[Math.min(index, parameterClasses.length - 1)];
-      if (parameterClass == Ptg.CLASS_VALUE && args.get(index) instanceof List<?>)
-        throw notSingleValue(name, index);
+      boolean singleValue =
+          parameterClass == Ptg.CLASS_VALUE
+              || SINGLE_VALUE_REFERENCES.contains(new ReferenceParameter(name, index));
+      if (singleValue && args.get(index) instanceof List<?>) throw notSingleValue(name, index);
     }
   }
 

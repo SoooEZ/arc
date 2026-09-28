@@ -1,13 +1,15 @@
 /**
  * Lossless JSON for the HTTP boundary and editable JSON buffers.
  *
- * The backend keeps numbers as exact decimals, while a JavaScript double cannot
- * represent every JSON number. parseJson keeps a number as a double only when
- * sending that double back as JSON preserves its decimal value. Other numbers,
- * such as 9007199254740993, 0.12345678901234567890123 and 1e400, become
- * DecimalNumber values, and stringifyJson writes their original tokens back.
- * The codec preserves values, not spelling: 1.0 becomes 1 and -0 becomes 0,
- * exactly as with JSON.parse and JSON.stringify.
+ * The backend keeps numbers as exact decimals with their decimal places (2.50
+ * stays 2.50 in $CONCAT results), while a JavaScript double carries neither
+ * every value nor any scale. parseJson keeps a number as a double only when
+ * sending that double back as JSON gives the server the same number: the same
+ * value with the same decimal places. Other numbers, such as 9007199254740993,
+ * 0.12345678901234567890123, 1e400 and 2.50, become DecimalNumber values, and
+ * stringifyJson writes their original tokens back. Only exponent spelling may
+ * change: 1E2 becomes 100 and -0 becomes 0, as with JSON.parse and
+ * JSON.stringify.
  */
 
 const numberGrammar = String.raw`-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?`;
@@ -53,38 +55,55 @@ export function isJsonObject(value: unknown): value is Record<string, unknown> {
 
 const decimalParts = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
 
-/** Coefficient/exponent form of decimal text, e.g. "-012.50e1" -> "-125e0"; null for other text. */
-function canonicalDecimal(text: string): string | null {
+interface Decimal {
+  /** Coefficient/exponent form of the value, e.g. "-012.50e1" -> "-125e0"; "0" for every zero. */
+  value: string;
+  /** The decimal places the server keeps: BigDecimal's scale, never below zero in its plain text. */
+  places: bigint;
+}
+
+function decimal(text: string): Decimal | null {
   const parts = decimalParts.exec(text);
   if (!parts) return null;
   const [, sign, integer, fraction = "", exponent = "0"] = parts;
   if (!integer && !fraction) return null;
+  const scale = BigInt(fraction.length) - BigInt(exponent);
+  const places = scale > 0n ? scale : 0n;
   const digits = (integer + fraction).replace(/^0+/, "");
-  if (!digits) return "0"; // Zero has one value whatever its sign or exponent.
+  // Zero has one value whatever its sign or exponent; only its places remain.
+  if (!digits) return { value: "0", places };
   const coefficient = digits.replace(/0+$/, "");
-  const power =
-    BigInt(exponent) -
-    BigInt(fraction.length) +
-    BigInt(digits.length - coefficient.length);
-  return `${sign === "-" ? "-" : ""}${coefficient}e${power}`;
+  const power = -scale + BigInt(digits.length - coefficient.length);
+  return { value: `${sign === "-" ? "-" : ""}${coefficient}e${power}`, places };
 }
 
 /**
- * Whether the JSON serialization of `value` has the decimal value written in
- * `text`. Sign, leading/trailing zeros and exponent spelling may differ
- * ("1.50e1" and 15 match); rounding, overflow and underflow do not.
+ * The number written in `text` as the server keeps it: its decimal value and
+ * its decimal places, computed from the token without expanding exponents.
+ * "1.50e1" and "15.0" share one key, "15" has another; null for other text.
  */
-export function sameDecimalValue(text: string, value: number): boolean {
+export function decimalKey(text: string): string | null {
+  const parsed = decimal(text);
+  return parsed && `${parsed.value}|${parsed.places}`;
+}
+
+/**
+ * Whether sending the double `value` as JSON gives the server the number
+ * written in `text`: the same decimal value with the same decimal places.
+ * Exponent spelling and leading zeros may differ ("1E2" and 100 match, as do
+ * ".5" and 0.5); rounding, overflow, underflow and a lost decimal place ("2.50"
+ * and 2.5) do not.
+ */
+export function doubleKeepsDecimal(text: string, value: number): boolean {
   if (!Number.isFinite(value)) return false;
   const serialized = JSON.stringify(value);
-  if (serialized === text) return true;
-  const expected = canonicalDecimal(text);
-  return expected !== null && expected === canonicalDecimal(serialized);
+  return serialized === text || decimalKey(serialized) === decimalKey(text);
 }
 
 /**
- * Whether two JSON numbers have the same decimal value, e.g. a double and a
- * DecimalNumber, or two DecimalNumbers spelled "1.50e1" and "15.0".
+ * Whether two JSON numbers are the same number to the server: the same decimal
+ * value with the same decimal places, e.g. a double and a DecimalNumber, or two
+ * DecimalNumbers spelled "1.50e1" and "15.0".
  */
 export function sameJsonNumber(
   left: number | DecimalNumber,
@@ -92,10 +111,10 @@ export function sameJsonNumber(
 ): boolean {
   if (isDecimalNumber(left)) {
     if (isDecimalNumber(right))
-      return canonicalDecimal(left.text) === canonicalDecimal(right.text);
-    return sameDecimalValue(left.text, right);
+      return decimalKey(left.text) === decimalKey(right.text);
+    return doubleKeepsDecimal(left.text, right);
   }
-  if (isDecimalNumber(right)) return sameDecimalValue(right.text, left);
+  if (isDecimalNumber(right)) return doubleKeepsDecimal(right.text, left);
   // Equal decimal values are equal doubles; JSON writes -0 as 0.
   return left === right;
 }
@@ -282,7 +301,7 @@ class JsonReader {
     if (!token) throw this.unexpected();
     this.position += token.length;
     const value = Number(token);
-    return sameDecimalValue(token, value) ? value : new DecimalNumber(token);
+    return doubleKeepsDecimal(token, value) ? value : new DecimalNumber(token);
   }
 
   private literal<T>(word: string, value: T): T {

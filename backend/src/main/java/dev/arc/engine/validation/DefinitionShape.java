@@ -24,6 +24,27 @@ final class DefinitionShape {
       Limits.format(Limits.MAX_EXPRESSION_CHARACTERS) + " characters";
   private static final Document DOCUMENT = new Document();
 
+  /**
+   * Whether content is checked besides structure. The scope plan reads only structure (node IDs and
+   * kinds, Switch cases, connections and input names), so {@code /variables} checks that alone: a
+   * blank label, an oversized expression, an unused property or an invalid default elsewhere in the
+   * draft cannot change any node's scope, and used to blank every inspector instead.
+   */
+  private final boolean contentChecks;
+
+  DefinitionShape() {
+    this(true);
+  }
+
+  private DefinitionShape(boolean contentChecks) {
+    this.contentChecks = contentChecks;
+  }
+
+  /** The checks that keep a scope plan well defined, in the same order; content problems pass. */
+  static DefinitionShape structureOnly() {
+    return new DefinitionShape(false);
+  }
+
   /** Throws the first violation, located at the node that owns it. */
   void validate(Definition definition) {
     var violation = firstViolation(definition);
@@ -35,7 +56,7 @@ final class DefinitionShape {
       checkDocument(definition);
       Set<String> nodeIds = checkNodes(definition.nodes());
       checkEdges(definition.edges(), nodeIds);
-      InputValidation.checkSchema(definition.inputs());
+      InputValidation.checkSchema(definition.inputs(), contentChecks);
       return Optional.empty();
     } catch (Violated stop) {
       return Optional.of(stop.violation);
@@ -88,7 +109,7 @@ final class DefinitionShape {
     String edgeLimit = "Provide at most " + Limits.MAX_EDGES + " edges";
     require(definition.edges() != null, DOCUMENT, edgeLimit);
     requireAtMost(definition.edges(), Limits.MAX_EDGES, Connection::new, edgeLimit);
-    checkNotes(definition.notes());
+    if (contentChecks) checkNotes(definition.notes());
   }
 
   private void checkNotes(List<String> notes) {
@@ -114,18 +135,31 @@ final class DefinitionShape {
         node != null && node.id() != null && NODE_ID.matcher(node.id()).matches(),
         declaration,
         "Every node needs a valid ID");
-    require(
-        node.position() == null
-            || Double.isFinite(node.position().x())
-                && Double.isFinite(node.position().y())
-                && Math.abs(node.position().x()) <= Limits.MAX_CANVAS_COORDINATE
-                && Math.abs(node.position().y()) <= Limits.MAX_CANVAS_COORDINATE,
-        declaration,
-        "Node position must be finite and within canvas bounds");
+    if (contentChecks)
+      require(
+          node.position() == null
+              || Double.isFinite(node.position().x())
+                  && Double.isFinite(node.position().y())
+                  && Math.abs(node.position().x()) <= Limits.MAX_CANVAS_COORDINATE
+                  && Math.abs(node.position().y()) <= Limits.MAX_CANVAS_COORDINATE,
+          declaration,
+          "Node position must be finite and within canvas bounds");
     require(ids.add(node.id()), declaration, "Duplicate node ID: " + node.id());
     require(
         NodeKind.parse(node.type()).isPresent(), declaration, "Unknown node type: " + node.type());
     NodeKind kind = node.kind();
+    if (contentChecks) checkContent(node, kind);
+    checkCases(node, kind);
+    if (contentChecks) {
+      checkFields(node);
+      checkBindings(node);
+      checkPin(node);
+    }
+  }
+
+  /** What a node says, beyond how it is connected: its label, properties and expression sizes. */
+  private void checkContent(Node node, NodeKind kind) {
+    var declaration = new NodeDeclaration(node);
     require(
         node.label() != null
             && !node.label().isBlank()
@@ -153,9 +187,10 @@ final class DefinitionShape {
         node.selector() == null || node.selector().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
         declaration,
         "Selector expression exceeds " + EXPRESSION_LIMIT);
-    checkCases(node);
-    checkFields(node);
-    checkBindings(node);
+  }
+
+  private void checkPin(Node node) {
+    var declaration = new NodeDeclaration(node);
     // A draft may choose a rule before its version (ARC Script `use "rule-id";`), not the reverse.
     require(
         node.version() == null || node.ruleId() != null,
@@ -167,8 +202,13 @@ final class DefinitionShape {
         node.label() + ": rule versions start at 1");
   }
 
-  private void checkCases(Node node) {
+  /**
+   * Case IDs name a Switch's handles, so they are structure; labels and expressions are content.
+   */
+  private void checkCases(Node node, NodeKind kind) {
     if (node.cases() == null) return;
+    // Cases on another kind are an unused property, which only the content checks report.
+    if (!contentChecks && !kind.uses(Property.CASES)) return;
     requireAtMost(
         node.cases(),
         Limits.MAX_SWITCH_CASES,
@@ -184,6 +224,7 @@ final class DefinitionShape {
               && caseIds.add(option.id()),
           switchCase,
           "Every case needs a unique, stable ID");
+      if (!contentChecks) continue;
       require(
           option.label() != null
               && !option.label().isBlank()

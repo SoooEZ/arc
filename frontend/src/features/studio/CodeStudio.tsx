@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { Button } from "@mui/material";
 import { Check, Code2 } from "lucide-react";
@@ -6,7 +6,7 @@ import { monaco } from "./arcLanguage";
 import type { Definition, Diagnostic, Rule } from "../../types";
 import { useFunctionCatalog } from "./useFunctionCatalog";
 import { useArcLanguageSupport, insertSnippet } from "./useArcLanguageSupport";
-import { useArcEditor, arcEditorOptions } from "./useArcEditor";
+import { adoptSource, useArcEditor, arcEditorOptions } from "./useArcEditor";
 import StudioLibrary from "./StudioLibrary";
 import StudioOutline from "./StudioOutline";
 import StudioProblems from "./StudioProblems";
@@ -39,6 +39,19 @@ export default function CodeStudio({
   const { data: functions, error: catalogError } = useFunctionCatalog();
   const latest = useRef({ onBuild, onSave, readOnly });
   latest.current = { onBuild, onSave, readOnly };
+  // The document owns the text. When a command adopts the server's canonical
+  // source, the model follows through one undoable edit that keeps the caret;
+  // typing already matches the document, so the adoption is a no-op for it.
+  const adopting = useRef(false);
+  useEffect(() => {
+    if (!editor.current || !model || model.isDisposed()) return;
+    adopting.current = true;
+    try {
+      adoptSource(editor.current, source);
+    } finally {
+      adopting.current = false;
+    }
+  }, [editor, model, source]);
   const insert = (snippet: string, atEnd = false) => {
     if (!latest.current.readOnly) insertSnippet(editor.current, snippet, atEnd);
   };
@@ -108,8 +121,11 @@ export default function CodeStudio({
         <MonacoEditor
           language="arc"
           theme="arc-light"
-          value={source}
-          onChange={(value) => onChange(value ?? "")}
+          defaultValue={source}
+          onChange={(value) => {
+            // An adoption echoes the document's own text; only typing reports.
+            if (!adopting.current) onChange(value ?? "");
+          }}
           onMount={mount}
           options={{
             ...arcEditorOptions,

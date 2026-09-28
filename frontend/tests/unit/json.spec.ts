@@ -5,7 +5,8 @@ import {
   isJsonObject,
   parseJson,
   parseJsonObject,
-  sameDecimalValue,
+  decimalKey,
+  doubleKeepsDecimal,
   sameJsonNumber,
   stringifyJson,
 } from "../../src/domain/json";
@@ -23,12 +24,11 @@ const inexactNumbers = [
   "1e-400",
 ];
 
-test("numbers that keep their decimal value as doubles stay numbers", () => {
+test("numbers that a double gives the server unchanged stay numbers", () => {
   for (const [token, value] of [
     ["0", 0],
     ["-1", -1],
     ["0.1", 0.1],
-    ["1.0", 1],
     ["1E2", 100],
     ["123.456e-2", 1.23456],
     ["9007199254740992", 9007199254740992],
@@ -38,10 +38,30 @@ test("numbers that keep their decimal value as doubles stay numbers", () => {
     ["1.7976931348623157e308", Number.MAX_VALUE],
   ] as const)
     expect(parseJson(token), token).toBe(value);
-  // Equal decimal values keep their value but not their spelling.
-  expect(stringifyJson(parseJson("[1.0,1E2,-0]"))).toBe("[1,100,0]");
+  // Only exponent spelling changes: the server reads 1E2 and 100 as one number.
+  expect(stringifyJson(parseJson("[1E2,-0,1e21]"))).toBe("[100,0,1e+21]");
   expect(Object.is(parseJson("-0"), -0)).toBe(true);
   expect(Object.is(parseJson("-0.0e5"), -0)).toBe(true);
+});
+
+test("numbers with decimal places a double would drop become DecimalNumber", () => {
+  // The server keeps scale (2.50 prints as 2.50), so 2.5 would change $CONCAT results,
+  // and an unchanged lookup table saved through the UI would store other numbers.
+  for (const token of [
+    "2.50",
+    "0.070",
+    "1.0",
+    "-0.0",
+    "0.000",
+    "1.50e1",
+    "10.50",
+  ]) {
+    const value = parseJson(token);
+    expect(isDecimalNumber(value), token).toBe(true);
+    expect(stringifyJson(value)).toBe(token);
+  }
+  const entries = '{"US":{"price":10.50,"rate":0.070}}';
+  expect(stringifyJson(parseJson(entries))).toBe(entries);
 });
 
 test("numbers a double would change become DecimalNumber and keep their token", () => {
@@ -273,17 +293,19 @@ test("JSON object helpers exclude arrays, null and DecimalNumber", () => {
     expect(isJsonObject(value)).toBe(false);
 });
 
-test("decimal comparison ignores spelling but not rounding, overflow or underflow", () => {
+test("a double keeps a decimal when its value and its decimal places both survive", () => {
   for (const [text, value] of [
-    ["1.50e1", 15],
-    ["+001.2300", 1.23],
+    ["1E2", 100],
+    ["+001.23", 1.23],
     [".5", 0.5],
     ["5.", 5],
     ["-0", -0],
-    ["0.000", 0],
+    ["0e5", 0],
     ["1e21", 1e21],
+    ["1.5e1", 15],
+    ["12.5e-1", 1.25],
   ] as const)
-    expect(sameDecimalValue(text, value), text).toBe(true);
+    expect(doubleKeepsDecimal(text, value), text).toBe(true);
   for (const [text, value] of [
     ["9007199254740993", 9007199254740992],
     ["1e-400", 0],
@@ -291,8 +313,24 @@ test("decimal comparison ignores spelling but not rounding, overflow or underflo
     ["1e400", Infinity],
     ["abc", Number.NaN],
     [".", 0],
+    // The same value with more decimal places is another number to the server.
+    ["1.50e1", 15],
+    ["+001.2300", 1.23],
+    ["0.000", 0],
+    ["2.50", 2.5],
   ] as const)
-    expect(sameDecimalValue(text, value), text).toBe(false);
+    expect(doubleKeepsDecimal(text, value), text).toBe(false);
+});
+
+test("decimalKey names a number's value and decimal places as the server keeps them", () => {
+  expect(decimalKey("1.50e1")).toBe(decimalKey("15.0"));
+  expect(decimalKey("1.50e1")).not.toBe(decimalKey("15"));
+  expect(decimalKey("1E2")).toBe(decimalKey("100"));
+  expect(decimalKey("0e-2")).toBe(decimalKey("0.00"));
+  expect(decimalKey("-0.0e5")).toBe(decimalKey("0"));
+  expect(decimalKey("0.10")).not.toBe(decimalKey("0.1"));
+  expect(decimalKey("abc")).toBeNull();
+  expect(decimalKey(".")).toBeNull();
 });
 
 test("JSON numbers compare by decimal value across doubles and DecimalNumber", () => {
@@ -314,6 +352,8 @@ test("JSON numbers compare by decimal value across doubles and DecimalNumber", (
     [new DecimalNumber("1e400"), Infinity],
     [0.1, 0.2],
     [Number.NaN, Number.NaN],
+    [new DecimalNumber("2.50"), 2.5],
+    [new DecimalNumber("2.50"), new DecimalNumber("2.5")],
   ] as const)
     expect(sameJsonNumber(left, right), `${left} ${right}`).toBe(false);
 });

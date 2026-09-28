@@ -61,12 +61,33 @@ final class GraphExecution {
     String key = ruleId + "@" + version;
     if (!activeRules.add(key)) throw ArcException.invalid("Circular rule reference: " + key);
     try {
-      CompiledGraph compiled = plans.prepare(ruleId, version, definition);
+      CompiledGraph compiled = prepare(ruleId, version, definition);
       return new RuleRun(ruleId, version, compiled, depth).execute(inputs);
     } catch (ArcException error) {
       throw error.inRule(ruleId, version);
     } finally {
       activeRules.remove(key);
+    }
+  }
+
+  /**
+   * The compiled plan of a draft or pinned version. Its failure, in draft shape or compilation, is
+   * the definition's and never a value error, so the caller's fallbacks let it through (lesson B7).
+   */
+  private CompiledGraph prepare(String ruleId, Integer version, Supplier<Definition> definition) {
+    try {
+      return plans.prepare(ruleId, version, definition);
+    } catch (ArcException error) {
+      throw error.asDefinitionFailure();
+    }
+  }
+
+  /** Reads a pin; a missing version or a rule that is not a Formula fails the definition too. */
+  private static Definition pinned(Supplier<Definition> read) {
+    try {
+      return read.get();
+    } catch (ArcException error) {
+      throw error.asDefinitionFailure();
     }
   }
 
@@ -222,14 +243,14 @@ final class GraphExecution {
         for (var binding : node.bindings().entrySet())
           inputs.put(binding.getKey(), eval(binding.getValue(), scope));
       }
-      Definition child = resolver.resolve(node.ruleId(), node.version());
+      Definition child = pinned(() -> resolver.resolve(node.ruleId(), node.version()));
       return run(node.ruleId(), node.version(), () -> child, inputs, depth + 1);
     }
 
     private Object callFormula(Expressions.FormulaCall call, List<Object> arguments) {
       try {
         deadline.check();
-        Definition child = resolver.resolveFormula(call.id(), call.version());
+        Definition child = pinned(() -> resolver.resolveFormula(call.id(), call.version()));
         if (arguments.size() > child.inputs().size())
           throw ArcException.invalid("Too many arguments for @" + call.id() + ":" + call.version());
         var inputs = new LinkedHashMap<String, Object>();

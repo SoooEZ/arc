@@ -71,7 +71,14 @@ export function useSourceEditor({
   const mounted = useRef(true);
   const dirty = document !== null && sourceIsDirty(document);
   const historical = document !== null && isHistoricalVersion(document);
-  const saving = document !== null && savingIds.includes(document.source.id);
+  // A stored source is pending while any save of it runs, even one started from another
+  // selection; a new draft only through its own request, so typing a pending create's ID into
+  // another draft does not freeze that draft's fields.
+  const saving =
+    document !== null &&
+    (document.source.version > 0
+      ? savingIds.includes(document.source.id)
+      : document.saving !== null);
   const selected = document?.source;
   const versions = usePagedResource(
     JSON.stringify([selected?.id, selected?.version]),

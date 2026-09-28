@@ -11,6 +11,7 @@ export default function TransformFields({
   node,
   patch,
   variables,
+  scopeKnown,
   readOnly,
 }: NodeFieldsProps) {
   const fields = node.fields ?? [];
@@ -64,6 +65,7 @@ export default function TransformFields({
                 optional={false}
                 value={field.expression}
                 variables={variables}
+                scopeKnown={scopeKnown}
                 disabled={readOnly}
                 onChange={(value) =>
                   patch({
@@ -99,6 +101,7 @@ export default function TransformFields({
             buttonLabel="Edit as one expression"
             disabled={readOnly}
             variables={variables}
+            scopeKnown={scopeKnown}
             value={`$OBJECT(${fields.map((field) => `${quoteText(field.name)}, ${field.expression || "null"}`).join(", ")})`}
             onChange={(expression) =>
               patch({
@@ -114,6 +117,7 @@ export default function TransformFields({
             label="Transform expression"
             value={node.expression || ""}
             variables={variables}
+            scopeKnown={scopeKnown}
             disabled={readOnly}
             onChange={(expression) => patch({ expression })}
             helperText="Use $OBJECT, $MERGE, $MAP, $FILTER or nested functions to return any value."

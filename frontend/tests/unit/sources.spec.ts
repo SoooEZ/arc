@@ -368,3 +368,50 @@ test("reopening a source during its save adopts the completed revision", () => {
   expect(document!.selection).toBe(3);
   expect(sourceIsDirty(document!)).toBe(false);
 });
+
+test("a new draft that takes a pending create's ID never adopts the created source", () => {
+  // Create "first" is pending; New source, unrelated content, and the same ID typed in.
+  const draft = { ...createSourceDraft(), id: "first", name: "Other table" };
+  const before = sourceDocumentReducer(openSource(draft, 2), {
+    type: "buffer",
+    field: "entries",
+    value: '{"FR":1}',
+  });
+  const document = sourceDocumentReducer(before, {
+    type: "save/success",
+    request: 1,
+    selection: 1,
+    source: source("first"),
+  });
+  // Before, this draft became "v1 · edited" and its Save published it as first v2.
+  expect(document).toBe(before);
+  expect(document!.source.version).toBe(0);
+  expect(sourceIsDirty(document!)).toBe(true);
+});
+
+test("a stored copy reopened during its save adopts the revision and keeps its edits", () => {
+  const first = source("first");
+  let document = sourceDocumentReducer(openSource(first, 1), {
+    type: "save/start",
+    request: 1,
+  });
+  document = sourceDocumentReducer(document, {
+    type: "select",
+    source: first,
+    selection: 2,
+  });
+  document = sourceDocumentReducer(document, {
+    type: "metadata",
+    patch: { name: "Edited again" },
+  });
+  document = sourceDocumentReducer(document, {
+    type: "save/success",
+    request: 1,
+    selection: 1,
+    source: { ...first, version: 2, name: "Saved A" },
+  });
+  expect(document!.source.version).toBe(2);
+  expect(document!.viewedVersion).toBe(2);
+  expect(document!.source.name).toBe("Edited again");
+  expect(sourceIsDirty(document!)).toBe(true);
+});

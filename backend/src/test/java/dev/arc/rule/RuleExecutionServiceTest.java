@@ -215,6 +215,43 @@ class RuleExecutionServiceTest {
   }
 
   @Test
+  void aPublishedCallerCannotRecoverACalleeVersionThatNoLongerPrepares() {
+    var amount = List.of(new Input("amount", "NUMBER", true, null));
+    var edge = new Edge("next", "input", "output", "next");
+    // Stored before unused properties were rejected: an Output with a result variable.
+    var child =
+        new Definition(
+            1,
+            amount,
+            List.of(
+                inputNode("input", "Inputs"),
+                nodeOf("output", "OUTPUT", "Result").expression("amount * 2").output("r").build()),
+            List.of(edge));
+    var parent =
+        new Definition(
+            1,
+            amount,
+            List.of(
+                inputNode("input", "Inputs"),
+                outputNode("output", "Result", "$IFERROR(@child:1(amount), -1)")),
+            List.of(edge));
+    when(rules.publishedVersion("parent")).thenReturn(1);
+    when(rules.resolve("parent", 1)).thenReturn(parent);
+    when(rules.resolveFormula("child", 1)).thenReturn(child);
+    // This returned 200 with -1 before: the fallback hid the callee's broken definition.
+    assertThatThrownBy(() -> service.execute("parent", new Execution(Map.of("amount", 3), null)))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(422);
+              assertThat(error.getMessage())
+                  .isEqualTo("Result variables belong to Formula, Transform and Reference nodes");
+              assertThat(error.locations())
+                  .contains(new ArcException.Location("child", 1, "output", "Result"));
+            });
+  }
+
+  @Test
   void legacyUnpublishedAndInvalidTimeoutErrorsRemainExplicit() {
     when(rules.publishedVersion("draft")).thenReturn(null);
     assertThatThrownBy(() -> service.execute("draft", new Execution(Map.of(), null)))

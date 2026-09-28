@@ -263,6 +263,27 @@ Preview and the published API playground offer **Include execution trace** and *
 
 Results display browser request time and server preparation/execution times separately. The server timeout defaults to 30 seconds and is shared across nested rules and source reads; deadline exhaustion returns `504`, including when a source has a default fallback. A shorter per-source timeout still follows that source's configured failure policy.
 
+## Behavior changes from the second review
+
+These editor changes shipped with [the second full review](reviews/2026-09-27-second-review.md), after the ones listed in the next section. Changes to API results, error messages and data sources are listed in [the API reference](api.md#behavior-changes-from-the-second-review).
+
+**Numbers**
+
+- Decimal places are kept: `2.50`, `0.070` and `1.0` stay exactly that in lookup entries, numeric defaults, the Test panel and the playground, where a JavaScript double used to turn them into `2.5`, `0.07` and `1`. A lookup source renamed and saved in **Data sources** stores the same numbers as the version it came from, and a Test run with `{"price": 2.50}` shows the same `$CONCAT` text as an API client. Only exponent spelling may change (`1E2` becomes `100`); a numeric default such as `0e-101` is refused like the server refuses it.
+
+**Inspector**
+
+- The Condition builder parenthesizes an operand that contains `||`, `&&`, `and`, `or` or a comparison, so choosing `flag` Equals `a || b` stores `flag == (a || b)` instead of `flag == a || b`, which meant `(flag == a) || b`. Stored expressions are not rewritten; the builder reads its parenthesized operand back.
+- A node's variable scope no longer depends on the rest of the draft being complete: a blank label, an invalid default or a property a node kind does not use elsewhere in the graph keeps every inspector's variables. While a scope read is pending or has failed, the Expression editor says "Variable scope unavailable" instead of "Unavailable variables" and still allows Apply, and switching a value source to **Upstream variable** keeps the current value instead of erasing it.
+
+**Code studio**
+
+- Build (Ctrl/⌘+Enter or the button), Save and Publish keep the caret and the undo history when the server rewrites the code into canonical form (a trailing comment hoisted into the header, an edge ID added): Ctrl/⌘+Z returns to the text before the command.
+
+**Data sources**
+
+- A new source draft that takes the ID of a create that is still pending stays its own draft: its fields stay editable, it does not become "v1 · edited" when the create completes, and its own Create receives "This source ID already exists". The HTTP URL field refuses raw non-ASCII characters and ports outside 1–65535 before Save, as the server does.
+
 ## Behavior changes in this revision
 
 These editor changes shipped with [the 2026-09-27 full review](reviews/2026-09-27-full-review.md). Changes to API results, error messages, data sources and ARC Script rendering are listed in [the API reference](api.md#behavior-changes-in-this-revision).

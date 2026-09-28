@@ -31,6 +31,7 @@ function DefaultRoute({
   rule,
   node,
   variables,
+  scopeKnown,
   readOnly,
   onDefinitionChange,
 }: NodeFieldsProps) {
@@ -44,6 +45,7 @@ function DefaultRoute({
           node={output}
           label="Default return value"
           variables={variables}
+          scopeKnown={scopeKnown}
           readOnly={readOnly}
           patch={(patch) =>
             onDefinitionChange((current) =>

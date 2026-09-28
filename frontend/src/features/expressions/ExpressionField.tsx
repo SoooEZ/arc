@@ -14,6 +14,7 @@ export default function ExpressionField({
   value,
   onChange,
   variables,
+  scopeKnown = true,
   disabled,
   helperText,
   hideInput = false,
@@ -23,6 +24,8 @@ export default function ExpressionField({
   value: string;
   onChange: (value: string) => void;
   variables: VariableOption[];
+  /** False while the node's scope read is pending or failed (see NodeFieldsProps). */
+  scopeKnown?: boolean;
   disabled: boolean;
   helperText?: string;
   hideInput?: boolean;
@@ -74,6 +77,7 @@ export default function ExpressionField({
             label={label}
             value={value}
             variables={variables}
+            scopeKnown={scopeKnown}
             readOnly={disabled}
             onClose={() => setOpen(false)}
             onApply={(expression) => {

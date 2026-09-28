@@ -115,6 +115,13 @@ try:
         "kind": "LOOKUP", "parameters": [{"name": "key", "type": "STRING", "required": True}],
         "entries": {"US": {"rate": 0.07}}, "timeoutMs": 3000}}, 409)
     assert duplicate_source["message"] == "This source ID already exists", duplicate_source
+    # An HTTP URL the transport could not send as written is refused at save, not rewritten.
+    for url, message in [("https://api.example.com/cities/Zürich?q=東京",
+                          "Percent-encode non-ASCII characters in the URL as UTF-8 (Zürich → Z%C3%BCrich)"),
+                         ("https://api.example.com:99999/x", "Use a port from 1 to 65535")]:
+        unsendable = request("POST", "/api/sources", {"id": f"{PREFIX}-url", "name": "Unsendable", "definition": {
+            "kind": "HTTP", "url": url, "parameters": [], "timeoutMs": 3000}}, 422)
+        assert unsendable["message"] == message, unsendable
     request("GET", f"/api/sources/{PREFIX}-missing/versions", expected=404)
     power = {"schemaVersion": 1, "inputs": [],
              "nodes": [{"id": "input", "type": "INPUT", "label": "Inputs"},

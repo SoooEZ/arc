@@ -119,15 +119,31 @@ export function canRunSourceTest(
   );
 }
 
+/**
+ * Why the server would refuse an HTTP URL that its transport could not send as
+ * written, or null. The server checks the rest of the URL.
+ */
+export function httpUrlProblem(url: string): string | null {
+  if (/[^\x00-\x7f]/.test(url))
+    return "Percent-encode non-ASCII characters as UTF-8 (Zürich → Z%C3%BCrich).";
+  const port = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]*:(\d+)(?=[/?#]|$)/i.exec(
+    url,
+  )?.[1];
+  if (port !== undefined && (Number(port) < 1 || Number(port) > 65535))
+    return "Use a port from 1 to 65535.";
+  return null;
+}
+
 /** Why the Save command refuses the draft, or null. The server rejects the same values. */
 export function sourceSaveProblem(document: SourceDocument): string | null {
   if (!document.source.version && !isResourceId(document.source.id))
     return `Enter a valid source ID. ${resourceIdGuidance}`;
-  if (
-    document.source.definition.kind === "HTTP" &&
-    parseHttpTimeout(document.timeout) === null
-  )
-    return `Timeout: ${httpTimeoutGuidance}`;
+  if (document.source.definition.kind === "HTTP") {
+    const urlProblem = httpUrlProblem(document.source.definition.url ?? "");
+    if (urlProblem) return `HTTP URL: ${urlProblem}`;
+    if (parseHttpTimeout(document.timeout) === null)
+      return `Timeout: ${httpTimeoutGuidance}`;
+  }
   return null;
 }
 
@@ -277,8 +293,12 @@ export function sourceDocumentReducer(
         document.selection !== action.selection ||
         document.saving?.request !== action.request
       ) {
-        // Reopening A while its save completes should expose its new revision, without
-        // replacing edits made in that reopened document.
+        // Only a stored copy of the source adopts a save from another selection or request:
+        // reopening A while its save completes exposes its new revision, without replacing
+        // edits made in that reopened document. A new draft that merely took the ID of a
+        // pending create was never that source; it keeps its state, and its own Create
+        // receives the server's 409 instead of publishing it as the next version.
+        if (document.source.version === 0) return document;
         if (!sourceIsDirty(document)) return saved;
         return {
           ...document,

@@ -19,6 +19,7 @@ export default function ReferenceFields({
   readOnly,
   patch,
   variables,
+  scopeKnown,
   onOpenReference,
 }: NodeFieldsProps) {
   const [chosenRule, setChosenRule] = useState<RuleChoice | null>(null);
@@ -168,6 +169,7 @@ export default function ReferenceFields({
                 type={input.type}
                 value={ownValue(node.bindings, input.name)}
                 variables={variables}
+                scopeKnown={scopeKnown}
                 disabled={readOnly}
                 helperText={
                   input.defaultValue != null

@@ -37,6 +37,11 @@ final class FunctionCatalog {
     return Set.copyOf(names);
   }
 
+  /** The Excel functions that may reach POI, for catalog-wide checks of the adapter. */
+  static Set<String> excelFunctions() {
+    return EXCEL;
+  }
+
   private static List<Entry> buildCatalog() {
     var all = new TreeMap<String, Entry>();
     Set<String> names = new TreeSet<>(EXCEL);

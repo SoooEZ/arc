@@ -15,8 +15,11 @@ import java.util.*;
  * Declared parameter contracts and strict runtime value types; missing values remain caller-owned.
  */
 final class InputValidation {
-  /** Part of the draft shape: stops at the first violation, like {@link DefinitionShape}. */
-  static void checkSchema(List<Input> inputs) {
+  /**
+   * Part of the draft shape: stops at the first violation, like {@link DefinitionShape}. Without
+   * content checks only the names are checked, which is all the scope plan reads.
+   */
+  static void checkSchema(List<Input> inputs, boolean contentChecks) {
     Set<String> names = new HashSet<>();
     for (Input parameter : inputs) {
       var declaration = new InputDeclaration(parameter);
@@ -25,6 +28,7 @@ final class InputValidation {
           declaration,
           "Input names must be identifiers (letters, digits, underscores)");
       require(names.add(parameter.name()), declaration, "Duplicate input: " + parameter.name());
+      if (!contentChecks) continue;
       require(
           InputTypes.NAMES.contains(parameter.type() == null ? "" : parameter.type()),
           declaration,

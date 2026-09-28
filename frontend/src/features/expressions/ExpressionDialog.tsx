@@ -26,6 +26,7 @@ export default function ExpressionDialog({
   label,
   value,
   variables,
+  scopeKnown = true,
   readOnly,
   onClose,
   onApply,
@@ -33,6 +34,8 @@ export default function ExpressionDialog({
   label: string;
   value: string;
   variables: VariableOption[];
+  /** False while the node's scope read is pending or failed (see NodeFieldsProps). */
+  scopeKnown?: boolean;
   readOnly: boolean;
   onClose: () => void;
   onApply: (value: string) => void;
@@ -55,8 +58,10 @@ export default function ExpressionDialog({
     kind: "expression",
     variables,
   });
-  const missing =
-    check?.variables.filter((name) => !names.includes(name)) ?? [];
+  // An unknown scope cannot judge a variable unavailable, so it does not block Apply.
+  const missing = scopeKnown
+    ? (check?.variables.filter((name) => !names.includes(name)) ?? [])
+    : [];
   const error =
     checkError ||
     check?.error ||
@@ -121,6 +126,12 @@ export default function ExpressionDialog({
             }}
           />
         </div>
+        {!scopeKnown && (
+          <Alert severity="info">
+            Variable scope unavailable: the variables in scope at this node are
+            checked once the scope read answers.
+          </Alert>
+        )}
         {error ? (
           <Alert severity="error">{error}</Alert>
         ) : (

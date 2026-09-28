@@ -7,6 +7,7 @@ export default function FormulaFields({
   readOnly,
   patch,
   variables,
+  scopeKnown,
 }: NodeFieldsProps) {
   return (
     <InspectorSection
@@ -18,6 +19,7 @@ export default function FormulaFields({
         value={node.expression || ""}
         onChange={(expression) => patch({ expression })}
         variables={variables}
+        scopeKnown={scopeKnown}
         disabled={readOnly}
         helperText="Nested functions, arrays, object fields and arithmetic are supported."
       />

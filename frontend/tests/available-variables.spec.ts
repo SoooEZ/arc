@@ -437,3 +437,101 @@ test("variable menus and expression tooltips show declared types and live produc
     "hello",
   );
 });
+
+/** Input(amount) → calc (amount * 2 as price) → out, whose value is the variable price. */
+function priced(): Definition {
+  return {
+    schemaVersion: 1,
+    inputs: [
+      { name: "amount", type: "NUMBER", required: true, defaultValue: 25 },
+    ],
+    nodes: [
+      {
+        id: "input",
+        type: "INPUT",
+        label: "Inputs",
+        position: { x: 150, y: 0 },
+      },
+      {
+        id: "calc",
+        type: "FORMULA",
+        label: "Calculate price",
+        expression: "amount * 2",
+        output: "price",
+        position: { x: 150, y: 180 },
+      },
+      {
+        id: "out",
+        type: "OUTPUT",
+        label: "Total",
+        expression: "price",
+        position: { x: 150, y: 360 },
+      },
+    ],
+    edges: [
+      { id: "start", source: "input", target: "calc", sourceHandle: "next" },
+      { id: "finish", source: "calc", target: "out", sourceHandle: "next" },
+    ],
+  };
+}
+
+test("a content problem elsewhere keeps every scope, and an unknown scope neither blocks Apply nor erases a value", async ({
+  page,
+  request,
+}) => {
+  const id = await create(request, priced());
+  await page.goto(`/#/rules/${id}?node=out`);
+  const inspector = page.locator(".inspector");
+  const returnValue = inspector.getByRole("combobox", {
+    name: "Return value",
+    exact: true,
+  });
+  const returnSource = inspector.getByRole("combobox", {
+    name: "Return value · value source",
+    exact: true,
+  });
+  await expect(returnValue).toContainText("price");
+  await expect(returnValue).not.toContainText("unavailable");
+  // A blank label is a content problem: the scope read still answers, for every node.
+  const scopeRead = page.waitForResponse((response) =>
+    response.url().endsWith("/api/variables"),
+  );
+  await inspector.getByLabel("Node name", { exact: true }).fill("");
+  expect((await scopeRead).status()).toBe(200);
+  await expect(returnValue).toContainText("price");
+  await expect(returnValue).not.toContainText("unavailable");
+  // A failed read (a cycle, or here a forced failure) leaves the scope unknown, not empty.
+  await page.route("**/api/variables", (route) =>
+    route.fulfill({
+      status: 422,
+      json: { message: "Decision graphs cannot contain cycles" },
+    }),
+  );
+  const failedRead = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/variables") && response.status() === 422,
+  );
+  await inspector.getByLabel("Node name", { exact: true }).fill("Total");
+  await failedRead;
+  await expect(returnValue).toContainText("price · unavailable");
+  await returnSource.click();
+  await page.getByRole("option", { name: "Expression", exact: true }).click();
+  await returnSource.click();
+  await page
+    .getByRole("option", { name: "Upstream variable", exact: true })
+    .click();
+  // Before, switching back erased the expression, and the editor has no undo.
+  await expect(returnValue).toContainText("price · unavailable");
+  await page.locator('.react-flow__node[data-id="calc"] .graph-node').click();
+  await inspector
+    .getByRole("button", { name: "Open in Editor · Expression", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Expression editor · Expression",
+  });
+  await expect(dialog).toContainText("Variable scope unavailable");
+  await expect(dialog).not.toContainText("Unavailable variables");
+  await expect(
+    dialog.getByRole("button", { name: "Apply expression", exact: true }),
+  ).toBeEnabled();
+});

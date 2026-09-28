@@ -21,7 +21,14 @@ public class ArcException extends RuntimeException {
     /** An execution budget is exhausted: steps, rule nesting, source reads or operations. */
     LIMIT,
     /** The execution deadline expired. */
-    DEADLINE
+    DEADLINE,
+    /**
+     * A called rule version cannot be prepared: its pin is missing or not a published Formula, or
+     * its stored definition fails draft shape or compilation. A fallback would turn the broken
+     * definition into a silently changed result, so it is not {@link #recoverable()}; {@link
+     * #asDefinitionFailure} classifies these.
+     */
+    DEFINITION
   }
 
   private final int status;
@@ -65,6 +72,16 @@ public class ArcException extends RuntimeException {
    */
   public boolean recoverable() {
     return kind == Kind.INVALID || kind == Kind.NOT_AVAILABLE;
+  }
+
+  /**
+   * This error as the failure of a rule definition rather than of a value: a recoverable kind
+   * becomes {@link Kind#DEFINITION}, so no fallback replaces it; limits and the deadline keep their
+   * kind. Status, message, issues and locations are unchanged.
+   */
+  public ArcException asDefinitionFailure() {
+    if (!recoverable()) return this;
+    return new ArcException(status, Kind.DEFINITION, getMessage(), issues, locations);
   }
 
   public List<String> issues() {

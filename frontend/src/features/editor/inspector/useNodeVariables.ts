@@ -8,6 +8,17 @@ import {
 } from "../../../domain/graph";
 import { ownValue } from "../../../domain/records";
 
+/** What the server reports in scope at a node, or nothing while that is unknown. */
+export interface NodeScope {
+  variables: VariableOption[];
+  /**
+   * False while the scope read is pending or failed: `variables` is then empty
+   * (lesson F10), and no control may judge a variable unavailable, or drop
+   * one, on its account.
+   */
+  known: boolean;
+}
+
 const noScopes: Record<string, string[]> = {};
 
 /**
@@ -22,16 +33,23 @@ export function nodeVariables(
   return availableVariables(definition, nodeId, ownValue(scopes, nodeId));
 }
 
-/** A pending or failed scope read offers no variables (lesson F10). */
+/** A pending or failed scope read offers no variables (lesson F10) and says so. */
 export function useNodeVariables(
   definition: Definition,
   nodeId: string,
-): VariableOption[] {
-  const { data: scopes } = useAsyncResource(
+): NodeScope {
+  const {
+    data: scopes,
+    loading,
+    error,
+  } = useAsyncResource(
     semanticGraphKey(definition),
     (signal) => studioApi.variables(definition, { signal }),
     noScopes,
     150,
   );
-  return nodeVariables(definition, nodeId, scopes);
+  return {
+    variables: nodeVariables(definition, nodeId, scopes),
+    known: !loading && !error,
+  };
 }

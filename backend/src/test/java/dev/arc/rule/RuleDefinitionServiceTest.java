@@ -142,6 +142,57 @@ class RuleDefinitionServiceTest {
     verifyNoInteractions(sources);
   }
 
+  @Test
+  void variablesDependOnTheGraphStructureAlone() {
+    var inputs =
+        List.of(
+            new Input("amount", "NUMBER", true, null),
+            new Input("items", "ARRAY", false, List.of()));
+    var calc = node("calc", "FORMULA", "Calc", "amount * 2", "total");
+    var valid = graph(calc, "total");
+    var scopes = service.variables(new Definition(1, inputs, valid.nodes(), valid.edges()));
+    assertThat(scopes).containsEntry("out", Set.of("amount", "items", "total"));
+    // Before, one content problem anywhere made the whole read fail and blanked every inspector.
+    var blankLabel =
+        nodeOf("calc", "FORMULA", "").at(0, 0).expression("amount * 2").output("total").build();
+    var legacyOutput =
+        nodeOf("out", "OUTPUT", "Return").at(0, 0).expression("total").output("legacy").build();
+    var variants = new LinkedHashMap<String, Definition>();
+    variants.put(
+        "blank label",
+        new Definition(1, inputs, graph(blankLabel, "total").nodes(), valid.edges()));
+    variants.put(
+        "ARRAY default {}",
+        new Definition(
+            1,
+            List.of(inputs.getFirst(), new Input("items", "ARRAY", false, Map.of())),
+            valid.nodes(),
+            valid.edges()));
+    variants.put(
+        "result variable on an Output",
+        new Definition(
+            1, inputs, List.of(valid.nodes().get(0), calc, legacyOutput), valid.edges()));
+    for (var variant : variants.entrySet()) {
+      assertThat(service.variables(variant.getValue())).as(variant.getKey()).isEqualTo(scopes);
+      // The full draft shape still reports the problem where it is saved or diagnosed.
+      assertThat(service.diagnostics(variant.getValue())).as(variant.getKey()).isNotEmpty();
+    }
+    // Structure problems keep failing, as the API reference states.
+    var missingTarget =
+        new Definition(
+            1, inputs, valid.nodes(), List.of(new Edge("gone", "input", "nowhere", "next")));
+    assertThatThrownBy(() -> service.variables(missingTarget))
+        .hasMessage("Connection refers to a missing node");
+    var duplicate =
+        new Definition(1, inputs, List.of(valid.nodes().get(0), calc, calc), valid.edges());
+    assertThatThrownBy(() -> service.variables(duplicate)).hasMessage("Duplicate node ID: calc");
+    var backEdges = new ArrayList<>(valid.edges());
+    backEdges.add(new Edge("back", "out", "calc", "next"));
+    var cycle = new Definition(1, inputs, valid.nodes(), backEdges);
+    assertThatThrownBy(() -> service.variables(cycle))
+        .hasMessage("Decision graphs cannot contain cycles");
+  }
+
   /** A published child whose input reads an HTTP source without mapping its required key. */
   private Definition childWithUnmappedSource() {
     var remote =

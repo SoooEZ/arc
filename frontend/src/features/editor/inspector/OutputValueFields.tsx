@@ -7,12 +7,13 @@ export default function OutputValueFields({
   rule,
   node,
   variables,
+  scopeKnown,
   readOnly,
   patch,
   label = "Return value",
 }: Pick<
   NodeFieldsProps,
-  "rule" | "node" | "variables" | "readOnly" | "patch"
+  "rule" | "node" | "variables" | "scopeKnown" | "readOnly" | "patch"
 > & {
   label?: string;
 }) {
@@ -31,6 +32,7 @@ export default function OutputValueFields({
         type="ANY"
         value={node.expression ?? undefined}
         variables={variables}
+        scopeKnown={scopeKnown}
         disabled={readOnly}
         optional={false}
         onChange={(value) => patch({ expression: value ?? "" })}

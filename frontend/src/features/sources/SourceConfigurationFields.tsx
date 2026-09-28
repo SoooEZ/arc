@@ -1,7 +1,11 @@
 import { TextField } from "@mui/material";
 import type { SourceConfig } from "../../types";
 import { sourceParameterBufferError, type SourceBuffers } from "./model";
-import { httpTimeoutGuidance, parseHttpTimeout } from "./sourceDocument";
+import {
+  httpTimeoutGuidance,
+  httpUrlProblem,
+  parseHttpTimeout,
+} from "./sourceDocument";
 import { identifierGuidance } from "../../domain/identifiers";
 
 export default function SourceConfigurationFields({
@@ -25,6 +29,7 @@ export default function SourceConfigurationFields({
   const http = configuration.kind === "HTTP";
   const parametersError = sourceParameterBufferError(buffers.parameters);
   const timeoutInvalid = parseHttpTimeout(timeout) === null;
+  const urlProblem = http ? httpUrlProblem(configuration.url || "") : null;
   return (
     <>
       {http && (
@@ -34,8 +39,12 @@ export default function SourceConfigurationFields({
             placeholder="https://api.example.com/customer"
             value={configuration.url || ""}
             disabled={disabled}
+            error={!!urlProblem}
             onChange={(event) => onConfig({ url: event.target.value })}
-            helperText="Mapped parameters become URL-encoded query parameters. The response must be JSON."
+            helperText={
+              urlProblem ??
+              "Mapped parameters become URL-encoded query parameters. The response must be JSON."
+            }
           />
           <TextField
             label="Timeout (ms)"

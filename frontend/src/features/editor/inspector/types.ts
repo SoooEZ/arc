@@ -6,7 +6,13 @@ export interface NodeFieldsProps {
   node: RuleNode;
   rules: RuleSummary[];
   readOnly: boolean;
+  /** The node's scope; empty while `scopeKnown` is false. */
   variables: VariableOption[];
+  /**
+   * False while the scope read is pending or failed: controls then keep the
+   * values they hold instead of judging them unavailable.
+   */
+  scopeKnown: boolean;
   patch: (patch: Partial<RuleNode>) => void;
   onDefinitionChange: (change: (definition: Definition) => Definition) => void;
   onInvalidDefault: (key: string, invalid: boolean) => void;
