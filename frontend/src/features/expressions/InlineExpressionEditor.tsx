@@ -6,10 +6,20 @@ import {
   isStringOrComment,
   useArcLanguageSupport,
 } from "../studio/useArcLanguageSupport";
-import { useAsyncResource } from "../../hooks/useAsyncResource";
-import { studioApi } from "../../api/studio";
+import { useFunctionCatalog } from "../studio/useFunctionCatalog";
 import type { VariableOption } from "../../domain/graph";
-import type { FunctionEntry } from "../../types";
+
+/** Help under the editor; a failed suggestion source explains the missing completions. */
+function helpText(
+  formulaError: string,
+  catalogError: string,
+  helperText: string | undefined,
+): string {
+  if (formulaError) return `Formula suggestions unavailable: ${formulaError}`;
+  if (catalogError)
+    return "Function suggestions unavailable. Reopen this node to retry.";
+  return helperText || "ARC expression · Tab completes suggestions or indents.";
+}
 
 /** The caller owns the expression, including incomplete syntax while typing. */
 export default function InlineExpressionEditor({
@@ -30,13 +40,7 @@ export default function InlineExpressionEditor({
   const { editor, model, onMount } = useArcEditor();
   const [catalogRequested, setCatalogRequested] = useState(false);
   // A Switch may have twenty case editors; load function help only when used.
-  const { data: functions, error } = useAsyncResource(
-    "functions",
-    (signal) => studioApi.functions({ signal }),
-    [] as FunctionEntry[],
-    0,
-    catalogRequested,
-  );
+  const { data: functions, error } = useFunctionCatalog(catalogRequested);
   const { formulaError } = useArcLanguageSupport(editor, model, functions, {
     kind: "expression",
     variables,
@@ -120,12 +124,7 @@ export default function InlineExpressionEditor({
         />
       </fieldset>
       <p className="inline-expression-help">
-        {formulaError
-          ? `Formula suggestions unavailable: ${formulaError}`
-          : error
-            ? "Function suggestions unavailable. Reopen this node to retry."
-            : helperText ||
-              "ARC expression · Tab completes suggestions or indents."}
+        {helpText(formulaError, error, helperText)}
       </p>
     </div>
   );

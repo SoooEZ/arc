@@ -17,21 +17,15 @@ import {
   Plus,
 } from "lucide-react";
 import { NodeIcon } from "../../../components/Icons";
-import { nodeLabel, type NodeType } from "../../../types";
-
-const addableNodes: NodeType[] = [
-  "FORMULA",
-  "CONDITION",
-  "SWITCH",
-  "TRANSFORM",
-  "REFERENCE",
-  "OUTPUT",
-];
+import type { NodeType } from "../../../types";
+import { addableNodeTypes, nodeKinds } from "../../../domain/nodeKinds";
+import type { EditorCapabilities } from "../editorCapabilities";
 
 export default function GraphToolbar({
   nodeCount,
   readOnly,
-  busy,
+  capabilities: can,
+  arranging,
   outline,
   onToggleOutline,
   onArrange,
@@ -40,8 +34,10 @@ export default function GraphToolbar({
   onAddNode,
 }: {
   nodeCount: number;
+  /** A published version: no editing controls are offered. */
   readOnly: boolean;
-  busy: string;
+  capabilities: EditorCapabilities;
+  arranging: boolean;
   outline: boolean;
   onToggleOutline: () => void;
   onArrange: () => Promise<void>;
@@ -71,10 +67,10 @@ export default function GraphToolbar({
           <span>
             <IconButton
               aria-label="Arrange graph"
-              disabled={readOnly || !!busy}
+              disabled={!can.arrange}
               onClick={onArrange}
             >
-              {busy === "layout" ? (
+              {arranging ? (
                 <CircularProgress size={16} />
               ) : (
                 <LayoutGrid size={16} />
@@ -91,7 +87,7 @@ export default function GraphToolbar({
           size="small"
           startIcon={<CheckCheck size={15} />}
           onClick={onValidate}
-          disabled={!!busy}
+          disabled={!can.validate}
         >
           Validate
         </Button>
@@ -101,7 +97,7 @@ export default function GraphToolbar({
             variant="outlined"
             startIcon={<Plus size={15} />}
             endIcon={<ChevronDown size={13} />}
-            disabled={!!busy}
+            disabled={!can.edit}
             onClick={(event) => setAddAnchor(event.currentTarget)}
           >
             Add node
@@ -113,19 +109,19 @@ export default function GraphToolbar({
         open={!!addAnchor}
         onClose={() => setAddAnchor(null)}
       >
-        {addableNodes.map((type) => (
+        {addableNodeTypes.map((type) => (
           <MenuItem
             key={type}
-            disabled={readOnly || !!busy}
+            disabled={!can.edit}
             onClick={() => {
               onAddNode(type);
               setAddAnchor(null);
             }}
           >
-            <span className={`node-icon ${type.toLowerCase()}`}>
+            <span className={`node-icon ${nodeKinds[type].className}`}>
               <NodeIcon type={type} />
             </span>
-            <span style={{ marginLeft: 10 }}>{nodeLabel[type]}</span>
+            <span style={{ marginLeft: 10 }}>{nodeKinds[type].label}</span>
           </MenuItem>
         ))}
       </Menu>

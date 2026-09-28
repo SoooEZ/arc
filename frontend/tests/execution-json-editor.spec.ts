@@ -172,3 +172,40 @@ test("published JSON uses the same keyboard editor and retains invalid input wit
     path: testInfo.outputPath("published-json-editor.png"),
   });
 });
+
+test("cURL examples show only object inputs and keep every digit of the buffer", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request, true);
+  await page.goto(`/#/rules/${id}`);
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  const input = page.getByLabel("Test input JSON", { exact: true });
+  const inputTab = page.getByRole("tab", { name: "Input JSON", exact: true });
+  const curlTab = page.getByRole("tab", { name: "cURL", exact: true });
+  const preview = page.locator(".curl-preview pre");
+  for (const text of ["null", "[1, 2]", "5", '{"hello":']) {
+    await inputTab.click();
+    await setEditorText(page, input, text);
+    await curlTab.click();
+    await expect(preview, text).toContainText('"inputs": {}');
+  }
+  await inputTab.click();
+  await setEditorText(page, input, '{"hello": {"a": 9007199254740993}}');
+  await curlTab.click();
+  await expect(preview).toContainText('"a": 9007199254740993');
+  await expect(preview).toContainText(`/api/rules/${id}/execute'`);
+
+  await page.goto("/#/playground");
+  await page.getByLabel("Find published rules", { exact: true }).fill(id);
+  await page.getByRole("combobox", { name: "Rule", exact: true }).click();
+  await page.getByRole("option", { name: id, exact: true }).click();
+  const apiInput = page.getByLabel("API input JSON", { exact: true });
+  const command = page.getByTestId("api-response");
+  await expect(command).toContainText('"a": 3');
+  await setEditorText(page, apiInput, "[1, 2]");
+  await expect(command).toContainText('"inputs": {}');
+  await setEditorText(page, apiInput, '{"hello": {"a": 9007199254740993}}');
+  await expect(command).toContainText('"a": 9007199254740993');
+  await expect(command).toContainText(`/api/rules/${id}/execute'`);
+});

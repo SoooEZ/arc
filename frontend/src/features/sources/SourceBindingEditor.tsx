@@ -1,7 +1,9 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, useEffect, useRef, useState } from "react";
 import { usePagedResource } from "../../hooks/usePagedResource";
 import CatalogPagination from "../../components/CatalogPagination";
+import { LazyBoundary } from "../../components/LazyBoundary";
 import { errorMessage } from "../../api/errors";
+import { ownValue } from "../../domain/records";
 import {
   Alert,
   Button,
@@ -11,7 +13,10 @@ import {
 } from "@mui/material";
 import { sourceApi } from "../../api/sources";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
-import { bindSourceVersion } from "./sourceBindings";
+import {
+  bindSourceVersion,
+  withSourceParameterBinding,
+} from "./sourceBindings";
 import ValueBinding from "../expressions/ValueBinding";
 import SourceProviderSelect from "./SourceProviderSelect";
 import type { VariableOption } from "../../domain/graph";
@@ -37,10 +42,10 @@ export default function SourceBindingEditor({
       sourceApi.versionSummaries(source!.id, { offset, limit }, { signal }),
     !!source,
   );
-  const detail = useAsyncResource(
+  const detail = useAsyncResource<DataSource | null>(
     JSON.stringify([source?.id, source?.version, catalogRevision]),
     (signal) => sourceApi.source(source!.id, source!.version, { signal }),
-    null as DataSource | null,
+    null,
     0,
     !!source,
   );
@@ -84,6 +89,11 @@ export default function SourceBindingEditor({
     } catch (failure) {
       if (!controller.signal.aborted) setSelectionError(errorMessage(failure));
     }
+  };
+  const closeManager = () => {
+    setManagerOpen(false);
+    // Managed sources may have new versions or names.
+    setCatalogRevision((value) => value + 1);
   };
   const versions = versionsResource.data.items;
   const error = versionsResource.error || detail.error || selectionError;
@@ -150,15 +160,12 @@ export default function SourceBindingEditor({
               key={`${source.id}:${source.version}:${p.name}`}
               label={`Source ${p.name}`}
               type={p.type}
-              value={source.bindings[p.name]}
+              value={ownValue(source.bindings, p.name)}
               variables={variables}
               disabled={readOnly}
-              onChange={(value) => {
-                const bindings = { ...source.bindings };
-                if (value === undefined) delete bindings[p.name];
-                else bindings[p.name] = value;
-                onChange({ ...source, bindings });
-              }}
+              onChange={(value) =>
+                onChange(withSourceParameterBinding(source, p.name, value))
+              }
             />
           ))}
           <TextField
@@ -191,18 +198,15 @@ export default function SourceBindingEditor({
         Manage data sources
       </Button>
       {managerOpen && (
-        <Suspense
+        <LazyBoundary
+          label="data source manager"
           fallback={
             <CircularProgress size={18} aria-label="Loading source manager" />
           }
+          onDismiss={closeManager}
         >
-          <SourceManagerDialog
-            onClose={() => {
-              setManagerOpen(false);
-              setCatalogRevision((value) => value + 1);
-            }}
-          />
-        </Suspense>
+          <SourceManagerDialog onClose={closeManager} />
+        </LazyBoundary>
       )}
     </div>
   );

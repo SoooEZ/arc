@@ -299,3 +299,44 @@ test("Switch default return edits the connected Output name and preserves it whe
   expect(preview.ok(), await preview.text()).toBeTruthy();
   expect((await preview.json()).result).toEqual({ fallback: 7 });
 });
+
+test("a stored invalid result name can be shortened and repaired while prohibited typing stays rejected", async ({
+  page,
+  request,
+}) => {
+  const rule = await create(request);
+  // Drafts saved before result names were validated can still hold one.
+  await page.route(`**/api/rules/${rule.id}`, async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const response = await route.fetch();
+    const legacy: Rule = await response.json();
+    legacy.draft.nodes.find((node) => node.id === "calc")!.output =
+      "order-total";
+    await route.fulfill({ response, json: legacy });
+  });
+  await page.goto(`/#/rules/${rule.id}?node=calc`);
+  const field = page.getByLabel("Result variable", { exact: true });
+  await expect(field).toHaveValue("order-total");
+  await expect(field).toHaveAttribute("aria-invalid", "true");
+  await field.click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Backspace");
+  await expect(field).toHaveValue("order-tota");
+  await expect(field).toHaveAttribute("aria-invalid", "true");
+  await page.keyboard.type(" ");
+  await expect(field).toHaveValue("order-tota");
+  await page.keyboard.press("Home");
+  for (let step = 0; step < "order".length; step++)
+    await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Delete");
+  await expect(field).toHaveValue("ordertota");
+  await expect(field).toHaveAttribute("aria-invalid", "false");
+  await page.keyboard.press("End");
+  await page.keyboard.type("l");
+  await expect(field).toHaveValue("ordertotal");
+  await save(page);
+  const saved: Rule = await (await request.get(`/api/rules/${rule.id}`)).json();
+  expect(saved.draft.nodes.find((node) => node.id === "calc")?.output).toBe(
+    "ordertotal",
+  );
+});

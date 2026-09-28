@@ -84,11 +84,13 @@ for (const outcome of ["success", "failure"] as const) {
       await expect(page).toHaveURL(/#\/library$/);
       await expect(page.getByText("Delayed build failure")).toHaveCount(0);
 
-      // A new session for the same rule must still build normally.
+      // A new session for the same rule must still build normally. Remove the
+      // route first: a request that starts while Playwright turns interception
+      // off can stay paused forever (here the rule read, leaving "Loading rule…").
+      await page.unroute("**/api/studio/build");
       await page.evaluate((ruleId) => {
         window.location.hash = `/studio/${ruleId}`;
       }, id);
-      await page.unroute("**/api/studio/build");
       await setEditorText(
         page,
         page.getByRole("textbox", { name: "ARC code editor", exact: true }),

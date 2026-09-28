@@ -143,15 +143,6 @@ export const kindDescription: Record<Kind, string> = {
   RULE: "Evaluate a condition, such as whether an order is eligible.",
   DECISION_TREE: "Combine conditions and calculations across branching paths.",
 };
-export const nodeLabel: Record<NodeType, string> = {
-  INPUT: "Input",
-  FORMULA: "Formula",
-  CONDITION: "Condition",
-  SWITCH: "Switch",
-  TRANSFORM: "Transform",
-  REFERENCE: "Reuse rule",
-  OUTPUT: "Output",
-};
 
 export interface SourceBinding {
   id: string;

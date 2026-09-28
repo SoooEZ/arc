@@ -1,4 +1,8 @@
-import type { Definition } from "../../types";
+import type { Definition, RuleNode } from "../../types";
+import { nodeKinds } from "../../domain/nodeKinds";
+
+/** A path ends at nodes without exits; the outline marks them like a result. */
+const endsPath = (node: RuleNode) => nodeKinds[node.type].exits === "none";
 
 export default function StudioOutline({
   definition,
@@ -15,9 +19,7 @@ export default function StudioOutline({
       </span>
       {definition.nodes.map((node) => (
         <button key={node.id} onClick={() => onSelect(node.id)}>
-          <span
-            className={`status-dot ${node.type === "OUTPUT" ? "published" : ""}`}
-          />
+          <span className={`status-dot ${endsPath(node) ? "published" : ""}`} />
           <span>
             {node.label}
             <small>{node.type.toLowerCase()}</small>

@@ -70,3 +70,32 @@ export function insertSnippet(
     )
     ?.insert(snippet);
 }
+
+/** The parts of Monaco's suggest controller used here (not in its public typings). */
+interface SuggestController extends monaco.editor.IEditorContribution {
+  readonly model: {
+    /** 0 when no suggestion list is open, 2 when it opened while typing. */
+    readonly state: number;
+    trigger(options: { auto: boolean; retrigger: boolean }): void;
+  };
+}
+
+/**
+ * Re-query the providers of an open suggestion list after data it shows has
+ * changed, such as a variable scope that finished loading. The public
+ * `editor.action.triggerSuggest` is disabled while a list is open, and fixed
+ * provider registrations no longer refresh it. Formula (`@`) suggestions show
+ * no variables, so an open `@` list is left alone.
+ */
+export function refreshOpenSuggestions(
+  editor: monaco.editor.IStandaloneCodeEditor | null,
+) {
+  const model = editor?.getModel();
+  const position = editor?.getPosition();
+  const suggest = editor?.getContribution<SuggestController>(
+    "editor.contrib.suggestController",
+  );
+  if (!model || !position || !suggest?.model.state) return;
+  if (completionWord(model, position).word.startsWith("@")) return;
+  suggest.model.trigger({ auto: suggest.model.state === 2, retrigger: true });
+}

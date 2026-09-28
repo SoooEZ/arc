@@ -15,25 +15,66 @@ import {
   Search,
   Workflow,
 } from "lucide-react";
-import type { RuleSummary } from "../../types";
+import type { Kind, RuleSummary } from "../../types";
 import type { useRuleLibrary } from "../../app/useRuleLibrary";
 import CatalogPagination from "../../components/CatalogPagination";
 import RuleCard from "./RuleCard";
 
+type KindFilter = Kind | "ALL";
+/** Plural forms of kindLabel; the Record type requires a tab for every rule kind. */
+const kindFilterLabels: Record<KindFilter, string> = {
+  ALL: "All rules",
+  DECISION_TREE: "Decision trees",
+  FORMULA: "Formulas",
+  RULE: "Condition rules",
+};
+const kindFilters = Object.keys(kindFilterLabels) as KindFilter[];
+
+function EmptyLibrary({
+  filtered,
+  onClearFilters,
+  onCreate,
+}: {
+  filtered: boolean;
+  onClearFilters: () => void;
+  onCreate: () => void;
+}) {
+  const empty = filtered
+    ? {
+        title: "No rules match this view",
+        hint: "Try another search or rule type.",
+        action: "Clear filters",
+        onAction: onClearFilters,
+      }
+    : {
+        title: "Build your first rule",
+        hint: "Start with a formula, condition, or decision tree.",
+        action: "Create rule",
+        onAction: onCreate,
+      };
+  return (
+    <div className="empty-library">
+      <Search size={28} />
+      <h3>{empty.title}</h3>
+      <p>{empty.hint}</p>
+      <Button onClick={empty.onAction}>{empty.action}</Button>
+    </div>
+  );
+}
+
 export default function Library({
-  rules,
   library,
   onOpen,
   onCreate,
   onDocs,
 }: {
-  rules: RuleSummary[];
   library: ReturnType<typeof useRuleLibrary>;
   onOpen: (r: RuleSummary) => void;
   onCreate: () => void;
   onDocs: () => void;
 }) {
   const {
+    rules,
     search: query,
     setSearch: setQuery,
     kind: filter,
@@ -41,7 +82,6 @@ export default function Library({
   } = library;
   const published = rules.filter((r) => r.publishedVersion).length;
   const references = rules.reduce((sum, r) => sum + r.referenceCount, 0);
-  const filtered = rules;
   return (
     <div className="library-page">
       <div className="page-heading">
@@ -98,23 +138,15 @@ export default function Library({
       </div>
       <div className="library-toolbar">
         <div className="filter-tabs">
-          {(["ALL", "DECISION_TREE", "FORMULA", "RULE"] as const).map(
-            (type) => (
-              <button
-                key={type}
-                className={filter === type ? "active" : ""}
-                onClick={() => setFilter(type)}
-              >
-                {type === "ALL"
-                  ? "All rules"
-                  : type === "DECISION_TREE"
-                    ? "Decision trees"
-                    : type === "FORMULA"
-                      ? "Formulas"
-                      : "Conditions"}
-              </button>
-            ),
-          )}
+          {kindFilters.map((type) => (
+            <button
+              key={type}
+              className={filter === type ? "active" : ""}
+              onClick={() => setFilter(type)}
+            >
+              {kindFilterLabels[type]}
+            </button>
+          ))}
         </div>
         <TextField
           placeholder="Search rules…"
@@ -135,7 +167,7 @@ export default function Library({
       </div>
       <div className="section-meta">
         <span>
-          {filtered.length} {filtered.length === 1 ? "rule" : "rules"}
+          {rules.length} {rules.length === 1 ? "rule" : "rules"}
         </span>
         <span>
           Last updated <ArrowDown size={12} />
@@ -147,43 +179,26 @@ export default function Library({
       {library.loadError && (
         <Alert
           severity="error"
-          action={<Button onClick={library.load}>Retry</Button>}
+          action={<Button onClick={library.retry}>Retry</Button>}
         >
           {library.loadError}
         </Alert>
       )}
       <div className="rule-grid">
-        {[...filtered]
+        {[...rules]
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
           .map((rule) => (
             <RuleCard key={rule.id} rule={rule} onOpen={onOpen} />
           ))}
-        {!library.loading && !library.loadError && !filtered.length && (
-          <div className="empty-library">
-            <Search size={28} />
-            <h3>
-              {query || filter !== "ALL"
-                ? "No rules match this view"
-                : "Build your first rule"}
-            </h3>
-            <p>
-              {query || filter !== "ALL"
-                ? "Try another search or rule type."
-                : "Start with a formula, condition, or decision tree."}
-            </p>
-            <Button
-              onClick={
-                query || filter !== "ALL"
-                  ? () => {
-                      setQuery("");
-                      setFilter("ALL");
-                    }
-                  : onCreate
-              }
-            >
-              {query || filter !== "ALL" ? "Clear filters" : "Create rule"}
-            </Button>
-          </div>
+        {!library.loading && !library.loadError && !rules.length && (
+          <EmptyLibrary
+            filtered={query !== "" || filter !== "ALL"}
+            onClearFilters={() => {
+              setQuery("");
+              setFilter("ALL");
+            }}
+            onCreate={onCreate}
+          />
         )}
       </div>
       <CatalogPagination

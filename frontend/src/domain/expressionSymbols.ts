@@ -1,4 +1,5 @@
 import type { VariableOption } from "./graph";
+import { isNodeType, storesResult } from "./nodeKinds";
 
 export type ExpressionSymbolKind =
   "function" | "formula" | "parameter" | "variable" | "variable.local";
@@ -128,12 +129,15 @@ function scriptNames(
       declare(index, "parameter");
       continue;
     }
-    // OUTPUT aliases name returned object fields; only these nodes declare
-    // an `as` value that later expressions can read from their scope.
+    // In a kind that stores a result (Reference, Transform) `as` names that
+    // result, which later expressions read from their scope; an Output's `as`
+    // names a returned object field.
     if (
       token.text === "as" &&
       depth === 1 &&
-      (nodeType === "REFERENCE" || nodeType === "TRANSFORM")
+      nodeType !== undefined &&
+      isNodeType(nodeType) &&
+      storesResult(nodeType)
     )
       declare(index + 1, "variable");
     if (token.text === "source") declare(index + 1, "parameter");

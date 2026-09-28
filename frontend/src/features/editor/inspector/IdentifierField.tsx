@@ -6,6 +6,17 @@ import {
   identifierGuidance,
 } from "../../../domain/identifiers";
 
+/** A refused edit explains the rule; an empty optional name is valid. */
+function fieldError(
+  value: string,
+  optional: boolean,
+  rejectedEdit: boolean,
+): string | null {
+  if (rejectedEdit) return identifierGuidance;
+  if (optional && value === "") return null;
+  return identifierError(value);
+}
+
 /** Parameter and result names share the expression language's identifier contract. */
 export default function IdentifierField({
   label,
@@ -23,11 +34,7 @@ export default function IdentifierField({
   onChange: (value: string) => void;
 }) {
   const [rejectedEdit, setRejectedEdit] = useState(false);
-  const error = rejectedEdit
-    ? identifierGuidance
-    : optional && value === ""
-      ? null
-      : identifierError(value);
+  const error = fieldError(value, optional, rejectedEdit);
   return (
     <TextField
       label={label}
@@ -40,7 +47,7 @@ export default function IdentifierField({
       onChange={(event) => {
         if (disabled) return;
         const name = event.target.value;
-        const accepted = acceptsIdentifierEdit(name);
+        const accepted = acceptsIdentifierEdit(value, name);
         setRejectedEdit(!accepted);
         if (accepted) onChange(name);
       }}

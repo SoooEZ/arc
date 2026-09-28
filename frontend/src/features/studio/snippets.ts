@@ -1,16 +1,34 @@
-import type { Definition, InputType, Rule, Version } from "../../types";
+import type { Definition, Rule, Version } from "../../types";
+import { quoteText } from "../../domain/expressions";
+import { shortId } from "../../domain/ids";
+import { placeholderLiteral } from "../../domain/placeholderLiterals";
 
-const bindingPlaceholder: Record<InputType, string> = {
-  STRING: '"value"',
-  BOOLEAN: "true",
-  ARRAY: "[]",
-  OBJECT: "null",
-  NUMBER: "0",
-};
+/**
+ * Monaco reads `$`, `}` and `\` in snippet text as tab-stop syntax. Escape ARC
+ * code that must be inserted verbatim, e.g. `$ROUND(x)` becomes `\$ROUND(x)`.
+ */
+export function escapeSnippetText(code: string): string {
+  return code.replace(/[$}\\]/g, "\\$&");
+}
 
-/** Escape data after ARC quoting; Monaco interprets snippets before ARC parses them. */
-function snippetLiteral(value: string): string {
-  return JSON.stringify(value).replace(/[$}\\]/g, "\\$&");
+/** An ARC string literal for `text`, escaped for a Monaco snippet: quote first, then escape. */
+export function snippetStringLiteral(text: string): string {
+  return escapeSnippetText(quoteText(text));
+}
+
+/** Backend Limits.MAX_NODE_ID_CHARACTERS; a rule ID alone may already use all 80. */
+const maxNodeIdLength = 80;
+const reusePrefix = "reuse-";
+const reuseSuffixDigits = 4;
+
+/** A Reference node ID that names the reused rule within the node-ID limit, e.g. "reuse-apply-discount-9f86". */
+export function reuseNodeId(ruleId: string): string {
+  const ruleIdLength =
+    maxNodeIdLength - reusePrefix.length - "-".length - reuseSuffixDigits;
+  return shortId(
+    `${reusePrefix}${ruleId.slice(0, ruleIdLength)}-`,
+    reuseSuffixDigits,
+  );
 }
 
 export function referenceSnippet(
@@ -19,22 +37,21 @@ export function referenceSnippet(
   caller: Definition,
   nodeId: string,
 ): string {
+  const callerInputs = new Set(caller.inputs.map((input) => input.name));
   const bindings = version.definition.inputs
     .filter(
       (input) => input.required && !input.source && input.defaultValue == null,
     )
     .map((input) => {
-      const expression = caller.inputs.some(
-        (candidate) => candidate.name === input.name,
-      )
+      const expression = callerInputs.has(input.name)
         ? input.name
-        : bindingPlaceholder[input.type];
-      return `  bind ${input.name} = ${expression};`;
+        : placeholderLiteral[input.type];
+      return `  bind ${input.name} = ${escapeSnippetText(expression)};`;
     });
   return [
     "",
-    `node ${snippetLiteral(nodeId)} REFERENCE ${snippetLiteral(rule.name)} {`,
-    `  use ${snippetLiteral(rule.id)} version ${version.version};`,
+    `node ${snippetStringLiteral(nodeId)} REFERENCE ${snippetStringLiteral(rule.name)} {`,
+    `  use ${snippetStringLiteral(rule.id)} version ${version.version};`,
     ...bindings,
     "  as ${1:reusedResult};",
     '  next -> "${2:output}";',

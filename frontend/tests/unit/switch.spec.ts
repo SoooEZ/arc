@@ -6,13 +6,20 @@ import {
 } from "../../src/domain/switchBranches";
 import type { Definition } from "../../src/types";
 
+const empty: Definition = {
+  schemaVersion: 1,
+  inputs: [],
+  nodes: [],
+  edges: [],
+};
+
 function definition(): Definition {
   return {
     schemaVersion: 1,
     inputs: [],
     nodes: [
-      createGraphNode("SWITCH", "choose", { x: 0, y: 0 }, 1),
-      createGraphNode("OUTPUT", "match", { x: 0, y: 200 }, 2),
+      createGraphNode(empty, "SWITCH", "choose", { x: 0, y: 0 }),
+      createGraphNode(empty, "OUTPUT", "match", { x: 0, y: 200 }),
     ],
     edges: [
       {
@@ -74,7 +81,7 @@ test("default shortcuts cannot rewrite shared Outputs or connected workflow bran
   );
   const downstream = definition();
   downstream.nodes.push(
-    createGraphNode("FORMULA", "formula", { x: 0, y: 400 }, 3),
+    createGraphNode(downstream, "FORMULA", "formula", { x: 0, y: 400 }),
   );
   downstream.edges.push({
     id: "default-edge",

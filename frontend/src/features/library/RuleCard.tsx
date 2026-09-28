@@ -7,6 +7,7 @@ import type { RuleSummary, Rule } from "../../types";
 import { kindLabel } from "../../types";
 import { KindIcon } from "../../components/Icons";
 import RulePreview from "./RulePreview";
+import { cachedPreview, rememberPreview } from "./previewCache";
 
 export default function RuleCard({
   rule,
@@ -16,12 +17,20 @@ export default function RuleCard({
   onOpen: (rule: RuleSummary) => void;
 }) {
   const [attempt, setAttempt] = useState(0);
+  const cached = cachedPreview(rule);
   // Only mounted cards on the current catalog page fetch; unmount aborts old previews.
-  const detail = useAsyncResource(
+  const detail = useAsyncResource<Rule | null>(
     `${rule.id}:${rule.revision}:${attempt}`,
-    (signal) => ruleApi.get(rule.id, { signal }),
-    null as Rule | null,
+    async (signal) => {
+      const loaded = await ruleApi.get(rule.id, { signal });
+      rememberPreview(rule, loaded);
+      return loaded;
+    },
+    null,
+    0,
+    !cached,
   );
+  const preview = cached ?? detail.data;
   return (
     <article className="rule-card">
       <div className="rule-card-top">
@@ -45,8 +54,8 @@ export default function RuleCard({
         {rule.description ||
           "Add a description to explain what this rule does."}
       </p>
-      {detail.data ? (
-        <RulePreview rule={detail.data} />
+      {preview ? (
+        <RulePreview rule={preview} />
       ) : (
         <div className="rule-preview">
           <div className="mini-graph preview-state" aria-live="polite">

@@ -40,14 +40,23 @@ HAND_WRITTEN_NODE_VOCABULARY = re.compile(
 )
 PURE_FRONTEND = {
     "domain/": ("types", "domain/"),
+    "app/routing.ts": (),
     "features/editor/documentState.ts": ("types", "domain/"),
+    "features/editor/editorCapabilities.ts": (),
+    "features/editor/nodeSelection.ts": ("types", "domain/"),
+    "features/library/previewCache.ts": ("types",),
     "features/sources/model.ts": ("types", "domain/"),
     "features/sources/sourceDocument.ts": ("types", "domain/", "features/sources/model"),
-    "features/sources/sourceBindings.ts": ("types",),
+    "features/sources/sourceBindings.ts": ("types", "domain/"),
+    "features/sources/sourceCatalog.ts": ("types",),
     "features/studio/snippets.ts": ("types", "domain/"),
+    "features/studio/formulaCalls.ts": ("types", "domain/", "features/studio/snippets"),
+    "features/studio/scriptOutline.ts": (),
     "features/editor/canvas/edgeRouting.ts": (),
     "features/editor/canvas/graphGeometry.ts": ("domain/",),
 }
+# HTTP clients may use the lossless JSON codec, but no other domain logic.
+TRANSPORT_FRONTEND = ("types", "api/", "domain/json")
 errors = []
 
 
@@ -115,7 +124,7 @@ for path in sorted(FRONTEND.rglob("*.ts*")):
             reject(path, dependency, "pure domain and HTTP modules cannot import UI libraries")
             continue
         target = (path.parent / dependency).resolve().relative_to(FRONTEND).as_posix()
-        allowed_targets = pure_imports if pure else ("types", "api/")
+        allowed_targets = pure_imports if pure else TRANSPORT_FRONTEND
         allowed = any(
             matches_boundary(target, owner)
             for owner in allowed_targets

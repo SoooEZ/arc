@@ -1,23 +1,30 @@
 import { TextField } from "@mui/material";
 import type { SourceConfig } from "../../types";
 import { sourceParameterBufferError, type SourceBuffers } from "./model";
+import { httpTimeoutGuidance, parseHttpTimeout } from "./sourceDocument";
 import { identifierGuidance } from "../../domain/identifiers";
 
 export default function SourceConfigurationFields({
   configuration,
   buffers,
+  timeout,
   disabled,
   onConfig,
   onBuffer,
+  onTimeout,
 }: {
   configuration: SourceConfig;
   buffers: SourceBuffers;
+  /** Raw timeout text, kept as typed so it can be cleared and retyped. */
+  timeout: string;
   disabled: boolean;
   onConfig: (patch: Partial<SourceConfig>) => void;
   onBuffer: (field: keyof SourceBuffers, value: string) => void;
+  onTimeout: (text: string) => void;
 }) {
   const http = configuration.kind === "HTTP";
   const parametersError = sourceParameterBufferError(buffers.parameters);
+  const timeoutInvalid = parseHttpTimeout(timeout) === null;
   return (
     <>
       {http && (
@@ -32,12 +39,12 @@ export default function SourceConfigurationFields({
           />
           <TextField
             label="Timeout (ms)"
-            type="number"
-            value={configuration.timeoutMs}
+            value={timeout}
             disabled={disabled}
-            onChange={(event) =>
-              onConfig({ timeoutMs: Number(event.target.value) })
-            }
+            error={timeoutInvalid}
+            helperText={timeoutInvalid ? httpTimeoutGuidance : undefined}
+            slotProps={{ htmlInput: { inputMode: "numeric" } }}
+            onChange={(event) => onTimeout(event.target.value)}
           />
         </>
       )}
@@ -52,7 +59,7 @@ export default function SourceConfigurationFields({
         helperText={
           parametersError ||
           (http
-            ? `Declare name, type (STRING / NUMBER / BOOLEAN / ARRAY / OBJECT), required, and optional defaultValue. ${identifierGuidance}`
+            ? `Declare name, type (STRING / NUMBER / BOOLEAN), required, and optional defaultValue. ${identifierGuidance}`
             : `Lookup tables require a parameter named "key". ${identifierGuidance}`)
         }
         slotProps={{ input: { className: "json-input" } }}

@@ -1,12 +1,20 @@
-import { useEffect, useMemo, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { monaco } from "./arcLanguage";
 import type { Definition, FunctionEntry } from "../../types";
 import { modules } from "./snippets";
 import { inputVariables, type VariableOption } from "../../domain/graph";
-import { expressionSymbols } from "../../domain/expressionSymbols";
+import {
+  expressionSymbols,
+  type ExpressionSymbol,
+  type ExpressionSymbolKind,
+} from "../../domain/expressionSymbols";
 import { useFormulaSupport } from "./useFormulaSupport";
 
-import { completionWord, isStringOrComment } from "./arcCompletion";
+import {
+  completionWord,
+  isStringOrComment,
+  refreshOpenSuggestions,
+} from "./arcCompletion";
 export {
   completionWord,
   isStringOrComment,
@@ -17,7 +25,66 @@ export type ArcEditorContext =
   | { kind: "expression"; variables: VariableOption[] }
   | { kind: "node" | "script"; definition: Definition };
 
-/** Providers belong to one model; nested rule dialogs do not leak suggestions into each other. */
+const semanticLegend: monaco.languages.SemanticTokensLegend = {
+  tokenTypes: ["function", "parameter", "variable", "formula"],
+  tokenModifiers: ["local"],
+};
+
+/** Indexes into semanticLegend for each symbol kind. */
+const semanticToken: Record<
+  ExpressionSymbolKind,
+  { type: number; modifiers: number }
+> = {
+  function: { type: 0, modifiers: 0 },
+  parameter: { type: 1, modifiers: 0 },
+  variable: { type: 2, modifiers: 0 },
+  "variable.local": { type: 2, modifiers: 1 },
+  formula: { type: 3, modifiers: 0 },
+};
+
+/** Monaco's relative encoding: line delta, start delta, length, type, modifiers per symbol. */
+function semanticTokenData(
+  model: monaco.editor.ITextModel,
+  symbols: ExpressionSymbol[],
+): Uint32Array {
+  const data: number[] = [];
+  let previousLine = 0;
+  let previousColumn = 0;
+  for (const symbol of symbols) {
+    const position = model.getPositionAt(symbol.offset);
+    const line = position.lineNumber - 1;
+    const column = position.column - 1;
+    const token = semanticToken[symbol.kind];
+    data.push(
+      line - previousLine,
+      line === previousLine ? column - previousColumn : column,
+      symbol.length,
+      token.type,
+      token.modifiers,
+    );
+    previousLine = line;
+    previousColumn = column;
+  }
+  return new Uint32Array(data);
+}
+
+function declaredVariables(definition: Definition): VariableOption[] {
+  return [
+    ...inputVariables(definition),
+    ...definition.nodes.flatMap((node): VariableOption[] =>
+      node.output
+        ? [{ name: node.output, type: "RESULT", label: node.label }]
+        : [],
+    ),
+  ];
+}
+
+/**
+ * Providers belong to one model; nested rule dialogs do not leak suggestions
+ * into each other. They are registered once per model and read the latest
+ * variables, because every graph edit produces a new variables array and a
+ * registration change restarts any open suggestion list.
+ */
 export function useArcLanguageSupport(
   editor: RefObject<monaco.editor.IStandaloneCodeEditor | null>,
   editorModel: monaco.editor.ITextModel | null,
@@ -25,22 +92,12 @@ export function useArcLanguageSupport(
   context: ArcEditorContext,
 ) {
   const definition = context.kind === "expression" ? null : context.definition;
-  const declaredVariables: VariableOption[] = useMemo(
-    () =>
-      definition
-        ? [
-            ...inputVariables(definition),
-            ...definition.nodes.flatMap((node): VariableOption[] =>
-              node.output
-                ? [{ name: node.output, type: "RESULT", label: node.label }]
-                : [],
-            ),
-          ]
-        : [],
+  const declarations = useMemo(
+    () => (definition ? declaredVariables(definition) : []),
     [definition],
   );
   const variables =
-    context.kind === "expression" ? context.variables : declaredVariables;
+    context.kind === "expression" ? context.variables : declarations;
   const scriptSyntax = context.kind !== "expression";
   const includeModules = context.kind === "script";
   const formulaSupport = useFormulaSupport(
@@ -49,47 +106,31 @@ export function useArcLanguageSupport(
     variables,
     scriptSyntax,
   );
+  const latestVariables = useRef(variables);
+  latestVariables.current = variables;
+  const recolor = useRef<monaco.Emitter<void> | null>(null);
+
+  // The function catalog arrives once per page load. Re-registering then lets
+  // Monaco refresh a suggestion list opened while the catalog was loading.
   useEffect(() => {
     // Providers must register after Monaco attaches the model. An initial token
     // request before onMount otherwise returns null and may never be retried.
     if (!editorModel || editorModel.isDisposed()) return;
+    const colorsChanged = new monaco.Emitter<void>();
+    recolor.current = colorsChanged;
     const colors = monaco.languages.registerDocumentSemanticTokensProvider(
       "arc",
       {
-        getLegend: () => ({
-          tokenTypes: ["function", "parameter", "variable", "formula"],
-          tokenModifiers: ["local"],
-        }),
+        onDidChange: colorsChanged.event,
+        getLegend: () => semanticLegend,
         provideDocumentSemanticTokens: (model) => {
           if (model !== editor.current?.getModel()) return null;
-          const data: number[] = [];
-          let previousLine = 0;
-          let previousColumn = 0;
-          for (const symbol of expressionSymbols(
+          const symbols = expressionSymbols(
             model.getValue(),
-            variables,
+            latestVariables.current,
             scriptSyntax,
-          )) {
-            const position = model.getPositionAt(symbol.offset);
-            const line = position.lineNumber - 1;
-            const column = position.column - 1;
-            data.push(
-              line - previousLine,
-              line === previousLine ? column - previousColumn : column,
-              symbol.length,
-              symbol.kind === "formula"
-                ? 3
-                : symbol.kind === "function"
-                  ? 0
-                  : symbol.kind === "parameter"
-                    ? 1
-                    : 2,
-              symbol.kind === "variable.local" ? 1 : 0,
-            );
-            previousLine = line;
-            previousColumn = column;
-          }
-          return { data: new Uint32Array(data) };
+          );
+          return { data: semanticTokenData(model, symbols) };
         },
         releaseDocumentSemanticTokens: () => {},
       },
@@ -134,12 +175,14 @@ export function useArcLanguageSupport(
                 monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               range,
             })),
-            ...(functionOnly ? [] : variables).map((variable) => ({
-              label: variable.name,
-              kind: monaco.languages.CompletionItemKind.Variable,
-              insertText: variable.name,
-              range,
-            })),
+            ...(functionOnly ? [] : latestVariables.current).map(
+              (variable) => ({
+                label: variable.name,
+                kind: monaco.languages.CompletionItemKind.Variable,
+                insertText: variable.name,
+                range,
+              }),
+            ),
           ],
         };
       },
@@ -151,7 +194,7 @@ export function useArcLanguageSupport(
         const offset = model.getOffsetAt(position);
         const symbol = expressionSymbols(
           model.getValue(),
-          variables,
+          latestVariables.current,
           scriptSyntax,
         ).find(
           (entry) =>
@@ -171,7 +214,9 @@ export function useArcLanguageSupport(
           const name = model
             .getValue()
             .slice(symbol.offset, symbol.offset + symbol.length);
-          const variable = variables.find((entry) => entry.name === name);
+          const variable = latestVariables.current.find(
+            (entry) => entry.name === name,
+          );
           if (!variable) return null;
           return {
             contents: [
@@ -217,7 +262,19 @@ export function useArcLanguageSupport(
       completions.dispose();
       hover.dispose();
       colors.dispose();
+      colorsChanged.dispose();
+      recolor.current = null;
     };
-  }, [editor, editorModel, functions, variables, scriptSyntax, includeModules]);
+  }, [editor, editorModel, functions, scriptSyntax, includeModules]);
+
+  // The registrations stay fixed while the scope changes. Repaint colors and
+  // refresh an open suggestion list only when variable names or roles change.
+  const variablesKey = JSON.stringify(
+    variables.map((variable) => [variable.name, variable.type]),
+  );
+  useEffect(() => {
+    recolor.current?.fire();
+    refreshOpenSuggestions(editor.current);
+  }, [editor, variablesKey]);
   return formulaSupport;
 }

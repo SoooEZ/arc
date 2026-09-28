@@ -1,12 +1,18 @@
 import type { DataSource, SourceConfig } from "../../types";
+import { stringifyJson } from "../../domain/json";
+import { isResourceId, resourceIdGuidance } from "../../domain/resourceIds";
 import { sourceBuffers, sourceSample, type SourceBuffers } from "./model";
 
 export interface SourceDocument {
   selection: number;
   source: DataSource;
   buffers: SourceBuffers;
+  /** Raw HTTP timeout text; the definition keeps its last valid value. */
+  timeout: string;
   baseline: string;
   viewedVersion: number;
+  /** The loaded configuration of a historical version; null while it loads or after it failed. */
+  viewedConfiguration: SourceConfig | null;
   testInput: string;
   testInputEdited: boolean;
   result: unknown;
@@ -15,15 +21,33 @@ export interface SourceDocument {
   testing: number | null;
 }
 
-export function sourceSnapshot(
-  source: DataSource,
-  buffers: SourceBuffers,
-): string {
-  // JSON buffers own these fields while editing; the parsed source is only their saved backing.
+/** The server accepts whole milliseconds in this range (HttpSourceAdapter). */
+export const httpTimeoutLimits = { min: 100, max: 10_000 };
+export const httpTimeoutGuidance =
+  "Enter whole milliseconds from 100 to 10,000.";
+
+/** The timeout in `text`, or null when the server would reject it. */
+export function parseHttpTimeout(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const milliseconds = Number(trimmed);
+  return milliseconds >= httpTimeoutLimits.min &&
+    milliseconds <= httpTimeoutLimits.max
+    ? milliseconds
+    : null;
+}
+
+export function sourceSnapshot({
+  source,
+  buffers,
+  timeout,
+}: Pick<SourceDocument, "source" | "buffers" | "timeout">): string {
+  // Raw buffers own these fields while editing; the parsed source is only their saved backing.
   const {
     parameters: _parameters,
     entries: _entries,
     secretHeaders: _secretHeaders,
+    timeoutMs: _timeoutMs,
     ...configuration
   } = source.definition;
   return JSON.stringify({
@@ -35,6 +59,8 @@ export function sourceSnapshot(
       ),
     ),
     buffers,
+    // "05000" and "5000" are the same timeout; invalid text differs from every saved value.
+    timeout: parseHttpTimeout(timeout) ?? timeout,
   });
 }
 
@@ -43,12 +69,15 @@ export function openSource(
   selection: number,
 ): SourceDocument {
   const buffers = sourceBuffers(source.definition);
+  const timeout = String(source.definition.timeoutMs ?? "");
   return {
     selection,
     source,
     buffers,
-    baseline: sourceSnapshot(source, buffers),
+    timeout,
+    baseline: sourceSnapshot({ source, buffers, timeout }),
     viewedVersion: source.version,
+    viewedConfiguration: null,
     testInput: sourceSample(source.definition),
     testInputEdited: false,
     result: undefined,
@@ -59,9 +88,47 @@ export function openSource(
 }
 
 export function sourceIsDirty(document: SourceDocument): boolean {
+  return sourceSnapshot(document) !== document.baseline;
+}
+
+export function isHistoricalVersion(document: SourceDocument): boolean {
+  return document.viewedVersion !== document.source.version;
+}
+
+/** The latest version shows the live draft; a historical version shows its loaded configuration. */
+export function displayedConfiguration(
+  document: SourceDocument,
+): SourceConfig | null {
+  return isHistoricalVersion(document)
+    ? document.viewedConfiguration
+    : document.source.definition;
+}
+
+/** One eligibility rule for the Fetch sample command and its button. */
+export function canRunSourceTest(
+  document: SourceDocument | null,
+  saving: boolean,
+): boolean {
   return (
-    sourceSnapshot(document.source, document.buffers) !== document.baseline
+    document !== null &&
+    document.source.version > 0 &&
+    displayedConfiguration(document) !== null &&
+    !sourceIsDirty(document) &&
+    !saving &&
+    document.testing === null
   );
+}
+
+/** Why the Save command refuses the draft, or null. The server rejects the same values. */
+export function sourceSaveProblem(document: SourceDocument): string | null {
+  if (!document.source.version && !isResourceId(document.source.id))
+    return `Enter a valid source ID. ${resourceIdGuidance}`;
+  if (
+    document.source.definition.kind === "HTTP" &&
+    parseHttpTimeout(document.timeout) === null
+  )
+    return `Timeout: ${httpTimeoutGuidance}`;
+  return null;
 }
 
 export type SourceDocumentAction =
@@ -70,6 +137,7 @@ export type SourceDocumentAction =
   | { type: "metadata"; patch: Pick<Partial<DataSource>, "id" | "name"> }
   | { type: "configuration"; patch: Partial<SourceConfig> }
   | { type: "buffer"; field: keyof SourceBuffers; value: string }
+  | { type: "timeout"; value: string }
   | { type: "provider"; kind: SourceConfig["kind"] }
   | { type: "version"; version: number; configuration: SourceConfig }
   | {
@@ -124,6 +192,20 @@ export function sourceDocumentReducer(
         ...invalidateTest(document),
         buffers: { ...document.buffers, [action.field]: action.value },
       };
+    case "timeout": {
+      const timeoutMs = parseHttpTimeout(action.value);
+      return {
+        ...invalidateTest(document),
+        timeout: action.value,
+        source:
+          timeoutMs === null
+            ? document.source
+            : {
+                ...document.source,
+                definition: { ...document.source.definition, timeoutMs },
+              },
+      };
+    }
     case "provider": {
       const parameters = [
         {
@@ -141,7 +223,7 @@ export function sourceDocumentReducer(
         },
         buffers: {
           ...document.buffers,
-          parameters: JSON.stringify(parameters, null, 2),
+          parameters: stringifyJson(parameters, 2),
         },
       };
     }
@@ -149,15 +231,24 @@ export function sourceDocumentReducer(
       return {
         ...invalidateTest(document),
         viewedVersion: action.version,
+        viewedConfiguration: null,
         testInput: sourceSample(action.configuration),
         testInputEdited: false,
       };
     case "version/loaded":
-      return document.selection === action.selection &&
-        document.viewedVersion === action.version &&
-        !document.testInputEdited
-        ? { ...document, testInput: sourceSample(action.configuration) }
-        : document;
+      if (
+        document.selection !== action.selection ||
+        document.viewedVersion !== action.version
+      )
+        return document;
+      return {
+        ...document,
+        viewedConfiguration: action.configuration,
+        // Loaded metadata may initialize an untouched sample, never an edited buffer.
+        testInput: document.testInputEdited
+          ? document.testInput
+          : sourceSample(action.configuration),
+      };
     case "test/input":
       return {
         ...invalidateTest(document),
@@ -168,10 +259,7 @@ export function sourceDocumentReducer(
       return {
         ...document,
         error: "",
-        saving: {
-          request: action.request,
-          snapshot: sourceSnapshot(document.source, document.buffers),
-        },
+        saving: { request: action.request, snapshot: sourceSnapshot(document) },
       };
     case "save/success": {
       if (
@@ -199,11 +287,7 @@ export function sourceDocumentReducer(
           baseline: saved.baseline,
         };
       }
-      if (
-        document.saving.snapshot ===
-        sourceSnapshot(document.source, document.buffers)
-      )
-        return saved;
+      if (document.saving.snapshot === sourceSnapshot(document)) return saved;
       // Advance the server revision without discarding an edit made after this save started.
       return {
         ...document,

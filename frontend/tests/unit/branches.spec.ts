@@ -8,11 +8,17 @@ import { nodeWidth, sourcePorts } from "../../src/domain/nodePorts";
 import type { Definition } from "../../src/types";
 
 test("case edits preserve stable connections and removing a case only removes its edges", () => {
-  const choose = createGraphNode("SWITCH", "choose", { x: 0, y: 0 }, 1);
+  const empty: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [],
+    edges: [],
+  };
+  const choose = createGraphNode(empty, "SWITCH", "choose", { x: 0, y: 0 });
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
-    nodes: [choose, createGraphNode("OUTPUT", "out", { x: 0, y: 200 }, 2)],
+    nodes: [choose, createGraphNode(empty, "OUTPUT", "out", { x: 0, y: 200 })],
     edges: ["case:case-1", "case:case-2", "default"].map((handle) => ({
       id: handle,
       source: "choose",

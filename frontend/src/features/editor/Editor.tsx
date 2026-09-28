@@ -1,7 +1,9 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Button, CircularProgress } from "@mui/material";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { GraphProblem } from "../../api/errors";
+import { LazyBoundary } from "../../components/LazyBoundary";
+import { isCurrentGraphLocation, semanticGraphKey } from "../../domain/graph";
 import Inspector from "./inspector/Inspector";
 import TestPanel from "../execution/TestPanel";
 import RuleSettings from "./RuleSettings";
@@ -15,10 +17,22 @@ import VersionHistory from "./VersionHistory";
 import { useGraphCommands } from "./canvas/useGraphCommands";
 import { useGraphFocus } from "./canvas/useGraphFocus";
 import { exportDefinition } from "./exportDefinition";
+import { usePreviewExecution } from "./usePreviewExecution";
+import { useNodeDialog } from "./useNodeDialog";
+import LazyNodeDialog from "./LazyNodeDialog";
+import { defaultSelection, selectedNode } from "./nodeSelection";
 import type { EditorProps, ReferenceTarget } from "./types";
 const CodeStudio = lazy(() => import("../studio/CodeStudio"));
 const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
 const NodeEditDialog = lazy(() => import("./NodeEditDialog"));
+const noProblems: GraphProblem[] = [];
+const noErrors: string[] = [];
+
+/** Located failures of the current preview result and of the last command. */
+function runtimeProblems(...problems: (GraphProblem | null)[]) {
+  return problems.filter((problem): problem is GraphProblem => !!problem);
+}
+
 export default function Editor(props: EditorProps) {
   return (
     <ReactFlowProvider>
@@ -38,15 +52,12 @@ function EditorContent({
   notify,
   embedded = false,
   onOpenReference,
-  initialProblems = [],
+  initialProblems = noProblems,
 }: EditorProps) {
-  const [runtimeProblems, setRuntimeProblems] = useState<GraphProblem[]>([]);
-  const reportRuntimeError = useCallback(
-    (problem: GraphProblem | null) =>
-      setRuntimeProblems(problem ? [problem] : []),
-    [],
+  const [commandProblem, setCommandProblem] = useState<GraphProblem | null>(
+    null,
   );
-  const clearRuntime = useCallback(() => setRuntimeProblems([]), []);
+  const clearCommandProblem = useCallback(() => setCommandProblem(null), []);
   const document = useRuleDocument({
     initial,
     mode,
@@ -55,80 +66,77 @@ function EditorContent({
     onDirty,
     navigate,
     notify,
-    reportRuntimeError,
+    reportCommandProblem: setCommandProblem,
   });
   const {
     rule,
     source,
     sourceDirty,
     diagnostics,
-    trace,
-    dispatch,
     readOnly,
     dirty,
+    busy,
+    capabilities: can,
+    view,
     hasInvalidDefaults,
     onInvalidDefault,
-    changeDefinition,
-    busy,
-    runTask,
+    blockedByInvalidDefault,
     error,
     setError,
     versionLoading,
     versionError,
     versionUnavailable,
     retryVersion,
-    buildCode,
+    edit,
+    editMetadata,
+    editSource,
     build,
     switchView,
     action,
+    toggleTest,
   } = document;
-  const [selected, setSelected] = useState(
-    initial.draft.nodes.find((node) => node.type === "CONDITION")?.id ||
-      initial.draft.nodes[0].id,
+  const graphKey = useMemo(() => semanticGraphKey(rule.draft), [rule.draft]);
+  const preview = usePreviewExecution(rule.draft, graphKey);
+  const [requestedSelection, setRequestedSelection] = useState(
+    () => defaultSelection(initial.draft).id,
   );
+  const node = selectedNode(rule.draft, requestedSelection);
+  const selected = node.id;
+  /** Selects a node unless an invalid default must be fixed before `action`. */
   const selectNode = useCallback(
-    (id: string) => {
-      if (hasInvalidDefaults && id !== selected) {
-        setError(
-          "Fix the invalid parameter default before selecting another node",
-        );
-        return false;
-      }
-      setSelected(id);
+    (id: string, action = "selecting another node") => {
+      if (id !== selected && blockedByInvalidDefault(action)) return false;
+      setRequestedSelection(id);
       return true;
     },
-    [hasInvalidDefaults, selected, setError],
+    [selected, blockedByInvalidDefault],
   );
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const nodeNameInput = useRef<HTMLInputElement>(null);
-  const [nodeCode, setNodeCode] = useState<string | null>(null);
+  const nodeDialog = useNodeDialog(rule.draft.nodes);
+  const { openCode, openEdit, active: activeDialog } = nodeDialog;
   const openNodeCode = useCallback(
     (id: string) => {
-      if (hasInvalidDefaults) {
-        setError("Fix the invalid parameter default before opening node code");
-        return;
-      }
-      setNodeCode(id);
+      if (!blockedByInvalidDefault("opening node code")) openCode(id);
     },
-    [hasInvalidDefaults, setError],
+    [blockedByInvalidDefault, openCode],
   );
-  const [nodeEdit, setNodeEdit] = useState<string | null>(null);
-  const [nodeCodeProblems, setNodeCodeProblems] = useState<string[]>([]);
   const [referenceTarget, setReferenceTarget] =
     useState<ReferenceTarget | null>(null);
-  const [testOpen, setTestOpen] = useState(false);
   const [history, setHistory] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const codeRequest =
+    activeDialog?.request.kind === "code" ? activeDialog.request : null;
   const { allProblems, nodeErrors } = useGraphProblems({
     rule,
+    graphKey,
     version: requestedVersion,
     loading: versionUnavailable,
     invalidDefaults: hasInvalidDefaults,
-    runtime: runtimeProblems,
+    runtime: runtimeProblems(preview.problem, commandProblem),
     inherited: initialProblems,
-    nodeCode,
-    codeProblems: nodeCodeProblems,
-    clearRuntime,
+    nodeCode: codeRequest,
+    clearCommandProblem,
     onError: setError,
   });
   const canvas = useGraphCanvas({
@@ -137,22 +145,18 @@ function EditorContent({
     selectedEdge,
     setSelectedEdge,
     onExpression: openNodeCode,
-    trace,
+    trace: preview.result,
     nodeErrors,
-    readOnly,
-    busy,
-    changeDefinition,
+    edit,
   });
-  const { measurements } = canvas;
+  const { measurements, requestFit } = canvas;
   const { patchNode, addNode, removeNode, arrange } = useGraphCommands({
     definition: rule.draft,
     measurements,
-    readOnly,
-    busy,
-    changeDefinition,
-    dispatch,
+    edit,
+    arrange: document.arrange,
     selectNode,
-    runTask,
+    requestFit,
   });
   const { focusNode, jumpToNode } = useGraphFocus({
     definition: rule.draft,
@@ -166,19 +170,16 @@ function EditorContent({
     selectEdge: setSelectedEdge,
     navigate,
   });
-  const setTrace = useCallback(
-    (trace: import("../../types").Execution | null) =>
-      dispatch({ type: "execution/completed", trace }),
-    [],
-  );
   const openReference = (target: ReferenceTarget) => {
+    const shown = { ruleId: rule.id, version: requestedVersion };
+    // The referenced-rule viewer needs explicit locations for this graph.
     const next = {
       ...target,
       problems: allProblems.map((problem) => ({
         ...problem,
         locations: problem.locations.map((location) =>
-          !location.ruleId || location.ruleId === "preview"
-            ? { ...location, ruleId: rule.id, version: requestedVersion }
+          isCurrentGraphLocation(location, shown)
+            ? { ...location, ...shown }
             : location,
         ),
       })),
@@ -187,24 +188,12 @@ function EditorContent({
     else setReferenceTarget(next);
   };
   const openNodeEditor = (id: string) => {
-    if (readOnly || busy) return;
-    if (hasInvalidDefaults) {
-      setError(
-        "Fix the invalid parameter default before opening another node editor",
-      );
+    if (!can.edit || blockedByInvalidDefault("opening another node editor"))
       return;
-    }
-    setNodeEdit(id);
+    openEdit(id);
   };
   const renameNode = (id: string) => {
-    if (readOnly || busy) return;
-    if (hasInvalidDefaults && id !== selected) {
-      setError(
-        "Fix the invalid parameter default before renaming another node",
-      );
-      return;
-    }
-    setSelected(id);
+    if (!can.edit || !selectNode(id, "renaming another node")) return;
     setSelectedEdge(null);
     requestAnimationFrame(() => {
       const input = nodeNameInput.current;
@@ -213,16 +202,17 @@ function EditorContent({
       input.select();
     });
   };
-  const testPanel = testOpen && (
+  // One element for both views: the preview session itself lives in
+  // usePreviewExecution, so remounting the panel with the view keeps it.
+  const testPanel = preview.open && (
     <TestPanel
-      definition={rule.draft}
+      preview={preview}
       ruleId={rule.id}
-      publishedVersion={requestedVersion || rule.publishedVersion}
-      onResult={setTrace}
-      onError={reportRuntimeError}
+      version={requestedVersion}
+      publishedVersion={requestedVersion ?? rule.publishedVersion}
+      buildPending={sourceDirty}
       onOpenReference={openReference}
       onNode={jumpToNode}
-      onClose={() => setTestOpen(false)}
     />
   );
   if (versionLoading)
@@ -254,20 +244,16 @@ function EditorContent({
         readOnly={readOnly}
         dirty={dirty}
         busy={busy}
+        capabilities={can}
         requestedVersion={requestedVersion}
-        testOpen={testOpen}
+        testOpen={preview.open}
         embedded={embedded}
         navigate={navigate}
         switchView={switchView}
         showHistory={() => setHistory((value) => !value)}
         setSettingsOpen={setSettingsOpen}
         action={action}
-        onToggleTest={() =>
-          void runTask("test", async () => {
-            await buildCode();
-            setTestOpen((value) => !value);
-          })
-        }
+        onToggleTest={() => void toggleTest(preview.toggle)}
       />
       {error && (
         <Alert severity="error" onClose={() => setError("")}>
@@ -277,13 +263,15 @@ function EditorContent({
       {history && (
         <VersionHistory
           ruleId={rule.id}
+          publishedVersion={rule.publishedVersion}
           navigate={navigate}
           onClose={() => setHistory(false)}
         />
       )}
-      {(mode === "code" && !hasInvalidDefaults) || sourceDirty ? (
+      {view === "code" ? (
         <>
-          <Suspense
+          <LazyBoundary
+            label="code editor"
             fallback={
               <div className="center-state">
                 <CircularProgress size={24} />
@@ -296,11 +284,9 @@ function EditorContent({
                 rule={rule}
                 definition={rule.draft}
                 source={source}
-                onChange={(source) =>
-                  dispatch({ type: "source/changed", source })
-                }
+                onChange={editSource}
                 diagnostics={diagnostics}
-                readOnly={readOnly || !!busy}
+                readOnly={!can.edit}
                 pending={sourceDirty}
                 onBuild={build}
                 onSave={() => void action("save")}
@@ -310,8 +296,8 @@ function EditorContent({
                 <CircularProgress size={24} />
               </div>
             )}
-          </Suspense>
-          {!sourceDirty && testPanel}
+          </LazyBoundary>
+          {testPanel}
         </>
       ) : (
         <div className="editor-body">
@@ -319,14 +305,14 @@ function EditorContent({
             definition={rule.draft}
             canvas={canvas}
             readOnly={readOnly}
-            busy={busy}
+            capabilities={can}
+            arranging={busy === "layout"}
             selected={selected}
             selectedEdge={selectedEdge}
             setSelected={selectNode}
             setSelectedEdge={setSelectedEdge}
-            nodeErrors={nodeErrors}
             focusNode={focusNode}
-            changeDefinition={changeDefinition}
+            edit={edit}
             layout={arrange}
             exportJson={() =>
               exportDefinition(rule.draft, rule.id, requestedVersion)
@@ -336,24 +322,21 @@ function EditorContent({
             onEditNode={openNodeEditor}
             onRenameNode={renameNode}
             onDeleteNode={removeNode}
-            hasTrace={!!trace}
+            hasTrace={!!preview.result}
           >
             {testPanel}
           </GraphCanvas>
           <Inspector
             rule={rule}
-            node={
-              rule.draft.nodes.find((n) => n.id === selected) ||
-              rule.draft.nodes[0]
-            }
+            node={node}
             rules={rules}
-            readOnly={readOnly || !!busy || !!nodeEdit || !!nodeCode}
+            readOnly={!can.edit || !!activeDialog}
             nameInputRef={nodeNameInput}
             onNodeChange={patchNode}
             onDelete={removeNode}
-            onDefinitionChange={changeDefinition}
+            onDefinitionChange={edit}
             onInvalidDefault={onInvalidDefault}
-            errors={nodeErrors[selected] || []}
+            errors={nodeErrors.get(selected) ?? noErrors}
             onExpression={openNodeCode}
             onOpenReference={openReference}
           />
@@ -367,42 +350,45 @@ function EditorContent({
           onClose={() => setReferenceTarget(null)}
         />
       )}
-      {nodeEdit && rule.draft.nodes.some((node) => node.id === nodeEdit) && (
-        <Suspense fallback={null}>
+      {activeDialog?.request.kind === "edit" && (
+        <LazyNodeDialog
+          key={`edit:${activeDialog.node.id}`}
+          label="node editor"
+          onCancel={nodeDialog.close}
+        >
           <NodeEditDialog
-            key={nodeEdit}
             rule={rule}
-            nodeId={nodeEdit}
+            nodeId={activeDialog.node.id}
             rules={rules}
-            readOnly={readOnly || !!busy}
-            onApply={changeDefinition}
-            onClose={() => setNodeEdit(null)}
+            readOnly={!can.edit}
+            onApply={edit}
+            onClose={nodeDialog.close}
             onOpenReference={openReference}
           />
-        </Suspense>
+        </LazyNodeDialog>
       )}
-      {nodeCode && rule.draft.nodes.some((n) => n.id === nodeCode) && (
-        <Suspense fallback={null}>
+      {activeDialog?.request.kind === "code" && (
+        <LazyNodeDialog
+          key={`code:${activeDialog.node.id}`}
+          label="node code editor"
+          onCancel={nodeDialog.close}
+        >
           <NodeExpressionDialog
-            key={nodeCode}
             definition={rule.draft}
-            node={rule.draft.nodes.find((n) => n.id === nodeCode)!}
-            readOnly={readOnly || !!busy}
-            onProblems={setNodeCodeProblems}
-            onApply={(d) => changeDefinition(() => d)}
-            onClose={() => {
-              setNodeCode(null);
-              setNodeCodeProblems([]);
-            }}
+            node={activeDialog.node}
+            readOnly={!can.edit}
+            onProblems={nodeDialog.reportCodeProblems}
+            onApply={(built) => edit(() => built)}
+            onClose={nodeDialog.close}
           />
-        </Suspense>
+        </LazyNodeDialog>
       )}
       {settingsOpen && (
         <RuleSettings
           rule={rule}
-          readOnly={readOnly || !!busy}
+          readOnly={!can.edit}
           onClose={() => setSettingsOpen(false)}
-          onApply={(patch) => dispatch({ type: "rule/metadata", patch })}
+          onApply={editMetadata}
         />
       )}
     </div>

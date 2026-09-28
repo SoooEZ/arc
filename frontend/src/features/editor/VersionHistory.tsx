@@ -5,15 +5,20 @@ import { usePagedResource } from "../../hooks/usePagedResource";
 import CatalogPagination from "../../components/CatalogPagination";
 export default function VersionHistory({
   ruleId,
+  publishedVersion,
   navigate,
   onClose,
 }: {
   ruleId: string;
+  /** The latest published version; publishing changes it and reloads the list. */
+  publishedVersion: number | null;
   navigate: (path: string) => void;
   onClose: () => void;
 }) {
-  const page = usePagedResource(ruleId, (offset, limit, signal) =>
-    ruleApi.versionSummaries(ruleId, { offset, limit }, { signal }),
+  const page = usePagedResource(
+    JSON.stringify([ruleId, publishedVersion]),
+    (offset, limit, signal) =>
+      ruleApi.versionSummaries(ruleId, { offset, limit }, { signal }),
   );
   const {
     data: { items: versions },

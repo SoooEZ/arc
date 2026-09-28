@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Button,
@@ -13,29 +13,47 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  useReactFlow,
 } from "@xyflow/react";
 import { Code2, Pencil, TextCursorInput, Trash2 } from "lucide-react";
-import type { Definition, NodeType, RuleNode } from "../../../types";
-import GraphNode from "./GraphNode";
+import type { Definition, NodeType } from "../../../types";
+import GraphNode, { type FlowNode } from "./GraphNode";
 import RoutedEdge, { RoutedConnectionLine, RoutingContext } from "./RoutedEdge";
-import type { DefinitionChange } from "../../../domain/graph";
+import {
+  canRemoveGraphNode,
+  type DefinitionChange,
+} from "../../../domain/graph";
+import { nodeKinds } from "../../../domain/nodeKinds";
 import type { useGraphCanvas } from "./useGraphCanvas";
+import type { EditorCapabilities } from "../editorCapabilities";
 import GraphToolbar from "./GraphToolbar";
 import GraphOutline from "./GraphOutline";
 const nodeTypes = { arc: GraphNode };
 const edgeTypes = { routed: RoutedEdge };
+const initialFit = { padding: 0.18 };
+const arrangedFit = { padding: 0.15, duration: 0 };
+const proOptions = { hideAttribution: true };
+
+function minimapColor(node: FlowNode): string {
+  if (node.data.errors.length) return "#d15a52";
+  if (node.data.visited) return "#8ebda8";
+  return nodeKinds[node.data.model.type].minimapColor;
+}
 interface Props {
   definition: Definition;
   canvas: ReturnType<typeof useGraphCanvas>;
+  /** A published version: no editing controls are offered. */
   readOnly: boolean;
-  busy: string;
+  capabilities: EditorCapabilities;
+  /** Arrange is running. */
+  arranging: boolean;
   selected: string;
   selectedEdge: string | null;
   setSelected: (id: string) => void;
   setSelectedEdge: (id: string | null) => void;
-  nodeErrors: Record<string, string[]>;
   focusNode: (id: string) => void;
-  changeDefinition: (change: DefinitionChange) => void;
+  /** The document's gated edit; false when it refused the change. */
+  edit: (change: DefinitionChange) => boolean;
   layout: () => Promise<void>;
   exportJson: () => void;
   action: (type: "validate") => Promise<void>;
@@ -50,14 +68,14 @@ export default function GraphCanvas({
   definition,
   canvas,
   readOnly,
-  busy,
+  capabilities: can,
+  arranging,
   selected,
   selectedEdge,
   setSelected,
   setSelectedEdge,
-  nodeErrors,
   focusNode,
-  changeDefinition,
+  edit,
   layout,
   exportJson,
   action,
@@ -83,33 +101,55 @@ export default function GraphCanvas({
     contextMenu?.kind === "edge"
       ? definition.edges.find((edge) => edge.id === contextMenu.id)
       : undefined;
+  const menuTargetRemovable = menuNode
+    ? canRemoveGraphNode(definition, menuNode.id)
+    : !!menuEdge;
+  const deleteMenuTarget = () => {
+    setContextMenu(null);
+    if (menuNode) onDeleteNode(menuNode.id);
+    else if (menuEdge) removeEdge(menuEdge.id);
+  };
   const removeEdge = (id: string) => {
-    if (readOnly || busy) return;
-    changeDefinition((current) => {
+    const removed = edit((current) => {
       if (!current.edges.some((edge) => edge.id === id)) return current;
       return {
         ...current,
         edges: current.edges.filter((edge) => edge.id !== id),
       };
     });
-    if (selectedEdge === id) setSelectedEdge(null);
+    if (removed && selectedEdge === id) setSelectedEdge(null);
   };
   const {
     nodes,
     edges,
     routing,
-    visited,
     blockedEdges,
+    fitRequest,
     onNodesChange,
     onEdgesChange,
     connect,
   } = canvas;
+  const flow = useReactFlow<FlowNode>();
+  // Fit requests made while this canvas was unmounted were covered by the
+  // initial fit, so only requests made while it is mounted run here.
+  const handledFit = useRef(fitRequest);
+  useEffect(() => {
+    if (handledFit.current === fitRequest) return;
+    const frame = requestAnimationFrame(() => {
+      handledFit.current = fitRequest;
+      // Nothing awaits the fit: an interrupted fit may never settle.
+      void flow.fitView(arrangedFit);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [fitRequest, flow]);
+  const blocked = definition.edges.filter((edge) => blockedEdges.has(edge.id));
   return (
     <div className="graph-workspace">
       <GraphToolbar
         nodeCount={definition.nodes.length}
         readOnly={readOnly}
-        busy={busy}
+        capabilities={can}
+        arranging={arranging}
         outline={outline}
         onToggleOutline={() => setOutline((value) => !value)}
         onArrange={layout}
@@ -117,25 +157,23 @@ export default function GraphCanvas({
         onValidate={() => action("validate")}
         onAddNode={onAddNode}
       />
-      {definition.edges.some((e) => blockedEdges[e.id]) && (
+      {!!blocked.length && (
         <Alert severity="warning" className="routing-warning">
           Connections blocked by overlapping or tightly spaced nodes. Move nodes
           apart or use Arrange graph:
-          {definition.edges
-            .filter((e) => blockedEdges[e.id])
-            .map((e) => (
-              <Button
-                key={e.id}
-                size="small"
-                onClick={() => {
-                  focusNode(e.source);
-                  setSelectedEdge(e.id);
-                }}
-              >
-                {definition.nodes.find((n) => n.id === e.source)?.label} →{" "}
-                {definition.nodes.find((n) => n.id === e.target)?.label}
-              </Button>
-            ))}
+          {blocked.map((e) => (
+            <Button
+              key={e.id}
+              size="small"
+              onClick={() => {
+                focusNode(e.source);
+                setSelectedEdge(e.id);
+              }}
+            >
+              {definition.nodes.find((n) => n.id === e.source)?.label} →{" "}
+              {definition.nodes.find((n) => n.id === e.target)?.label}
+            </Button>
+          ))}
         </Alert>
       )}
       <div className="flow-container">
@@ -182,15 +220,15 @@ export default function GraphCanvas({
               });
             }}
             onConnect={connect}
-            nodesDraggable={!readOnly && !busy}
-            nodesConnectable={!readOnly && !busy}
+            nodesDraggable={can.edit}
+            nodesConnectable={can.edit}
             edgesReconnectable={false}
             deleteKeyCode={null}
             fitView
-            fitViewOptions={{ padding: 0.18 }}
+            fitViewOptions={initialFit}
             minZoom={0.25}
             maxZoom={1.5}
-            proOptions={{ hideAttribution: true }}
+            proOptions={proOptions}
           >
             <Background
               variant={BackgroundVariant.Dots}
@@ -199,17 +237,8 @@ export default function GraphCanvas({
               color="#cad5cf"
             />
             <Controls showInteractive={false} />
-            <MiniMap
-              nodeColor={(n) =>
-                nodeErrors[n.id]?.length
-                  ? "#d15a52"
-                  : visited.has(n.id)
-                    ? "#8ebda8"
-                    : n.data?.model &&
-                        (n.data.model as RuleNode).type === "CONDITION"
-                      ? "#e8d8b2"
-                      : "#d4dfd8"
-              }
+            <MiniMap<FlowNode>
+              nodeColor={minimapColor}
               maskColor="rgba(245,248,246,.7)"
               pannable
               zoomable
@@ -236,9 +265,8 @@ export default function GraphCanvas({
         >
           {menuNode && (
             <MenuItem
-              disabled={readOnly || !!busy}
+              disabled={!can.edit}
               onClick={() => {
-                if (readOnly || busy) return;
                 setContextMenu(null);
                 onRenameNode(menuNode.id);
               }}
@@ -251,9 +279,8 @@ export default function GraphCanvas({
           )}
           {menuNode && (
             <MenuItem
-              disabled={readOnly || !!busy}
+              disabled={!can.edit}
               onClick={() => {
-                if (!menuNode || readOnly || busy) return;
                 setContextMenu(null);
                 onEditNode(menuNode.id);
               }}
@@ -265,24 +292,8 @@ export default function GraphCanvas({
             </MenuItem>
           )}
           <MenuItem
-            disabled={
-              readOnly ||
-              !!busy ||
-              menuNode?.type === "INPUT" ||
-              (!!menuNode && definition.nodes.length <= 1)
-            }
-            onClick={() => {
-              if (
-                readOnly ||
-                busy ||
-                menuNode?.type === "INPUT" ||
-                (menuNode && definition.nodes.length <= 1)
-              )
-                return;
-              setContextMenu(null);
-              if (menuEdge) removeEdge(menuEdge.id);
-              else if (menuNode) onDeleteNode(menuNode.id);
-            }}
+            disabled={!can.edit || !menuTargetRemovable}
+            onClick={deleteMenuTarget}
           >
             <ListItemIcon>
               <Trash2 size={16} />
@@ -304,7 +315,7 @@ export default function GraphCanvas({
               size="small"
               color="error"
               startIcon={<Trash2 size={14} />}
-              disabled={!!busy}
+              disabled={!can.edit}
               onClick={() => removeEdge(selectedEdge)}
             >
               Delete connection

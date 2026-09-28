@@ -1,7 +1,8 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, useState } from "react";
 import { Button, CircularProgress } from "@mui/material";
 import { ExternalLink } from "lucide-react";
 import type { VariableOption } from "../../domain/graph";
+import { LazyBoundary } from "../../components/LazyBoundary";
 import AvailableVariables from "./AvailableVariables";
 
 const ExpressionDialog = lazy(() => import("./ExpressionDialog"));
@@ -36,7 +37,8 @@ export default function ExpressionField({
         </div>
       )}
       {!hideInput && (
-        <Suspense
+        <LazyBoundary
+          label={`${label.toLowerCase()} editor`}
           fallback={
             <div className="inline-expression-loading" role="status">
               <CircularProgress size={16} /> Loading {label.toLowerCase()}{" "}
@@ -52,7 +54,7 @@ export default function ExpressionField({
             onChange={onChange}
             helperText={helperText}
           />
-        </Suspense>
+        </LazyBoundary>
       )}
       <Button
         size="small"
@@ -63,7 +65,11 @@ export default function ExpressionField({
         {buttonLabel}
       </Button>
       {open && (
-        <Suspense fallback={<CircularProgress size={18} />}>
+        <LazyBoundary
+          label="expression editor"
+          fallback={<CircularProgress size={18} />}
+          onDismiss={() => setOpen(false)}
+        >
           <ExpressionDialog
             label={label}
             value={value}
@@ -75,7 +81,7 @@ export default function ExpressionField({
               setOpen(false);
             }}
           />
-        </Suspense>
+        </LazyBoundary>
       )}
     </div>
   );

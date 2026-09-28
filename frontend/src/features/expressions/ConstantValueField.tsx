@@ -1,6 +1,13 @@
 import { MenuItem, TextField } from "@mui/material";
-import type { InputType } from "../../types";
-import { literalText, quoteText } from "../../domain/expressions";
+import {
+  literalText,
+  quoteText,
+  trimExpression,
+} from "../../domain/expressions";
+import {
+  constantTextError,
+  type ConstantType,
+} from "../../domain/valueBinding";
 
 /** Edits a typed value while preserving the expression stored in the graph. */
 export default function ConstantValueField({
@@ -12,12 +19,13 @@ export default function ConstantValueField({
   onChange,
 }: {
   label: string;
-  type: InputType | "NULL";
+  type: ConstantType;
   value?: string;
   disabled: boolean;
   helperText?: string;
   onChange: (value: string | undefined) => void;
 }) {
+  const stored = value ?? "";
   if (type === "NULL") {
     return (
       <TextField
@@ -33,7 +41,7 @@ export default function ConstantValueField({
       <TextField
         select
         label={label}
-        value={value?.trim().toLowerCase() || "false"}
+        value={trimExpression(stored).toLowerCase() || "false"}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         helperText={helperText}
@@ -43,30 +51,42 @@ export default function ConstantValueField({
       </TextField>
     );
   }
-  const literal = literalText((value ?? "").trim());
-  const text = type === "STRING" && literal !== null ? literal : (value ?? "");
-  const hint =
-    type === "STRING"
-      ? "Text value · no quotation marks needed"
-      : helperText ||
-        (type === "ARRAY"
-          ? "ARC array literal, for example [1, 2, 3]"
-          : type.toLowerCase());
+  if (type === "STRING") {
+    return (
+      <TextField
+        label={label}
+        value={literalText(trimExpression(stored)) ?? stored}
+        disabled={disabled}
+        onChange={(event) => onChange(quoteText(event.target.value))}
+        helperText="Text value · no quotation marks needed"
+      />
+    );
+  }
+  const error = constantTextError(type, stored);
+  if (type === "NUMBER")
+    return (
+      <TextField
+        label={label}
+        // A number input shows nothing for padded text; the server trims it too.
+        value={trimExpression(stored)}
+        disabled={disabled}
+        type="number"
+        error={!!error}
+        onChange={(event) => onChange(event.target.value || undefined)}
+        helperText={error ?? (helperText || "number")}
+      />
+    );
   return (
     <TextField
       label={label}
-      value={text}
+      value={stored}
       disabled={disabled}
-      multiline={type === "ARRAY" || type === "OBJECT"}
-      type={type === "NUMBER" ? "number" : "text"}
-      onChange={(event) =>
-        onChange(
-          type === "STRING"
-            ? quoteText(event.target.value)
-            : event.target.value || undefined,
-        )
+      multiline
+      error={!!error}
+      onChange={(event) => onChange(event.target.value || undefined)}
+      helperText={
+        error ?? (helperText || "ARC array literal, for example [1, 2, 3]")
       }
-      helperText={hint}
     />
   );
 }

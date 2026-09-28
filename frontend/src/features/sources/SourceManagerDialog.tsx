@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Button,
@@ -17,21 +17,12 @@ export default function SourceManagerDialog({
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  // Route changes and page unloads are guarded by the source editor's navigation guard.
   const close = () => {
     if (busy) return;
     if (dirty && !window.confirm("Discard unsaved source changes?")) return;
     onClose();
   };
-  useEffect(() => {
-    const leave = (event: BeforeUnloadEvent) => {
-      if (dirty || busy) {
-        event.preventDefault();
-        event.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", leave);
-    return () => window.removeEventListener("beforeunload", leave);
-  }, [dirty, busy]);
   return (
     <Dialog
       open

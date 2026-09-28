@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { TextField } from "@mui/material";
-import { parseNumericDefault } from "../../../domain/numericDefaults";
+import type { DecimalNumber } from "../../../domain/json";
+import {
+  parseNumericDefault,
+  sameNumericDefault,
+} from "../../../domain/numericDefaults";
+
+const defaultText = (value: unknown) => (value == null ? "" : String(value));
 
 export default function NumericDefaultField({
   value,
@@ -10,19 +16,20 @@ export default function NumericDefaultField({
 }: {
   value: unknown;
   disabled: boolean;
-  onChange: (value: number | null) => void;
+  onChange: (value: number | DecimalNumber | null) => void;
   onValidity: (valid: boolean) => void;
 }) {
-  const [text, setText] = useState(value == null ? "" : String(value));
+  const [text, setText] = useState(() => defaultText(value));
   const [error, setError] = useState("");
   const acceptedValue = useRef(value);
   const validity = useRef(onValidity);
   validity.current = onValidity;
   useEffect(() => () => validity.current(true), []);
   useEffect(() => {
-    if (Object.is(value, acceptedValue.current)) return;
+    // The field's own value returns through the draft; keep the text as typed.
+    if (sameNumericDefault(value, acceptedValue.current)) return;
     acceptedValue.current = value;
-    setText(value == null ? "" : String(value));
+    setText(defaultText(value));
     setError("");
     validity.current(true);
   }, [value]);

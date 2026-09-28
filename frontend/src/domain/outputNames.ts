@@ -1,5 +1,5 @@
 import type { RuleNode } from "../types";
-import { identifierError } from "./identifiers";
+import { isIdentifier } from "./identifiers";
 
 /** Each reached Output contributes its raw value under this key in a multi-output result. */
 export function multipleOutputFieldName(
@@ -7,5 +7,5 @@ export function multipleOutputFieldName(
 ): string {
   if (node.outputName) return node.outputName;
   const expression = node.expression?.trim() ?? "";
-  return identifierError(expression) === null ? expression : node.id;
+  return isIdentifier(expression) ? expression : node.id;
 }

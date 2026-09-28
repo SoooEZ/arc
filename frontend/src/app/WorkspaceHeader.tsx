@@ -1,11 +1,17 @@
 import { ChevronRight, Radio } from "lucide-react";
+import type { WorkspacePage, WorkspaceRoute } from "./routing";
 
-function sectionLabel(route: string) {
-  if (route === "/playground") return "API playground";
-  if (route === "/docs") return "API reference";
-  if (route === "/sources") return "Data sources";
-  if (route.startsWith("/studio/")) return "Code studio";
-  return "Rule library";
+const sectionLabels: Record<WorkspacePage, string> = {
+  library: "Rule library",
+  rule: "Rule library",
+  sources: "Data sources",
+  playground: "API playground",
+  docs: "API reference",
+};
+
+function sectionLabel(route: WorkspaceRoute) {
+  if (route.page === "rule" && route.mode === "code") return "Code studio";
+  return sectionLabels[route.page];
 }
 
 export default function WorkspaceHeader({
@@ -13,7 +19,7 @@ export default function WorkspaceHeader({
   ruleName,
   navigate,
 }: {
-  route: string;
+  route: WorkspaceRoute;
   ruleName?: string;
   navigate: (path: string) => void;
 }) {

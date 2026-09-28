@@ -4,6 +4,17 @@ import "monaco-editor/features/register.all";
 // Monaco's all-features entry registers viewport tokens, but not document tokens.
 import "monaco-editor/editor/contrib/semanticTokens/browser/documentSemanticTokens";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
+import { nodeTypes } from "../../domain/nodeKinds";
+
+/** Node kinds and input types, highlighted as type names in ARC Script. */
+const typeNames = [
+  ...nodeTypes,
+  "NUMBER",
+  "STRING",
+  "BOOLEAN",
+  "ARRAY",
+  "OBJECT",
+];
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco });
@@ -38,10 +49,7 @@ monaco.languages.setMonarchTokensProvider("arc", {
         /\b(schema|inputs|node|at|let|when|select|case|equals|field|return|use|version|bind|as|next|edge|source|required|optional|default)\b/,
         "keyword",
       ],
-      [
-        /\b(INPUT|FORMULA|CONDITION|SWITCH|TRANSFORM|REFERENCE|OUTPUT|NUMBER|STRING|BOOLEAN|ARRAY|OBJECT)\b/,
-        "type",
-      ],
+      [new RegExp(`\\b(${typeNames.join("|")})\\b`), "type"],
       [/\b(true|false|null)\b/, "constant"],
       [/\$[A-Za-z_][\w.]*/, "function"],
       [/[A-Za-z_][\w.]*(?=\s*\()/, "function"],

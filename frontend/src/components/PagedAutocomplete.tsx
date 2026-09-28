@@ -14,6 +14,20 @@ type Choice<T> =
   | { type: "retry" }
   | { type: "status"; label: string };
 
+function choiceText<T>(
+  choice: Choice<T>,
+  itemLabel: (item: T) => string,
+): string {
+  switch (choice.type) {
+    case "item":
+      return itemLabel(choice.item);
+    case "status":
+      return choice.label;
+    case "retry":
+      return "Retry loading results";
+  }
+}
+
 /** One editable field combines server search with an append-only option list. */
 export default function PagedAutocomplete<T>({
   label,
@@ -72,6 +86,7 @@ export default function PagedAutocomplete<T>({
   const selected: Choice<T> | null = value
     ? { type: "item", item: value }
     : null;
+  const selectedText = value ? itemLabel(value) : "";
   const close = () => {
     setOpen(false);
     setSearch("");
@@ -107,7 +122,7 @@ export default function PagedAutocomplete<T>({
         if (reason !== "selectOption") close();
       }}
       value={selected}
-      inputValue={open && editing ? search : value ? itemLabel(value) : ""}
+      inputValue={open && editing ? search : selectedText}
       onInputChange={(_event, text, reason) => {
         if (reason === "input") {
           scroll.current = null;
@@ -120,13 +135,7 @@ export default function PagedAutocomplete<T>({
       getOptionKey={(option) =>
         option.type === "item" ? `item:${itemKey(option.item)}` : option.type
       }
-      getOptionLabel={(option) =>
-        option.type === "item"
-          ? itemLabel(option.item)
-          : option.type === "status"
-            ? option.label
-            : "Retry loading results"
-      }
+      getOptionLabel={(option) => choiceText(option, itemLabel)}
       getOptionDisabled={(option) => option.type === "status"}
       isOptionEqualToValue={(option, selectedOption) =>
         option.type === "item" &&
@@ -173,15 +182,13 @@ export default function PagedAutocomplete<T>({
       }}
       renderOption={({ key, ...props }, option) => (
         <li key={key} {...props}>
-          {option.type === "item" ? (
-            itemLabel(option.item)
-          ) : option.type === "status" ? (
-            option.label
-          ) : (
+          {option.type === "retry" ? (
             <span>
-              <strong>Retry loading results</strong>
+              <strong>{choiceText(option, itemLabel)}</strong>
               <small style={{ display: "block" }}>{pages.error}</small>
             </span>
+          ) : (
+            choiceText(option, itemLabel)
           )}
         </li>
       )}

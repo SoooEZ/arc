@@ -11,20 +11,15 @@ import {
 import { Tooltip, useMediaQuery } from "@mui/material";
 import FocusTrap from "@mui/material/Unstable_TrapFocus";
 import { ArcMark } from "../components/Icons";
+import type { WorkspaceRoute } from "./routing";
 
 const preferenceKey = "arc.navigation.expanded";
 interface Props {
-  route: string;
-  studioRuleId: string | null;
+  route: WorkspaceRoute;
   navigate: (path: string) => void;
-  newRule: () => void;
+  openCodeStudio: () => void;
 }
-export default function Sidebar({
-  route,
-  studioRuleId,
-  navigate,
-  newRule,
-}: Props) {
+export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(preferenceKey) === "true";
@@ -55,41 +50,39 @@ export default function Sidebar({
     navigate(path);
     if (mobile) toggleExpanded(false);
   };
+  const ruleMode = route.page === "rule" ? route.mode : null;
   const links = [
     {
       label: "Rule library",
       icon: Layers3,
-      active: route === "/library" || route.startsWith("/rules/"),
+      active: route.page === "library" || ruleMode === "graph",
       action: () => open("/library"),
     },
     {
       label: "API playground",
       icon: Terminal,
-      active: route === "/playground",
+      active: route.page === "playground",
       action: () => open("/playground"),
     },
     {
       label: "API reference",
       icon: BookOpen,
-      active: route === "/docs",
+      active: route.page === "docs",
       action: () => open("/docs"),
     },
     {
       label: "Code studio",
       icon: Terminal,
-      active: route.startsWith("/studio/"),
+      active: ruleMode === "code",
       action: () => {
-        if (studioRuleId) open(`/studio/${studioRuleId}`);
-        else {
-          newRule();
-          if (mobile) toggleExpanded(false);
-        }
+        openCodeStudio();
+        if (mobile) toggleExpanded(false);
       },
     },
     {
       label: "Data sources",
       icon: Workflow,
-      active: route === "/sources",
+      active: route.page === "sources",
       action: () => open("/sources"),
     },
   ];

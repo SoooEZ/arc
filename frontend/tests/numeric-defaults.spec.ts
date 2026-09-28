@@ -6,6 +6,11 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 
+/** The stored draft as raw JSON text: parsing it into doubles would hide rounding. */
+async function storedDraft(request: APIRequestContext, id: string) {
+  return (await request.get(`/api/rules/${id}`)).text();
+}
+
 async function openNumericRule(page: Page, request: APIRequestContext) {
   const id = `numeric-default-${Date.now()}`;
   const definition: Definition = {
@@ -41,30 +46,35 @@ async function openNumericRule(page: Page, request: APIRequestContext) {
   return { id, original: (await created.json()) as Rule };
 }
 
-test("a rounded numeric default retains its raw text, blocks writes and can be corrected", async ({
-  page,
-  request,
-}) => {
-  const { id, original } = await openNumericRule(page, request);
-  const field = page.getByLabel("Default value (optional)");
-  const writes: unknown[] = [];
+function watchWrites(page: Page, id: string) {
+  const writes: string[] = [];
   page.on("request", (outgoing) => {
     if (
       outgoing.method() === "PUT" &&
       outgoing.url().endsWith(`/api/rules/${id}`)
     )
-      writes.push(outgoing.postDataJSON());
+      writes.push(outgoing.postData() ?? "");
   });
-  await field.fill("9007199254740993");
-  await expect(field).toHaveValue("9007199254740993");
+  return writes;
+}
+
+test("an unsupported numeric default retains its raw text, blocks writes and can be corrected", async ({
+  page,
+  request,
+}) => {
+  const { id, original } = await openNumericRule(page, request);
+  const field = page.getByLabel("Default value (optional)");
+  const writes = watchWrites(page, id);
+  await field.fill("1e400");
+  await expect(field).toHaveValue("1e400");
   await expect(field).toHaveAttribute("aria-invalid", "true");
   await expect(
     page.getByText(
-      "This number would change when saved. Enter a value that can be stored exactly.",
+      "This number is too large or too precise. Use at most 100 digits and 100 decimal places.",
     ),
   ).toBeVisible();
   await page.getByLabel("Parameter name", { exact: true }).fill("renamed");
-  await expect(field).toHaveValue("9007199254740993");
+  await expect(field).toHaveValue("1e400");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(
     page.getByText(
@@ -82,13 +92,43 @@ test("a rounded numeric default retains its raw text, blocks writes and can be c
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
   expect(writes).toHaveLength(1);
-  expect(writes[0]).toMatchObject({
+  expect(JSON.parse(writes[0])).toMatchObject({
     definition: {
       inputs: [{ name: "renamed", defaultValue: 9007199254740992 }],
     },
   });
   const saved: Rule = await (await request.get(`/api/rules/${id}`)).json();
   expect(saved.draft.inputs[0].defaultValue).toBe(9007199254740992);
+});
+
+test("a numeric default that a double would round saves and reloads with every digit", async ({
+  page,
+  request,
+}) => {
+  const { id } = await openNumericRule(page, request);
+  const field = page.getByLabel("Default value (optional)");
+  const writes = watchWrites(page, id);
+  await field.fill("9007199254740993");
+  await expect(field).toHaveAttribute("aria-invalid", "false");
+  await page.getByLabel("Parameter name", { exact: true }).fill("limit");
+  await expect(field).toHaveValue("9007199254740993");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(writes).toHaveLength(1);
+  expect(writes[0]).toContain('"defaultValue":9007199254740993');
+  expect(await storedDraft(request, id)).toContain(
+    '"name":"limit","type":"NUMBER","required":false,"defaultValue":9007199254740993',
+  );
+
+  // A decimal with more digits than a double carries keeps them as typed.
+  await field.fill("0.10000000000000000000001");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(writes[1]).toContain('"defaultValue":0.10000000000000000000001');
+  await page.reload();
+  await expect(page.getByLabel("Default value (optional)")).toHaveValue(
+    "0.10000000000000000000001",
+  );
 });
 
 test("decimal and scientific defaults keep their edit text and save their numeric value", async ({
@@ -139,7 +179,7 @@ test("incomplete numeric defaults survive typing and reset validity when the typ
   });
 });
 
-test("the staged Input editor blocks rounded defaults and cancels without changing the parent", async ({
+test("the staged Input editor blocks unsupported defaults, cancels without changing the parent and applies exact values", async ({
   page,
   request,
 }) => {
@@ -151,7 +191,7 @@ test("the staged Input editor blocks rounded defaults and cancels without changi
     name: "Edit node · Inputs",
     exact: true,
   });
-  await dialog.getByLabel("Default value (optional)").fill("9007199254740993");
+  await dialog.getByLabel("Default value (optional)").fill("1e-400");
   await expect(
     dialog.getByRole("button", { name: "Apply to graph", exact: true }),
   ).toBeDisabled();
@@ -171,4 +211,19 @@ test("the staged Input editor blocks rounded defaults and cancels without changi
   await expect(page.getByText("All changes saved")).toBeVisible();
   const saved: Rule = await (await request.get(`/api/rules/${id}`)).json();
   expect(saved.draft.inputs[0].defaultValue).toBe(0.125);
+
+  await input.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await dialog.getByLabel("Default value (optional)").fill("-9007199254740993");
+  await dialog
+    .getByRole("button", { name: "Apply to graph", exact: true })
+    .click();
+  await expect(page.getByLabel("Default value (optional)")).toHaveValue(
+    "-9007199254740993",
+  );
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(await storedDraft(request, id)).toContain(
+    '"defaultValue":-9007199254740993',
+  );
 });

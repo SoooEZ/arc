@@ -101,12 +101,30 @@ test("at completion pins a formula and hover explains input, formula and result 
     "Customer inputs",
   );
   await setEditorText(page, expression, "");
+  // Arguments are filled from the node's scope when the suggestion is
+  // accepted. Every edit re-reads the scope, and no variable is offered while
+  // that read is pending (lesson F10), so accept once the read for the typed
+  // text has finished and rendered.
+  const scopeRead = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/variables") &&
+      (response.request().postData() ?? "").includes(
+        `"expression":"@${callee}"`,
+      ),
+  );
   await page.keyboard.type(`@${callee}`);
   await expect(
     page
       .locator(".suggest-widget.visible")
       .getByRole("option", { name: new RegExp(`@${callee}:1`) }),
   ).toBeVisible();
+  await (await scopeRead).finished();
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
   await page.keyboard.press("Tab");
   await expect(editorLines(expression)).toHaveText(`@${callee}:1(amount)`);
   await page.keyboard.press("Escape");

@@ -1,74 +1,47 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, useState } from "react";
 import { Button, IconButton, Tab, Tabs } from "@mui/material";
-import { Play, Terminal, X } from "lucide-react";
-import { studioApi } from "../../api/studio";
-import type { GraphProblem } from "../../api/errors";
+import { Hammer, Play, Terminal, X } from "lucide-react";
+import { ruleApi } from "../../api/rules";
+import { LazyBoundary } from "../../components/LazyBoundary";
 import {
   curlExample,
-  parseExecutionInputs,
-  sampleInputs,
+  tryParseExecutionInputs,
 } from "../../domain/executionInputs";
-import { useExecutionRequest } from "./useExecutionRequest";
+import type {
+  PreviewExecution,
+  PreviewInputView,
+} from "../editor/usePreviewExecution";
 import type { ReferenceTarget } from "../editor/types";
-import type { Definition, Execution } from "../../types";
 import ExecutionError from "./ExecutionError";
 import ExecutionResult from "./ExecutionResult";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
 
 const InputJsonEditor = lazy(() => import("./InputJsonEditor"));
 
-export default function TestPanel({
-  definition,
-  ruleId,
-  publishedVersion,
-  onResult,
-  onError,
-  onOpenReference,
-  onNode,
-  onClose,
-}: {
-  definition: Definition;
+interface Props {
+  preview: PreviewExecution;
   ruleId: string;
+  /** The version shown in the editor; null for the draft. */
+  version: number | null;
+  /** The version the published endpoint runs, for the cURL example. */
   publishedVersion: number | null;
-  onResult: (r: Execution | null) => void;
-  onError: (problem: GraphProblem | null) => void;
+  /** Code has edits that are not built into the graph that preview runs. */
+  buildPending: boolean;
   onOpenReference: (target: ReferenceTarget) => void;
   onNode: (id: string) => void;
-  onClose: () => void;
-}) {
-  const [input, setInput] = useState(() =>
-    JSON.stringify(sampleInputs(definition), null, 2),
-  );
-  const [tab, setTab] = useState(0);
-  const [trace, setTrace] = useState(true);
-  const [timeoutMs, setTimeoutMs] = useState(30000);
+}
+
+/** Presents the editor's preview session; the session state lives in usePreviewExecution. */
+export default function TestPanel({
+  preview,
+  ruleId,
+  version,
+  publishedVersion,
+  buildPending,
+  onOpenReference,
+  onNode,
+}: Props) {
   const [inputFocusRequest, setInputFocusRequest] = useState(0);
-  const inputSchema = JSON.stringify(definition.inputs);
-  const execution = useExecutionRequest(
-    JSON.stringify([definition, input, trace, timeoutMs]),
-  );
-  const { result, error, running, problem } = execution;
-  useEffect(() => {
-    setInput(JSON.stringify(sampleInputs(definition), null, 2));
-  }, [inputSchema]); // Reset example values when the input contract changes.
-  useEffect(() => {
-    onResult(result);
-    onError(problem);
-  }, [result, problem, onResult, onError]);
-  const run = () =>
-    execution.run((signal) =>
-      studioApi.preview(definition, parseExecutionInputs(input), {
-        signal,
-        trace,
-        timeoutMs,
-      }),
-    );
-  let parsed: Record<string, unknown> = {};
-  try {
-    parsed = JSON.parse(input);
-  } catch {
-    /* Keep the JSON editor editable while invalid. */
-  }
   return (
     <div className="test-panel">
       <div className="test-panel-heading">
@@ -82,15 +55,15 @@ export default function TestPanel({
             size="small"
             variant="contained"
             startIcon={<Play size={13} />}
-            onClick={run}
-            disabled={running}
+            onClick={preview.run}
+            disabled={preview.running || buildPending}
           >
-            {running ? "Running…" : "Run test"}
+            {preview.running ? "Running…" : "Run test"}
           </Button>
           <IconButton
             aria-label="Close test panel"
             size="small"
-            onClick={onClose}
+            onClick={preview.close}
           >
             <X size={16} />
           </IconButton>
@@ -99,17 +72,21 @@ export default function TestPanel({
       <div className="test-panel-content">
         <div className="test-input">
           <ExecutionOptionsFields
-            trace={trace}
-            timeoutMs={timeoutMs}
-            onTrace={setTrace}
-            onTimeout={setTimeoutMs}
+            trace={preview.trace}
+            timeoutMs={preview.timeoutMs}
+            onTrace={preview.setTrace}
+            onTimeout={preview.setTimeoutMs}
           />
-          <Tabs value={tab} onChange={(_, value) => setTab(value)}>
-            <Tab label="Input JSON" />
-            <Tab label="cURL" />
+          <Tabs
+            value={preview.inputView}
+            onChange={(_, view: PreviewInputView) => preview.setInputView(view)}
+          >
+            <Tab value="json" label="Input JSON" />
+            <Tab value="curl" label="cURL" />
           </Tabs>
-          {tab === 0 ? (
-            <Suspense
+          {preview.inputView === "json" ? (
+            <LazyBoundary
+              label="JSON editor"
               fallback={
                 <div className="execution-json-editor" role="status">
                   Loading JSON editor…
@@ -118,11 +95,11 @@ export default function TestPanel({
             >
               <InputJsonEditor
                 label="Test input JSON"
-                value={input}
-                onChange={setInput}
+                value={preview.input}
+                onChange={preview.changeInput}
                 focusRequest={inputFocusRequest}
               />
-            </Suspense>
+            </LazyBoundary>
           ) : (
             <div className="curl-preview">
               {!publishedVersion && (
@@ -130,11 +107,10 @@ export default function TestPanel({
               )}
               <pre>
                 {curlExample(
-                  window.location.origin,
-                  ruleId,
-                  parsed,
+                  ruleApi.executeUrl(ruleId),
+                  tryParseExecutionInputs(preview.input),
                   publishedVersion,
-                  { trace, timeoutMs },
+                  { trace: preview.trace, timeoutMs: preview.timeoutMs },
                 )}
               </pre>
               <small>
@@ -145,40 +121,82 @@ export default function TestPanel({
           )}
         </div>
         <div className="test-output">
-          {error ? (
-            <ExecutionError
-              error={error}
-              problem={problem}
-              ruleId={ruleId}
-              publishedVersion={publishedVersion}
-              onNode={onNode}
-              onOpenReference={onOpenReference}
-              onEditInputs={() => {
-                setTab(0);
-                setInputFocusRequest((request) => request + 1);
-              }}
-            />
-          ) : result ? (
-            <ExecutionResult
-              result={result}
-              onNode={onNode}
-              requestDurationMs={execution.requestDurationMs}
-            />
-          ) : (
-            <div className="test-empty">
-              <span>
-                <Play size={19} />
-              </span>
-              <strong>Follow the logic</strong>
-              <p>
-                Send a set of inputs to see the result
-                <br />
-                and every decision along the way.
-              </p>
-            </div>
-          )}
+          <PreviewOutput
+            preview={preview}
+            shown={{ ruleId, version }}
+            buildPending={buildPending}
+            onNode={onNode}
+            onOpenReference={onOpenReference}
+            onEditInputs={() => {
+              preview.setInputView("json");
+              setInputFocusRequest((request) => request + 1);
+            }}
+          />
         </div>
       </div>
+    </div>
+  );
+}
+
+function PreviewOutput({
+  preview,
+  shown,
+  buildPending,
+  onNode,
+  onOpenReference,
+  onEditInputs,
+}: {
+  preview: PreviewExecution;
+  shown: { ruleId: string; version: number | null };
+  buildPending: boolean;
+  onNode: (id: string) => void;
+  onOpenReference: (target: ReferenceTarget) => void;
+  onEditInputs: () => void;
+}) {
+  if (buildPending)
+    return (
+      <div className="test-empty">
+        <span>
+          <Hammer size={19} />
+        </span>
+        <strong>Build to test these changes</strong>
+        <p>
+          Preview runs the built graph. Build the code
+          <br />
+          to test your latest edits.
+        </p>
+      </div>
+    );
+  if (preview.error)
+    return (
+      <ExecutionError
+        error={preview.error}
+        problem={preview.problem}
+        shown={shown}
+        onNode={onNode}
+        onOpenReference={onOpenReference}
+        onEditInputs={onEditInputs}
+      />
+    );
+  if (preview.result)
+    return (
+      <ExecutionResult
+        result={preview.result}
+        onNode={onNode}
+        requestDurationMs={preview.requestDurationMs}
+      />
+    );
+  return (
+    <div className="test-empty">
+      <span>
+        <Play size={19} />
+      </span>
+      <strong>Follow the logic</strong>
+      <p>
+        Send a set of inputs to see the result
+        <br />
+        and every decision along the way.
+      </p>
     </div>
   );
 }

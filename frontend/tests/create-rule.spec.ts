@@ -142,3 +142,51 @@ test("generated Rule IDs satisfy the server policy and invalid IDs are rejected 
     );
   }
 });
+
+test("editing the name keeps a Rule ID the user chose", async ({
+  page,
+  request,
+}) => {
+  const stamp = Date.now();
+  const submitted: { id: string; name: string }[] = [];
+  page.on("request", (sent) => {
+    if (
+      sent.method() === "POST" &&
+      new URL(sent.url()).pathname === "/api/rules"
+    )
+      submitted.push(sent.postDataJSON());
+  });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Create rule", exact: true })
+    .last()
+    .click();
+  const dialog = page.getByRole("dialog");
+  const name = dialog.getByLabel("Rule name", { exact: true });
+  const id = dialog.getByLabel("Rule ID", { exact: true });
+  await name.fill(`Tax ${stamp}`);
+  await expect(id).toHaveValue(`tax-${stamp}`);
+  const chosenId = `vat-${stamp}`;
+  await id.fill(chosenId);
+  await name.fill(`Tax rules ${stamp}`);
+  await expect(id).toHaveValue(chosenId);
+
+  // Clearing the ID hands it back to the name.
+  await id.fill("");
+  await name.fill(`Sales tax ${stamp}`);
+  await expect(id).toHaveValue(`sales-tax-${stamp}`);
+  await id.fill(chosenId);
+  await name.fill(`Tax ${stamp}`);
+  await expect(id).toHaveValue(chosenId);
+
+  await dialog
+    .getByRole("button", { name: "Create rule", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: `Tax ${stamp}`, exact: true }),
+  ).toBeVisible();
+  expect(submitted).toEqual([
+    expect.objectContaining({ id: chosenId, name: `Tax ${stamp}` }),
+  ]);
+  expect((await request.get(`/api/rules/${chosenId}`)).ok()).toBeTruthy();
+});

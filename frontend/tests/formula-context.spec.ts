@@ -410,3 +410,74 @@ test("Formula completion uses scope that arrives after suggestions appeared", as
     releaseCatalog();
   }
 });
+
+test("inspector updates that keep the same variables leave an open Formula suggestion and the catalog alone", async ({
+  page,
+  request,
+}) => {
+  const { caller, callee } = await fixtures(request);
+  await page.goto(`/#/rules/${caller}?node=out`);
+  const expression = page.getByLabel("Return value", { exact: true });
+  await expect(editorLines(expression)).toHaveText("amount + price");
+  const heldDiagnostics: (() => void)[] = [];
+  let holding = true;
+  await page.route("**/api/diagnostics", async (route) => {
+    if (holding)
+      await new Promise<void>((resolve) => heldDiagnostics.push(resolve));
+    // The page aborts a read that a newer edit superseded.
+    await route.continue().catch(() => undefined);
+  });
+  const catalogReads: string[] = [];
+  page.on("request", (sent) => {
+    const url = new URL(sent.url());
+    if (
+      url.pathname === "/api/rule-summaries" &&
+      url.searchParams.get("kind") === "FORMULA"
+    )
+      catalogReads.push(sent.url());
+  });
+  let observed = -1;
+  const readsSettled = () =>
+    expect
+      .poll(
+        () => {
+          const unchanged = observed === catalogReads.length;
+          observed = catalogReads.length;
+          return unchanged;
+        },
+        { intervals: [500] },
+      )
+      .toBe(true);
+  try {
+    const scope = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/variables") &&
+        (response.request().postDataJSON() as Definition).nodes.find(
+          (node) => node.id === "out",
+        )?.expression === `@${callee}`,
+    );
+    await setEditorText(page, expression, "");
+    await page.keyboard.type(`@${callee}`);
+    await scope;
+    const suggestion = page
+      .locator(".suggest-widget.visible")
+      .getByRole("option", { name: new RegExp(`@${callee}:1`) });
+    await expect(suggestion).toBeVisible();
+    await expect.poll(() => heldDiagnostics.length).toBeGreaterThan(0);
+    await readsSettled();
+    const reads = catalogReads.length;
+    // Diagnostics change the inspector's errors, not the node's variables.
+    holding = false;
+    for (const release of heldDiagnostics.splice(0)) release();
+    await expect(
+      page.getByRole("button", { name: /^Node errors/ }),
+    ).toBeVisible();
+    await readsSettled();
+    expect(catalogReads.length).toBe(reads);
+    await expect(suggestion).toBeVisible();
+    await expect(expression).toBeFocused();
+  } finally {
+    holding = false;
+    for (const release of heldDiagnostics.splice(0)) release();
+  }
+});

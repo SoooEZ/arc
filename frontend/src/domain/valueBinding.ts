@@ -1,5 +1,12 @@
 import type { InputType } from "../types";
-import { literalText } from "./expressions";
+import {
+  isArrayLiteral,
+  isNumberLiteral,
+  literalText,
+  trimExpression,
+} from "./expressions";
+import { isIdentifier } from "./identifiers";
+import { placeholderLiteral } from "./placeholderLiterals";
 
 export type BindingMode = "variable" | "constant" | "expression" | "default";
 export type ConstantType = "NUMBER" | "STRING" | "BOOLEAN" | "ARRAY" | "NULL";
@@ -17,25 +24,28 @@ export const bindingConstantTypes: Readonly<
   SCALAR: ["NUMBER", "STRING", "BOOLEAN"],
 };
 
+/**
+ * The literal a constant binding starts with after its type changes. Numbers,
+ * booleans and arrays share the placeholders used for required values; a new
+ * text constant starts empty rather than with the placeholder word, and NULL
+ * is a real choice here, not a missing value.
+ */
 export const constantDefaults: Record<ConstantType, string> = {
-  NUMBER: "0",
+  NUMBER: placeholderLiteral.NUMBER,
   STRING: '""',
-  BOOLEAN: "false",
-  ARRAY: "[]",
+  BOOLEAN: placeholderLiteral.BOOLEAN,
+  ARRAY: placeholderLiteral.ARRAY,
   NULL: "null",
 };
 
+/** The literal type the server would read from `value`, or null for any other expression. */
 export function inferConstantType(value: string): ConstantType | null {
-  const text = value.trim();
+  const text = trimExpression(value);
   if (literalText(text) !== null) return "STRING";
   if (/^(true|false)$/i.test(text)) return "BOOLEAN";
   if (/^null$/i.test(text)) return "NULL";
-  if (/^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return "NUMBER";
-  try {
-    if (Array.isArray(JSON.parse(text))) return "ARRAY";
-  } catch {
-    // A nonliteral value stays available in expression mode.
-  }
+  if (isNumberLiteral(text)) return "NUMBER";
+  if (isArrayLiteral(text)) return "ARRAY";
   return null;
 }
 
@@ -47,6 +57,25 @@ export function compatibleConstantType(
   return inferred && bindingConstantTypes[type].includes(inferred)
     ? inferred
     : null;
+}
+
+const constantFormats: Partial<Record<ConstantType, string>> = {
+  NUMBER: "Enter a number such as 42, -0.5 or 1e3.",
+  ARRAY: 'Enter an array literal such as [1, "two", true].',
+};
+
+/**
+ * A typed constant field keeps partial text while the user edits it. Name what
+ * the server would reject; an empty field is left to the caller's required or
+ * default handling.
+ */
+export function constantTextError(
+  type: ConstantType,
+  text: string,
+): string | null {
+  const format = constantFormats[type];
+  if (!format || !text.trim() || inferConstantType(text) === type) return null;
+  return format;
 }
 
 /** Computed results and property paths have no declared type; keep their actual literal type. */
@@ -73,6 +102,7 @@ export function acceptsVariableType(
   );
 }
 
+/** The value source to show for a value the user has not edited in this control. */
 export function inferBindingMode(
   value: string | undefined,
   type: BindingType,
@@ -84,7 +114,30 @@ export function inferBindingMode(
     return bindingConstantTypes[type].includes(inferred)
       ? "constant"
       : "expression";
-  if (variableNames.includes(value)) return "variable";
-  if (/^[A-Za-z_][A-Za-z_0-9]*$/.test(value)) return "variable";
+  // Listed names cover stored names that predate identifier validation.
+  if (variableNames.includes(value) || isIdentifier(value)) return "variable";
   return "expression";
+}
+
+/**
+ * Sets or removes one parameter mapping, keeping the other mappings in order.
+ * Parameter names are user names such as "__proto__", so the copy defines own
+ * properties instead of assigning through the prototype.
+ */
+export function withBinding(
+  bindings: Readonly<Record<string, string>> | null | undefined,
+  name: string,
+  value: string | undefined,
+): Record<string, string> {
+  const entries: [string, string][] = [];
+  let replaced = false;
+  for (const [key, mapped] of Object.entries(bindings ?? {})) {
+    if (key !== name) entries.push([key, mapped]);
+    else if (value !== undefined) {
+      entries.push([key, value]);
+      replaced = true;
+    }
+  }
+  if (value !== undefined && !replaced) entries.push([name, value]);
+  return Object.fromEntries(entries);
 }

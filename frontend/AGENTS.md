@@ -11,14 +11,16 @@ Read the applicable [frontend failures](../docs/review-lessons.md#frontend-failu
 - Treat `documentState.ts` as the owner of draft/code transitions. Maintain one authoritative draft; derive values instead of synchronizing duplicate state with effects. Keep React Flow measurements and selection out of persisted definitions.
 - Model states and actions with precise TypeScript types. Prefer explicit variants or composition when independent boolean props produce invalid combinations. A simple two-state control does not need an elaborate component family.
 - Keep side effects at a clear boundary. Resource identity includes every value that changes the response. `useAsyncResource` keys drive reads; merely changing a loader closure does not refetch.
-- Cancel obsolete reads and ignore late results. Mutations need explicit pending/error behavior and must preserve unsaved edits. Position-only edits do not invalidate variable/diagnostic semantics.
+- Cancel obsolete reads and ignore late results. Mutations need explicit pending/error behavior and must preserve unsaved edits. Position-only edits do not invalidate variable/diagnostic semantics. Work that a route change would discard registers `useNavigationGuard`; features add no `beforeunload` listeners of their own.
+- JSON that is saved, sent or shown goes through `domain/json` (`parseJson`, `stringifyJson`), because numbers may arrive as exact `DecimalNumber` values. Look up user-chosen names with `Map`/`Set` or `ownValue`, and create IDs with `domain/ids` in event handlers, never inside a document updater.
 
 ## Readable UI and extensions
 
-- Put node-specific forms in the exhaustive inspector registry and keep expression escaping in the shared value-binding/domain helpers. Add new node kinds across types, defaults, presentation and code round trips together.
-- Keep component/hook names tied to their capability. Extract substantial decisions from JSX; avoid nested ternaries and wrappers that only hide prop forwarding. Use readable local names instead of cast chains or `any` to satisfy the compiler.
+- Put per-kind facts in `domain/nodeKinds.ts` and node-specific forms in the exhaustive inspector registry; keep expression escaping in the shared value-binding/domain helpers. A new node kind starts in `types.ts` and the descriptor; follow the compiler to the icon and form tables, then add styles, backend support and code round trips.
+- Keep component/hook names tied to their capability. Extract substantial decisions from JSX; avoid nested ternaries and wrappers that only hide prop forwarding. Use readable local names instead of cast chains or `any` to satisfy the compiler. Read editor permissions from the document's `capabilities` and change the draft through its gated operations; do not re-derive `readOnly || busy` in a component.
 - Reuse MUI conventions for labels, keyboard/focus behavior and dialogs. Changes to referenced-rule navigation must preserve the parent draft and the Back/Close all behavior.
-- Monaco providers/listeners belong to one editor/model and must be disposed. Retain lazy loading for large optional features. Add memoization or a new state library only for a demonstrated need, and include the relevant dependencies rather than hiding stale closures.
+- Monaco providers/listeners belong to one editor/model and must be disposed. Retain lazy loading for large optional features, rendered inside `LazyBoundary`. Add memoization or a new state library only for a demonstrated need, and include the relevant dependencies rather than hiding stale closures.
+- Styles: change the rule that owns a selector, or a token in `styles/tokens.css`; never add a later override file. A value shared by design becomes a token, and MUI component sizing belongs in `app/theme.ts`. `index.css` keeps tokens and base first and the responsive layers last.
 
 ## Verification
 

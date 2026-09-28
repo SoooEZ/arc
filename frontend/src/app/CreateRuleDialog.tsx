@@ -13,7 +13,8 @@ import {
 import { Plus } from "lucide-react";
 import { ruleApi } from "../api/rules";
 import { errorMessage } from "../api/errors";
-import { isRuleId, ruleIdGuidance, suggestedRuleId } from "../domain/ruleIds";
+import { isResourceId, suggestedRuleId } from "../domain/resourceIds";
+import ResourceIdField from "../components/ResourceIdField";
 import type { Kind, Rule } from "../types";
 import { kindDescription, kindLabel } from "../types";
 export default function CreateRuleDialog({
@@ -25,13 +26,14 @@ export default function CreateRuleDialog({
 }) {
   const [name, setName] = useState("");
   const [id, setId] = useState("");
-  const [rejectedIdEdit, setRejectedIdEdit] = useState(false);
+  // The ID follows the name until the user types their own; clearing it resumes suggestions.
+  const [idChosen, setIdChosen] = useState(false);
   const [kind, setKind] = useState<Kind>("DECISION_TREE");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const create = async () => {
-    if (creating || !name.trim() || !isRuleId(id)) return;
+    if (creating || !name.trim() || !isResourceId(id)) return;
     setCreating(true);
     setCreateError("");
     try {
@@ -54,31 +56,20 @@ export default function CreateRuleDialog({
             autoFocus
             label="Rule name"
             value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setId(suggestedRuleId(e.target.value));
-              setRejectedIdEdit(false);
+            onChange={(event) => {
+              setName(event.target.value);
+              if (!idChosen) setId(suggestedRuleId(event.target.value));
             }}
           />
-          <TextField
+          <ResourceIdField
             label="Rule ID"
             value={id}
             disabled={creating}
-            error={rejectedIdEdit || (!!id && !isRuleId(id))}
-            onChange={(event) => {
-              const next = event.target.value;
-              const accepted = next === "" || isRuleId(next);
-              setRejectedIdEdit(!accepted);
-              if (accepted) setId(next);
+            description="A permanent, unique ID used in API calls."
+            onChange={(next) => {
+              setId(next);
+              setIdChosen(next !== "");
             }}
-            onPaste={(event) => {
-              // Native single-line inputs strip tabs/newlines before onChange.
-              if (/[\s$@]/u.test(event.clipboardData.getData("text"))) {
-                event.preventDefault();
-                setRejectedIdEdit(true);
-              }
-            }}
-            helperText={`A permanent, unique ID used in API calls. ${ruleIdGuidance}`}
           />
           <TextField
             select
@@ -115,7 +106,7 @@ export default function CreateRuleDialog({
           variant="contained"
           startIcon={<Plus size={16} />}
           onClick={create}
-          disabled={creating || !name.trim() || !isRuleId(id)}
+          disabled={creating || !name.trim() || !isResourceId(id)}
         >
           {creating ? "Creating…" : "Create rule"}
         </Button>

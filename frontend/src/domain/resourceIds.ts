@@ -1,11 +1,11 @@
-const ruleId = /^[a-z][a-z0-9-]{0,79}$/;
+const resourceId = /^[a-z][a-z0-9-]{0,79}$/;
 
-export const ruleIdGuidance =
+export const resourceIdGuidance =
   "Use lowercase letters, digits and hyphens; start with a letter. No spaces, $ or @. Maximum 80 characters.";
 
-/** Rule IDs are API slugs, distinct from expression variable identifiers. */
-export function isRuleId(value: string): boolean {
-  return ruleId.test(value);
+/** Rule and source IDs are API slugs, distinct from expression variable identifiers. */
+export function isResourceId(value: string): boolean {
+  return resourceId.test(value);
 }
 
 export function suggestedRuleId(name: string): string {

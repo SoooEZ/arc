@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, TextField, Tooltip } from "@mui/material";
 import { ruleApi } from "../../api/rules";
-import { errorMessage } from "../../api/errors";
 import { useAutocompletePages } from "../../hooks/useAutocompletePages";
 import type { RuleSummary } from "../../types";
+import { useLibraryInsertion } from "./useLibraryInsertion";
+
+function catalogStatus(catalog: {
+  loading: boolean;
+  error: string;
+  items: unknown[];
+  total: number;
+}): string {
+  if (catalog.loading) return "Loading formulas…";
+  if (catalog.items.length)
+    return `${catalog.items.length} of ${catalog.total} ${catalog.total === 1 ? "formula" : "formulas"}`;
+  return catalog.error ? "" : "No matching published formulas.";
+}
 
 export default function PublishedFormulaLibrary({
   readOnly,
@@ -13,9 +25,8 @@ export default function PublishedFormulaLibrary({
   onInsert: (rule: RuleSummary, signal?: AbortSignal) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const pending = useRef<AbortController | null>(null);
+  const insertion = useLibraryInsertion();
+  const { cancel } = insertion;
   const list = useRef<HTMLDivElement>(null);
   const catalog = useAutocompletePages(
     "published-formulas",
@@ -31,26 +42,13 @@ export default function PublishedFormulaLibrary({
   useEffect(() => {
     list.current?.scrollTo({ top: 0 });
   }, [search.trim()]);
+  // A new search or read-only switch abandons the pending insertion.
   useEffect(() => {
-    pending.current?.abort();
-    setBusy("");
-    setError("");
-    return () => pending.current?.abort();
-  }, [search, readOnly]);
-  const insert = async (rule: RuleSummary) => {
+    cancel();
+  }, [search, readOnly, cancel]);
+  const insert = (rule: RuleSummary) => {
     if (readOnly) return;
-    pending.current?.abort();
-    const controller = new AbortController();
-    pending.current = controller;
-    setBusy(rule.id);
-    setError("");
-    try {
-      await onInsert(rule, controller.signal);
-    } catch (failure) {
-      if (!controller.signal.aborted) setError(errorMessage(failure));
-    } finally {
-      if (!controller.signal.aborted) setBusy("");
-    }
+    void insertion.run(rule.id, (signal) => onInsert(rule, signal));
   };
   return (
     <>
@@ -86,14 +84,14 @@ export default function PublishedFormulaLibrary({
             <span className="published-formula-item">
               <button
                 className="snippet-card"
-                disabled={readOnly || busy === rule.id}
-                onClick={() => void insert(rule)}
+                disabled={readOnly || insertion.busy === rule.id}
+                onClick={() => insert(rule)}
               >
                 <span>
                   {rule.name}
                   <small>
                     @{rule.id}:{rule.publishedVersion}
-                    {busy === rule.id ? " · loading…" : ""}
+                    {insertion.busy === rule.id ? " · loading…" : ""}
                   </small>
                 </span>
                 <span aria-hidden="true">+</span>
@@ -102,11 +100,7 @@ export default function PublishedFormulaLibrary({
           </Tooltip>
         ))}
         <p className="studio-hint" role="status">
-          {catalog.loading
-            ? "Loading formulas…"
-            : catalog.items.length
-              ? `${catalog.items.length} of ${catalog.total} ${catalog.total === 1 ? "formula" : "formulas"}`
-              : !catalog.error && "No matching published formulas."}
+          {catalogStatus(catalog)}
         </p>
         {catalog.error ? (
           <Alert
@@ -123,7 +117,7 @@ export default function PublishedFormulaLibrary({
           )
         )}
       </div>
-      {error && <Alert severity="error">{error}</Alert>}
+      {insertion.error && <Alert severity="error">{insertion.error}</Alert>}
     </>
   );
 }

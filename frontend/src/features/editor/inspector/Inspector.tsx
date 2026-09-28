@@ -9,12 +9,12 @@ import type {
   RuleNode,
 } from "../../../types";
 import type { ReferenceTarget } from "../types";
-import { studioApi } from "../../../api/studio";
-import { useAsyncResource } from "../../../hooks/useAsyncResource";
-import { availableVariables, semanticGraphKey } from "../../../domain/graph";
+import { canRemoveGraphNode } from "../../../domain/graph";
+import { nodeKinds } from "../../../domain/nodeKinds";
 import InputFields from "./InputFields";
 import ReferenceFields from "./ReferenceFields";
-import ExpressionFields from "./ExpressionFields";
+import FormulaFields from "./FormulaFields";
+import ConditionFields from "./ConditionFields";
 import ResultFields from "./ResultFields";
 import OutputFields from "./OutputFields";
 import SwitchFields from "./SwitchFields";
@@ -22,12 +22,15 @@ import TransformFields from "./TransformFields";
 import type { NodeFieldsProps } from "./types";
 import InspectorProblems from "./InspectorProblems";
 import NodeIdentity from "./NodeIdentity";
-// Exhaustive registry: every portable node kind has an editor.
+import { useNodeVariables } from "./useNodeVariables";
+// Exhaustive registry: every portable node kind has an editor. Other per-kind
+// facts, such as which kinds store a result or can be deleted, are in
+// domain/nodeKinds.
 const fieldsByType: Record<NodeType, ComponentType<NodeFieldsProps>> = {
   INPUT: InputFields,
   REFERENCE: ReferenceFields,
-  FORMULA: ExpressionFields,
-  CONDITION: ExpressionFields,
+  FORMULA: FormulaFields,
+  CONDITION: ConditionFields,
   SWITCH: SwitchFields,
   TRANSFORM: TransformFields,
   OUTPUT: OutputFields,
@@ -63,18 +66,12 @@ export default function Inspector({
   errors,
 }: Props) {
   const scroll = useRef<HTMLDivElement>(null);
-  const key = semanticGraphKey(rule.draft);
-  const { data: available } = useAsyncResource(
-    key,
-    (signal) => studioApi.variables(rule.draft, { signal }),
-    {} as Record<string, string[]>,
-    150,
-  );
   useEffect(() => {
     scroll.current?.scrollTo({ top: 0 });
   }, [node.id]);
   const patch = (value: Partial<RuleNode>) => onNodeChange(node.id, value);
-  const variables = availableVariables(rule.draft, node.id, available[node.id]);
+  const variables = useNodeVariables(rule.draft, node.id);
+  const kind = nodeKinds[node.type];
   const Fields = fieldsByType[node.type];
   const fieldProps: NodeFieldsProps = {
     rule,
@@ -110,38 +107,22 @@ export default function Inspector({
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip
-              title={
-                onDelete && node.type !== "INPUT"
-                  ? rule.draft.nodes.length <= 1
-                    ? "Keep at least one node in the draft"
-                    : "Delete node"
-                  : ""
-              }
-            >
-              <span className="inspector-delete-slot">
-                {onDelete && node.type !== "INPUT" && (
-                  <IconButton
-                    size="small"
-                    color="error"
-                    aria-label="Delete node"
-                    disabled={readOnly || rule.draft.nodes.length <= 1}
-                    onClick={() => {
-                      if (!readOnly && rule.draft.nodes.length > 1)
-                        onDelete(node.id);
-                    }}
-                  >
-                    <Trash2 size={16} />
-                  </IconButton>
-                )}
-              </span>
-            </Tooltip>
+            {/* A kind that cannot be deleted keeps an empty slot to align the header. */}
+            {onDelete && kind.removable ? (
+              <DeleteNodeButton
+                removable={canRemoveGraphNode(rule.draft, node.id)}
+                readOnly={readOnly}
+                onDelete={() => onDelete(node.id)}
+              />
+            ) : (
+              <span className="inspector-delete-slot" />
+            )}
           </div>
         </div>
       )}
       <div className="inspector-scroll" ref={scroll}>
         <Fields key={node.id} {...fieldProps} />
-        {node.type !== "INPUT" && (
+        {kind.storesResult && (
           <ResultFields key={`result:${node.id}`} {...fieldProps} />
         )}
       </div>
@@ -154,5 +135,35 @@ export default function Inspector({
         </div>
       )}
     </aside>
+  );
+}
+
+function DeleteNodeButton({
+  removable,
+  readOnly,
+  onDelete,
+}: {
+  removable: boolean;
+  readOnly: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <Tooltip
+      title={removable ? "Delete node" : "Keep at least one node in the draft"}
+    >
+      <span className="inspector-delete-slot">
+        <IconButton
+          size="small"
+          color="error"
+          aria-label="Delete node"
+          disabled={readOnly || !removable}
+          onClick={() => {
+            if (!readOnly && removable) onDelete();
+          }}
+        >
+          <Trash2 size={16} />
+        </IconButton>
+      </span>
+    </Tooltip>
   );
 }

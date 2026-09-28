@@ -255,8 +255,10 @@ test("historical source metadata initializes only the untouched test buffer of i
     type: "test/input",
     value: '{"key":',
   });
-  expect(sourceDocumentReducer(edited, loaded)).toBe(edited);
-  expect(edited!.testInput).toBe('{"key":');
+  const editedAfterLoad = sourceDocumentReducer(edited, loaded)!;
+  expect(editedAfterLoad.testInput).toBe('{"key":');
+  expect(editedAfterLoad.testInputEdited).toBe(true);
+  expect(editedAfterLoad.viewedConfiguration).toBe(historical);
 
   const anotherVersion = sourceDocumentReducer(inspecting, {
     type: "version",
@@ -320,21 +322,22 @@ test("source candidates serialize only the active provider without consuming ina
   expect(document!.buffers.secretHeaders).toBe("{unfinished headers");
 });
 
-test("source samples respect structured values and falsy defaults", () => {
+test("source samples respect falsy defaults and share rule input placeholders", () => {
   const config = source("first").definition;
+  // Source parameters are scalar: the server rejects ARRAY and OBJECT parameters.
   config.parameters = [
-    { name: "items", type: "ARRAY", required: true, defaultValue: null },
-    { name: "customer", type: "OBJECT", required: true, defaultValue: null },
     { name: "enabled", type: "BOOLEAN", required: true, defaultValue: false },
     { name: "amount", type: "NUMBER", required: true, defaultValue: 0 },
     { name: "name", type: "STRING", required: true, defaultValue: "" },
+    { name: "key", type: "STRING", required: true, defaultValue: null },
+    { name: "count", type: "NUMBER", required: false, defaultValue: null },
   ];
   expect(JSON.parse(sourceSample(config))).toEqual({
-    items: [],
-    customer: {},
     enabled: false,
     amount: 0,
     name: "",
+    key: "US",
+    count: 150,
   });
 });
 

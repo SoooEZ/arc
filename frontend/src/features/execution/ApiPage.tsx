@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { Alert, Button, Chip, MenuItem, TextField } from "@mui/material";
 import {
   ArrowRight,
@@ -9,11 +9,13 @@ import {
   Terminal,
 } from "lucide-react";
 import type { RuleSummary } from "../../types";
+import { stringifyJson } from "../../domain/json";
 import ApiReference from "./ApiReference";
 import { usePublishedExecution } from "./usePublishedExecution";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
 import ExecutionTiming from "./ExecutionTiming";
 import CatalogPagination from "../../components/CatalogPagination";
+import { LazyBoundary } from "../../components/LazyBoundary";
 
 const InputJsonEditor = lazy(() => import("./InputJsonEditor"));
 
@@ -107,11 +109,11 @@ export default function ApiPage({
             />
             <CatalogPagination
               label="Published rules"
-              offset={request.offset}
-              limit={request.catalogPage.limit}
-              total={request.catalogPage.total}
-              loading={request.catalogLoading}
-              onPage={request.setOffset}
+              offset={request.catalog.offset}
+              limit={request.catalog.limit}
+              total={request.catalog.data.total}
+              loading={request.catalog.loading}
+              onPage={request.catalog.setOffset}
             />
             <div className="api-select-row">
               <TextField
@@ -120,7 +122,7 @@ export default function ApiPage({
                 value={id}
                 onChange={(e) => request.selectRule(e.target.value)}
                 disabled={
-                  running || request.catalogLoading || !published.length
+                  running || request.catalog.loading || !published.length
                 }
               >
                 {published.map((r) => (
@@ -132,11 +134,11 @@ export default function ApiPage({
               <TextField
                 select
                 label="Version"
-                value={version}
+                value={version ?? ""}
                 onChange={(e) => request.selectVersion(Number(e.target.value))}
-                disabled={running || request.versionLoading || !id}
+                disabled={running || request.history.loading || !id}
               >
-                {!!version &&
+                {version !== null &&
                   !versions.some(
                     (candidate) => candidate.version === version,
                   ) && <MenuItem value={version}>v{version}</MenuItem>}
@@ -149,11 +151,11 @@ export default function ApiPage({
             </div>
             <CatalogPagination
               label="Published versions"
-              offset={request.versionOffset}
-              limit={request.versionPage.limit}
-              total={request.versionPage.total}
-              loading={request.versionLoading || !id}
-              onPage={request.setVersionOffset}
+              offset={request.history.offset}
+              limit={request.history.limit}
+              total={request.history.data.total}
+              loading={request.history.loading || !id}
+              onPage={request.history.setOffset}
             />
             {!published.length && (
               <Alert severity="info">
@@ -169,7 +171,8 @@ export default function ApiPage({
             <label className="field-label">
               Input parameters <span>application/json</span>
             </label>
-            <Suspense
+            <LazyBoundary
+              label="JSON editor"
               fallback={
                 <div className="execution-json-editor" role="status">
                   Loading JSON editor…
@@ -182,7 +185,7 @@ export default function ApiPage({
                 value={inputs}
                 onChange={request.setInputs}
               />
-            </Suspense>
+            </LazyBoundary>
             {definition && (
               <div className="parameter-chips">
                 {definition.inputs.map((p) => (
@@ -206,7 +209,7 @@ export default function ApiPage({
               variant="contained"
               startIcon={<Play size={14} />}
               onClick={request.run}
-              disabled={running || loading || !definition || !version}
+              disabled={running || loading || !definition || version === null}
             >
               {running ? "Executing…" : "Execute rule"}
             </Button>
@@ -226,6 +229,12 @@ export default function ApiPage({
                 </Button>
               )}
             </div>
+            {!result && !error && !request.inputsAreObject && (
+              <Alert severity="warning">
+                Input parameters must be a JSON object. The cURL example sends
+                empty inputs until the JSON is fixed.
+              </Alert>
+            )}
             {error && (
               <Alert
                 severity="error"
@@ -261,7 +270,7 @@ export default function ApiPage({
               <Alert severity="info">Execution trace is disabled.</Alert>
             )}
             <pre data-testid="api-response">
-              {result ? JSON.stringify(result, null, 2) : curl}
+              {result ? stringifyJson(result, 2) : curl}
             </pre>
             {result && (
               <button className="text-link" onClick={request.clear}>

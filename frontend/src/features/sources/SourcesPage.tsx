@@ -8,19 +8,25 @@ import {
   TextField,
 } from "@mui/material";
 import { Database, Globe2, Plus, Save, ArrowRight } from "lucide-react";
+import { stringifyJson } from "../../domain/json";
 import { createSourceDraft } from "./model";
 import { useSourceEditor } from "./useSourceEditor";
 import CatalogPagination from "../../components/CatalogPagination";
+import ResourceIdField from "../../components/ResourceIdField";
 import SourceConfigurationFields from "./SourceConfigurationFields";
 import SourceTestPanel from "./SourceTestPanel";
 
+/**
+ * The source editor, as a workspace page or inside the embedded source manager.
+ * Unsaved edits and pending saves guard workspace navigation themselves.
+ */
 export default function SourcesPage({
-  onDirty,
   notify,
+  onDirty,
   onBusy,
 }: {
-  onDirty: (dirty: boolean) => void;
   notify: (message: string) => void;
+  onDirty?: (dirty: boolean) => void;
   onBusy?: (busy: boolean) => void;
 }) {
   const editor = useSourceEditor({ onDirty, notify });
@@ -89,7 +95,7 @@ export default function SourcesPage({
             label="Data sources"
             offset={editor.catalog.offset}
             limit={editor.catalog.limit}
-            total={Math.max(editor.catalog.data.total, editor.sources.length)}
+            total={editor.sourcesTotal}
             loading={editor.loading}
             onPage={editor.catalog.setOffset}
           />
@@ -135,21 +141,22 @@ export default function SourcesPage({
                   startIcon={
                     saving ? <CircularProgress size={14} /> : <Save size={15} />
                   }
-                  disabled={saving || historical || !dirty}
+                  disabled={
+                    saving || historical || !dirty || !!editor.saveProblem
+                  }
                   onClick={() => void editor.save()}
                 >
                   {selected.version ? "Save new version" : "Create source"}
                 </Button>
               </div>
               <div className="source-form-grid">
-                <TextField
+                <ResourceIdField
                   label="Source ID"
                   value={selected.id}
                   disabled={!!selected.version || saving || historical}
                   placeholder="customer-profile"
-                  onChange={(event) =>
-                    editor.changeMetadata({ id: event.target.value })
-                  }
+                  description="A permanent ID that rules pin."
+                  onChange={(id) => editor.changeMetadata({ id })}
                 />
                 <TextField
                   label="Name"
@@ -223,17 +230,21 @@ export default function SourcesPage({
                     Viewing an immutable configuration. Choose the latest
                     version to edit.
                   </Alert>
-                  <pre className="source-json">
-                    {JSON.stringify(editor.displayConfig, null, 2)}
-                  </pre>
+                  {editor.displayConfig && (
+                    <pre className="source-json">
+                      {stringifyJson(editor.displayConfig, 2)}
+                    </pre>
+                  )}
                 </>
               ) : (
                 <SourceConfigurationFields
                   configuration={selected.definition}
                   buffers={document.buffers}
+                  timeout={document.timeout}
                   disabled={saving}
                   onConfig={editor.changeConfig}
                   onBuffer={editor.changeBuffer}
+                  onTimeout={editor.changeTimeout}
                 />
               )}
               <SourceTestPanel
@@ -241,13 +252,7 @@ export default function SourcesPage({
                 input={document.testInput}
                 result={document.result}
                 running={document.testing !== null}
-                disabled={
-                  saving ||
-                  !selected.version ||
-                  dirty ||
-                  editor.versionLoading ||
-                  (historical && !editor.displayConfig)
-                }
+                disabled={!editor.canRun}
                 dirty={dirty}
                 onInput={editor.changeTestInput}
                 onRun={editor.run}

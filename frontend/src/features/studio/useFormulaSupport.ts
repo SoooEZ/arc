@@ -5,17 +5,69 @@ import type { VariableOption } from "../../domain/graph";
 import { expressionSymbols } from "../../domain/expressionSymbols";
 import { errorMessage } from "../../api/errors";
 import {
-  FormulaMetadata,
   formulaCallName,
   formulaParameterDescription,
   formulaSignature,
   formulaSnippet,
 } from "./formulaCalls";
+import { formulaMetadata } from "./formulaMetadata";
 import {
   completionWord,
   insertSnippet,
   isStringOrComment,
 } from "./arcCompletion";
+
+/** How long typing must pause before `@` completion searches the catalog. */
+const searchDelayMs = 150;
+
+/** Resolves true after `milliseconds`, or false as soon as Monaco cancels the request. */
+function afterPause(
+  token: monaco.CancellationToken,
+  milliseconds: number,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      cancellation.dispose();
+      resolve(!token.isCancellationRequested);
+    }, milliseconds);
+    const cancellation = token.onCancellationRequested(() => {
+      clearTimeout(timer);
+      resolve(false);
+    });
+  });
+}
+
+/**
+ * Monaco keeps a completion request open while the user types ordinary
+ * characters instead of cancelling it. Waiting until the text has not changed
+ * for `searchDelayMs` therefore sends one search for the settled prefix.
+ */
+async function typingPaused(
+  model: monaco.editor.ITextModel,
+  token: monaco.CancellationToken,
+): Promise<boolean> {
+  let version = model.getVersionId();
+  for (;;) {
+    if (!(await afterPause(token, searchDelayMs)) || model.isDisposed())
+      return false;
+    if (model.getVersionId() === version) return true;
+    version = model.getVersionId();
+  }
+}
+
+/** The `@` word at the cursor while it still starts where the requested word started. */
+function settledFormulaWord(
+  editor: monaco.editor.IStandaloneCodeEditor | null,
+  model: monaco.editor.ITextModel,
+  requested: { lineNumber: number; startColumn: number },
+): string | null {
+  const cursor = editor?.getPosition();
+  if (!cursor || cursor.lineNumber !== requested.lineNumber) return null;
+  const word = completionWord(model, cursor);
+  return word.startColumn === requested.startColumn && word.word.startsWith("@")
+    ? word.word
+    : null;
+}
 
 export function useFormulaSupport(
   editor: RefObject<monaco.editor.IStandaloneCodeEditor | null>,
@@ -23,7 +75,6 @@ export function useFormulaSupport(
   variables: VariableOption[],
   script: boolean,
 ) {
-  const metadata = useRef(new FormulaMetadata());
   const latestVariables = useRef(variables);
   latestVariables.current = variables;
   const pending = useRef(new Set<AbortController>());
@@ -64,39 +115,45 @@ export function useFormulaSupport(
           isStringOrComment(model, position)
         )
           return { suggestions: [] };
-        const word = completionWord(model, position);
-        if (!word.word.startsWith("@")) return { suggestions: [] };
-        const before = model.getVersionId();
+        const requested = completionWord(model, position);
+        if (!requested.word.startsWith("@")) return { suggestions: [] };
+        // Monaco adjusts this request-time range for characters typed since.
         const range = new monaco.Range(
           position.lineNumber,
-          word.startColumn,
+          requested.startColumn,
           position.lineNumber,
-          word.endColumn,
+          requested.endColumn,
         );
         try {
-          const query = word.word.slice(1).split(":")[0];
+          if (!(await typingPaused(model, token))) return { suggestions: [] };
+          const word = settledFormulaWord(editor.current, model, {
+            lineNumber: position.lineNumber,
+            startColumn: requested.startColumn,
+          });
+          if (!word) return { suggestions: [] };
+          const query = word.slice(1).split(":")[0];
           const entries = await load(token, (signal) =>
-            metadata.current.search(query, signal),
+            formulaMetadata.search(query, signal),
           );
           if (
             token.isCancellationRequested ||
             model.isDisposed() ||
-            model.getVersionId() !== before ||
             model !== editor.current?.getModel()
           )
             return { suggestions: [] };
           setError("");
+          // Monaco filters by what was typed since; a longer word re-requests.
           return {
             incomplete: true,
             suggestions: entries
               .filter(
                 (entry) =>
-                  !word.word.includes(":") ||
-                  formulaCallName(entry).startsWith(word.word),
+                  !word.includes(":") ||
+                  formulaCallName(entry).startsWith(word),
               )
               .map((entry) => ({
                 label: formulaCallName(entry),
-                filterText: word.word,
+                filterText: word,
                 kind: monaco.languages.CompletionItemKind.Function,
                 detail: `${entry.name} · ${formulaSignature(entry)}`,
                 documentation: entry.inputs
@@ -150,7 +207,7 @@ export function useFormulaSupport(
         const before = model.getVersionId();
         try {
           const entry = await load(token, (signal) =>
-            metadata.current.load(call[1], Number(call[2]), signal),
+            formulaMetadata.load(call[1], Number(call[2]), signal),
           );
           if (
             token.isCancellationRequested ||
@@ -203,7 +260,7 @@ export function useFormulaSupport(
     const cancel = () => controller.abort();
     signal?.addEventListener("abort", cancel, { once: true });
     try {
-      const formula = await metadata.current.load(
+      const formula = await formulaMetadata.load(
         rule.id,
         rule.publishedVersion,
         controller.signal,

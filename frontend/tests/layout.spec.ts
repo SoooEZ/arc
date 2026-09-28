@@ -110,7 +110,7 @@ test("nested splits, unequal measured sizes, and a shared descendant remain conn
     b: { width: 310, height: 180 },
     approved: { width: 290, height: 150 },
   };
-  const arranged = await arrangeGraph(d, sizes);
+  const arranged = await arrangeGraph(d, new Map(Object.entries(sizes)));
   expect(withoutPositions(arranged)).toEqual(withoutPositions(d));
   expect(x(arranged, "approved")).toBeLessThan(x(arranged, "declined"));
   for (const a of arranged.nodes)

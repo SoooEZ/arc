@@ -30,7 +30,8 @@ export default function NodeEditDialog({
   nodeId: string;
   rules: RuleSummary[];
   readOnly: boolean;
-  onApply: (change: DefinitionChange) => void;
+  /** Applies the change to the graph; false when the document refused it. */
+  onApply: (change: DefinitionChange) => boolean;
   onClose: () => void;
   onOpenReference: (target: ReferenceTarget) => void;
 }) {
@@ -63,11 +64,11 @@ export default function NodeEditDialog({
       );
       return;
     }
-    onApply(
+    const applied = onApply(
       (current) =>
         applyNodeFormDraft(current, before, draft, nodeId) ?? current,
     );
-    onClose();
+    if (applied) onClose();
   };
   return (
     <Dialog

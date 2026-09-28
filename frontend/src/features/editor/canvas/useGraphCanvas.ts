@@ -1,18 +1,20 @@
-import { useCallback, useMemo, useState } from "react";
-import {
-  useReactFlow,
-  type Connection,
-  type EdgeChange,
-  type NodeChange,
-} from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Connection, Edge, EdgeChange, NodeChange } from "@xyflow/react";
 import type { Definition, Execution } from "../../../types";
 import type { FlowNode } from "./GraphNode";
-import { defaultNodeSize } from "./graphGeometry";
+import type { NodeSize, NodeSizes } from "./graphGeometry";
+import {
+  cardBounds,
+  flowEdges,
+  flowNodes,
+  takenBranches,
+} from "./flowElements";
 import {
   connectGraphNodes,
   type DefinitionChange,
 } from "../../../domain/graph";
-import { nodeWidth, sourcePorts } from "../../../domain/nodePorts";
+import { newId } from "../../../domain/ids";
+import type { NodeErrors } from "../useGraphProblems";
 interface Options {
   definition: Definition;
   selected: string;
@@ -20,10 +22,9 @@ interface Options {
   setSelectedEdge: (id: string | null) => void;
   onExpression: (id: string) => void;
   trace: Execution | null;
-  nodeErrors: Record<string, string[]>;
-  readOnly: boolean;
-  busy: string;
-  changeDefinition: (change: DefinitionChange) => void;
+  nodeErrors: NodeErrors;
+  /** The document's gated edit; dragging and connecting follow its rules. */
+  edit: (change: DefinitionChange) => boolean;
 }
 export function useGraphCanvas({
   definition,
@@ -33,165 +34,138 @@ export function useGraphCanvas({
   onExpression,
   trace,
   nodeErrors,
-  readOnly,
-  busy,
-  changeDefinition,
+  edit,
 }: Options) {
-  const flow = useReactFlow<FlowNode>();
-  const [measurements, setMeasurements] = useState<
-    Record<string, { width: number; height: number }>
-  >({});
-  const [blockedEdges, setBlockedEdges] = useState<Record<string, boolean>>({});
+  const [measurements, setMeasurements] = useState<NodeSizes>(() => new Map());
+  const [blockedEdges, setBlockedEdges] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  // Counts viewport fits requested by commands. The mounted canvas performs
+  // them, so no command waits for a viewport animation (lesson F8).
+  const [fitRequest, setFitRequest] = useState(0);
+  const requestFit = useCallback(
+    () => setFitRequest((request) => request + 1),
+    [],
+  );
   const reportBlocked = useCallback((id: string, blocked: boolean) => {
     setBlockedEdges((current) => {
-      if (!!current[id] === blocked) return current;
-      const next = { ...current };
-      if (blocked) next[id] = true;
-      else delete next[id];
+      if (current.has(id) === blocked) return current;
+      const next = new Set(current);
+      if (blocked) next.add(id);
+      else next.delete(id);
       return next;
     });
   }, []);
+  const bounds = cardBounds(definition.nodes, measurements);
+  const geometry = JSON.stringify(bounds);
+  // Label and expression edits replace node objects without moving a card.
+  // Keyed by geometry, the context keeps its identity, so edges do not re-route.
   const routing = useMemo(
-    () => ({
-      nodes: definition.nodes.map((n) => ({
-        id: n.id,
-        ...n.position,
-        ...(measurements[n.id] || { ...defaultNodeSize, width: nodeWidth(n) }),
-      })),
-      reportBlocked,
-    }),
-    [definition.nodes, measurements, reportBlocked],
+    () => ({ nodes: bounds, reportBlocked }),
+    [geometry, reportBlocked],
   );
   const visited = useMemo(
     () =>
       new Set(trace?.trace.filter((s) => s.depth === 0).map((s) => s.nodeId)),
     [trace],
   );
-  const nodes: FlowNode[] = useMemo(
+  const taken = useMemo(() => takenBranches(trace), [trace]);
+  const previousNodes = useRef<ReadonlyMap<string, FlowNode>>(new Map());
+  const nodes = useMemo(
     () =>
-      definition.nodes.map((n) => ({
-        id: n.id,
-        type: "arc",
-        position: n.position || { x: 0, y: 0 },
-        measured: measurements[n.id],
-        style: { width: nodeWidth(n) },
-        selected: n.id === selected,
-        data: {
-          model: n,
-          visited: visited.has(n.id),
+      flowNodes(
+        definition.nodes,
+        {
+          selected,
+          visited,
           inputCount: definition.inputs.length,
-          errors: nodeErrors[n.id] || [],
-          onExpression: () => onExpression(n.id),
+          errors: nodeErrors,
+          sizes: measurements,
+          onExpression,
         },
-      })),
-    [definition, selected, visited, measurements, nodeErrors, onExpression],
+        previousNodes.current,
+      ),
+    [
+      definition.nodes,
+      definition.inputs.length,
+      selected,
+      visited,
+      nodeErrors,
+      measurements,
+      onExpression,
+    ],
   );
+  const previousEdges = useRef<ReadonlyMap<string, Edge>>(new Map());
   const edges = useMemo(
-    () =>
-      definition.edges.map((e) => {
-        const active = !!trace?.trace.find(
-          (s) =>
-            s.depth === 0 &&
-            s.nodeId === e.source &&
-            s.branch === e.sourceHandle,
-        );
-        return {
-          ...e,
-          type: "routed",
-          selected: selectedEdge === e.id,
-          animated: active,
-          style: {
-            stroke: active
-              ? "#278765"
-              : e.sourceHandle === "false"
-                ? "#b7a696"
-                : "#a5b4ae",
-            strokeWidth: active || selectedEdge === e.id ? 2.3 : 1.6,
-          },
-          label:
-            sourcePorts(
-              definition.nodes.find((node) => node.id === e.source)!,
-            ).find((port) => port.id === e.sourceHandle)?.label || undefined,
-          labelStyle: {
-            fill: e.sourceHandle === "false" ? "#956a4a" : "#47765d",
-            fontSize: 10,
-            fontWeight: 550,
-          },
-          labelBgStyle: { fill: "#f8faf8", fillOpacity: 1 },
-          labelBgPadding: [5, 3] as [number, number],
-        };
-      }),
-    [definition.edges, definition.nodes, selectedEdge, trace],
+    () => flowEdges(definition, { selectedEdge, taken }, previousEdges.current),
+    [definition, selectedEdge, taken],
   );
+  useEffect(() => {
+    previousNodes.current = new Map(nodes.map((node) => [node.id, node]));
+    previousEdges.current = new Map(edges.map((edge) => [edge.id, edge]));
+  }, [nodes, edges]);
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
-      const resized = changes.filter(
-        (c) => c.type === "dimensions" && c.dimensions,
-      );
-      if (resized.length) {
+      const resized = new Map<string, NodeSize>();
+      for (const change of changes)
+        if (change.type === "dimensions" && change.dimensions)
+          resized.set(change.id, change.dimensions);
+      if (resized.size) {
         // React Flow's minimap reads measured user nodes. Keep these UI-only
         // measurements without changing the portable graph or dirtying a draft.
         setMeasurements((current) => {
-          const next = { ...current };
-          let changed = false;
-          for (const c of resized)
-            if (c.type === "dimensions" && c.dimensions) {
-              if (
-                next[c.id]?.width !== c.dimensions.width ||
-                next[c.id]?.height !== c.dimensions.height
-              ) {
-                next[c.id] = c.dimensions;
-                changed = true;
-              }
-            }
-          return changed ? next : current;
+          let next: Map<string, NodeSize> | null = null;
+          for (const [id, size] of resized) {
+            const known = current.get(id);
+            if (known?.width === size.width && known.height === size.height)
+              continue;
+            next ??= new Map(current);
+            next.set(id, size);
+          }
+          return next ?? current;
         });
       }
-      const moved = changes.filter((c) => c.type === "position" && c.position);
-      if (!moved.length) return;
-      changeDefinition((d) => ({
+      const moved = new Map<string, { x: number; y: number }>();
+      for (const change of changes)
+        if (change.type === "position" && change.position)
+          moved.set(change.id, change.position);
+      if (!moved.size) return;
+      edit((d) => ({
         ...d,
         nodes: d.nodes.map((n) => {
-          const c = moved.find((c) => c.type === "position" && c.id === n.id);
-          return c?.type === "position" && c.position
-            ? { ...n, position: c.position }
-            : n;
+          const position = moved.get(n.id);
+          return position ? { ...n, position } : n;
         }),
       }));
     },
-    [changeDefinition],
+    [edit],
   );
   const onEdgesChange = (changes: EdgeChange[]) => {
     for (const c of changes)
       if (c.type === "select" && c.selected) setSelectedEdge(c.id);
   };
-  const connect = (connection: Connection) => {
-    if (
-      readOnly ||
-      busy ||
-      !connection.source ||
-      !connection.target ||
-      connection.source === connection.target
-    )
-      return;
-    changeDefinition((definition) =>
+  const connect = ({ source, target, sourceHandle }: Connection) => {
+    if (!source || !target || source === target) return;
+    // Document updaters can run more than once, so the ID is chosen here.
+    const edgeId = newId();
+    edit((definition) =>
       connectGraphNodes(
         definition,
-        connection.source!,
-        connection.target!,
-        connection.sourceHandle || "next",
-        crypto.randomUUID(),
+        source,
+        target,
+        sourceHandle || "next",
+        edgeId,
       ),
     );
   };
   return {
-    flow,
     measurements,
     blockedEdges,
     routing,
-    visited,
     nodes,
     edges,
+    fitRequest,
+    requestFit,
     onNodesChange,
     onEdgesChange,
     connect,

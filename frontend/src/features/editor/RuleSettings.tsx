@@ -17,7 +17,8 @@ export default function RuleSettings({
 }: {
   rule: Rule;
   readOnly: boolean;
-  onApply: (patch: Pick<Rule, "name" | "description">) => void;
+  /** Applies the settings to the draft; false when the document refused them. */
+  onApply: (patch: Pick<Rule, "name" | "description">) => boolean;
   onClose: () => void;
 }) {
   const [name, setName] = useState(rule.name);
@@ -81,8 +82,7 @@ export default function RuleSettings({
               !name.trim() || name.length > 160 || description.length > 2000
             }
             onClick={() => {
-              onApply({ name, description });
-              onClose();
+              if (onApply({ name, description })) onClose();
             }}
           >
             Apply changes

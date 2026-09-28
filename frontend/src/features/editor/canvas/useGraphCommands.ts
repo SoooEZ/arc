@@ -1,93 +1,73 @@
-import type { Dispatch } from "react";
 import { useReactFlow } from "@xyflow/react";
 import type { Definition, NodeType, RuleNode } from "../../../types";
 import type { FlowNode } from "./GraphNode";
+import type { NodeSizes } from "./graphGeometry";
 import {
+  canRemoveGraphNode,
   createGraphNode,
   patchGraphNode,
   removeGraphNode,
   type DefinitionChange,
 } from "../../../domain/graph";
-import type { DocumentAction } from "../documentState";
+import { shortId } from "../../../domain/ids";
+import type { DraftLayout } from "../useRuleDocument";
 
 interface Options {
   definition: Definition;
-  measurements: Record<string, { width: number; height: number }>;
-  readOnly: boolean;
-  busy: string;
-  changeDefinition: (change: DefinitionChange) => void;
-  dispatch: Dispatch<DocumentAction>;
+  measurements: NodeSizes;
+  /** The document's gated edit; false when it refused the change. */
+  edit: (change: DefinitionChange) => boolean;
+  /** The document's Arrange command. */
+  arrange: (layout: DraftLayout, onArranged: () => void) => Promise<void>;
   selectNode: (id: string) => void;
-  runTask: (name: string, task: () => Promise<unknown>) => Promise<void>;
+  /** Asks the mounted canvas to fit the viewport once it shows the new layout. */
+  requestFit: () => void;
 }
 
-/** Graph mutations share the document guard; async layout carries its starting draft. */
+/** Graph mutations share the document's edit gate; only accepted edits move the selection. */
 export function useGraphCommands({
   definition,
   measurements,
-  readOnly,
-  busy,
-  changeDefinition,
-  dispatch,
+  edit,
+  arrange: arrangeDocument,
   selectNode,
-  runTask,
+  requestFit,
 }: Options) {
   const flow = useReactFlow<FlowNode>();
 
   const patchNode = (id: string, patch: Partial<RuleNode>) =>
-    changeDefinition((current) => patchGraphNode(current, id, patch));
+    edit((current) => patchGraphNode(current, id, patch));
 
   const addNode = (type: NodeType) => {
-    if (readOnly || busy) return;
     const position = flow.screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
     });
-    const id = `node-${crypto.randomUUID().slice(0, 8)}`;
-    changeDefinition((current) => ({
+    const id = shortId("node-");
+    const added = edit((current) => ({
       ...current,
-      nodes: [
-        ...current.nodes,
-        createGraphNode(type, id, position, current.nodes.length),
-      ],
+      nodes: [...current.nodes, createGraphNode(current, type, id, position)],
     }));
-    selectNode(id);
+    if (added) selectNode(id);
   };
 
   const removeNode = (id: string) => {
-    const node = definition.nodes.find((candidate) => candidate.id === id);
-    if (
-      readOnly ||
-      busy ||
-      !node ||
-      node.type === "INPUT" ||
-      definition.nodes.length <= 1
-    )
-      return;
-    changeDefinition((current) => removeGraphNode(current, id));
+    if (!canRemoveGraphNode(definition, id)) return;
     const next =
       definition.nodes.find((node) => node.type === "INPUT") ||
       definition.nodes.find((node) => node.id !== id);
-    selectNode(next?.id || "");
+    if (edit((current) => removeGraphNode(current, id)))
+      selectNode(next?.id || "");
   };
 
+  // The viewport fit after Arrange is optional presentation: the canvas may
+  // unmount (a view switch) or the user may interrupt its animation, and
+  // neither may keep the document locked (F8).
   const arrange = () =>
-    runTask("layout", async () => {
-      if (readOnly) return;
+    arrangeDocument(async (draft) => {
       const { arrangeGraph } = await import("./graphLayout");
-      const arranged = await arrangeGraph(definition, measurements);
-      dispatch({
-        type: "graph/arranged",
-        before: definition,
-        definition: arranged,
-      });
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => resolve()),
-      );
-      // Interrupted React Flow animations may never settle their fit promise.
-      // Keep viewport animation outside the document's command lock.
-      await flow.fitView({ padding: 0.15, duration: 0 });
-    });
+      return arrangeGraph(draft, measurements);
+    }, requestFit);
 
   return { patchNode, addNode, removeNode, arrange };
 }

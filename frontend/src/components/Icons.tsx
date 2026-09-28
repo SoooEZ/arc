@@ -8,16 +8,29 @@ import {
   ListTree,
   Split,
   WandSparkles,
+  type LucideIcon,
 } from "lucide-react";
 import type { Kind, NodeType } from "../types";
 
+const kindIcons: Record<Kind, LucideIcon> = {
+  DECISION_TREE: Network,
+  FORMULA: Calculator,
+  RULE: GitBranch,
+};
+
+/** Node kind icons; the other per-kind facts are in domain/nodeKinds. */
+const nodeIcons: Record<NodeType, LucideIcon> = {
+  INPUT: LogIn,
+  FORMULA: Calculator,
+  CONDITION: Split,
+  SWITCH: ListTree,
+  TRANSFORM: WandSparkles,
+  REFERENCE: Braces,
+  OUTPUT: LogOut,
+};
+
 export function KindIcon({ kind, size = 20 }: { kind: Kind; size?: number }) {
-  const Icon =
-    kind === "DECISION_TREE"
-      ? Network
-      : kind === "FORMULA"
-        ? Calculator
-        : GitBranch;
+  const Icon = kindIcons[kind];
   return <Icon size={size} strokeWidth={1.7} />;
 }
 export function NodeIcon({
@@ -27,15 +40,7 @@ export function NodeIcon({
   type: NodeType;
   size?: number;
 }) {
-  const Icon = {
-    INPUT: LogIn,
-    FORMULA: Calculator,
-    CONDITION: Split,
-    SWITCH: ListTree,
-    TRANSFORM: WandSparkles,
-    REFERENCE: Braces,
-    OUTPUT: LogOut,
-  }[type];
+  const Icon = nodeIcons[type];
   return <Icon size={size} strokeWidth={1.8} />;
 }
 export function ArcMark() {

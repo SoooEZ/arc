@@ -5,9 +5,9 @@ import { usePagedResource } from "../../hooks/usePagedResource";
 import CatalogPagination from "../../components/CatalogPagination";
 import FunctionLibrary from "./FunctionLibrary";
 import { ruleApi } from "../../api/rules";
-import { errorMessage } from "../../api/errors";
 import type { Definition, FunctionEntry, RuleSummary } from "../../types";
-import { modules, referenceSnippet } from "./snippets";
+import { modules, referenceSnippet, reuseNodeId } from "./snippets";
+import { useLibraryInsertion } from "./useLibraryInsertion";
 
 type Pane = "functions" | "modules" | "reuse";
 const panes: Pane[] = ["functions", "modules", "reuse"];
@@ -40,41 +40,26 @@ export default function StudioLibrary({
       ),
     pane === "reuse",
   );
-  const [error, setError] = useState("");
-  const pending = useRef(new Set<AbortController>());
+  const insertion = useLibraryInsertion();
+  const { cancel } = insertion;
   const latest = useRef({ definition, readOnly, onInsert });
   latest.current = { definition, readOnly, onInsert };
-  useEffect(
-    () => () => {
-      for (const request of pending.current) request.abort();
-    },
-    [],
-  );
+  useEffect(() => {
+    if (readOnly) cancel();
+  }, [readOnly, cancel]);
 
-  const reuse = async (rule: RuleSummary) => {
-    if (readOnly || rule.publishedVersion === null) return;
-    const request = new AbortController();
-    pending.current.add(request);
-    setError("");
-    try {
-      const version = await ruleApi.version(rule.id, rule.publishedVersion, {
-        signal: request.signal,
-      });
-      if (request.signal.aborted || latest.current.readOnly) return;
+  const reuse = (rule: RuleSummary) => {
+    const pinned = rule.publishedVersion;
+    if (readOnly || pinned === null) return;
+    const nodeId = reuseNodeId(rule.id);
+    void insertion.run(rule.id, async (signal) => {
+      const version = await ruleApi.version(rule.id, pinned, { signal });
+      if (signal.aborted || latest.current.readOnly) return;
       latest.current.onInsert(
-        referenceSnippet(
-          rule,
-          version,
-          latest.current.definition,
-          `reuse-${rule.id}-${Math.random().toString(36).slice(2, 6)}`,
-        ),
+        referenceSnippet(rule, version, latest.current.definition, nodeId),
         true,
       );
-    } catch (failure) {
-      if (!request.signal.aborted) setError(errorMessage(failure));
-    } finally {
-      pending.current.delete(request);
-    }
+    });
   };
 
   return (
@@ -142,14 +127,15 @@ export default function StudioLibrary({
               <button
                 key={rule.id}
                 className="snippet-card"
-                disabled={readOnly}
-                onClick={() => void reuse(rule)}
+                disabled={readOnly || insertion.busy === rule.id}
+                onClick={() => reuse(rule)}
               >
                 <GitBranch size={17} />
                 <span>
                   {rule.name}
                   <small>
                     v{rule.publishedVersion} · {rule.kind.toLowerCase()}
+                    {insertion.busy === rule.id ? " · loading…" : ""}
                   </small>
                 </span>
                 <span>+</span>
@@ -165,12 +151,12 @@ export default function StudioLibrary({
           />
         </>
       )}
-      {(error || catalogError || catalog.error) && (
+      {(insertion.error || catalogError || catalog.error) && (
         <Alert
           severity="error"
-          onClose={error ? () => setError("") : undefined}
+          onClose={insertion.error ? insertion.dismissError : undefined}
         >
-          {error || catalogError || catalog.error}
+          {insertion.error || catalogError || catalog.error}
         </Alert>
       )}
     </aside>

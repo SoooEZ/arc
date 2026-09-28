@@ -1,78 +1,114 @@
 import { useEffect, useMemo } from "react";
 import { studioApi } from "../../api/studio";
 import type { GraphProblem } from "../../api/errors";
-import type { Rule } from "../../types";
-import { semanticGraphKey } from "../../domain/graph";
+import type { Definition, Rule } from "../../types";
+import { isCurrentGraphLocation } from "../../domain/graph";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
+
+/** Messages per node ID. A Map, because node IDs such as "constructor" are legal. */
+export type NodeErrors = ReadonlyMap<string, string[]>;
+
+const noProblems: GraphProblem[] = [];
+
+interface NodeErrorSources {
+  /** The rule version the editor shows; null version for the draft. */
+  shown: { ruleId: string; version: number | null };
+  definition: Definition;
+  /** Diagnostics, preview failures and command failures for this graph. */
+  problems: GraphProblem[];
+  /** Problems carried into a referenced-rule viewer from its caller. */
+  inherited: GraphProblem[];
+  invalidDefaults: boolean;
+  nodeCode: { nodeId: string; problems: string[] } | null;
+}
+
+/** Distinct messages for each node of the shown graph, in the order reported. */
+export function nodeErrorsOf({
+  shown,
+  definition,
+  problems,
+  inherited,
+  invalidDefaults,
+  nodeCode,
+}: NodeErrorSources): Map<string, string[]> {
+  const errors = new Map<string, string[]>();
+  const add = (nodeId: string, message: string) => {
+    const messages = errors.get(nodeId);
+    if (!messages) errors.set(nodeId, [message]);
+    else if (!messages.includes(message)) messages.push(message);
+  };
+  for (const problem of problems)
+    for (const location of problem.locations)
+      if (isCurrentGraphLocation(location, shown))
+        add(location.nodeId, problem.message);
+  // Inherited problems mark only locations that explicitly name this version.
+  for (const problem of inherited)
+    for (const location of problem.locations)
+      if (
+        location.ruleId === shown.ruleId &&
+        location.version === shown.version
+      )
+        add(location.nodeId, problem.message);
+  const input = definition.nodes.find((node) => node.type === "INPUT");
+  if (invalidDefaults && input)
+    add(input.id, "Fix the invalid parameter default.");
+  if (nodeCode)
+    for (const message of nodeCode.problems) add(nodeCode.nodeId, message);
+  return errors;
+}
 
 interface Options {
   rule: Rule;
+  /** semanticGraphKey of the draft: moving cards does not re-check the graph. */
+  graphKey: string;
   version: number | null;
   loading: boolean;
   invalidDefaults: boolean;
+  /** Current preview and command failures. */
   runtime: GraphProblem[];
   inherited: GraphProblem[];
-  nodeCode: string | null;
-  codeProblems: string[];
-  clearRuntime: () => void;
+  nodeCode: { nodeId: string; problems: string[] } | null;
+  /** Command failures describe the graph they ran on; semantic edits clear them. */
+  clearCommandProblem: () => void;
   onError: (error: string) => void;
 }
 export function useGraphProblems({
   rule,
+  graphKey,
   version,
   loading,
   invalidDefaults,
   runtime,
   inherited,
   nodeCode,
-  codeProblems,
-  clearRuntime,
+  clearCommandProblem,
   onError,
 }: Options) {
-  const key = semanticGraphKey(rule.draft);
   const { data: graphProblems, error } = useAsyncResource(
-    key,
+    graphKey,
     (signal) => studioApi.diagnostics(rule.draft, { signal }),
-    [] as GraphProblem[],
+    noProblems,
     350,
     !loading,
   );
   useEffect(() => {
-    if (!loading) clearRuntime();
-  }, [key, loading, clearRuntime]);
+    if (!loading) clearCommandProblem();
+  }, [graphKey, loading, clearCommandProblem]);
   useEffect(() => {
     if (error) onError(`Could not check graph: ${error}`);
   }, [error, onError]);
   const allProblems = [...graphProblems, ...runtime, ...inherited];
-  const local = [
-    ...graphProblems,
-    ...runtime,
-    ...inherited.map((problem) => ({
-      ...problem,
-      locations: problem.locations.filter(
-        (location) =>
-          location.ruleId === rule.id && location.version === version,
-      ),
-    })),
-  ];
-  const errors: Record<string, string[]> = {};
-  for (const problem of local)
-    for (const location of problem.locations) {
-      if (
-        location.ruleId &&
-        location.ruleId !== "preview" &&
-        !(location.ruleId === rule.id && location.version === version)
-      )
-        continue;
-      (errors[location.nodeId] ||= []).push(problem.message);
-    }
-  const input = rule.draft.nodes.find((node) => node.type === "INPUT");
-  if (invalidDefaults && input)
-    (errors[input.id] ||= []).push("Fix the invalid parameter default.");
-  if (nodeCode && codeProblems.length)
-    (errors[nodeCode] ||= []).push(...codeProblems);
-  for (const id of Object.keys(errors)) errors[id] = [...new Set(errors[id])];
-  const errorsKey = JSON.stringify(errors);
-  const nodeErrors = useMemo(() => errors, [errorsKey]);
+  const errors = nodeErrorsOf({
+    shown: { ruleId: rule.id, version },
+    definition: rule.draft,
+    problems: [...graphProblems, ...runtime],
+    inherited,
+    invalidDefaults,
+    nodeCode,
+  });
+  // Keep one Map while its content is unchanged, so memoized canvas nodes and
+  // the inspector keep their error lists.
+  const errorsKey = JSON.stringify([...errors]);
+  const nodeErrors: NodeErrors = useMemo(() => errors, [errorsKey]);
   return { allProblems, nodeErrors };
 }

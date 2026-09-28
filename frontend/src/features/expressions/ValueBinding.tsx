@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { MenuItem, TextField } from "@mui/material";
 
 import { variableOptionLabel, type VariableOption } from "../../domain/graph";
@@ -14,6 +13,21 @@ import {
 } from "../../domain/valueBinding";
 import ExpressionField from "./ExpressionField";
 import ConstantValueField from "./ConstantValueField";
+import { useEditingPin } from "./useEditingPin";
+
+const bindingModes: readonly BindingMode[] = [
+  "variable",
+  "constant",
+  "expression",
+  "default",
+];
+
+/** The value source, and for ANY/SCALAR bindings the constant type, being edited. */
+interface BindingEditor {
+  mode: BindingMode;
+  constantType: ConstantType | null;
+}
+
 export default function ValueBinding({
   label,
   type,
@@ -33,35 +47,53 @@ export default function ValueBinding({
   optional?: boolean;
   helperText?: string;
 }) {
-  const [chosenMode, setChosenMode] = useState<BindingMode | null>(null);
-  const [chosenType, setChosenType] = useState<ConstantType | null>(null);
+  const [editing, keepEditor] = useEditingPin<BindingEditor>(value);
   const dynamicType = type === "ANY" || type === "SCALAR";
   const constantTypes = bindingConstantTypes[type];
   const acceptedType = compatibleConstantType(value ?? "", type);
-  const selectedType =
-    chosenType && constantTypes.includes(chosenType) ? chosenType : null;
-  const effectiveType = dynamicType
-    ? (selectedType ?? acceptedType ?? "NUMBER")
-    : type;
+  const pinnedType =
+    editing?.constantType && constantTypes.includes(editing.constantType)
+      ? editing.constantType
+      : null;
+  // Only ANY and SCALAR offer several types; OBJECT offers no constant at all.
+  const constantType: ConstantType =
+    pinnedType ?? acceptedType ?? constantTypes[0] ?? "NUMBER";
   const mode =
-    chosenMode ??
+    editing?.mode ??
     inferBindingMode(
       value,
       type,
       variables.map((variable) => variable.name),
     );
   const choices = variables.filter((v) => acceptsVariableType(type, v.type));
+  // Typing keeps the current editor, even while the value is empty or partial.
+  const edit = (next: string | undefined) => {
+    keepEditor({ mode, constantType }, next);
+    onChange(next);
+  };
   const chooseMode = (next: BindingMode) => {
     if (next === "constant" && !constantTypes.length) return;
-    setChosenMode(next);
-    if (next === "default") onChange(undefined);
-    else if (next === "variable") {
-      if (!choices.some((v) => v.name === value)) onChange(undefined);
+    if (next === "default") {
+      keepEditor({ mode: next, constantType: null }, undefined);
+      onChange(undefined);
+    } else if (next === "variable") {
+      const kept = choices.some((v) => v.name === value) ? value : undefined;
+      keepEditor({ mode: next, constantType: null }, kept);
+      if (kept === undefined) onChange(undefined);
     } else if (next === "constant") {
-      const nextType = acceptedType ?? selectedType ?? constantTypes[0];
-      if (dynamicType) setChosenType(nextType);
-      if (acceptedType === null) onChange(constantDefaults[nextType]);
-    }
+      // A compatible literal is kept; anything else starts from the type's default.
+      const nextType = acceptedType ?? pinnedType ?? constantTypes[0];
+      const nextValue = acceptedType ? value : constantDefaults[nextType];
+      keepEditor({ mode: next, constantType: nextType }, nextValue);
+      if (!acceptedType) onChange(nextValue);
+    } else keepEditor({ mode: next, constantType: null }, value);
+  };
+  const chooseConstantType = (next: ConstantType) => {
+    keepEditor(
+      { mode: "constant", constantType: next },
+      constantDefaults[next],
+    );
+    onChange(constantDefaults[next]);
   };
   return (
     <div className="value-binding">
@@ -70,7 +102,10 @@ export default function ValueBinding({
         label={`${label} · value source`}
         value={mode}
         disabled={disabled}
-        onChange={(e) => chooseMode(e.target.value as BindingMode)}
+        onChange={(e) => {
+          const next = bindingModes.find((item) => item === e.target.value);
+          if (next) chooseMode(next);
+        }}
       >
         <MenuItem value="variable">Upstream variable</MenuItem>
         {!!constantTypes.length && (
@@ -83,12 +118,11 @@ export default function ValueBinding({
         <TextField
           select
           label="Constant type"
-          value={effectiveType}
+          value={constantType}
           disabled={disabled}
           onChange={(e) => {
-            const next = e.target.value as ConstantType;
-            setChosenType(next);
-            onChange(constantDefaults[next]);
+            const next = constantTypes.find((item) => item === e.target.value);
+            if (next) chooseConstantType(next);
           }}
         >
           {constantTypes.map((t) => (
@@ -101,11 +135,11 @@ export default function ValueBinding({
       {mode === "constant" && (
         <ConstantValueField
           label={label}
-          type={effectiveType}
+          type={constantType}
           value={value}
           disabled={disabled}
           helperText={helperText}
-          onChange={onChange}
+          onChange={edit}
         />
       )}
       {mode === "variable" && (
@@ -114,7 +148,7 @@ export default function ValueBinding({
           label={label}
           value={value ?? ""}
           disabled={disabled}
-          onChange={(e) => onChange(e.target.value || undefined)}
+          onChange={(e) => edit(e.target.value || undefined)}
           helperText={
             helperText ||
             (choices.length
@@ -152,12 +186,7 @@ export default function ValueBinding({
           value={value ?? ""}
           variables={variables}
           disabled={disabled}
-          onChange={(expression) => {
-            // Once editing begins, an empty buffer or a literal is still an
-            // expression draft. Only the source dropdown changes editor mode.
-            setChosenMode("expression");
-            onChange(expression || undefined);
-          }}
+          onChange={(expression) => edit(expression || undefined)}
           helperText="ARC expression · quote literal text here"
         />
       )}

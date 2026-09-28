@@ -1,7 +1,8 @@
 import type { Ref } from "react";
 import { TextField } from "@mui/material";
 import { NodeIcon } from "../../../components/Icons";
-import { nodeLabel, type RuleNode } from "../../../types";
+import type { RuleNode } from "../../../types";
+import { nodeKinds } from "../../../domain/nodeKinds";
 
 export default function NodeIdentity({
   node,
@@ -14,13 +15,14 @@ export default function NodeIdentity({
   onRename: (label: string) => void;
   inputRef?: Ref<HTMLInputElement>;
 }) {
+  const kind = nodeKinds[node.type];
   return (
     <div className="inspector-node-identity">
       <div className="inspector-node-kind">
-        <span className={`node-icon ${node.type.toLowerCase()}`}>
+        <span className={`node-icon ${kind.className}`}>
           <NodeIcon type={node.type} size={19} />
         </span>
-        <span>{nodeLabel[node.type]}</span>
+        <span>{kind.label}</span>
       </div>
       <TextField
         className="inspector-node-name"

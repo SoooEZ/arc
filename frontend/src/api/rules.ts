@@ -16,6 +16,7 @@ export interface RuleCatalogQuery {
   kind?: Kind | "";
   publishedOnly?: boolean;
 }
+const executePath = (id: string) => `/rules/${pathId(id)}/execute`;
 export const ruleApi = {
   catalog: (query: RuleCatalogQuery = {}, options?: RequestOptions) =>
     http.get<Page<RuleSummary>>(
@@ -33,17 +34,26 @@ export const ruleApi = {
     ),
   get: (id: string, options?: RequestOptions) =>
     http.get<Rule>(`/rules/${pathId(id)}`, options),
-  create: (id: string, name: string, description: string, kind: Kind) =>
-    http.post<Rule>("/rules", { id, name, description, kind }),
-  save: (rule: Rule) =>
-    http.put<Rule>(`/rules/${pathId(rule.id)}`, {
-      name: rule.name,
-      description: rule.description,
-      revision: rule.revision,
-      definition: rule.draft,
-    }),
-  publish: (id: string, revision: number) =>
-    http.post<Rule>(`/rules/${pathId(id)}/publish`, { revision }),
+  create: (
+    id: string,
+    name: string,
+    description: string,
+    kind: Kind,
+    options?: RequestOptions,
+  ) => http.post<Rule>("/rules", { id, name, description, kind }, options),
+  save: (rule: Rule, options?: RequestOptions) =>
+    http.put<Rule>(
+      `/rules/${pathId(rule.id)}`,
+      {
+        name: rule.name,
+        description: rule.description,
+        revision: rule.revision,
+        definition: rule.draft,
+      },
+      options,
+    ),
+  publish: (id: string, revision: number, options?: RequestOptions) =>
+    http.post<Rule>(`/rules/${pathId(id)}/publish`, { revision }, options),
   execute: (
     id: string,
     inputs: Record<string, unknown>,
@@ -51,10 +61,13 @@ export const ruleApi = {
     options?: RequestOptions & ExecutionOptions,
   ) =>
     http.post<Execution>(
-      `/rules/${pathId(id)}/execute`,
+      executePath(id),
       { inputs, version, trace: options?.trace, timeoutMs: options?.timeoutMs },
       options,
     ),
+  /** The execute endpoint as an absolute URL, for copyable examples such as cURL. */
+  executeUrl: (id: string, origin: string = window.location.origin) =>
+    new URL(http.url(executePath(id)), origin).href,
   version: (id: string, version: number, options?: RequestOptions) =>
     http.get<Version>(`/rules/${pathId(id)}/versions/${version}`, options),
 };

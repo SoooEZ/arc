@@ -19,8 +19,8 @@ export const studioApi = {
     http.post<GraphProblem[]>("/diagnostics", definition, options),
   variables: (definition: Definition, options?: RequestOptions) =>
     http.post<Record<string, string[]>>("/variables", definition, options),
-  validate: (definition: Definition) =>
-    http.post<{ valid: boolean }>("/validate", definition),
+  validate: (definition: Definition, options?: RequestOptions) =>
+    http.post<{ valid: boolean }>("/validate", definition, options),
   preview: (
     definition: Definition,
     inputs: Record<string, unknown>,

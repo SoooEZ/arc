@@ -58,6 +58,12 @@ async function mockCatalog(
     failCatalogOnce: false,
     executionError: false,
     executions: [] as { version: number; inputs: Record<string, unknown> }[],
+    /** Raw request bodies, which keep number tokens that postDataJSON would round. */
+    executionBodies: [] as string[],
+    historyRequests: [] as number[],
+    /** Raw JSON texts, so a mocked number keeps digits that a double cannot. */
+    rawDefinition: null as string | null,
+    rawResult: null as string | null,
     unexpected: [] as string[],
   };
   await page.route("**/api/**", async (route) => {
@@ -90,6 +96,7 @@ async function mockCatalog(
       return;
     }
     if (url.pathname === `/api/rules/${ruleId}/version-summaries`) {
+      state.historyRequests.push(offset);
       const newestVersion = state.historyVersion ?? state.version;
       const items = Array.from({ length: newestVersion }, (_, index) => ({
         ruleId,
@@ -111,12 +118,8 @@ async function mockCatalog(
     );
     if (selectedVersion) {
       await route.fulfill({
-        json: {
-          ruleId,
-          version: Number(selectedVersion[1]),
-          definition,
-          publishedAt,
-        },
+        contentType: "application/json",
+        body: `{"ruleId":"${ruleId}","version":${Number(selectedVersion[1])},"publishedAt":"${publishedAt}","definition":${state.rawDefinition ?? JSON.stringify(definition)}}`,
       });
       return;
     }
@@ -129,6 +132,7 @@ async function mockCatalog(
         inputs: Record<string, unknown>;
       };
       state.executions.push(execution);
+      state.executionBodies.push(request.postData() ?? "");
       if (state.executionError) {
         await route.fulfill({
           status: 422,
@@ -136,13 +140,8 @@ async function mockCatalog(
         });
       } else {
         await route.fulfill({
-          json: {
-            ruleId,
-            version: execution.version,
-            result: execution.inputs.amount,
-            trace: [],
-            durationMicros: 10,
-          },
+          contentType: "application/json",
+          body: `{"ruleId":"${ruleId}","version":${execution.version},"result":${state.rawResult ?? JSON.stringify(execution.inputs.amount ?? null)},"trace":[],"durationMicros":10}`,
         });
       }
       return;
@@ -253,6 +252,8 @@ test("paging history retains the newest implicit version learned after stale cat
   await expect(
     page.getByRole("button", { name: "Execute rule", exact: true }),
   ).toBeEnabled();
+  // Learning v25 from the history page must not request that page again.
+  expect(state.historyRequests).toEqual([0]);
   const inputs = page.getByLabel("API input JSON", { exact: true });
   await setEditorText(page, inputs, '{"amount":456}');
 
@@ -336,5 +337,85 @@ test("runtime errors keep edited inputs and offer execution rather than a metada
   await executeVersion(page, 1);
   expect(state.executions).toHaveLength(2);
   expect(state.executions[1].inputs).toEqual({ amount: 321 });
+  expect(state.unexpected).toEqual([]);
+});
+
+test("the cURL preview sends only JSON-object inputs to the encoded execute URL", async ({
+  page,
+}) => {
+  const state = await mockCatalog(page, false, 1);
+  await page.goto("/#/playground");
+  await expect(
+    page.getByRole("button", { name: "Execute rule", exact: true }),
+  ).toBeEnabled();
+  const origin = new URL(page.url()).origin;
+  const curl = page.getByTestId("api-response");
+  await expect(curl).toContainText(
+    `curl -X POST '${origin}/api/rules/${ruleId}/execute'`,
+  );
+  await expect(curl).toContainText('"amount": 10');
+  const inputs = page.getByLabel("API input JSON", { exact: true });
+  for (const invalid of ["null", "5", "[1, 2]", '"text"', '{"amount":']) {
+    await setEditorText(page, inputs, invalid);
+    await expect(editorLines(inputs)).toHaveText(invalid);
+    await expect(
+      page.getByText("Input parameters must be a JSON object.", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await expect(curl).toContainText('"inputs": {}');
+    await expect(curl).not.toContainText('"amount"');
+  }
+  await setEditorText(page, inputs, '{"amount":7}');
+  await expect(curl).toContainText('"amount": 7');
+  await expect(
+    page.getByText("Input parameters must be a JSON object.", {
+      exact: false,
+    }),
+  ).toHaveCount(0);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("a JSON editor chunk that fails to load keeps the playground usable", async ({
+  page,
+}) => {
+  const state = await mockCatalog(page, false, 1);
+  await page.route("**/assets/InputJsonEditor-*.js", (route) => route.abort());
+  await page.goto("/#/playground");
+  await expect(
+    page.getByText("Could not load the JSON editor.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "API playground", exact: true }),
+  ).toBeVisible();
+  // The sample inputs remain executable without the editor.
+  await executeVersion(page, 1);
+  expect(state.executions[0].inputs).toEqual({ amount: 10 });
+  expect(state.unexpected).toEqual([]);
+});
+
+test("exact decimals survive the sample buffer, cURL and response without JSON.rawJSON", async ({
+  page,
+}) => {
+  // Engines without JSON.rawJSON stringify a DecimalNumber as a string.
+  await page.addInitScript(() => {
+    Reflect.deleteProperty(JSON, "rawJSON");
+  });
+  const state = await mockCatalog(page, false, 1);
+  state.rawDefinition = JSON.stringify(definition).replace(
+    '"defaultValue":10',
+    '"defaultValue":9007199254740993',
+  );
+  state.rawResult = "0.3333333333333333333333333333333333";
+  await page.goto("/#/playground");
+  const inputs = page.getByLabel("API input JSON", { exact: true });
+  await expect(editorLines(inputs)).toContainText('"amount": 9007199254740993');
+  const response = page.getByTestId("api-response");
+  await expect(response).toContainText('"amount": 9007199254740993');
+  await executeVersion(page, 1);
+  expect(state.executionBodies[0]).toContain('"amount":9007199254740993');
+  await expect(response).toContainText(
+    '"result": 0.3333333333333333333333333333333333',
+  );
   expect(state.unexpected).toEqual([]);
 });

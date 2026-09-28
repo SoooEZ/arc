@@ -2,12 +2,12 @@ import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 import IdentifierField from "./IdentifierField";
 
+/** The result variable of a kind that stores one (see domain/nodeKinds). */
 export default function ResultFields({
   node,
   readOnly,
   patch,
 }: NodeFieldsProps) {
-  if (!["FORMULA", "REFERENCE", "TRANSFORM"].includes(node.type)) return null;
   return (
     <InspectorSection
       title="Output As"

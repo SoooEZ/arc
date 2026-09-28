@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { studioApi } from "../../api/studio";
 import { errorMessage } from "../../api/errors";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
@@ -9,7 +9,8 @@ interface Options {
   nodeId: string;
   readOnly: boolean;
   onProblems: (messages: string[]) => void;
-  onApply: (definition: Definition) => void;
+  /** False when the document refused the change; the dialog then stays open. */
+  onApply: (definition: Definition) => boolean;
   onClose: () => void;
 }
 
@@ -64,13 +65,16 @@ export function useNodeExpressionDraft({
     ? applyDiagnostics
     : (checked.data?.diagnostics ?? []);
   const messages = checked.data?.messages ?? [];
-  const problemKey = JSON.stringify([
+  const problems = [
     ...diagnostics.map((diagnostic) => diagnostic.message),
     ...messages,
-  ]);
+  ];
+  // One array while the messages stay the same, so only changes are reported.
+  const problemsKey = JSON.stringify(problems);
+  const reportedProblems = useMemo(() => problems, [problemsKey]);
   useEffect(() => {
-    onProblems(JSON.parse(problemKey) as string[]);
-  }, [problemKey, onProblems]);
+    onProblems(reportedProblems);
+  }, [reportedProblems, onProblems]);
   const changeSource = (value: string) => {
     setSource(value);
     setApplyError("");
@@ -88,10 +92,7 @@ export function useNodeExpressionDraft({
       });
       if (controller.signal.aborted) return;
       setApplyDiagnostics(built.diagnostics);
-      if (built.definition) {
-        onApply(built.definition);
-        onClose();
-      }
+      if (built.definition && onApply(built.definition)) onClose();
     } catch (failure) {
       if (!controller.signal.aborted) setApplyError(errorMessage(failure));
     } finally {

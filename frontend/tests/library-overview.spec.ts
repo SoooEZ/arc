@@ -295,3 +295,36 @@ test("leaving a catalog page cancels its preview and late data cannot replace th
     release();
   }
 });
+
+test("the library does not download React Flow until a rule opens", async ({
+  page,
+}) => {
+  const index = await (await page.request.get("/")).text();
+  test.skip(
+    index.includes("/@vite/client"),
+    "The dev server does not split chunks.",
+  );
+  await mockLibrary(page);
+  const assets: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith("/assets/")) assets.push(path);
+  });
+  await page.goto("/#/library");
+  await expect(page.locator(".rule-preview-svg")).toHaveCount(2);
+  await expect(page.locator(".filter-tabs button")).toHaveText([
+    "All rules",
+    "Decision trees",
+    "Formulas",
+    "Condition rules",
+  ]);
+  expect(assets.filter((path) => /\/(flow|EditorRoute)-/.test(path))).toEqual(
+    [],
+  );
+  await page
+    .getByRole("button", { name: `Open graph: ${complex.name}`, exact: true })
+    .click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(9);
+  expect(assets.some((path) => /\/flow-[^/]*\.js$/.test(path))).toBe(true);
+  expect(assets.some((path) => /\/flow-[^/]*\.css$/.test(path))).toBe(true);
+});

@@ -1,6 +1,8 @@
 import { createTheme } from "@mui/material";
 
 export const theme = createTheme({
+  // Mirrored by the CSS tokens in styles/tokens.css (--color-brand, --color-ink,
+  // --color-page, --color-surface); change both together.
   palette: {
     primary: { main: "#19735b", dark: "#10553f", light: "#e5f3ec" },
     secondary: { main: "#5f648d" },
@@ -18,6 +20,12 @@ export const theme = createTheme({
   },
   shape: { borderRadius: 9 },
   components: {
+    MuiAlert: {
+      styleOverrides: {
+        root: { fontSize: 11 },
+        message: { overflowWrap: "anywhere" },
+      },
+    },
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
@@ -40,6 +48,8 @@ export const theme = createTheme({
       styleOverrides: { root: { height: 25, fontSize: 11, fontWeight: 550 } },
     },
     MuiDialog: { styleOverrides: { paper: { borderRadius: 14 } } },
+    MuiDialogActions: { styleOverrides: { root: { padding: "16px 24px" } } },
+    MuiMenuItem: { styleOverrides: { root: { fontSize: 12 } } },
     MuiTooltip: { defaultProps: { arrow: true } },
   },
 });

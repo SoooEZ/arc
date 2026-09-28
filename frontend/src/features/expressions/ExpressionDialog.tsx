@@ -17,9 +17,9 @@ import {
   useArcLanguageSupport,
   insertSnippet,
 } from "../studio/useArcLanguageSupport";
+import { useFunctionCatalog } from "../studio/useFunctionCatalog";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { studioApi } from "../../api/studio";
-import type { FunctionEntry } from "../../types";
 import { variableOptionLabel, type VariableOption } from "../../domain/graph";
 
 export default function ExpressionDialog({
@@ -39,11 +39,7 @@ export default function ExpressionDialog({
 }) {
   const [source, setSource] = useState(value);
   const { editor, model, onMount } = useArcEditor();
-  const { data: functions, error: catalogError } = useAsyncResource(
-    "functions",
-    (signal) => studioApi.functions({ signal }),
-    [] as FunctionEntry[],
-  );
+  const { data: functions, error: catalogError } = useFunctionCatalog();
   const {
     data: check,
     error: checkError,

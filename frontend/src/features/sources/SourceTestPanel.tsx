@@ -1,5 +1,6 @@
 import { Button, TextField } from "@mui/material";
 import { Play } from "lucide-react";
+import { stringifyJson } from "../../domain/json";
 
 export default function SourceTestPanel({
   version,
@@ -46,7 +47,7 @@ export default function SourceTestPanel({
       </Button>
       {result !== undefined && (
         <pre className="source-json" data-testid="source-result">
-          {JSON.stringify(result, null, 2)}
+          {stringifyJson(result, 2)}
         </pre>
       )}
     </div>

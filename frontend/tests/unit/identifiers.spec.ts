@@ -12,7 +12,7 @@ import {
 
 test("identifier editing permits keyword prefixes and clearing, but rejects invalid syntax intact", () => {
   for (const name of ["", "a", "_", "true", "trueValue", "SUM", "a".repeat(64)])
-    expect(acceptsIdentifierEdit(name), name).toBe(true);
+    expect(acceptsIdentifierEdit("", name), name).toBe(true);
   for (const name of [
     "first name",
     "first\tname",
@@ -26,11 +26,45 @@ test("identifier editing permits keyword prefixes and clearing, but rejects inva
     "a-b",
     "a".repeat(65),
   ])
-    expect(acceptsIdentifierEdit(name), name).toBe(false);
+    expect(acceptsIdentifierEdit("", name), name).toBe(false);
   for (const name of ["", "true", "FALSE", "Null", "and", "OR"])
     expect(identifierError(name), name).not.toBeNull();
   for (const name of ["SUM", "trueValue", "amount_1", "_amount"])
     expect(identifierError(name), name).toBeNull();
+});
+
+test("a stored invalid name can be shortened and repaired, but typing cannot add a violation", () => {
+  for (const [previous, next] of [
+    ["order-total", "order-tota"],
+    ["order-total", "rder-total"],
+    ["total amount", "total amoun"],
+    ["a".repeat(70), "a".repeat(69)],
+    ["a".repeat(70), "a".repeat(30)],
+    ["1-total", "1total"],
+    ["a-b-c", "a_b-c"],
+    ["order-total", "order_total"],
+    ["order-total", "order-totals"],
+    ["a".repeat(70), "b" + "a".repeat(69)],
+  ])
+    expect(
+      acceptsIdentifierEdit(previous, next),
+      `${previous} -> ${next}`,
+    ).toBe(true);
+  for (const [previous, next] of [
+    ["order-total", "order--total"],
+    ["order-total", "order total"],
+    ["order-total", "$order-total"],
+    ["order-total", "order-total@"],
+    ["a".repeat(70), "a".repeat(71)],
+    ["x-y", "1x-y"],
+    ["_1abc", "1abc"],
+    ["a".repeat(64), "a".repeat(65)],
+    ["amount", "amount-"],
+  ])
+    expect(
+      acceptsIdentifierEdit(previous, next),
+      `${previous} -> ${next}`,
+    ).toBe(false);
 });
 
 test("source declaration validation rejects invalid names without changing raw buffers or defaults", () => {

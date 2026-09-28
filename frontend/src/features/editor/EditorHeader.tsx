@@ -11,12 +11,23 @@ import {
 import type { Rule } from "../../types";
 import { kindLabel } from "../../types";
 import { KindIcon } from "../../components/Icons";
+import type { EditorCapabilities, EditorTask } from "./editorCapabilities";
+
+/** How the draft relates to what is saved, shown beside the rule kind. */
+function saveStatus(dirty: boolean, readOnly: boolean): string {
+  if (dirty) return "Unsaved changes";
+  if (readOnly) return "Immutable published version";
+  return "All changes saved";
+}
+
 interface Props {
   rule: Rule;
   mode: "code" | "graph";
   readOnly: boolean;
   dirty: boolean;
-  busy: string;
+  /** The running command, which the Save and Publish labels report. */
+  busy: EditorTask | "";
+  capabilities: EditorCapabilities;
   requestedVersion: number | null;
   testOpen: boolean;
   embedded: boolean;
@@ -33,6 +44,7 @@ export default function EditorHeader({
   readOnly,
   dirty,
   busy,
+  capabilities: can,
   requestedVersion,
   testOpen,
   embedded,
@@ -56,7 +68,7 @@ export default function EditorHeader({
               <IconButton
                 aria-label="Rule settings"
                 size="small"
-                disabled={!!busy}
+                disabled={!can.openSettings}
                 onClick={() => setSettingsOpen(true)}
               >
                 <Settings size={17} />
@@ -71,11 +83,7 @@ export default function EditorHeader({
           <span>
             {kindLabel[rule.kind]}
             <span className="tiny-divider" />
-            {dirty
-              ? "Unsaved changes"
-              : readOnly
-                ? "Immutable published version"
-                : "All changes saved"}
+            {saveStatus(dirty, readOnly)}
           </span>
         </div>
       </div>
@@ -85,7 +93,7 @@ export default function EditorHeader({
             mode === "code" ? <GitBranch size={15} /> : <Code2 size={15} />
           }
           onClick={() => void switchView()}
-          disabled={!!busy}
+          disabled={!can.switchView}
         >
           {mode === "code" ? "Graph view" : "Code editor"}
         </Button>
@@ -97,7 +105,7 @@ export default function EditorHeader({
         <Button
           startIcon={<Play size={15} />}
           variant="outlined"
-          disabled={!!busy}
+          disabled={!can.test}
           onClick={onToggleTest}
         >
           {testOpen ? "Hide test" : "Test rule"}
@@ -108,7 +116,7 @@ export default function EditorHeader({
               startIcon={<Save size={15} />}
               variant="outlined"
               onClick={() => action("save")}
-              disabled={!!busy || !dirty}
+              disabled={!can.save}
             >
               {busy === "save" ? "Saving…" : "Save draft"}
             </Button>
@@ -116,7 +124,7 @@ export default function EditorHeader({
               startIcon={<Upload size={15} />}
               variant="contained"
               onClick={() => action("publish")}
-              disabled={!!busy}
+              disabled={!can.publish}
             >
               {busy === "publish" ? "Publishing…" : "Publish"}
             </Button>

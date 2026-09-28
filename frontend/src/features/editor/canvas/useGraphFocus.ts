@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useReactFlow } from "@xyflow/react";
 import type { Definition } from "../../../types";
 import type { FlowNode } from "./GraphNode";
+import type { NodeSizes } from "./graphGeometry";
 
 interface Options {
   definition: Definition;
@@ -10,7 +11,7 @@ interface Options {
   requestedNode?: string | null;
   mode: "graph" | "code";
   unavailable: boolean;
-  measurements: Record<string, { width: number; height: number }>;
+  measurements: NodeSizes;
   selectNode: (id: string) => boolean;
   selectEdge: (id: string | null) => void;
   navigate: (path: string) => void;
@@ -37,11 +38,10 @@ export function useGraphFocus({
       selectEdge(null);
       const node = definition.nodes.find((candidate) => candidate.id === id);
       if (node)
-        void flow.setCenter(
-          (node.position?.x ?? 0) + 115,
-          (node.position?.y ?? 0) + 50,
-          { zoom: 1, duration: 350 },
-        );
+        void flow.setCenter(node.position.x + 115, node.position.y + 50, {
+          zoom: 1,
+          duration: 350,
+        });
     },
     [definition.nodes, flow, selectNode, selectEdge],
   );
@@ -60,7 +60,7 @@ export function useGraphFocus({
       mode !== "graph" ||
       unavailable ||
       !pendingFocus ||
-      !measurements[pendingFocus]
+      !measurements.has(pendingFocus)
     )
       return;
     const frame = requestAnimationFrame(() => {

@@ -1,5 +1,12 @@
-import { ruleApi } from "../../api/rules";
-import type { Input, RuleSummary } from "../../types";
+import type { Input } from "../../types";
+import { quoteText } from "../../domain/expressions";
+import {
+  isDecimalNumber,
+  isJsonObject,
+  stringifyJson,
+} from "../../domain/json";
+import { placeholderLiteral } from "../../domain/placeholderLiterals";
+import { escapeSnippetText } from "./snippets";
 
 export interface FormulaEntry {
   id: string;
@@ -12,49 +19,53 @@ export function formulaCallName(formula: Pick<FormulaEntry, "id" | "version">) {
   return `@${formula.id}:${formula.version}`;
 }
 
-function snippetLiteral(text: string) {
-  return text.replace(/[$}\\]/g, "\\$&");
+/** The ARC expression that rebuilds a JSON default value, e.g. {"a": [1]} -> $OBJECT("a", [1]). */
+function valueExpression(value: unknown): string {
+  if (isDecimalNumber(value)) return value.text;
+  if (typeof value === "string") return quoteText(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(valueExpression).join(", ")}]`;
+  if (isJsonObject(value)) {
+    const entries = Object.entries(value).flatMap(([key, entry]) => [
+      quoteText(key),
+      valueExpression(entry),
+    ]);
+    return `$OBJECT(${entries.join(", ")})`;
+  }
+  return "null";
 }
 
-function defaultExpression(value: unknown): string {
-  if (Array.isArray(value))
-    return `[${value.map(defaultExpression).join(", ")}]`;
-  if (value && typeof value === "object")
-    return `$OBJECT(${Object.entries(value)
-      .flatMap(([key, entry]) => [
-        JSON.stringify(key),
-        defaultExpression(entry),
-      ])
-      .join(", ")})`;
-  return JSON.stringify(value) ?? "null";
+/** An in-scope variable of the same name, the input's default, null for an optional input, else a typed placeholder. */
+function argumentExpression(input: Input, available: string[]): string {
+  if (available.includes(input.name)) return input.name;
+  if (input.defaultValue != null) return valueExpression(input.defaultValue);
+  if (!input.required) return "null";
+  return placeholderLiteral[input.type];
+}
+
+/** Arguments run through the last input that is in scope or has no fallback; later inputs are omitted. */
+function insertedArgumentCount(inputs: Input[], available: string[]): number {
+  let count = inputs.length;
+  while (count > 0) {
+    const input = inputs[count - 1];
+    const needsArgument =
+      input.required && input.defaultValue == null && !input.source;
+    if (available.includes(input.name) || needsArgument) break;
+    count--;
+  }
+  return count;
 }
 
 export function formulaSnippet(formula: FormulaEntry, available: string[]) {
-  let count = formula.inputs.length;
-  while (count) {
-    const input = formula.inputs[count - 1];
-    if (
-      available.includes(input.name) ||
-      (input.required && input.defaultValue == null && !input.source)
-    )
-      break;
-    count--;
-  }
-  const arguments_ = formula.inputs.slice(0, count).map((input, index) => {
-    let value = input.name;
-    if (!available.includes(input.name)) {
-      if (input.defaultValue !== undefined && input.defaultValue !== null)
-        value = defaultExpression(input.defaultValue);
-      else if (!input.required) value = "null";
-      else if (input.type === "STRING") value = '"value"';
-      else if (input.type === "NUMBER") value = "0";
-      else if (input.type === "BOOLEAN") value = "false";
-      else if (input.type === "ARRAY") value = "[]";
-      else value = "null";
-    }
-    return "${" + (index + 1) + ":" + snippetLiteral(value) + "}";
-  });
-  return `${formulaCallName(formula)}(${arguments_.join(", ")})`;
+  const count = insertedArgumentCount(formula.inputs, available);
+  const placeholders = formula.inputs
+    .slice(0, count)
+    .map(
+      (input, index) =>
+        `\${${index + 1}:${escapeSnippetText(argumentExpression(input, available))}}`,
+    );
+  return `${formulaCallName(formula)}(${placeholders.join(", ")})`;
 }
 
 export function formulaSignature(formula: FormulaEntry) {
@@ -63,60 +74,8 @@ export function formulaSignature(formula: FormulaEntry) {
 
 export function formulaParameterDescription(input: Input) {
   const fallback =
-    input.defaultValue === undefined || input.defaultValue === null
+    input.defaultValue == null
       ? ""
-      : ` · default ${JSON.stringify(input.defaultValue)}`;
+      : ` · default ${stringifyJson(input.defaultValue)}`;
   return `${input.name} (${input.type.toLowerCase()}) · ${input.required ? "required" : "optional"}${fallback}${input.source ? " · data source" : ""}`;
-}
-
-/** A bounded editor-local cache contains only immutable published input metadata. */
-export class FormulaMetadata {
-  private readonly entries = new Map<string, FormulaEntry>();
-
-  async load(
-    id: string,
-    version: number,
-    signal: AbortSignal,
-    summary?: RuleSummary,
-  ) {
-    const key = `${id}:${version}`;
-    const cached = this.entries.get(key);
-    if (cached) return cached;
-    const rule = summary ?? (await ruleApi.get(id, { signal }));
-    if (rule.kind !== "FORMULA")
-      throw new Error(
-        "Only published Formula rules can be called in an expression.",
-      );
-    const published = await ruleApi.version(id, version, { signal });
-    const formula: FormulaEntry = {
-      id,
-      name: rule.name,
-      version,
-      inputs: published.definition.inputs,
-    };
-    if (!signal.aborted) {
-      this.entries.set(key, formula);
-      if (this.entries.size > 64)
-        this.entries.delete(this.entries.keys().next().value!);
-    }
-    return formula;
-  }
-
-  async search(search: string, signal: AbortSignal) {
-    const page = await ruleApi.catalog(
-      { search, kind: "FORMULA", publishedOnly: true, offset: 0, limit: 8 },
-      { signal },
-    );
-    const results = await Promise.allSettled(
-      page.items
-        .filter((rule) => rule.publishedVersion !== null)
-        .map((rule) =>
-          this.load(rule.id, rule.publishedVersion!, signal, rule),
-        ),
-    );
-    if (signal.aborted) return [];
-    return results.flatMap((result) =>
-      result.status === "fulfilled" ? [result.value] : [],
-    );
-  }
 }

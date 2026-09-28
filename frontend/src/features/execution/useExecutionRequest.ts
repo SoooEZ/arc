@@ -18,6 +18,8 @@ const idle = (key: string): ExecutionState => ({
   problem: null,
   requestDurationMs: null,
 });
+const isIdle = (state: ExecutionState) =>
+  !state.running && !state.result && !state.error;
 
 /** An execution belongs to exactly one graph/version and input buffer. */
 export function useExecutionRequest(key: string) {
@@ -31,7 +33,10 @@ export function useExecutionRequest(key: string) {
   }, []);
   useEffect(() => {
     cancel();
-    setState(idle(key));
+    // The returned state already hides another key's result. Only an obsolete
+    // result or run needs clearing; an idle state is kept to avoid a render
+    // for every keystroke that changes the key.
+    setState((current) => (isIdle(current) ? current : idle(key)));
     return cancel;
   }, [key, cancel]);
 

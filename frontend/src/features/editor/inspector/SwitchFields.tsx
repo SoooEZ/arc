@@ -6,6 +6,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { shortId } from "../../../domain/ids";
 import ExpressionField from "../../expressions/ExpressionField";
 import ValueBinding from "../../expressions/ValueBinding";
 import SwitchDefaultReturn from "./SwitchDefaultReturn";
@@ -164,7 +165,7 @@ export default function SwitchFields(props: NodeFieldsProps) {
               cases: [
                 ...cases,
                 {
-                  id: `case-${crypto.randomUUID().slice(0, 8)}`,
+                  id: shortId("case-"),
                   label: `Case ${cases.length + 1}`,
                   expression: "true",
                 },

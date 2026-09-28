@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { literalText, quoteText } from "../../src/domain/expressions";
+import {
+  literalText,
+  quoteText,
+  trimExpression,
+} from "../../src/domain/expressions";
+import { literalCases } from "./literal-cases";
 
 test("graph string constants preserve the standard JSON string value", () => {
   const text = 'A "quoted" \\ path\b\f\n\r\t\u0000 · 中文 · 😀';
@@ -32,4 +37,17 @@ test("malformed Unicode strings stay expressions instead of becoming altered con
   ]) {
     expect(literalText(value), value).toBeNull();
   }
+});
+
+test("string constants decode exactly the literals the server reads, and nothing else", () => {
+  for (const { text, constant, value } of literalCases)
+    expect(literalText(trimExpression(text)), JSON.stringify(text)).toBe(
+      constant === "STRING" ? value : null,
+    );
+});
+
+test("expression text is trimmed like the server's String.trim, not Unicode whitespace", () => {
+  expect(trimExpression("\u0000\t 1 + 2 \r\n\u0001")).toBe("1 + 2");
+  expect(trimExpression("\u00a0 1 \u2028")).toBe("\u00a0 1 \u2028");
+  expect(trimExpression("\ufeff1")).toBe("\ufeff1");
 });

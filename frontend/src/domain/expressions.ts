@@ -1,7 +1,21 @@
+// Literal syntax mirrors the server tokenizer (ExpressionParser.TOKEN). A looser
+// pattern would show text the server rejects as a valid typed constant.
+
 // JSON escapes are part of ARC's string contract.
 export const quoteText = (text: string) => JSON.stringify(text);
+
+/** The server trims UTF-16 code units up to U+0020 (Java String.trim) before tokenizing. */
+export function trimExpression(source: string): string {
+  return source.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "");
+}
+
+// A backslash escapes any character except a line terminator: the server's
+// `\\.` excludes \n, \r, U+0085, U+2028 and U+2029.
+const stringToken =
+  /^("(?:[^"\\]|\\[^\n\r\u0085\u2028\u2029])*"|'(?:[^'\\]|\\[^\n\r\u0085\u2028\u2029])*')$/;
+
 export function literalText(value: string): string | null {
-  if (!/^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')$/s.test(value)) return null;
+  if (!stringToken.test(value)) return null;
   // Normalize ARC's single quotes, raw characters and legacy unknown escapes.
   // JSON.parse then owns Unicode validation and all standard escape decoding.
   const body = value
@@ -19,6 +33,30 @@ export function literalText(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+// The server has no leading-dot exponent (.5e3) or trailing dot (1., 1.e5).
+// A directly attached minus sign is ARC's unary negation of the number.
+const numberToken = /^-?(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\.\d+)$/;
+
+export function isNumberLiteral(text: string): boolean {
+  return numberToken.test(text);
+}
+
+/** JSON arrays of numbers, strings, booleans, null and nested arrays; ARC has no object literal. */
+export function isArrayLiteral(text: string): boolean {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return false;
+  }
+  return Array.isArray(value) && !containsObject(value);
+}
+
+function containsObject(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(containsObject);
+  return value !== null && typeof value === "object";
 }
 
 export function simpleComparison(expression: string): string[] | null {

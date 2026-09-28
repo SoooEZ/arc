@@ -3,15 +3,15 @@ import MonacoEditor from "@monaco-editor/react";
 import { Button } from "@mui/material";
 import { Check, Code2 } from "lucide-react";
 import { monaco } from "./arcLanguage";
-import { studioApi } from "../../api/studio";
-import type { Definition, Diagnostic, FunctionEntry, Rule } from "../../types";
-import { useAsyncResource } from "../../hooks/useAsyncResource";
+import type { Definition, Diagnostic, Rule } from "../../types";
+import { useFunctionCatalog } from "./useFunctionCatalog";
 import { useArcLanguageSupport, insertSnippet } from "./useArcLanguageSupport";
 import { useArcEditor, arcEditorOptions } from "./useArcEditor";
 import StudioLibrary from "./StudioLibrary";
 import StudioOutline from "./StudioOutline";
 import StudioProblems from "./StudioProblems";
 import ExpressionColorKey from "./ExpressionColorKey";
+import { nodeDeclarationOffset } from "./scriptOutline";
 
 interface Props {
   rule: Rule;
@@ -36,11 +36,7 @@ export default function CodeStudio({
   onSave,
 }: Props) {
   const { editor, model, onMount, reveal } = useArcEditor(diagnostics);
-  const { data: functions, error: catalogError } = useAsyncResource(
-    "functions",
-    (signal) => studioApi.functions({ signal }),
-    [] as FunctionEntry[],
-  );
+  const { data: functions, error: catalogError } = useFunctionCatalog();
   const latest = useRef({ onBuild, onSave, readOnly });
   latest.current = { onBuild, onSave, readOnly };
   const insert = (snippet: string, atEnd = false) => {
@@ -73,24 +69,11 @@ export default function CodeStudio({
   };
   const selectNode = (nodeId: string) => {
     const model = editor.current?.getModel();
-    const match =
-      model?.findMatches(
-        `node "${nodeId}"`,
-        false,
-        false,
-        false,
-        null,
-        false,
-      )[0] ||
-      model?.findMatches(
-        `node ${nodeId} `,
-        false,
-        false,
-        false,
-        null,
-        false,
-      )[0];
-    if (match) reveal(match.range.startLineNumber);
+    if (!model) return;
+    const offset = nodeDeclarationOffset(model.getValue(), nodeId);
+    if (offset === null) return;
+    const declaration = model.getPositionAt(offset);
+    reveal(declaration.lineNumber, declaration.column);
   };
 
   return (

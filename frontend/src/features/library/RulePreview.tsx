@@ -1,6 +1,6 @@
 import { useId } from "react";
 import type { Rule } from "../../types";
-import { nodeLabel } from "../../types";
+import { nodeKinds } from "../../domain/nodeKinds";
 import {
   rulePreview,
   previewNodeHeight,
@@ -60,9 +60,9 @@ export default function RulePreview({ rule }: { rule: Rule }) {
                 key={node.id}
                 transform={`translate(${x} ${y})`}
                 data-preview-node={node.id}
-                className={`preview-node preview-node-${node.type.toLowerCase()}`}
+                className={`preview-node preview-node-${nodeKinds[node.type].className}`}
               >
-                <title>{`${node.label} · ${nodeLabel[node.type]}`}</title>
+                <title>{`${node.label} · ${nodeKinds[node.type].label}`}</title>
                 <rect
                   width={previewNodeWidth}
                   height={previewNodeHeight}

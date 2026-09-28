@@ -15,10 +15,9 @@ import {
 import FunctionLibrary from "../studio/FunctionLibrary";
 import ExpressionColorKey from "../studio/ExpressionColorKey";
 import { useArcEditor, arcEditorOptions } from "../studio/useArcEditor";
-import { studioApi } from "../../api/studio";
-import { useAsyncResource } from "../../hooks/useAsyncResource";
+import { useFunctionCatalog } from "../studio/useFunctionCatalog";
 import { useNodeExpressionDraft } from "./useNodeExpressionDraft";
-import type { Definition, FunctionEntry, RuleNode } from "../../types";
+import type { Definition, RuleNode } from "../../types";
 
 export default function NodeExpressionDialog({
   definition,
@@ -31,7 +30,8 @@ export default function NodeExpressionDialog({
   definition: Definition;
   node: RuleNode;
   readOnly: boolean;
-  onApply: (d: Definition) => void;
+  /** Replaces the graph with the built one; false when the document refused it. */
+  onApply: (built: Definition) => boolean;
   onClose: () => void;
   onProblems: (messages: string[]) => void;
 }) {
@@ -44,11 +44,7 @@ export default function NodeExpressionDialog({
       onClose,
       onProblems,
     });
-  const { data: functions, error: catalogError } = useAsyncResource(
-    "functions",
-    (signal) => studioApi.functions({ signal }),
-    [] as FunctionEntry[],
-  );
+  const { data: functions, error: catalogError } = useFunctionCatalog();
   const { editor, model, onMount } = useArcEditor(diagnostics, "arc-node");
   const { insertFormula } = useArcLanguageSupport(editor, model, functions, {
     kind: "node",
@@ -57,6 +53,8 @@ export default function NodeExpressionDialog({
   const insert = (snippet: string) => {
     if (!readOnly) insertSnippet(editor.current, snippet);
   };
+  // Applying locks the buffer until the build answers.
+  const locked = readOnly || busy;
   return (
     <Dialog
       open
@@ -84,7 +82,7 @@ export default function NodeExpressionDialog({
             <aside className="studio-library">
               <FunctionLibrary
                 functions={functions}
-                readOnly={readOnly || busy}
+                readOnly={locked}
                 onInsert={insert}
                 onInsertFormula={insertFormula}
               />
@@ -97,7 +95,7 @@ export default function NodeExpressionDialog({
               onMount={onMount}
               options={{
                 ...arcEditorOptions,
-                readOnly: readOnly || busy,
+                readOnly: locked,
                 ariaLabel: "Node code editor",
               }}
             />

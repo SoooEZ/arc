@@ -6,6 +6,9 @@ import type { RuleSummary, Version, VersionSummary } from "../../../types";
 import ValueBinding from "../../expressions/ValueBinding";
 import { ruleApi } from "../../../api/rules";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
+import { stringifyJson } from "../../../domain/json";
+import { ownValue } from "../../../domain/records";
+import { withBinding } from "../../../domain/valueBinding";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 type RuleChoice = Pick<RuleSummary, "id" | "name" | "publishedVersion">;
@@ -23,10 +26,10 @@ export default function ReferenceFields({
     chosenRule?.id === node.ruleId
       ? chosenRule
       : rules.find((rule) => rule.id === node.ruleId);
-  const selectedRule = useAsyncResource(
+  const selectedRule = useAsyncResource<RuleChoice | null>(
     node.ruleId || "",
     (signal) => ruleApi.get(node.ruleId!, { signal }),
-    null as RuleChoice | null,
+    null,
     0,
     !!node.ruleId && !knownRule,
   );
@@ -38,10 +41,10 @@ export default function ReferenceFields({
         publishedVersion: node.version ?? null,
       }
     : null;
-  const detail = useAsyncResource(
+  const detail = useAsyncResource<Version | null>(
     `${node.ruleId}:${node.version}`,
     (signal) => ruleApi.version(node.ruleId!, node.version!, { signal }),
-    null as Version | null,
+    null,
     0,
     !!node.ruleId && !!node.version,
   );
@@ -163,20 +166,19 @@ export default function ReferenceFields({
               <ValueBinding
                 label={`${input.name}${input.required ? " *" : ""}`}
                 type={input.type}
-                value={node.bindings?.[input.name]}
+                value={ownValue(node.bindings, input.name)}
                 variables={variables}
                 disabled={readOnly}
                 helperText={
                   input.defaultValue != null
-                    ? `Default: ${JSON.stringify(input.defaultValue)}`
+                    ? `Default: ${stringifyJson(input.defaultValue)}`
                     : undefined
                 }
-                onChange={(value) => {
-                  const bindings = { ...node.bindings };
-                  if (value !== undefined) bindings[input.name] = value;
-                  else delete bindings[input.name];
-                  patch({ bindings });
-                }}
+                onChange={(value) =>
+                  patch({
+                    bindings: withBinding(node.bindings, input.name, value),
+                  })
+                }
               />
             </div>
           ))}

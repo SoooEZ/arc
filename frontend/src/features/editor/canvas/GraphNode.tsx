@@ -8,23 +8,29 @@ import {
 import { Fragment, useEffect, useRef } from "react";
 import { AlertCircle, Check, Code2, ExternalLink } from "lucide-react";
 import { Tooltip } from "@mui/material";
-import type { RuleNode } from "../../../types";
-import { nodeLabel } from "../../../types";
+import type { NodeType, RuleNode } from "../../../types";
 import { NodeIcon } from "../../../components/Icons";
-import { nodeWidth, sourcePorts } from "../../../domain/nodePorts";
+import { nodeKinds } from "../../../domain/nodeKinds";
+import {
+  hasTargetPort,
+  nodeWidth,
+  sourcePorts,
+} from "../../../domain/nodePorts";
 
 export type FlowNode = Node<
   {
     model: RuleNode;
     visited: boolean;
     inputCount: number;
-    errors: string[];
-    onExpression: () => void;
+    errors: readonly string[];
+    /** Shared by every card, so an unchanged card keeps its data object. */
+    onExpression: (id: string) => void;
   },
   "arc"
 >;
 export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
   const n = data.model;
+  const kind = nodeKinds[n.type];
   const ports = sourcePorts(n);
   const portKey = ports.map((port) => port.id).join(",");
   const updateInternals = useUpdateNodeInternals();
@@ -39,15 +45,15 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
   }, [n.id, portKey, updateInternals]);
   return (
     <div
-      className={`graph-node node-${n.type.toLowerCase()} ${selected ? "node-selected" : ""} ${data.visited ? "node-visited" : ""} ${data.errors.length ? "node-error" : ""}`}
+      className={`graph-node node-${kind.className} ${selected ? "node-selected" : ""} ${data.visited ? "node-visited" : ""} ${data.errors.length ? "node-error" : ""}`}
       style={{ width: nodeWidth(n) }}
     >
-      {n.type !== "INPUT" && <Handle type="target" position={Position.Top} />}
+      {hasTargetPort(n) && <Handle type="target" position={Position.Top} />}
       <div className="node-type-line">
-        <span className={`node-icon ${n.type.toLowerCase()}`}>
+        <span className={`node-icon ${kind.className}`}>
           <NodeIcon type={n.type} size={14} />
         </span>
-        <span>{nodeLabel[n.type]}</span>
+        <span>{kind.label}</span>
         <div className="node-header-actions">
           <Tooltip title="View or edit the whole node expression">
             <button
@@ -55,35 +61,17 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
               aria-label={`Node expression · ${n.label}`}
               onClick={(e) => {
                 e.stopPropagation();
-                data.onExpression();
+                data.onExpression(n.id);
               }}
             >
               <Code2 size={13} />
             </button>
           </Tooltip>
-          {data.visited ? (
-            <Check size={13} className="node-check" />
-          ) : n.type === "REFERENCE" ? (
-            <ExternalLink size={12} className="node-link-icon" />
-          ) : null}
+          <NodeStatusIcon visited={data.visited} type={n.type} />
         </div>
       </div>
       <strong>{n.label}</strong>
-      <div className="node-detail">
-        {n.type === "INPUT"
-          ? `${data.inputCount} input parameter${data.inputCount === 1 ? "" : "s"}`
-          : n.type === "REFERENCE"
-            ? `${n.ruleId || "Select a rule"}${n.version ? ` · v${n.version}` : ""}`
-            : n.type === "SWITCH"
-              ? n.selector != null
-                ? `Match ${n.selector} · ${n.cases?.length ?? 0} cases + default`
-                : `${n.cases?.length ?? 0} cases · first match + default`
-              : n.type === "TRANSFORM" && n.fields?.length
-                ? `${n.fields.length} fields → ${n.output || "data"}`
-                : n.type === "OUTPUT" && n.outputName
-                  ? `${n.outputName} ← ${n.expression || "Choose a value"}`
-                  : n.expression || "Add an expression"}
-      </div>
+      <div className="node-detail">{kind.summary(n, data.inputCount)}</div>
       {!!data.errors.length && (
         <Tooltip
           title={
@@ -113,7 +101,7 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
           {port.label && (
             <span
               title={port.label}
-              className={`handle-label handle-caption ${port.id === "false" || port.id === "default" ? "handle-fallback" : ""}`}
+              className={`handle-label handle-caption ${port.fallback ? "handle-fallback" : ""}`}
               style={{ left: `${port.ratio * 100}%` }}
             >
               {port.label}
@@ -123,4 +111,18 @@ export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
       ))}
     </div>
   );
+}
+
+/** A visited card shows a check; otherwise a Reference shows that it opens another rule. */
+function NodeStatusIcon({
+  visited,
+  type,
+}: {
+  visited: boolean;
+  type: NodeType;
+}) {
+  if (visited) return <Check size={13} className="node-check" />;
+  if (type === "REFERENCE")
+    return <ExternalLink size={12} className="node-link-icon" />;
+  return null;
 }

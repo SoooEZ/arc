@@ -1,6 +1,12 @@
 import type { DataSource, Input, SourceConfig } from "../../types";
 import { identifierError } from "../../domain/identifiers";
+import { sampleValue } from "../../domain/executionInputs";
+import { parseJson, parseJsonObject, stringifyJson } from "../../domain/json";
 
+/**
+ * Raw JSON text for the editable parts of a source. Buffers keep every digit of
+ * the saved configuration, e.g. lookup entries such as 12345678901234567890.
+ */
 export interface SourceBuffers {
   parameters: string;
   entries: string;
@@ -9,9 +15,9 @@ export interface SourceBuffers {
 
 export function sourceBuffers(config: SourceConfig): SourceBuffers {
   return {
-    parameters: JSON.stringify(config.parameters, null, 2),
-    entries: JSON.stringify(config.entries ?? {}, null, 2),
-    secretHeaders: JSON.stringify(config.secretHeaders ?? {}, null, 2),
+    parameters: stringifyJson(config.parameters, 2),
+    entries: stringifyJson(config.entries ?? {}, 2),
+    secretHeaders: stringifyJson(config.secretHeaders ?? {}, 2),
   };
 }
 
@@ -19,7 +25,7 @@ export function sourceCandidate(
   source: DataSource,
   buffers: SourceBuffers,
 ): DataSource {
-  const parameters: unknown = JSON.parse(buffers.parameters);
+  const parameters = parseJson(buffers.parameters);
   const namesError = sourceParameterNamesError(parameters);
   if (namesError) throw new Error(namesError);
   const {
@@ -34,10 +40,33 @@ export function sourceCandidate(
       ...configuration,
       parameters: parameters as Input[],
       ...(configuration.kind === "HTTP"
-        ? { url, secretHeaders: JSON.parse(buffers.secretHeaders) }
-        : { entries: JSON.parse(buffers.entries) }),
+        ? { url, secretHeaders: secretHeaderAliases(buffers.secretHeaders) }
+        : {
+            entries: parseJsonObject(
+              buffers.entries,
+              "Lookup entries must be a JSON object.",
+            ),
+          }),
     },
   };
+}
+
+function secretHeaderAliases(text: string): Record<string, string> {
+  const aliases = parseJsonObject(
+    text,
+    "Secret header aliases must be a JSON object.",
+  );
+  if (!hasTextValues(aliases))
+    throw new Error(
+      'Secret header aliases must be text, for example {"Authorization":"CRM_TOKEN"}.',
+    );
+  return aliases;
+}
+
+function hasTextValues(
+  record: Record<string, unknown>,
+): record is Record<string, string> {
+  return Object.values(record).every((value) => typeof value === "string");
 }
 
 export function sourceParameterNamesError(parameters: unknown): string | null {
@@ -52,28 +81,13 @@ export function sourceParameterNamesError(parameters: unknown): string | null {
 
 export function sourceParameterBufferError(text: string): string | null {
   try {
-    return sourceParameterNamesError(JSON.parse(text));
+    return sourceParameterNamesError(parseJson(text));
   } catch {
     return "Enter valid JSON before saving source parameters.";
   }
 }
 
-function sampleValue(parameter: Input): unknown {
-  if (parameter.defaultValue != null) return parameter.defaultValue;
-  switch (parameter.type) {
-    case "NUMBER":
-      return 1;
-    case "BOOLEAN":
-      return true;
-    case "ARRAY":
-      return [];
-    case "OBJECT":
-      return {};
-    case "STRING":
-      return parameter.name === "key" ? "US" : "example";
-  }
-}
-
+/** Example test parameters. Source parameters are scalar: the server rejects ARRAY and OBJECT. */
 export function sourceSample(config: SourceConfig): string {
   const values = Object.fromEntries(
     config.parameters.map((parameter) => [
@@ -81,7 +95,12 @@ export function sourceSample(config: SourceConfig): string {
       sampleValue(parameter),
     ]),
   );
-  return JSON.stringify(values, null, 2);
+  return stringifyJson(values, 2);
+}
+
+/** Reads the source test buffer without rounding numbers. */
+export function parseSourceTestInputs(text: string): Record<string, unknown> {
+  return parseJsonObject(text, "Test parameters must be a JSON object.");
 }
 
 export const createSourceDraft = (): DataSource => ({

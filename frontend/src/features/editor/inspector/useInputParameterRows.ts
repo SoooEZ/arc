@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import type { Definition, Input } from "../../../types";
+import { uniqueName } from "../../../domain/ids";
 
 /** Row identity belongs to the editing session, never to the persisted input schema. */
 export function useInputParameterRows(
@@ -37,19 +38,16 @@ export function useInputParameterRows(
   };
   const add = () => {
     onDefinitionChange((definition) => {
-      let suffix = definition.inputs.length + 1;
-      while (definition.inputs.some((input) => input.name === `input${suffix}`))
-        suffix++;
+      const name = uniqueName(
+        "input",
+        definition.inputs.map((input) => input.name),
+        definition.inputs.length + 1,
+      );
       return {
         ...definition,
         inputs: [
           ...definition.inputs,
-          {
-            name: `input${suffix}`,
-            type: "NUMBER",
-            required: true,
-            defaultValue: null,
-          },
+          { name, type: "NUMBER", required: true, defaultValue: null },
         ],
       };
     });

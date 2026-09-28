@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { TextField } from "@mui/material";
+import { parseJson, stringifyJson } from "../domain/json";
+
+/** Indented JSON for a value; an undefined value (no default at all) is an empty buffer. */
+const jsonText = (value: unknown) => stringifyJson(value, 2) ?? "";
+
+/** Values are the same when they serialize identically, including DecimalNumber digits. */
+const sameJson = (left: unknown, right: unknown) =>
+  Object.is(left, right) || stringifyJson(left) === stringifyJson(right);
+
 export default function JsonField({
   label,
   value,
@@ -18,13 +27,19 @@ export default function JsonField({
   const validity = useRef(onValidity);
   validity.current = onValidity;
   useEffect(() => () => validity.current(true), []);
-  const [text, setText] = useState(JSON.stringify(value, null, 2) ?? "");
+  const [text, setText] = useState(() => jsonText(value));
   const [error, setError] = useState("");
-  const encoded = JSON.stringify(value);
+  // The value the text represents: the last one typed here or received from outside.
+  const acceptedValue = useRef(value);
   useEffect(() => {
-    setText(encoded ? JSON.stringify(JSON.parse(encoded), null, 2) : "");
+    // Typing echoes its own value back through the draft; rewriting the text then
+    // would move the caret. Only a different value from outside replaces the buffer.
+    if (sameJson(value, acceptedValue.current)) return;
+    acceptedValue.current = value;
+    setText(jsonText(value));
     setError("");
-  }, [encoded]);
+    validity.current(true);
+  }, [value]);
   return (
     <TextField
       label={label}
@@ -36,19 +51,24 @@ export default function JsonField({
       error={!!error}
       helperText={error || "JSON"}
       onChange={(e) => {
-        setText(e.target.value);
+        const raw = e.target.value;
+        setText(raw);
+        let parsed: unknown;
         try {
-          const v = e.target.value.trim() ? JSON.parse(e.target.value) : null;
-          onChange(v);
-          setError("");
-          onValidity(true);
+          parsed = raw.trim() ? parseJson(raw) : null;
         } catch {
           setError("Enter valid JSON before saving");
           onValidity(false);
+          return;
         }
+        acceptedValue.current = parsed;
+        onChange(parsed);
+        setError("");
+        onValidity(true);
       }}
       slotProps={{
         input: {
+          className: "code-text",
           style: { fontFamily: "JetBrains Mono, monospace", fontSize: 12 },
         },
       }}

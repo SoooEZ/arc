@@ -5,6 +5,13 @@ interface Resource<T> {
   error: string;
   loading: boolean;
 }
+interface ResourceOptions {
+  /**
+   * While a new key loads, keep returning the previous key's data (with
+   * `loading` true) instead of `initial`, so lists do not blank and remount.
+   */
+  keepPrevious?: boolean;
+}
 /** Cancel stale reads, including servers that finish after the selected resource changes. */
 export function useAsyncResource<T>(
   key: string,
@@ -12,15 +19,23 @@ export function useAsyncResource<T>(
   initial: T,
   delay = 0,
   enabled = true,
+  { keepPrevious = false }: ResourceOptions = {},
 ): Resource<T> {
   const latest = useRef(load);
   latest.current = load;
   const [state, setState] = useState<
     Resource<T> & { key: string; enabled: boolean }
   >({ key, enabled, data: initial, error: "", loading: enabled });
+  const keepData = keepPrevious && enabled;
   useEffect(() => {
     const controller = new AbortController();
-    setState({ key, enabled, data: initial, error: "", loading: enabled });
+    setState((previous) => ({
+      key,
+      enabled,
+      data: keepData ? previous.data : initial,
+      error: "",
+      loading: enabled,
+    }));
     if (!enabled) return;
     const timer = setTimeout(() => {
       latest
@@ -45,8 +60,11 @@ export function useAsyncResource<T>(
       clearTimeout(timer);
     };
     // key is the resource identity; consumers may supply inline loaders and defaults.
-  }, [key, delay, enabled]);
-  return state.key === key && state.enabled === enabled
-    ? state
-    : { data: initial, error: "", loading: enabled };
+  }, [key, delay, enabled, keepData]);
+  if (state.key === key && state.enabled === enabled) return state;
+  return {
+    data: keepData ? state.data : initial,
+    error: "",
+    loading: enabled,
+  };
 }

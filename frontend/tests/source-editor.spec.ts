@@ -390,16 +390,18 @@ test("an old source list retains a source created while that list was loading", 
   await mockWorkspace(page);
   const gate = deferredResponse();
   let held = false;
-  await page.route("**/api/sources", (route) =>
-    route.fulfill({
-      status: 201,
-      json: { ...route.request().postDataJSON(), version: 1 },
-    }),
-  );
+  // Like the server, every read that starts after the creation lists the new source.
+  const created: DataSource[] = [];
+  await page.route("**/api/sources", (route) => {
+    const source = { ...route.request().postDataJSON(), version: 1 };
+    created.push(source);
+    return route.fulfill({ status: 201, json: source });
+  });
   await page.route("**/api/source-summaries?*", async (route) => {
+    const listed = [...created, first, second];
     held = true;
     await gate.promise;
-    await route.fulfill({ json: summaries([first, second]) });
+    await route.fulfill({ json: summaries(listed) });
   });
   await page.route("**/api/sources/created/version-summaries?*", (route) =>
     route.fulfill({
@@ -695,3 +697,97 @@ for (const provider of ["HTTP", "LOOKUP"] as const) {
     }
   });
 }
+
+test("a new source ID follows the shared resource ID policy", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  const posted: { id: string }[] = [];
+  await page.route("**/api/sources", (route) => {
+    const payload = route.request().postDataJSON();
+    posted.push(payload);
+    return route.fulfill({ status: 201, json: { ...payload, version: 1 } });
+  });
+  await page.goto("/#/sources");
+  await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
+  await page.getByRole("button", { name: "New source" }).click();
+  const id = page.getByLabel("Source ID");
+  const create = page.getByRole("button", { name: "Create source" });
+  await page.getByLabel("Name", { exact: true }).fill("Customer profile");
+  await expect(create).toBeDisabled();
+  for (const refused of [
+    "Customer Profile",
+    "customer_profile",
+    "1st-source",
+    "customer profile",
+  ]) {
+    await id.fill(refused);
+    await expect(id).toHaveValue("");
+    await expect(id).toHaveAttribute("aria-invalid", "true");
+  }
+  await expect(
+    page.getByText(/lowercase letters, digits and hyphens/),
+  ).toBeVisible();
+  await id.fill("customer-profile");
+  await expect(id).toHaveAttribute("aria-invalid", "false");
+  await expect(create).toBeEnabled();
+  await create.click();
+  await expect
+    .poll(() => posted)
+    .toEqual([expect.objectContaining({ id: "customer-profile" })]);
+});
+
+test("the HTTP timeout keeps typed text and blocks values the server rejects", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  const saved: { definition: { kind: string; timeoutMs: number } }[] = [];
+  await page.route("**/api/sources/source-a", (route) => {
+    const payload = route.request().postDataJSON();
+    saved.push(payload);
+    return route.fulfill({
+      json: {
+        ...first,
+        name: payload.name,
+        definition: payload.definition,
+        version: 3,
+      },
+    });
+  });
+  await page.goto("/#/sources");
+  await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
+  await page.getByLabel("Provider").click();
+  await page.getByRole("option", { name: "HTTP GET · JSON response" }).click();
+  // Source parameters are scalar; the helper lists only accepted types.
+  await expect(
+    page.getByText(
+      "Declare name, type (STRING / NUMBER / BOOLEAN), required, and optional defaultValue.",
+      { exact: false },
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/ARRAY \/ OBJECT/)).toHaveCount(0);
+  await page.getByLabel("HTTP URL").fill("https://example.com/customer");
+  const timeout = page.getByLabel("Timeout (ms)");
+  const save = page.getByRole("button", { name: "Save new version" });
+  await expect(timeout).toHaveValue("3000");
+  await timeout.fill("");
+  await expect(timeout).toHaveValue("");
+  await expect(timeout).toHaveAttribute("aria-invalid", "true");
+  await expect(
+    page.getByText("Enter whole milliseconds from 100 to 10,000."),
+  ).toBeVisible();
+  await expect(save).toBeDisabled();
+  await timeout.pressSequentially("5000");
+  await expect(timeout).toHaveValue("5000");
+  await expect(timeout).toHaveAttribute("aria-invalid", "false");
+  for (const rejected of ["50", "20000", "1e3", "-"]) {
+    await timeout.fill(rejected);
+    await expect(timeout).toHaveValue(rejected);
+    await expect(save).toBeDisabled();
+  }
+  await timeout.fill("250");
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect.poll(() => saved.length).toBe(1);
+  expect(saved[0].definition).toMatchObject({ kind: "HTTP", timeoutMs: 250 });
+});

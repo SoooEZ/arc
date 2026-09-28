@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
 import {
+  formulaParameterDescription,
   formulaSnippet,
   formulaSignature,
   type FormulaEntry,
 } from "../../src/features/studio/formulaCalls";
 import { expressionSymbols } from "../../src/domain/expressionSymbols";
+import { parseJson } from "../../src/domain/json";
+import type { Input } from "../../src/types";
 const formula: FormulaEntry = {
   id: "price-with-tax",
   name: "Price with tax",
@@ -63,4 +66,22 @@ test("formula tokens do not consume arguments or literal at signs", () => {
     ["$ROUND", "function"],
     ["amount", "parameter"],
   ]);
+});
+test("lossless defaults keep every digit in inserted arguments and parameter help", () => {
+  // Published definitions arrive through the lossless codec as DecimalNumber values.
+  const inputs = parseJson(
+    '[{"name":"limit","type":"NUMBER","required":false,"defaultValue":9007199254740993},' +
+      '{"name":"rates","type":"OBJECT","required":false,"defaultValue":{"base":0.12345678901234567890}},' +
+      '{"name":"amount","type":"NUMBER","required":true,"defaultValue":null}]',
+  ) as Input[];
+  const snippet = formulaSnippet({ ...formula, inputs }, ["amount"]);
+  expect(snippet).toBe(
+    '@price-with-tax:3(${1:9007199254740993}, ${2:\\$OBJECT("base", 0.12345678901234567890)}, ${3:amount})',
+  );
+  expect(formulaParameterDescription(inputs[0])).toBe(
+    "limit (number) · optional · default 9007199254740993",
+  );
+  expect(formulaParameterDescription(inputs[1])).toBe(
+    'rates (object) · optional · default {"base":0.12345678901234567890}',
+  );
 });

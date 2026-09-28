@@ -2,6 +2,7 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 import { Alert } from "@mui/material";
 import { NodeIcon } from "../../components/Icons";
 import type { Execution } from "../../types";
+import { stringifyJson } from "../../domain/json";
 import ExecutionTiming from "./ExecutionTiming";
 
 export default function ExecutionResult({
@@ -21,7 +22,7 @@ export default function ExecutionResult({
           Result
         </span>
         <strong data-testid="test-result">
-          {JSON.stringify(result.result)}
+          {stringifyJson(result.result)}
         </strong>
       </div>
       <ExecutionTiming result={result} requestDurationMs={requestDurationMs} />
@@ -79,7 +80,7 @@ export default function ExecutionResult({
               )}
             </span>
             <code>
-              {step.type === "INPUT" ? "received" : JSON.stringify(step.value)}
+              {step.type === "INPUT" ? "received" : stringifyJson(step.value)}
             </code>
             {step.branch === "true" || step.branch === "false" ? (
               <span className={`trace-branch ${step.branch}`}>

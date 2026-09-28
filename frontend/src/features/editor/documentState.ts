@@ -1,5 +1,10 @@
-import type { Definition, Diagnostic, Execution, Rule } from "../../types";
-import { ruleSnapshot, type DefinitionChange } from "../../domain/graph";
+import type { Definition, Diagnostic, Rule } from "../../types";
+import {
+  ruleSnapshot,
+  sameDefinition,
+  withNodePositions,
+  type DefinitionChange,
+} from "../../domain/graph";
 
 export interface DocumentState {
   rule: Rule;
@@ -7,16 +12,15 @@ export interface DocumentState {
   source: string | null;
   sourceDirty: boolean;
   diagnostics: Diagnostic[];
-  trace: Execution | null;
 }
 export function initialDocument(rule: Rule): DocumentState {
+  const opened = { ...rule, draft: withNodePositions(rule.draft) };
   return {
-    rule,
-    baseline: ruleSnapshot(rule),
+    rule: opened,
+    baseline: ruleSnapshot(opened),
     source: null,
     sourceDirty: false,
     diagnostics: [],
-    trace: null,
   };
 }
 export type DocumentAction =
@@ -33,8 +37,7 @@ export type DocumentAction =
       definition: Definition;
       source: string;
     }
-  | { type: "source/diagnostics"; before: string; diagnostics: Diagnostic[] }
-  | { type: "execution/completed"; trace: Execution | null };
+  | { type: "source/diagnostics"; before: string; diagnostics: Diagnostic[] };
 
 /** Draft/code transitions are atomic; layout and async renders cannot replace newer edits. */
 export function documentReducer(
@@ -51,7 +54,6 @@ export function documentReducer(
         source: null,
         sourceDirty: false,
         diagnostics: [],
-        trace: null,
       };
     }
     case "graph/arranged":
@@ -62,23 +64,14 @@ export function documentReducer(
           })
         : state;
     case "version/loaded":
-      return { ...state, rule: { ...state.rule, draft: action.definition } };
+      return {
+        ...state,
+        rule: { ...state.rule, draft: withNodePositions(action.definition) },
+      };
     case "rule/metadata":
       return { ...state, rule: { ...state.rule, ...action.patch } };
     case "rule/saved":
-      return {
-        ...state,
-        rule:
-          ruleSnapshot(state.rule) === ruleSnapshot(action.submitted)
-            ? action.rule
-            : {
-                ...action.rule,
-                name: state.rule.name,
-                description: state.rule.description,
-                draft: state.rule.draft,
-              },
-        baseline: ruleSnapshot(action.rule),
-      };
+      return acknowledgeSave(state, action.submitted, action.rule);
     case "source/changed":
       return action.source === state.source
         ? state
@@ -96,17 +89,48 @@ export function documentReducer(
       if (state.source !== action.before) return state;
       return {
         ...state,
-        rule: { ...state.rule, draft: action.definition },
+        rule: { ...state.rule, draft: withNodePositions(action.definition) },
         source: action.source,
         sourceDirty: false,
         diagnostics: [],
-        trace: null,
       };
     case "source/diagnostics":
       return state.source === action.before
         ? { ...state, diagnostics: action.diagnostics }
         : state;
-    case "execution/completed":
-      return { ...state, trace: action.trace };
   }
+}
+
+/**
+ * Advances the revision and saved baseline without discarding edits made after
+ * submission. The server stores the submitted draft; its response differs only
+ * in key order and explicit nulls. Keeping the local draft object keeps every
+ * identity derived from it (diagnostics, variables, preview inputs and input
+ * rows) unchanged. The server's trimmed name is adopted when nothing changed.
+ */
+function acknowledgeSave(
+  state: DocumentState,
+  submitted: Rule,
+  response: Rule,
+): DocumentState {
+  const edited = ruleSnapshot(state.rule) !== ruleSnapshot(submitted);
+  const localDraft = edited ? submitted.draft : state.rule.draft;
+  const saved: Rule = {
+    ...response,
+    draft: sameDefinition(localDraft, response.draft)
+      ? localDraft
+      : withNodePositions(response.draft),
+  };
+  return {
+    ...state,
+    rule: edited
+      ? {
+          ...saved,
+          name: state.rule.name,
+          description: state.rule.description,
+          draft: state.rule.draft,
+        }
+      : saved,
+    baseline: ruleSnapshot(saved),
+  };
 }

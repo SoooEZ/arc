@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import ExpressionField from "../../expressions/ExpressionField";
 import ValueBinding from "../../expressions/ValueBinding";
 import { quoteText } from "../../../domain/expressions";
+import { uniqueName } from "../../../domain/ids";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 
@@ -78,15 +79,12 @@ export default function TransformFields({
             startIcon={<Plus size={14} />}
             disabled={readOnly || fields.length >= 50}
             onClick={() => {
-              let suffix = fields.length + 1;
-              while (fields.some((field) => field.name === `field_${suffix}`))
-                suffix++;
-              patch({
-                fields: [
-                  ...fields,
-                  { name: `field_${suffix}`, expression: "null" },
-                ],
-              });
+              const name = uniqueName(
+                "field_",
+                fields.map((field) => field.name),
+                fields.length + 1,
+              );
+              patch({ fields: [...fields, { name, expression: "null" }] });
             }}
           >
             Add field
