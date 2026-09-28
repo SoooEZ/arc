@@ -505,3 +505,30 @@ test("reference pickers in the node dialog stage changes and historical pins rem
     }),
   ).toHaveValue("Version 1");
 });
+
+test("selecting a Reference node again does not read its pinned version again", async ({
+  page,
+  request,
+}) => {
+  const { parent, child } = await fixture(request);
+  const reads: string[] = [];
+  page.on("request", (outgoing) => {
+    if (outgoing.url().endsWith(`/api/rules/${child.id}/versions/1`))
+      reads.push(outgoing.url());
+  });
+  await page.goto(`/#/rules/${parent.id}?node=ref`);
+  const parameter = page.getByRole("group", { name: "Parameter amount" });
+  await expect(parameter).toBeVisible();
+  for (let round = 0; round < 3; round++) {
+    await page
+      .locator('.react-flow__node[data-id="input"] .graph-node')
+      .click();
+    await expect(page.getByLabel("Node name", { exact: true })).toHaveValue(
+      "Inputs",
+    );
+    await page.locator('.react-flow__node[data-id="ref"] .graph-node').click();
+    await expect(parameter).toBeVisible();
+  }
+  // The immutable pin was read on every selection.
+  expect(reads).toHaveLength(1);
+});

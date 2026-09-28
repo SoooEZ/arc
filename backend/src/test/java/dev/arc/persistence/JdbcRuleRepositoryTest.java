@@ -108,4 +108,35 @@ class JdbcRuleRepositoryTest {
     order.verify(jdbc).update("DELETE FROM rule_versions WHERE rule_id = ?", "old-draft");
     order.verify(jdbc).update("DELETE FROM rules WHERE id = ?", "old-draft");
   }
+
+  /**
+   * Searching the bare ID matched every stored definition for IDs such as "type", so a delete
+   * decoded them all under the row lock; the filter now names the two ways a rule is called.
+   */
+  @Test
+  void definitionsMentioningFiltersOnReferencePinsAndFormulaCalls() {
+    var statements = new ArrayList<String>();
+    var arguments = new ArrayList<List<Object>>();
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              Object[] values = call.getArguments();
+              arguments.add(Arrays.asList(values).subList(2, values.length));
+              return List.of();
+            });
+
+    repository.definitionsMentioning("type");
+
+    String statement = statements.getFirst();
+    assertThat(statement).doesNotContain("strpos(draft::text, ?)");
+    assertThat(statement)
+        .contains(
+            "draft @> jsonb_build_object('nodes', jsonb_build_array(jsonb_build_object('ruleId', ?::text)))",
+            "strpos(draft::text, '@' || ? || ':') > 0",
+            "definition @> jsonb_build_object('nodes', jsonb_build_array(jsonb_build_object('ruleId', ?::text)))",
+            "strpos(definition::text, '@' || ? || ':') > 0");
+    assertThat(arguments.getFirst())
+        .containsExactly("type", "type", "type", "type", "type", "type");
+  }
 }

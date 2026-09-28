@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
-import { arcEditorOptions, useArcEditor } from "../studio/useArcEditor";
+import {
+  inlineExpressionEditorOptions,
+  useArcEditor,
+  useEditorOptions,
+} from "../studio/useArcEditor";
 import {
   completionWord,
   isStringOrComment,
@@ -39,6 +43,11 @@ export default function InlineExpressionEditor({
   helperText?: string;
 }) {
   const { editor, model, onMount } = useArcEditor();
+  const options = useEditorOptions(
+    inlineExpressionEditorOptions,
+    readOnly,
+    label,
+  );
   const [catalogRequested, setCatalogRequested] = useState(false);
   // A Switch may have twenty case editors; load function help only when used.
   const { data: functions, error } = useFunctionCatalog(catalogRequested);
@@ -102,26 +111,7 @@ export default function InlineExpressionEditor({
             if (!readOnly) onChange(text ?? "");
           }}
           onMount={onMount}
-          options={{
-            ...arcEditorOptions,
-            readOnly,
-            ariaLabel: label,
-            lineNumbers: "off",
-            folding: false,
-            glyphMargin: false,
-            lineDecorationsWidth: 0,
-            lineNumbersMinChars: 0,
-            renderLineHighlight: "none",
-            overviewRulerLanes: 0,
-            hideCursorInOverviewRuler: true,
-            padding: { top: 6, bottom: 6 },
-            scrollbar: { vertical: "auto", horizontal: "hidden" },
-            tabCompletion: "on",
-            wordBasedSuggestions: "off",
-            quickSuggestions: { other: true, comments: false, strings: false },
-            acceptSuggestionOnEnter: "off",
-            suggest: { showWords: false, preview: false },
-          }}
+          options={options}
         />
       </fieldset>
       <p className="inline-expression-help">

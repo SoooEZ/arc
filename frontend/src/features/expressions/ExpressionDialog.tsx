@@ -10,7 +10,11 @@ import {
   DialogTitle,
   Tooltip,
 } from "@mui/material";
-import { arcEditorOptions, useArcEditor } from "../studio/useArcEditor";
+import {
+  expressionDialogOptions,
+  useArcEditor,
+  useEditorOptions,
+} from "../studio/useArcEditor";
 import FunctionLibrary from "../studio/FunctionLibrary";
 import ExpressionColorKey from "../studio/ExpressionColorKey";
 import {
@@ -43,6 +47,11 @@ export default function ExpressionDialog({
 }) {
   const [source, setSource] = useState(value);
   const { editor, model, onMount } = useArcEditor();
+  const options = useEditorOptions(
+    expressionDialogOptions,
+    readOnly,
+    "Expression code editor",
+  );
   const { data: functions, error: catalogError } = useFunctionCatalog();
   const {
     data: check,
@@ -126,12 +135,7 @@ export default function ExpressionDialog({
               onMount(instance);
               instance.focus();
             }}
-            options={{
-              readOnly,
-              ...arcEditorOptions,
-              fontSize: 13,
-              ariaLabel: "Expression code editor",
-            }}
+            options={options}
           />
         </div>
         {!scopeKnown && (

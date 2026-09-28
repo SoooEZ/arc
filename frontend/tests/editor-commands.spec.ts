@@ -319,3 +319,121 @@ test("node code cannot open while Arrange runs, and opens with the arranged posi
     saved.draft.nodes.find((node) => node.id === "calculate")!.position,
   ).toEqual({ x: Number(arranged[1]), y: Number(arranged[2]) });
 });
+
+test("Arrange lays out a large graph off the main thread, and a failing worker releases the editor", async ({
+  page,
+  request,
+}) => {
+  const nodes: Definition["nodes"] = [
+    { id: "input", type: "INPUT", label: "Inputs", position: { x: 0, y: 0 } },
+  ];
+  for (let index = 1; index < 99; index++)
+    nodes.push({
+      id: `n${index}`,
+      type: "FORMULA",
+      label: `Step ${index}`,
+      expression: index === 1 ? "amount" : `v${index - 1}`,
+      output: `v${index}`,
+      position: {
+        x: (index % 10) * 300,
+        y: Math.floor(index / 10) * 200 + 200,
+      },
+    });
+  nodes.push({
+    id: "out",
+    type: "OUTPUT",
+    label: "Result",
+    expression: "v98",
+    position: { x: 0, y: 2400 },
+  });
+  const edges: Definition["edges"] = nodes.slice(1).map((node, index) => ({
+    id: `e${index}`,
+    source: nodes[index].id,
+    target: node.id,
+    sourceHandle: "next",
+  }));
+  // Long-span edges make the layered layout expensive.
+  let seed = 7;
+  for (let index = 0; index < 100; index++) {
+    seed = (seed * 48271) % 2147483647;
+    const from = 1 + (seed % 96);
+    const to = from + 1 + ((seed >> 8) % (98 - from));
+    if (to <= from || to > 98) continue;
+    edges.push({
+      id: `l${index}`,
+      source: `n${from}`,
+      target: `n${to}`,
+      sourceHandle: "next",
+    });
+  }
+  const id = `arrange-worker-${Date.now()}`;
+  const created = await request.post("/api/rules", {
+    data: {
+      id,
+      name: `Arrange worker ${id}`,
+      kind: "FORMULA",
+      definition: {
+        schemaVersion: 1,
+        inputs: [
+          { name: "amount", type: "NUMBER", required: true, defaultValue: 1 },
+        ],
+        nodes,
+        edges,
+      },
+    },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const workerScripts: string[] = [];
+  page.on("request", (outgoing) => {
+    if (/elk-worker/.test(outgoing.url())) workerScripts.push(outgoing.url());
+  });
+  await page.addInitScript(() => {
+    const longTasks: number[] = [];
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) longTasks.push(entry.duration);
+    }).observe({ type: "longtask", buffered: true });
+    Object.assign(window, { __longTasks: longTasks });
+  });
+  await page.goto(`/#/rules/${id}`);
+  await expect(page.locator(".react-flow__node")).toHaveCount(100);
+  await page.evaluate(
+    () =>
+      ((window as unknown as { __longTasks: number[] }).__longTasks.length = 0),
+  );
+  const before = (await (await request.get(`/api/rules/${id}`)).json()).draft
+    .nodes[5].position;
+  await page
+    .getByRole("button", { name: "Arrange graph", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Save draft", exact: true }),
+  ).toBeEnabled({ timeout: 30_000 });
+  // ELK ran on the main thread as one long task of 1.3 s on this graph; off
+  // the main thread, what remains is the arranged graph's render and routing.
+  const longTasks = await page.evaluate(
+    () => (window as unknown as { __longTasks: number[] }).__longTasks,
+  );
+  expect(Math.max(0, ...longTasks)).toBeLessThan(800);
+  expect(workerScripts.length).toBeGreaterThanOrEqual(1);
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  const after = (await (await request.get(`/api/rules/${id}`)).json()).draft
+    .nodes[5].position;
+  expect(after).not.toEqual(before);
+
+  // A worker that cannot load reports an error and releases the commands (lesson F8).
+  await page.route(/elk-worker/, (route) => route.abort());
+  await page.reload();
+  await expect(page.locator(".react-flow__node")).toHaveCount(100);
+  await page
+    .getByRole("button", { name: "Arrange graph", exact: true })
+    .click();
+  // The development server loads the worker module itself under that name; either failure
+  // reports through the same alert and releases the commands.
+  await expect(page.getByRole("alert")).toContainText(
+    /layout worker|Arrange|imported module/i,
+  );
+  await expect(
+    page.getByRole("button", { name: "Arrange graph", exact: true }),
+  ).toBeEnabled();
+});

@@ -14,7 +14,11 @@ import {
 } from "../studio/useArcLanguageSupport";
 import FunctionLibrary from "../studio/FunctionLibrary";
 import ExpressionColorKey from "../studio/ExpressionColorKey";
-import { useArcEditor, arcEditorOptions } from "../studio/useArcEditor";
+import {
+  nodeCodeOptions,
+  useArcEditor,
+  useEditorOptions,
+} from "../studio/useArcEditor";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
 import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import { useNodeExpressionDraft } from "./useNodeExpressionDraft";
@@ -61,6 +65,7 @@ export default function NodeExpressionDialog({
   };
   // Applying locks the buffer until the build answers.
   const locked = readOnly || busy;
+  const options = useEditorOptions(nodeCodeOptions, locked, "Node code editor");
   return (
     <Dialog
       open
@@ -99,11 +104,7 @@ export default function NodeExpressionDialog({
               value={source}
               onChange={(s) => changeSource(s ?? "")}
               onMount={onMount}
-              options={{
-                ...arcEditorOptions,
-                readOnly: locked,
-                ariaLabel: "Node code editor",
-              }}
+              options={options}
             />
           </div>
         )}

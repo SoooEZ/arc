@@ -25,7 +25,7 @@ ENGINE_DEPENDENCIES = {
     "graph": {"graph"},
     "validation": {"validation", "graph", "expression", "Identifiers", "InputTypes", "RuleResolver", "Limits"},
     "script": {"script", "expression", "validation", "Identifiers", "InputTypes", "Limits"},
-    "execution": {"execution", "graph", "validation", "expression", "Identifiers", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline", "Limits"},
+    "execution": {"execution", "graph", "validation", "expression", "Identifiers", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline", "Limits", "BoundedCache"},
 }
 # Node kinds and connection handles have one vocabulary: dev.arc.model.NodeKind and Handles.
 NODE_KINDS = "(?:INPUT|FORMULA|CONDITION|SWITCH|TRANSFORM|REFERENCE|OUTPUT)"

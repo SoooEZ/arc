@@ -492,14 +492,17 @@ test("a content problem elsewhere keeps every scope, and an unknown scope neithe
   });
   await expect(returnValue).toContainText("price");
   await expect(returnValue).not.toContainText("unavailable");
-  // A blank label is a content problem: the scope read still answers, for every node.
-  const scopeRead = page.waitForResponse((response) =>
-    response.url().endsWith("/api/variables"),
-  );
+  // A blank label is a content problem: it neither changes the scope nor reads it again.
+  const reads: string[] = [];
+  page.on("request", (outgoing) => {
+    if (outgoing.url().endsWith("/api/variables")) reads.push(outgoing.url());
+  });
   await inspector.getByLabel("Node name", { exact: true }).fill("");
-  expect((await scopeRead).status()).toBe(200);
+  await page.waitForTimeout(400);
+  expect(reads).toEqual([]);
   await expect(returnValue).toContainText("price");
   await expect(returnValue).not.toContainText("unavailable");
+  await inspector.getByLabel("Node name", { exact: true }).fill("Total");
   // A failed read (a cycle, or here a forced failure) leaves the scope unknown, not empty.
   await page.route("**/api/variables", (route) =>
     route.fulfill({
@@ -511,7 +514,8 @@ test("a content problem elsewhere keeps every scope, and an unknown scope neithe
     (response) =>
       response.url().endsWith("/api/variables") && response.status() === 422,
   );
-  await inspector.getByLabel("Node name", { exact: true }).fill("Total");
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.reload();
   await failedRead;
   await expect(returnValue).toContainText("price · unavailable");
   await returnSource.click();
@@ -534,4 +538,51 @@ test("a content problem elsewhere keeps every scope, and an unknown scope neithe
   await expect(
     dialog.getByRole("button", { name: "Apply expression", exact: true }),
   ).toBeEnabled();
+});
+
+test("label and name edits keep the scope without reading it again", async ({
+  page,
+  request,
+}) => {
+  const id = await create(request, definition(true));
+  await page.goto(`/#/rules/${id}?node=choose`);
+  const value = page.getByRole("combobox", {
+    name: "Value to match",
+    exact: true,
+  });
+  await expect(value).toHaveText("amount [number] from Inputs");
+  const reads: string[] = [];
+  page.on("request", (outgoing) => {
+    if (outgoing.url().endsWith("/api/variables")) reads.push(outgoing.url());
+  });
+  // A keystroke in a label sent the whole draft again and showed "price · unavailable" meanwhile.
+  await page.route("**/api/variables", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await route.fallback();
+  });
+  await page.getByLabel("Case 1 label", { exact: true }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("!!!", { delay: 120 });
+  await page.getByLabel("Node name", { exact: true }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("!!", { delay: 120 });
+  await expect(page.getByLabel("Node name", { exact: true })).toHaveValue(
+    "Choose value!!",
+  );
+  await expect(value).toHaveText("amount [number] from Inputs");
+  await page.waitForTimeout(400);
+  expect(reads).toEqual([]);
+  await expect(page.getByText("unavailable")).toHaveCount(0);
+  // A new connection changes the scope and reads once, without variables meanwhile.
+  await page.getByLabel("Node name", { exact: true }).fill("Choose value");
+  // The Input card sits under the toolbar at this viewport: select it by outline.
+  await page.getByRole("button", { name: "Node outline", exact: true }).click();
+  await page
+    .locator(".node-outline button", { hasText: "Inputs" })
+    .first()
+    .click();
+  await page
+    .getByRole("button", { name: "Add parameter", exact: true })
+    .click();
+  await expect.poll(() => reads.length).toBe(1);
 });

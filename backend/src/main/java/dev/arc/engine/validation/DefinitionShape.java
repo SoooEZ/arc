@@ -170,7 +170,7 @@ final class DefinitionShape {
         "Every node needs a label of 1 to " + Limits.MAX_LABEL_CHARACTERS + " characters");
     // A property its kind does not use would be ignored silently, so no graph may keep one.
     for (Property property : Property.values())
-      require(kind.uses(property) || !node.sets(property), declaration, belongsTo(property));
+      require(kind.uses(property) || !node.sets(property), declaration, BELONGS_TO.get(property));
     require(
         node.expression() == null || node.expression().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
         declaration,
@@ -318,6 +318,18 @@ final class DefinitionShape {
           connection,
           "Invalid connection handle");
     }
+  }
+
+  /**
+   * The ownership messages, built once: they depend on kind facts only, and building one per
+   * property of every node made up most of a draft-shape pass.
+   */
+  private static final Map<Property, String> BELONGS_TO = belongsToMessages();
+
+  private static Map<Property, String> belongsToMessages() {
+    var messages = new EnumMap<Property, String>(Property.class);
+    for (Property property : Property.values()) messages.put(property, belongsTo(property));
+    return messages;
   }
 
   /** Where a property may appear, e.g. "Cases belong to Switch nodes". */

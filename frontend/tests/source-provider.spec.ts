@@ -144,7 +144,14 @@ async function fixture(page: Page) {
       return route.fulfill({ json: { input: ["amount"], out: ["amount"] } });
     return route.fulfill({ json: [] });
   });
-  return { reads, saved: () => rule };
+  return {
+    reads,
+    saved: () => rule,
+    /** Replaces the served draft before the page opens it. */
+    setDraft: (draft: Rule["draft"]) => {
+      rule = { ...rule, draft };
+    },
+  };
 }
 
 test("each provider picker searches and appends bounded pages while preserving focus and its immutable pin", async ({
@@ -729,4 +736,54 @@ test("source manager creates, versions and tests providers without losing the pa
   expect(unchanged.revision).toBe(createdRevision);
   expect(unchanged.draft.inputs[0].defaultValue).toEqual([]);
   expect(unchanged.draft.inputs[1].source.version).toBe(1);
+});
+
+test("five inputs bound to one source read its pinned version once and no version list until asked", async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  const draft = state.saved().draft;
+  state.setDraft({
+    ...draft,
+    inputs: ["name", "tier", "limit", "country", "segment"].map((name) => ({
+      name,
+      type: "STRING" as const,
+      required: false,
+      defaultValue: null,
+      source: {
+        id: "provider-24",
+        version: 1,
+        bindings: { key: '"US"' },
+        pointer: `/${name}`,
+        onError: "DEFAULT" as const,
+      },
+    })),
+  });
+  const reads = { pins: 0, lists: 0 };
+  page.on("request", (outgoing) => {
+    const path = new URL(outgoing.url()).pathname;
+    if (path === "/api/sources/provider-24/versions/1") reads.pins += 1;
+    if (path === "/api/sources/provider-24/version-summaries") reads.lists += 1;
+  });
+  await page.goto("/#/rules/provider-picker?node=input");
+  const cards = page.getByRole("combobox", {
+    name: "Source version",
+    exact: true,
+  });
+  await expect(cards).toHaveCount(5);
+  await expect(cards.first()).toHaveText("v1");
+  // Each card sent its own pin read and its own version list: 10 reads on mount.
+  await page.waitForTimeout(300);
+  expect(reads).toEqual({ pins: 1, lists: 0 });
+  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
+  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
+  await expect(cards).toHaveCount(5);
+  await page.waitForTimeout(300);
+  expect(reads).toEqual({ pins: 1, lists: 0 });
+  await cards.first().click();
+  await expect(
+    page.getByRole("option", { name: "v1", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect.poll(() => reads.lists).toBe(1);
 });

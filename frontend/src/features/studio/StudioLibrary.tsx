@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Alert, TextField } from "@mui/material";
 import { Braces, GitBranch, Puzzle } from "lucide-react";
-import { usePagedResource } from "../../hooks/usePagedResource";
+import { usePagedSearch } from "../../hooks/usePagedSearch";
 import CatalogPagination from "../../components/CatalogPagination";
 import FunctionLibrary from "./FunctionLibrary";
 import { ruleApi } from "../../api/rules";
@@ -47,14 +47,15 @@ export default function StudioLibrary({
 }) {
   const [search, setSearch] = useState("");
   const [pane, setPane] = useState<Pane>("functions");
-  const catalog = usePagedResource(
+  // The shown cards stay until the settled search answers, as in the library.
+  const catalog = usePagedSearch(
     search,
-    (offset, limit, signal) =>
+    (query, offset, limit, signal) =>
       ruleApi.catalog(
-        { offset, limit, search, publishedOnly: true },
+        { offset, limit, search: query, publishedOnly: true },
         { signal },
       ),
-    pane === "reuse",
+    { enabled: pane === "reuse", keepPrevious: true },
   );
   const insertion = useLibraryInsertion();
   const { cancel } = insertion;

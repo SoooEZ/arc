@@ -36,19 +36,6 @@ final class ExpressionParser {
               + SINGLE_QUOTED
               + ")|(&&|\\|\\||==|!=|<>|<=|>=|[=^\\[\\]+*/%<>()!,\\-]))");
 
-  private static int priority(String op) {
-    return switch (op) {
-      case "||", "OR" -> 1;
-      case "&&", "AND" -> 2;
-      case "==", "!=", "=", "<>" -> 3;
-      case "<", "<=", ">", ">=" -> 4;
-      case "+", "-" -> 5;
-      case "*", "/", "%" -> 6;
-      case "^" -> 8;
-      default -> -1;
-    };
-  }
-
   private final List<String> tokens = new ArrayList<>();
   private final Set<String> variables = new LinkedHashSet<>();
   private final List<FormulaCall> formulaCalls = new ArrayList<>();
@@ -90,22 +77,24 @@ final class ExpressionParser {
       throw ArcException.invalid(
           "Expression nesting exceeds " + Limits.MAX_EXPRESSION_NESTING + " levels");
     Expr left = atom();
-    while (priority(peek()) >= minimumPriority) {
-      String operator = take();
+    BinaryOperator operator;
+    while ((operator = BinaryOperator.of(peek())) != null
+        && operator.priority() >= minimumPriority) {
+      take();
       Expr leftOperand = left;
-      // Power associates right-to-left; all other binary operators associate left-to-right.
-      int nextPriority = priority(operator) + (operator.equals("^") ? 0 : 1);
+      BinaryOperator op = operator;
+      int nextPriority = op.priority() + (op.rightAssociative() ? 0 : 1);
       Expr rightOperand = parse(nextPriority);
       left =
-          switch (operator) {
-            case "&&", "AND" ->
+          switch (op) {
+            case AND ->
                 context -> bool(leftOperand.eval(context)) && bool(rightOperand.eval(context));
-            case "||", "OR" ->
+            case OR ->
                 context -> bool(leftOperand.eval(context)) || bool(rightOperand.eval(context));
             default ->
                 context ->
                     ExpressionRuntime.binary(
-                        operator, leftOperand.eval(context), rightOperand.eval(context));
+                        op, leftOperand.eval(context), rightOperand.eval(context));
           };
     }
     depth--;

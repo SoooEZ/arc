@@ -8,7 +8,9 @@ import {
   flowEdges,
   flowNodes,
   takenBranches,
+  type CardBounds,
 } from "./flowElements";
+import type { MovedCard } from "./edgeRouting";
 import {
   connectGraphNodes,
   type DefinitionChange,
@@ -61,11 +63,31 @@ export function useGraphCanvas({
   }, []);
   const bounds = cardBounds(definition.nodes, measurements);
   const geometry = JSON.stringify(bounds);
+  // The cards a drag in progress has moved: their bounds before the drag
+  // started and now. Null between drags, so a settled graph routes fully.
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<Map<string, CardBounds> | null>(null);
+  const moved = useMemo((): MovedCard[] | null => {
+    if (!dragging) {
+      dragStart.current = null;
+      return null;
+    }
+    dragStart.current ??= new Map(bounds.map((card) => [card.id, card]));
+    const before = dragStart.current;
+    const cards: MovedCard[] = [];
+    for (const card of bounds) {
+      const start = before.get(card.id);
+      if (start && (start.x !== card.x || start.y !== card.y))
+        cards.push({ id: card.id, before: start, after: card });
+    }
+    return cards;
+    // The bounds are keyed by their geometry text.
+  }, [dragging, geometry]);
   // Label and expression edits replace node objects without moving a card.
   // Keyed by geometry, the context keeps its identity, so edges do not re-route.
   const routing = useMemo(
-    () => ({ nodes: bounds, reportBlocked }),
-    [geometry, reportBlocked],
+    () => ({ nodes: bounds, moved, reportBlocked }),
+    [geometry, moved, reportBlocked],
   );
   const visited = useMemo(
     () =>
@@ -131,9 +153,13 @@ export function useGraphCanvas({
         });
       }
       const moved = new Map<string, { x: number; y: number }>();
+      let dragState: boolean | null = null;
       for (const change of changes)
-        if (change.type === "position" && change.position)
-          moved.set(change.id, change.position);
+        if (change.type === "position") {
+          if (change.position) moved.set(change.id, change.position);
+          if (typeof change.dragging === "boolean") dragState = change.dragging;
+        }
+      if (dragState !== null) setDragging(dragState);
       if (!moved.size) return;
       edit((d) => ({
         ...d,
@@ -145,24 +171,32 @@ export function useGraphCanvas({
     },
     [edit],
   );
-  const onEdgesChange = (changes: EdgeChange[]) => {
-    for (const c of changes)
-      if (c.type === "select" && c.selected) setSelectedEdge(c.id);
-  };
-  const connect = ({ source, target, sourceHandle }: Connection) => {
-    if (!source || !target || source === target) return;
-    // Document updaters can run more than once, so the ID is chosen here.
-    const edgeId = newId();
-    edit((definition) =>
-      connectGraphNodes(
-        definition,
-        source,
-        target,
-        sourceHandle || "next",
-        edgeId,
-      ),
-    );
-  };
+  // Stable handlers: React Flow hands them to every memoized card and
+  // connection, so a new function per render re-rendered the whole canvas.
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      for (const c of changes)
+        if (c.type === "select" && c.selected) setSelectedEdge(c.id);
+    },
+    [setSelectedEdge],
+  );
+  const connect = useCallback(
+    ({ source, target, sourceHandle }: Connection) => {
+      if (!source || !target || source === target) return;
+      // Document updaters can run more than once, so the ID is chosen here.
+      const edgeId = newId();
+      edit((definition) =>
+        connectGraphNodes(
+          definition,
+          source,
+          target,
+          sourceHandle || "next",
+          edgeId,
+        ),
+      );
+    },
+    [edit],
+  );
   return {
     measurements,
     blockedEdges,

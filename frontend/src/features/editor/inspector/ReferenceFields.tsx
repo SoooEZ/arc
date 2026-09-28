@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 import type { RuleSummary, Version, VersionSummary } from "../../../types";
 import ValueBinding from "../../expressions/ValueBinding";
 import { ruleApi } from "../../../api/rules";
+import { readRuleVersion } from "../../studio/pinnedVersions";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
 import { stringifyJson } from "../../../domain/json";
 import { ownValue } from "../../../domain/records";
@@ -47,9 +48,10 @@ export default function ReferenceFields({
         publishedVersion: node.version ?? null,
       }
     : null;
+  // The pinned version is immutable: the page-wide cache serves every selection.
   const detail = useAsyncResource<Version | null>(
     `${node.ruleId}:${node.version}`,
-    (signal) => ruleApi.version(node.ruleId!, node.version!, { signal }),
+    (signal) => readRuleVersion(node.ruleId!, node.version!, signal),
     null,
     0,
     !!node.ruleId && !!node.version,

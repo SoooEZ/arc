@@ -1,8 +1,4 @@
-import ELK, {
-  type ElkExtendedEdge,
-  type ElkNode,
-  type ElkPort,
-} from "elkjs/lib/elk.bundled.js";
+import type { ElkExtendedEdge, ElkNode, ElkPort } from "elkjs/lib/elk-api.js";
 import type { Definition, RuleNode } from "../../../types";
 import { defaultNodeSize, type NodeSizes } from "./graphGeometry";
 import {
@@ -11,7 +7,9 @@ import {
   sourcePorts,
 } from "../../../domain/nodePorts";
 
-const elk = new ELK();
+/** Lays out an ELK graph: the worker-backed instance in the browser, the bundled one in tests. */
+export type ElkLayout = (graph: ElkNode) => Promise<ElkNode>;
+
 const portId = (nodeId: string, handle: string) => `${nodeId}:${handle}`;
 /**
  * Code-unit order: IDs are ASCII, and localeCompare made the layout depend on the browser
@@ -59,7 +57,8 @@ function layoutNode(node: RuleNode, sizes: NodeSizes) {
 /** Arrange presentation coordinates only; edge identities and execution semantics stay intact. */
 export async function arrangeGraph(
   definition: Definition,
-  sizes: NodeSizes = new Map(),
+  sizes: NodeSizes,
+  layout: ElkLayout,
 ): Promise<Definition> {
   const children = [...definition.nodes]
     .sort(compareId)
@@ -98,7 +97,7 @@ export async function arrangeGraph(
     children,
     edges,
   };
-  const result = await elk.layout(graph);
+  const result = await layout(graph);
   const positions = new Map<string, { x: number; y: number }>();
   for (const { id, x, y } of result.children ?? [])
     if (isFiniteNumber(x) && isFiniteNumber(y)) positions.set(id, { x, y });

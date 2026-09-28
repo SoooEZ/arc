@@ -302,17 +302,8 @@ test("editing an inferred Output expression retains its editor through empty tex
   await expect(page.locator(".suggest-widget.visible")).toHaveCount(0);
   await setEditorText(page, expression, "");
   await expect(editorLines(expression)).toHaveText("");
-  const scope = page.waitForResponse((response) => {
-    if (!response.url().endsWith("/api/variables")) return false;
-    const draft = response.request().postDataJSON() as Definition;
-    return (
-      draft.nodes
-        .find((node) => node.id === "out")
-        ?.expression?.startsWith(`@${callee}`) ?? false
-    );
-  });
+  // An expression edit keeps the scope read at load; the suggestion needs no new read.
   await page.keyboard.type(`@${callee}`);
-  await scope;
   await expect(
     page
       .locator(".suggest-widget.visible")
@@ -335,9 +326,6 @@ test("Formula completion uses scope that arrives after suggestions appeared", as
   request,
 }) => {
   const { caller, callee } = await fixtures(request);
-  await page.goto(`/#/rules/${caller}?node=out`);
-  const expression = page.getByLabel("Return value", { exact: true });
-  await expect(editorLines(expression)).toHaveText("amount + price");
   let release!: () => void;
   const pending = new Promise<void>((resolve) => {
     release = resolve;
@@ -353,17 +341,17 @@ test("Formula completion uses scope that arrives after suggestions appeared", as
       await pendingCatalog;
     await route.continue();
   });
+  // The scope is read once for the graph when the editor opens; expression
+  // edits keep it. Holding that read leaves the scope unknown while typing.
   let requested = false;
   await page.route("**/api/variables", async (route) => {
-    const draft = route.request().postDataJSON() as Definition;
-    if (
-      draft.nodes.find((node) => node.id === "out")?.expression === `@${callee}`
-    ) {
-      requested = true;
-      await pending;
-    }
-    await route.continue();
+    requested = true;
+    await pending;
+    await route.continue().catch(() => undefined);
   });
+  await page.goto(`/#/rules/${caller}?node=out`);
+  const expression = page.getByLabel("Return value", { exact: true });
+  await expect(editorLines(expression)).toHaveText("amount + price");
   try {
     await setEditorText(page, expression, "");
     await page.keyboard.type(`@${callee}`);
@@ -449,16 +437,8 @@ test("inspector updates that keep the same variables leave an open Formula sugge
       )
       .toBe(true);
   try {
-    const scope = page.waitForResponse(
-      (response) =>
-        response.url().endsWith("/api/variables") &&
-        (response.request().postDataJSON() as Definition).nodes.find(
-          (node) => node.id === "out",
-        )?.expression === `@${callee}`,
-    );
     await setEditorText(page, expression, "");
     await page.keyboard.type(`@${callee}`);
-    await scope;
     const suggestion = page
       .locator(".suggest-widget.visible")
       .getByRole("option", { name: new RegExp(`@${callee}:1`) });

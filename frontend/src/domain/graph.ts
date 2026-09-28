@@ -27,6 +27,32 @@ export const semanticGraphKey = (definition: Definition) =>
   });
 
 /**
+ * What the server's scope analysis reads (BranchScopes and the graph
+ * topology): input names, each node's ID, kind, stored result name and a
+ * Switch's case IDs, and every connection. Labels, expressions, defaults and
+ * positions are not part of it, so editing them keeps the variables in scope
+ * and sends no read (lesson F10 still applies to a pending read).
+ */
+export function scopeGraphKey(definition: Definition): string {
+  const nodes = definition.nodes.map((node) => [
+    node.id,
+    node.type,
+    nodeKinds[node.type].storesResult ? (node.output ?? null) : null,
+    node.type === "SWITCH" ? (node.cases ?? []).map((c) => c.id) : null,
+  ]);
+  const edges = definition.edges.map((edge) => [
+    edge.source,
+    edge.sourceHandle,
+    edge.target,
+  ]);
+  return JSON.stringify([
+    definition.inputs.map((input) => input.name),
+    nodes,
+    edges,
+  ]);
+}
+
+/**
  * Compares definitions the way the server stores them: object key order does
  * not matter and an explicit null equals an absent field. A save response
  * lists every record field (unset ones as null) in declaration order, so it

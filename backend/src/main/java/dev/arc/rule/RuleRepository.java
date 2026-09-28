@@ -58,8 +58,9 @@ public interface RuleRepository extends RuleResolver {
   RuleVersion version(String id, int version);
 
   /**
-   * The drafts and published versions of other rules whose stored JSON contains the ID: every
-   * definition that calls the rule, and possibly more, for the caller to check exactly.
+   * The drafts and published versions of other rules that may call the rule: every definition with
+   * a Reference pin to the ID or a Formula call {@code @id:version}, and possibly more, for the
+   * caller to check exactly.
    */
   List<StoredDefinition> definitionsMentioning(String id);
 

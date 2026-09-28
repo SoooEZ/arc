@@ -6,6 +6,11 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, editorSurface, setEditorText } from "./helpers/editor";
+import {
+  installRenderProbe,
+  renderCounts,
+  resetRenderCounts,
+} from "./helpers/renderProbe";
 
 async function create(
   request: APIRequestContext,
@@ -352,8 +357,9 @@ test("unfinished quoted strings do not open variable or function suggestions", a
   const first = page.getByLabel("Case 1 condition", { exact: true });
   for (const quote of ["'", '"']) {
     await setEditorText(page, first, "");
+    // An expression edit reads diagnostics; the scope depends on structure only.
     const scope = page.waitForResponse((response) => {
-      if (!response.url().endsWith("/api/variables")) return false;
+      if (!response.url().endsWith("/api/diagnostics")) return false;
       const definition = response.request().postDataJSON() as Definition;
       return (
         definition.nodes
@@ -366,4 +372,87 @@ test("unfinished quoted strings do not open variable or function suggestions", a
     await expect(page.locator(".suggest-widget.visible")).toHaveCount(0);
     await expect(editorLines(first)).toContainText(quote + "hell");
   }
+});
+
+test("typing beside twenty inline editors hands Monaco no new options object", async ({
+  page,
+  request,
+}) => {
+  await installRenderProbe(page);
+  const id = `inline-expression-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [
+      { name: "amount", type: "NUMBER", required: true, defaultValue: 1 },
+    ],
+    nodes: [
+      {
+        id: "input",
+        type: "INPUT",
+        label: "Inputs",
+        position: { x: 300, y: 0 },
+      },
+      {
+        id: "choose",
+        type: "SWITCH",
+        label: "Choose",
+        cases: Array.from({ length: 20 }, (_, index) => ({
+          id: `case-${index + 1}`,
+          label: `Case ${index + 1}`,
+          expression: `amount > ${index}`,
+        })),
+        position: { x: 300, y: 200 },
+      },
+    ],
+    edges: [
+      { id: "start", source: "input", sourceHandle: "next", target: "choose" },
+    ],
+  };
+  const created = await request.post("/api/rules", {
+    data: { id, name: id, kind: "DECISION_TREE", definition },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  await page.goto(`/#/rules/${id}?node=choose`);
+  const label = page.getByLabel("Case 1 label", { exact: true });
+  await expect(label).toHaveValue("Case 1");
+  await expect(
+    page.getByLabel("Case 20 condition", { exact: true }),
+  ).toBeVisible();
+  await label.click();
+  await page.keyboard.press("End");
+  await resetRenderCounts(page);
+  await page.keyboard.type("0123456789", { delay: 60 });
+  await expect(label).toHaveValue("Case 10123456789");
+  const counts = await renderCounts(page);
+  // Every render handed each editor a new options object: 400 global configuration
+  // changes for 10 keystrokes, a cost quadratic in the number of editors.
+  expect(counts.optionsChanges).toBe(0);
+  expect(counts.commits).toBeGreaterThanOrEqual(10);
+});
+
+test("typing in Code studio with the Test panel open flips no editor option", async ({
+  page,
+  request,
+}) => {
+  await installRenderProbe(page);
+  const rule = await create(request);
+  await page.goto(`/#/studio/${rule.id}`);
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await expect(code).toBeVisible();
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await expect(
+    page.getByLabel("Test input JSON", { exact: true }),
+  ).toBeVisible();
+  await code.focus();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("End");
+  await resetRenderCounts(page);
+  await page.keyboard.type("\n// noted", { delay: 40 });
+  await expect(editorLines(code)).toContainText("// noted");
+  const counts = await renderCounts(page);
+  expect(counts.optionsChanges).toBe(0);
+  expect(counts.commits).toBeGreaterThan(0);
 });

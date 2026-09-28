@@ -51,7 +51,13 @@ public class ArcException extends RuntimeException {
 
   private ArcException(
       int status, Kind kind, String message, List<String> issues, List<Location> locations) {
-    super(message);
+    // An expected, user-facing outcome: the HTTP body carries status, message, issues and
+    // locations, never a trace, and Errors logs only unexpected exceptions. Every factory and
+    // rewrap funnels through here, so no trace is ever recorded; capturing one was most of the
+    // cost of a fallback-caught value error or a diagnostics pass with many problems. An
+    // ArcException that reaches a logger elsewhere is logged without frames, which its message
+    // and locations make up for.
+    super(message, null, false, false);
     this.status = status;
     this.kind = kind;
     this.issues = issues;

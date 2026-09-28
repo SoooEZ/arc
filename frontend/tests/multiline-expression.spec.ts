@@ -130,16 +130,8 @@ test("closing multiline strings and ending comments restore normal function and 
     await expect(editorLines(expression)).toContainText("$ROUND(amount, 2)");
     await page.keyboard.press("Escape");
     await setEditorText(page, expression, prefix);
-    const scope = page.waitForResponse((response) => {
-      if (!response.url().endsWith("/api/variables")) return false;
-      const definition = response.request().postDataJSON() as Definition;
-      return (
-        definition.nodes.find((node) => node.id === "calculate")?.expression ===
-        prefix + `@${rule.id}`
-      );
-    });
+    // An expression edit keeps the scope read at load: no read precedes the suggestion.
     await page.keyboard.type(`@${rule.id}`);
-    await scope;
     await expect(
       suggestions.getByRole("option", { name: new RegExp(`@${rule.id}:1`) }),
     ).toBeVisible();

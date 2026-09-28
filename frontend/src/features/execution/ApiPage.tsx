@@ -8,7 +8,6 @@ import {
   Play,
   Terminal,
 } from "lucide-react";
-import type { RuleSummary } from "../../types";
 import { stringifyJson } from "../../domain/json";
 import ApiReference from "./ApiReference";
 import { usePublishedExecution } from "./usePublishedExecution";
@@ -21,14 +20,12 @@ const InputJsonEditor = lazy(() => import("./InputJsonEditor"));
 
 export default function ApiPage({
   mode,
-  rules,
   notify,
 }: {
   mode: "docs" | "playground";
-  rules: RuleSummary[];
   notify: (s: string) => void;
 }) {
-  const request = usePublishedExecution(rules, notify);
+  const request = usePublishedExecution(notify);
   const {
     published,
     id,

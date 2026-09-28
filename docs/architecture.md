@@ -73,7 +73,7 @@ Transform creates a new value without mutating inputs. Field mappings produce an
 
 ## Canvas layout
 
-**Arrange graph** uses ELK's layered layout with fixed port positions matching the rendered handles: True at 27% of node width, False at 73%, incoming connections at the top center. This lets crossing minimization reorder branch nodes and their downstream nodes with the exit order in view. Measured node dimensions prevent overlaps. Stable input ordering and a fixed seed make repeated arrangements reproducible.
+**Arrange graph** uses ELK's layered layout with fixed port positions matching the rendered handles: True at 27% of node width, False at 73%, incoming connections at the top center. This lets crossing minimization reorder branch nodes and their downstream nodes with the exit order in view. Measured node dimensions prevent overlaps. Stable input ordering and a fixed seed make repeated arrangements reproducible. The layout runs in a Web Worker, so a large graph's Arrange does not block the page; the options and the seed are the same, so the result is the same as in-thread.
 
 Switch ports are ordered left to right by case priority, with Default last. Cards widen to keep exit labels separated. Canvas, connection validation and layout share the same port definitions.
 

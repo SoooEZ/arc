@@ -1,14 +1,21 @@
+import { memo, useCallback } from "react";
 import { Button, IconButton, TextField, Tooltip } from "@mui/material";
 import { Plus, Trash2 } from "lucide-react";
 import ExpressionField from "../../expressions/ExpressionField";
 import ValueBinding from "../../expressions/ValueBinding";
 import { quoteText } from "../../../domain/expressions";
+import { patchGraphNode } from "../../../domain/graph";
 import { uniqueName } from "../../../domain/ids";
+import type { VariableOption } from "../../../domain/graph";
+import type { Definition, RuleNode } from "../../../types";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 import { useRowIdentities } from "./useRowIdentities";
 
-type Field = NonNullable<NodeFieldsProps["node"]["fields"]>[number];
+type Field = NonNullable<RuleNode["fields"]>[number];
+
+/** A functional update of one node's fields, read from the current draft. */
+type FieldsUpdate = (fields: Field[]) => Field[];
 
 export default function TransformFields({
   node,
@@ -16,16 +23,44 @@ export default function TransformFields({
   variables,
   scopeKnown,
   readOnly,
+  onDefinitionChange,
 }: NodeFieldsProps) {
   const fields = node.fields ?? [];
   const fieldMode = node.expression == null;
   // Rows keep their editors across edits, additions and removals (lesson F6).
   const rows = useRowIdentities<Field>("transform-field");
-  const replaceField = (index: number, patch: Partial<Field>) =>
-    patch &&
-    fields.map((field, i) =>
-      i === index ? rows.carry(field, { ...field, ...patch }) : field,
-    );
+  const nodeId = node.id;
+  // One stable updater for every row: a row callback reads the current fields
+  // instead of closing over this render's array, so rows can be memoized.
+  const updateFields = useCallback(
+    (update: FieldsUpdate) =>
+      onDefinitionChange((definition: Definition) => {
+        const current = definition.nodes.find((n) => n.id === nodeId);
+        if (!current) return definition;
+        return patchGraphNode(definition, nodeId, {
+          fields: update(current.fields ?? []),
+        });
+      }),
+    [onDefinitionChange, nodeId],
+  );
+  const replaceField = useCallback(
+    (identity: string, change: Partial<Field>) =>
+      updateFields((current) =>
+        current.map((field) =>
+          rows.identity(field) === identity
+            ? rows.carry(field, { ...field, ...change })
+            : field,
+        ),
+      ),
+    [updateFields, rows],
+  );
+  const removeField = useCallback(
+    (identity: string) =>
+      updateFields((current) =>
+        current.filter((field) => rows.identity(field) !== identity),
+      ),
+    [updateFields, rows],
+  );
   return (
     <InspectorSection
       title="Transform data"
@@ -38,50 +73,17 @@ export default function TransformFields({
       {fieldMode ? (
         <>
           {fields.map((field, index) => (
-            <div key={rows.identity(field)} className="node-mapping-card">
-              <div className="mapping-card-heading">
-                <strong>Field {index + 1}</strong>
-                <Tooltip title="Remove field">
-                  <span>
-                    <IconButton
-                      size="small"
-                      aria-label={`Remove field ${index + 1}`}
-                      disabled={readOnly}
-                      onClick={() =>
-                        patch({ fields: fields.filter((_, i) => i !== index) })
-                      }
-                    >
-                      <Trash2 size={14} />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </div>
-              <TextField
-                label={`Field ${index + 1} name`}
-                value={field.name}
-                disabled={readOnly}
-                onChange={(e) =>
-                  patch({
-                    fields: replaceField(index, { name: e.target.value }),
-                  })
-                }
-              />
-              <ValueBinding
-                key={rows.identity(field)}
-                label={`Field ${index + 1} value`}
-                type="ANY"
-                optional={false}
-                value={field.expression}
-                variables={variables}
-                scopeKnown={scopeKnown}
-                disabled={readOnly}
-                onChange={(value) =>
-                  patch({
-                    fields: replaceField(index, { expression: value ?? "" }),
-                  })
-                }
-              />
-            </div>
+            <TransformFieldRow
+              key={rows.identity(field)}
+              identity={rows.identity(field)}
+              index={index}
+              field={field}
+              variables={variables}
+              scopeKnown={scopeKnown}
+              readOnly={readOnly}
+              onReplace={replaceField}
+              onRemove={removeField}
+            />
           ))}
           <Button
             startIcon={<Plus size={14} />}
@@ -137,3 +139,60 @@ export default function TransformFields({
     </InspectorSection>
   );
 }
+
+/** One field: renders again only when its own field, index, scope or callbacks change. */
+const TransformFieldRow = memo(function TransformFieldRow({
+  identity,
+  index,
+  field,
+  variables,
+  scopeKnown,
+  readOnly,
+  onReplace,
+  onRemove,
+}: {
+  identity: string;
+  index: number;
+  field: Field;
+  variables: VariableOption[];
+  scopeKnown: boolean;
+  readOnly: boolean;
+  onReplace: (identity: string, change: Partial<Field>) => void;
+  onRemove: (identity: string) => void;
+}) {
+  return (
+    <div className="node-mapping-card">
+      <div className="mapping-card-heading">
+        <strong>Field {index + 1}</strong>
+        <Tooltip title="Remove field">
+          <span>
+            <IconButton
+              size="small"
+              aria-label={`Remove field ${index + 1}`}
+              disabled={readOnly}
+              onClick={() => onRemove(identity)}
+            >
+              <Trash2 size={14} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      </div>
+      <TextField
+        label={`Field ${index + 1} name`}
+        value={field.name}
+        disabled={readOnly}
+        onChange={(e) => onReplace(identity, { name: e.target.value })}
+      />
+      <ValueBinding
+        label={`Field ${index + 1} value`}
+        type="ANY"
+        optional={false}
+        value={field.expression}
+        variables={variables}
+        scopeKnown={scopeKnown}
+        disabled={readOnly}
+        onChange={(value) => onReplace(identity, { expression: value ?? "" })}
+      />
+    </div>
+  );
+});

@@ -2,6 +2,7 @@ package dev.arc.engine.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.BoundedCache;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.validation.CompiledGraph;
@@ -17,14 +18,9 @@ import java.util.function.Supplier;
 final class ExecutionPlans {
   private record Pin(String id, int version) {}
 
-  private record Entry(CompiledGraph plan, long weight) {}
-
   private final Validator validator;
   private final ObjectMapper json;
-  private final int maximumEntries;
-  private final long maximumWeight;
-  private final Map<Pin, Entry> published = new LinkedHashMap<>(16, 0.75f, true);
-  private long weight;
+  private final BoundedCache<Pin, CompiledGraph> published;
 
   /**
    * Advances whenever plans are forgotten. A session may have read a rule before its deletion, so
@@ -39,17 +35,15 @@ final class ExecutionPlans {
   ExecutionPlans(Validator validator, ObjectMapper json, int maximumEntries, long maximumWeight) {
     this.validator = validator;
     this.json = json;
-    this.maximumEntries = maximumEntries;
-    this.maximumWeight = maximumWeight;
+    this.published = new BoundedCache<>(maximumEntries, maximumWeight);
   }
 
   Session session(RuleResolver resolver, ExecutionDeadline deadline, boolean cachePublished) {
     return new Session(resolver, deadline, cachePublished);
   }
 
-  private synchronized CompiledGraph cached(Pin pin) {
-    Entry entry = published.get(pin);
-    return entry == null ? null : entry.plan();
+  private CompiledGraph cached(Pin pin) {
+    return published.get(pin);
   }
 
   /**
@@ -58,13 +52,7 @@ final class ExecutionPlans {
    */
   synchronized void forget(String ruleId) {
     generation++;
-    var entries = published.entrySet().iterator();
-    while (entries.hasNext()) {
-      var entry = entries.next();
-      if (!entry.getKey().id().equals(ruleId)) continue;
-      weight -= entry.getValue().weight();
-      entries.remove();
-    }
+    published.removeIf(pin -> pin.id().equals(ruleId));
   }
 
   private synchronized long currentGeneration() {
@@ -75,18 +63,11 @@ final class ExecutionPlans {
     store(pin, plan, weight(plan), sessionGeneration);
   }
 
+  /** A plan compiled before a deletion is not stored after it: the generation guards the store. */
   private synchronized void store(
       Pin pin, CompiledGraph plan, long planWeight, long sessionGeneration) {
     if (sessionGeneration != generation) return;
-    if (maximumEntries <= 0 || planWeight > maximumWeight) return;
-    Entry previous = published.put(pin, new Entry(plan, planWeight));
-    weight += planWeight - (previous == null ? 0 : previous.weight());
-    while (published.size() > maximumEntries || weight > maximumWeight) {
-      var iterator = published.entrySet().iterator();
-      Entry removed = iterator.next().getValue();
-      iterator.remove();
-      weight -= removed.weight();
-    }
+    published.put(pin, plan, planWeight);
   }
 
   final class Session {

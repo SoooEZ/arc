@@ -6,25 +6,64 @@ import {
   Tooltip,
 } from "@mui/material";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { memo, useCallback } from "react";
 import { shortId } from "../../../domain/ids";
+import { patchGraphNode, type VariableOption } from "../../../domain/graph";
+import type { Definition, RuleNode } from "../../../types";
 import ExpressionField from "../../expressions/ExpressionField";
 import ValueBinding from "../../expressions/ValueBinding";
 import SwitchDefaultReturn from "./SwitchDefaultReturn";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 
+type Case = NonNullable<RuleNode["cases"]>[number];
+
 export default function SwitchFields(props: NodeFieldsProps) {
-  const { node, patch, variables, scopeKnown, readOnly } = props;
+  const { node, patch, variables, scopeKnown, readOnly, onDefinitionChange } =
+    props;
   const cases = node.cases ?? [];
   const matchingValue = node.selector != null;
-  const move = (index: number, direction: number) => {
-    const next = [...cases];
-    [next[index], next[index + direction]] = [
-      next[index + direction],
-      next[index],
-    ];
-    patch({ cases: next });
-  };
+  const nodeId = node.id;
+  // Stable per-row callbacks read the current cases from the draft, so a
+  // keystroke in one case re-renders that row alone.
+  const updateCase = useCallback(
+    (id: string, change: Partial<Case>) =>
+      onDefinitionChange((definition: Definition) => {
+        const current = definition.nodes.find((n) => n.id === nodeId);
+        if (!current) return definition;
+        return patchGraphNode(definition, nodeId, {
+          cases: (current.cases ?? []).map((c) =>
+            c.id === id ? { ...c, ...change } : c,
+          ),
+        });
+      }),
+    [onDefinitionChange, nodeId],
+  );
+  const removeCase = useCallback(
+    (id: string) =>
+      onDefinitionChange((definition: Definition) => {
+        const current = definition.nodes.find((n) => n.id === nodeId);
+        if (!current) return definition;
+        return patchGraphNode(definition, nodeId, {
+          cases: (current.cases ?? []).filter((c) => c.id !== id),
+        });
+      }),
+    [onDefinitionChange, nodeId],
+  );
+  const moveCase = useCallback(
+    (id: string, direction: number) =>
+      onDefinitionChange((definition: Definition) => {
+        const current = definition.nodes.find((n) => n.id === nodeId);
+        const list = [...(current?.cases ?? [])];
+        const index = list.findIndex((c) => c.id === id);
+        const target = index + direction;
+        if (!current || index < 0 || target < 0 || target >= list.length)
+          return definition;
+        [list[index], list[target]] = [list[target], list[index]];
+        return patchGraphNode(definition, nodeId, { cases: list });
+      }),
+    [onDefinitionChange, nodeId],
+  );
   return (
     <>
       <InspectorSection
@@ -64,101 +103,19 @@ export default function SwitchFields(props: NodeFieldsProps) {
           Otherwise, Default runs.
         </p>
         {cases.map((option, index) => (
-          <div
+          <SwitchCaseRow
             key={`${option.id}:${matchingValue}`}
-            className="node-mapping-card"
-            data-testid={`switch-case-${option.id}`}
-          >
-            <div className="mapping-card-heading">
-              <strong>Case {index + 1}</strong>
-              <Tooltip title="Higher priority">
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label={`Move case ${index + 1} up`}
-                    disabled={readOnly || index === 0}
-                    onClick={() => move(index, -1)}
-                  >
-                    <ArrowUp size={14} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Lower priority">
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label={`Move case ${index + 1} down`}
-                    disabled={readOnly || index === cases.length - 1}
-                    onClick={() => move(index, 1)}
-                  >
-                    <ArrowDown size={14} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Remove case and its outgoing connections">
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label={`Remove case ${index + 1}`}
-                    disabled={readOnly}
-                    onClick={() =>
-                      patch({ cases: cases.filter((c) => c.id !== option.id) })
-                    }
-                  >
-                    <Trash2 size={14} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </div>
-            <TextField
-              label={`Case ${index + 1} label`}
-              value={option.label}
-              disabled={readOnly}
-              onChange={(e) =>
-                patch({
-                  cases: cases.map((c) =>
-                    c.id === option.id ? { ...c, label: e.target.value } : c,
-                  ),
-                })
-              }
-            />
-            {matchingValue ? (
-              <ValueBinding
-                label={`Case ${index + 1} value`}
-                type="SCALAR"
-                value={option.expression}
-                variables={variables}
-                scopeKnown={scopeKnown}
-                disabled={readOnly}
-                optional={false}
-                onChange={(expression) =>
-                  patch({
-                    cases: cases.map((c) =>
-                      c.id === option.id
-                        ? { ...c, expression: expression ?? "" }
-                        : c,
-                    ),
-                  })
-                }
-              />
-            ) : (
-              <ExpressionField
-                label={`Case ${index + 1} condition`}
-                value={option.expression}
-                variables={variables}
-                scopeKnown={scopeKnown}
-                disabled={readOnly}
-                helperText="Must return true or false. Functions can be nested."
-                onChange={(expression) =>
-                  patch({
-                    cases: cases.map((c) =>
-                      c.id === option.id ? { ...c, expression } : c,
-                    ),
-                  })
-                }
-              />
-            )}
-          </div>
+            option={option}
+            index={index}
+            count={cases.length}
+            matchingValue={matchingValue}
+            variables={variables}
+            scopeKnown={scopeKnown}
+            readOnly={readOnly}
+            onChange={updateCase}
+            onRemove={removeCase}
+            onMove={moveCase}
+          />
         ))}
         <Button
           startIcon={<Plus size={14} />}
@@ -187,3 +144,102 @@ export default function SwitchFields(props: NodeFieldsProps) {
     </>
   );
 }
+
+/** One case: renders again only when its own case, position, scope or callbacks change. */
+const SwitchCaseRow = memo(function SwitchCaseRow({
+  option,
+  index,
+  count,
+  matchingValue,
+  variables,
+  scopeKnown,
+  readOnly,
+  onChange,
+  onRemove,
+  onMove,
+}: {
+  option: Case;
+  index: number;
+  count: number;
+  matchingValue: boolean;
+  variables: VariableOption[];
+  scopeKnown: boolean;
+  readOnly: boolean;
+  onChange: (id: string, change: Partial<Case>) => void;
+  onRemove: (id: string) => void;
+  onMove: (id: string, direction: number) => void;
+}) {
+  return (
+    <div className="node-mapping-card" data-testid={`switch-case-${option.id}`}>
+      <div className="mapping-card-heading">
+        <strong>Case {index + 1}</strong>
+        <Tooltip title="Higher priority">
+          <span>
+            <IconButton
+              size="small"
+              aria-label={`Move case ${index + 1} up`}
+              disabled={readOnly || index === 0}
+              onClick={() => onMove(option.id, -1)}
+            >
+              <ArrowUp size={14} />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Lower priority">
+          <span>
+            <IconButton
+              size="small"
+              aria-label={`Move case ${index + 1} down`}
+              disabled={readOnly || index === count - 1}
+              onClick={() => onMove(option.id, 1)}
+            >
+              <ArrowDown size={14} />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Remove case and its outgoing connections">
+          <span>
+            <IconButton
+              size="small"
+              aria-label={`Remove case ${index + 1}`}
+              disabled={readOnly}
+              onClick={() => onRemove(option.id)}
+            >
+              <Trash2 size={14} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      </div>
+      <TextField
+        label={`Case ${index + 1} label`}
+        value={option.label}
+        disabled={readOnly}
+        onChange={(e) => onChange(option.id, { label: e.target.value })}
+      />
+      {matchingValue ? (
+        <ValueBinding
+          label={`Case ${index + 1} value`}
+          type="SCALAR"
+          value={option.expression}
+          variables={variables}
+          scopeKnown={scopeKnown}
+          disabled={readOnly}
+          optional={false}
+          onChange={(expression) =>
+            onChange(option.id, { expression: expression ?? "" })
+          }
+        />
+      ) : (
+        <ExpressionField
+          label={`Case ${index + 1} condition`}
+          value={option.expression}
+          variables={variables}
+          scopeKnown={scopeKnown}
+          disabled={readOnly}
+          helperText="Must return true or false. Functions can be nested."
+          onChange={(expression) => onChange(option.id, { expression })}
+        />
+      )}
+    </div>
+  );
+});

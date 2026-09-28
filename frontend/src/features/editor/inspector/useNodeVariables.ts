@@ -1,9 +1,10 @@
+import { useRef } from "react";
 import type { Definition } from "../../../types";
 import { studioApi } from "../../../api/studio";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
 import {
   availableVariables,
-  semanticGraphKey,
+  scopeGraphKey,
   type VariableOption,
 } from "../../../domain/graph";
 import { ownValue } from "../../../domain/records";
@@ -43,13 +44,27 @@ export function useNodeVariables(
     loading,
     error,
   } = useAsyncResource(
-    semanticGraphKey(definition),
+    // Keyed by the structure scopes depend on: a label or expression edit
+    // blanked the scope for 150 ms and read the whole draft again.
+    scopeGraphKey(definition),
     (signal) => studioApi.variables(definition, { signal }),
     noScopes,
     150,
   );
-  return {
-    variables: nodeVariables(definition, nodeId, scopes),
-    known: !loading && !error,
-  };
+  // The same options keep the previous array, so memoized rows see one prop.
+  const previous = useRef<VariableOption[]>([]);
+  const variables = nodeVariables(definition, nodeId, scopes);
+  if (!sameOptions(previous.current, variables)) previous.current = variables;
+  return { variables: previous.current, known: !loading && !error };
+}
+
+function sameOptions(left: VariableOption[], right: VariableOption[]): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index++) {
+    const a = left[index];
+    const b = right[index];
+    if (a.name !== b.name || a.type !== b.type || a.label !== b.label)
+      return false;
+  }
+  return true;
 }

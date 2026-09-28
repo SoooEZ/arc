@@ -113,63 +113,63 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 | [X84](#x84) | 3 | CONFIRMED | medium | bug | Docs | `docs` | `docs/openapi.yaml:626` | OpenAPI drift: branch enum lacks case:<id>/default; Node lacks outputName; diagnostics/node render/build paths missing | G6 | ☑ |
 | [X102](#x102) | 3 | CONFIRMED | medium | bug | Backend | `engine.graph` | `backend/src/main/java/dev/arc/engine/graph/BranchScopes.java:25` | BDD variable order follows node-ID tie-break → identical 32-node graph valid or "too complex" by naming; random editor IDs flip publishability (live) | G2 | ☑ |
 | [X148](#x148) | 3 | CONFIRMED | medium | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:85` | array in reference-class single-value params (VLOOKUP/HLOOKUP index, MATCH type, D* field) silently uses first element; docs promise 422 | G1 | ☑ |
-| [X03](#x03) | 4 | CONFIRMED | low | bug | Frontend | `features/execution` | `frontend/src/features/execution/ExecutionError.tsx:66` | Edit test inputs only when no locations; server test-input errors carry Input location → Input card marked broken | G2 | ☐ |
-| [X04](#x04) | 4 | CONFIRMED | low | bug | Frontend | `features/execution` | `frontend/src/features/execution/ApiPage.tsx:160` | playground shows "no published rules" while loading and after failed catalog read | G2 | ☐ |
-| [X08](#x08) | 4 | CONFIRMED | low | bug | Frontend | `features/library` | `frontend/src/features/library/LibraryPage.tsx:144` | filter buttons expose no pressed state; search aria-label on FormControl div | G6 | ☐ |
-| [X10](#x10) | 4 | CONFIRMED | low | bug | Backend | `model` | `backend/src/main/java/dev/arc/model/PageRequest.java:20` | NUL in paged search → 500; Reference ruleId with NUL → 500 on validate/diagnostics/preview | G1 | ☐ |
-| [X12](#x12) | 4 | CONFIRMED | low | bug | Backend | `engine.script` | `backend/src/main/java/dev/arc/engine/script/ArcScript.java:135` | node-code comments silently discarded on Apply; removing at() moves node to 0,0 | G2 | ☐ |
-| [X14](#x14) | 4 | CONFIRMED | low | bug | Backend | `engine.script` | `backend/src/main/java/dev/arc/engine/script/ArcScriptRenderer.java:28` | notes with line terminators/padding split and trimmed on code rebuild; 600-line note makes code unbuildable | G2 | ☐ |
-| [X15](#x15) | 4 | CONFIRMED | low | bug | Backend | `engine.script` | `backend/src/main/java/dev/arc/engine/script/ArcScriptNodeParser.java:153` | duplicate same-handle/target connections (API draft) render to unbuildable script | G2 | ☐ |
-| [X17](#x17) | 4 | CONFIRMED | low | bug | Infra | `frontend` | `frontend/nginx.conf:6` | nginx cap equals Java's → web origin gets HTML 413 without CORS, never the JSON 413 | G3 | ☐ |
-| [X22](#x22) | 4 | CONFIRMED | low | bug | Backend | `engine` | `backend/src/main/java/dev/arc/engine/InputTypes.java:26` | locale-dependent lowercase → "strıng" under tr/az (native dev) | G1 | ☐ |
-| [X23](#x23) | 4 | CONFIRMED | low | bug | Infra | `frontend` | `frontend/nginx.conf:19` | /health double Content-Type; absolute redirects drop published port (/api → http://localhost/api/) | G4 | ☐ |
+| [X03](#x03) | 4 | CONFIRMED | low | bug | Frontend | `features/execution` | `frontend/src/features/execution/ExecutionError.tsx:66` | Edit test inputs only when no locations; server test-input errors carry Input location → Input card marked broken | G2 | ☑ |
+| [X04](#x04) | 4 | CONFIRMED | low | bug | Frontend | `features/execution` | `frontend/src/features/execution/ApiPage.tsx:160` | playground shows "no published rules" while loading and after failed catalog read | G2 | ☑ |
+| [X08](#x08) | 4 | CONFIRMED | low | bug | Frontend | `features/library` | `frontend/src/features/library/LibraryPage.tsx:144` | filter buttons expose no pressed state; search aria-label on FormControl div | G6 | ☑ |
+| [X10](#x10) | 4 | CONFIRMED | low | bug | Backend | `model` | `backend/src/main/java/dev/arc/model/PageRequest.java:20` | NUL in paged search → 500; Reference ruleId with NUL → 500 on validate/diagnostics/preview | G1 | ☑ |
+| [X12](#x12) | 4 | CONFIRMED | low | bug | Backend | `engine.script` | `backend/src/main/java/dev/arc/engine/script/ArcScript.java:135` | node-code comments silently discarded on Apply; removing at() moves node to 0,0 | G2 | ☑ |
+| [X14](#x14) | 4 | CONFIRMED | low | bug | Backend | `engine.script` | `backend/src/main/java/dev/arc/engine/script/ArcScriptRenderer.java:28` | notes with line terminators/padding split and trimmed on code rebuild; 600-line note makes code unbuildable | G2 | ☑ |
+| [X15](#x15) | 4 | CONFIRMED | low | bug | Backend | `engine.script` | `backend/src/main/java/dev/arc/engine/script/ArcScriptNodeParser.java:153` | duplicate same-handle/target connections (API draft) render to unbuildable script | G2 | ☑ |
+| [X17](#x17) | 4 | CONFIRMED | low | bug | Infra | `frontend` | `frontend/nginx.conf:6` | nginx cap equals Java's → web origin gets HTML 413 without CORS, never the JSON 413 | G3 | ☑ |
+| [X22](#x22) | 4 | CONFIRMED | low | bug | Backend | `engine` | `backend/src/main/java/dev/arc/engine/InputTypes.java:26` | locale-dependent lowercase → "strıng" under tr/az (native dev) | G1 | ☑ |
+| [X23](#x23) | 4 | CONFIRMED | low | bug | Infra | `frontend` | `frontend/nginx.conf:19` | /health double Content-Type; absolute redirects drop published port (/api → http://localhost/api/) | G4 | ☑ |
 | [X27](#x27) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/Expressions.java:131` | BigInteger skips precision bound → 150-digit lookup entry saves/tests, every execution 422 (B22 class) | G1 | ☑ |
-| [X29](#x29) | 4 | CONFIRMED | low | bug | Backend | `persistence` | `backend/src/main/java/dev/arc/persistence/StoredText.java:18` | lone surrogate silently stored as '?' (200); frontend then adopts altered echo | G1 | ☐ |
-| [X33](#x33) | 4 | CONFIRMED | low | bug | Frontend | `domain` | `frontend/src/domain/graph.ts:28` | sameDefinition compares DecimalNumber tokens → exponent default respelled in echo → draft replaced, preview dropped | G3 | ☐ |
-| [X34](#x34) | 4 | CONFIRMED | low | bug | Frontend | `features/sources` | `frontend/src/features/sources/sourceDocument.ts:226` | provider switch round trip discards declared parameters | G3 | ☐ |
-| [X36](#x36) | 4 | CONFIRMED | low | bug | Frontend | `features/sources` | `frontend/src/features/sources/SourceBindingEditor.tsx:158` | source mapping for undeclared parameter hidden in form while diagnostics flag Input (removable only via node code) | G3 | ☐ |
-| [X37](#x37) | 4 | CONFIRMED | low | bug | Frontend | `domain` | `frontend/src/domain/nodeKinds.ts:102` | second Input node (accepted by build/save) can't be deleted in graph view | G3 | ☐ |
-| [X39](#x39) | 4 | CONFIRMED | low | bug | Frontend | `features/sources` | `frontend/src/features/sources/useSourceEditor.ts:286` | catalog error alert can't be dismissed; no retry | G3 | ☐ |
-| [X48](#x48) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/useRuleDocument.ts:313` | refused route switch bounces with push → Back trapped | G5 | ☐ |
-| [X50](#x50) | 4 | CONFIRMED | low | bug | Frontend | `hooks` | `frontend/src/hooks/usePagedResource.ts:29` | returning to an earlier filter/search restores its old page offset | G2 | ☐ |
-| [X53](#x53) | 4 | CONFIRMED | low | bug | Frontend | `app` | `frontend/src/app/WorkspaceHeader.tsx:31` | breadcrumb labeled with current section always goes to library (discard prompt in Code studio) | G6 | ☐ |
-| [X57](#x57) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/inspector` | `frontend/src/features/editor/inspector/InputDefaultValue.tsx:17` | ARRAY/OBJECT defaults accept wrong-type/out-of-limit JSON as valid → save 422, triggers X56 | G2 | ☐ |
-| [X58](#x58) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/inspector` | `frontend/src/features/editor/inspector/ReferenceFields.tsx:152` | Reference binding for undeclared parameter hidden in form while diagnostics flag node | G3 | ☐ |
-| [X60](#x60) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/inspector` | `frontend/src/features/editor/inspector/TransformFields.tsx:61` | Add/Remove field remounts every field binding (key includes length) → editors re-inferred, partial text lost | G6 | ☐ |
-| [X63](#x63) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/inspector` | `frontend/src/features/editor/inspector/useInputParameterRows.ts:41` | Add parameter name ignores result variables → validation "cannot overwrite input" | G6 | ☐ |
-| [X65](#x65) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/CodeStudio.tsx:64` | Cmd/Ctrl+S precondition !editorReadonly → browser Save Page dialog on published version / second quick press | G6 | ☐ |
-| [X66](#x66) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/StudioLibrary.tsx:57` | late Reuse insertion hijacks caret; typing becomes result name | G6 | ☐ |
-| [X67](#x67) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/useArcLanguageSupport.ts:71` | duplicate completions for results produced on both branches; hover names first producer only | G6 | ☐ |
-| [X68](#x68) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/arcLanguage.ts:49` | Monarch colors keyword/type/constant fragments inside identifiers (order.format → `at`) | G6 | ☐ |
-| [X69](#x69) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/CodeStudio.tsx:45` | failed @ Formula search silent in Code studio and dialogs | G2 | ☐ |
-| [X74](#x74) | 4 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:108` | static checks never verify pinned callee version can be prepared → publish parents that always fail | G1 | ☐ |
-| [X76](#x76) | 4 | CONFIRMED | low | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleExecutionService.java:104` | published prepare/source-contract errors lack ruleId/version (api.md:81 says published locations always carry a version); test asserts current null | G1 | ☐ |
-| [X86](#x86) | 4 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:52` | input shape problems → locations [] on save/create/render/variables (validate/diagnostics use Input node) | G2 | ☐ |
-| [X87](#x87) | 4 | CONFIRMED | low | bug | Frontend | `domain` | `frontend/src/domain/expressions.ts:54` | ARRAY constant with ≥128 items accepted by field, server rejects >256 tokens | G6 | ☐ |
-| [X89](#x89) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/canvas` | `frontend/src/features/editor/canvas/useGraphFocus.ts:63` | Show problem from code view overridden by initial fitView (stale measurements) | G5 | ☐ |
-| [X90](#x90) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/Editor.tsx:123` | node code opens during Arrange; Apply writes stale position back | G5 | ☐ |
-| [X96](#x96) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/Editor.tsx:384` | no-op node-code Apply adopts build echo (nulls, reordered edges) → clean draft dirty, preview dropped (even for server-loaded rules) | G5 | ☐ |
-| [X97](#x97) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/useRuleDocument.ts:309` | route switch dropped while command running; failed build → code under graph URL, inverted toggle | G5 | ☐ |
-| [X98](#x98) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/canvas` | `frontend/src/features/editor/canvas/GraphCanvas.tsx:312` | stale "Delete connection" after edge removed with node | G5 | ☐ |
-| [X99](#x99) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/canvas` | `frontend/src/features/editor/canvas/useGraphCommands.ts:60` | deleting unselected node moves selection to Input | G5 | ☐ |
-| [X100](#x100) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/useRuleDocument.ts:397` | Hide test builds code first; broken code keeps panel open | G5 | ☐ |
-| [X103](#x103) | 4 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/GraphDiagnostics.java:41` | no scope plan → diagnostics drop scope-free node checks; structure reports only the first problem | G2 | ☐ |
-| [X105](#x105) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/Expressions.java:191` | type errors name JDK classes (UnmodifiableMap, ListN...) | G1 | ☐ |
-| [X106](#x106) | 4 | CONFIRMED | low | bug | Backend | `engine.execution` | `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:223` | runtime Reference binding / source-mapping errors unlabeled (Transform/Switch labeled) | G2 | ☐ |
-| [X121](#x121) | 4 | CONFIRMED | low | bug | Frontend | `domain` | `frontend/src/domain/json.ts:177` | integer-like object keys reordered in displayed results (cosmetic; storage order is JSONB's anyway) | G3 | ☐ |
-| [X124](#x124) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/snippets.ts:56` | Reuse snippet fixed result name → two inserts write same variable; fan-out validates but every run 422s | G6 | ☐ |
-| [X126](#x126) | 4 | CONFIRMED | low | bug | Frontend | `frontend/src` | `frontend/src/App.tsx:199` | Snackbar closes on any clickaway (error notices vanish) | G3 | ☐ |
-| [X130](#x130) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/Functions.java:157` | $GET/$PLUCK: "name." reads name, "." whole object, 3/2 index reads nested element | G1 | ☐ |
-| [X131](#x131) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:131` | $REPT pre-check uses String.valueOf: 1E+2 vs 100 differ; null counted as "null"; 1/3 over-counted | G1 | ☐ |
-| [X132](#x132) | 4 | CONFIRMED | low | bug | Backend | `api` | `backend/src/main/java/dev/arc/api/Errors.java:21` | Accept without JSON → every error becomes 500 + stack trace | G1 | ☐ |
-| [X133](#x133) | 4 | CONFIRMED | low | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleService.java:79` | name validated untrimmed, stored trimmed: control-char name stored empty; source name policy copy never trims | G1 | ☐ |
-| [X136](#x136) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/useLibraryInsertion.ts:48` | ordinary double-click (120–250 ms) inserts two Reference nodes (K63 fix incomplete) | G6 | ☐ |
-| [X149](#x149) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:57` | POI RATE logs ERROR + stack (IRR WARN) even when IFERROR handles → ~10 KB log per call | G1 | ☐ |
-| [X150](#x150) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/ExpressionParser.java:131` | negative literal/constant rounded to 34 digits (negate(MATH)); positive exact | G1 | ☐ |
-| [X196](#x196) | 4 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:159` | Reference ruleId never checked as resource ID: "Bad ID!"/5,000-char/"" save and build silently; NUL ruleId → 500 on validate/diagnostics/preview | G2 | ☐ |
-| [X225](#x225) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/canvas` | `frontend/src/features/editor/canvas/graphLayout.ts:17` | Arrange ID sort uses localeCompare → locale-dependent layout | G6 | ☐ |
-| [X226](#x226) | 4 | CONFIRMED | low | bug | Backend | `source` | `backend/src/main/java/dev/arc/source/SourceBindingValidator.java:71` | static nesting check depth of first DFS visit → order-dependent; accepted root fails every run with LIMIT (live publish) | G6 | ☐ |
-| [X227](#x227) | 4 | CONFIRMED | low | bug | Backend | `source.http` | `backend/src/main/java/dev/arc/source/http/HttpSourceAdapter.java:29` | HTTP entries unbounded: {"a":1e5000} → 500 on create/update (read-back rollback) instead of 422 | G6 | ☐ |
+| [X29](#x29) | 4 | CONFIRMED | low | bug | Backend | `persistence` | `backend/src/main/java/dev/arc/persistence/StoredText.java:18` | lone surrogate silently stored as '?' (200); frontend then adopts altered echo | G1 | ☑ |
+| [X33](#x33) | 4 | CONFIRMED | low | bug | Frontend | `domain` | `frontend/src/domain/graph.ts:28` | sameDefinition compares DecimalNumber tokens → exponent default respelled in echo → draft replaced, preview dropped | G3 | ☑ |
+| [X34](#x34) | 4 | CONFIRMED | low | bug | Frontend | `features/sources` | `frontend/src/features/sources/sourceDocument.ts:226` | provider switch round trip discards declared parameters | G3 | ☑ |
+| [X36](#x36) | 4 | CONFIRMED | low | bug | Frontend | `features/sources` | `frontend/src/features/sources/SourceBindingEditor.tsx:158` | source mapping for undeclared parameter hidden in form while diagnostics flag Input (removable only via node code) | G3 | ☑ |
+| [X37](#x37) | 4 | CONFIRMED | low | bug | Frontend | `domain` | `frontend/src/domain/nodeKinds.ts:102` | second Input node (accepted by build/save) can't be deleted in graph view | G3 | ☑ |
+| [X39](#x39) | 4 | CONFIRMED | low | bug | Frontend | `features/sources` | `frontend/src/features/sources/useSourceEditor.ts:286` | catalog error alert can't be dismissed; no retry | G3 | ☑ |
+| [X48](#x48) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/useRuleDocument.ts:313` | refused route switch bounces with push → Back trapped | G5 | ☑ |
+| [X50](#x50) | 4 | CONFIRMED | low | bug | Frontend | `hooks` | `frontend/src/hooks/usePagedResource.ts:29` | returning to an earlier filter/search restores its old page offset | G2 | ☑ |
+| [X53](#x53) | 4 | CONFIRMED | low | bug | Frontend | `app` | `frontend/src/app/WorkspaceHeader.tsx:31` | breadcrumb labeled with current section always goes to library (discard prompt in Code studio) | G6 | ☑ |
+| [X57](#x57) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/inspector` | `frontend/src/features/editor/inspector/InputDefaultValue.tsx:17` | ARRAY/OBJECT defaults accept wrong-type/out-of-limit JSON as valid → save 422, triggers X56 | G2 | ☑ |
+| [X58](#x58) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/inspector` | `frontend/src/features/editor/inspector/ReferenceFields.tsx:152` | Reference binding for undeclared parameter hidden in form while diagnostics flag node | G3 | ☑ |
+| [X60](#x60) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/inspector` | `frontend/src/features/editor/inspector/TransformFields.tsx:61` | Add/Remove field remounts every field binding (key includes length) → editors re-inferred, partial text lost | G6 | ☑ |
+| [X63](#x63) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/inspector` | `frontend/src/features/editor/inspector/useInputParameterRows.ts:41` | Add parameter name ignores result variables → validation "cannot overwrite input" | G6 | ☑ |
+| [X65](#x65) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/CodeStudio.tsx:64` | Cmd/Ctrl+S precondition !editorReadonly → browser Save Page dialog on published version / second quick press | G6 | ☑ |
+| [X66](#x66) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/StudioLibrary.tsx:57` | late Reuse insertion hijacks caret; typing becomes result name | G6 | ☑ |
+| [X67](#x67) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/useArcLanguageSupport.ts:71` | duplicate completions for results produced on both branches; hover names first producer only | G6 | ☑ |
+| [X68](#x68) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/arcLanguage.ts:49` | Monarch colors keyword/type/constant fragments inside identifiers (order.format → `at`) | G6 | ☑ |
+| [X69](#x69) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/CodeStudio.tsx:45` | failed @ Formula search silent in Code studio and dialogs | G2 | ☑ |
+| [X74](#x74) | 4 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:108` | static checks never verify pinned callee version can be prepared → publish parents that always fail | G1 | ☑ |
+| [X76](#x76) | 4 | CONFIRMED | low | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleExecutionService.java:104` | published prepare/source-contract errors lack ruleId/version (api.md:81 says published locations always carry a version); test asserts current null | G1 | ☑ |
+| [X86](#x86) | 4 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:52` | input shape problems → locations [] on save/create/render/variables (validate/diagnostics use Input node) | G2 | ☑ |
+| [X87](#x87) | 4 | CONFIRMED | low | bug | Frontend | `domain` | `frontend/src/domain/expressions.ts:54` | ARRAY constant with ≥128 items accepted by field, server rejects >256 tokens | G6 | ☑ |
+| [X89](#x89) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/canvas` | `frontend/src/features/editor/canvas/useGraphFocus.ts:63` | Show problem from code view overridden by initial fitView (stale measurements) | G5 | ☑ |
+| [X90](#x90) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/Editor.tsx:123` | node code opens during Arrange; Apply writes stale position back | G5 | ☑ |
+| [X96](#x96) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/Editor.tsx:384` | no-op node-code Apply adopts build echo (nulls, reordered edges) → clean draft dirty, preview dropped (even for server-loaded rules) | G5 | ☑ |
+| [X97](#x97) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/useRuleDocument.ts:309` | route switch dropped while command running; failed build → code under graph URL, inverted toggle | G5 | ☑ |
+| [X98](#x98) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/canvas` | `frontend/src/features/editor/canvas/GraphCanvas.tsx:312` | stale "Delete connection" after edge removed with node | G5 | ☑ |
+| [X99](#x99) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/canvas` | `frontend/src/features/editor/canvas/useGraphCommands.ts:60` | deleting unselected node moves selection to Input | G5 | ☑ |
+| [X100](#x100) | 4 | CONFIRMED | low | bug | Frontend | `features/editor` | `frontend/src/features/editor/useRuleDocument.ts:397` | Hide test builds code first; broken code keeps panel open | G5 | ☑ |
+| [X103](#x103) | 4 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/GraphDiagnostics.java:41` | no scope plan → diagnostics drop scope-free node checks; structure reports only the first problem | G2 | ☑ |
+| [X105](#x105) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/Expressions.java:191` | type errors name JDK classes (UnmodifiableMap, ListN...) | G1 | ☑ |
+| [X106](#x106) | 4 | CONFIRMED | low | bug | Backend | `engine.execution` | `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:223` | runtime Reference binding / source-mapping errors unlabeled (Transform/Switch labeled) | G2 | ☑ |
+| [X121](#x121) | 4 | CONFIRMED | low | bug | Frontend | `domain` | `frontend/src/domain/json.ts:177` | integer-like object keys reordered in displayed results (cosmetic; storage order is JSONB's anyway) | G3 | ☑ |
+| [X124](#x124) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/snippets.ts:56` | Reuse snippet fixed result name → two inserts write same variable; fan-out validates but every run 422s | G6 | ☑ |
+| [X126](#x126) | 4 | CONFIRMED | low | bug | Frontend | `frontend/src` | `frontend/src/App.tsx:199` | Snackbar closes on any clickaway (error notices vanish) | G3 | ☑ |
+| [X130](#x130) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/Functions.java:157` | $GET/$PLUCK: "name." reads name, "." whole object, 3/2 index reads nested element | G1 | ☑ |
+| [X131](#x131) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:131` | $REPT pre-check uses String.valueOf: 1E+2 vs 100 differ; null counted as "null"; 1/3 over-counted | G1 | ☑ |
+| [X132](#x132) | 4 | CONFIRMED | low | bug | Backend | `api` | `backend/src/main/java/dev/arc/api/Errors.java:21` | Accept without JSON → every error becomes 500 + stack trace | G1 | ☑ |
+| [X133](#x133) | 4 | CONFIRMED | low | bug | Backend | `rule` | `backend/src/main/java/dev/arc/rule/RuleService.java:79` | name validated untrimmed, stored trimmed: control-char name stored empty; source name policy copy never trims | G1 | ☑ |
+| [X136](#x136) | 4 | CONFIRMED | low | bug | Frontend | `features/studio` | `frontend/src/features/studio/useLibraryInsertion.ts:48` | ordinary double-click (120–250 ms) inserts two Reference nodes (K63 fix incomplete) | G6 | ☑ |
+| [X149](#x149) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:57` | POI RATE logs ERROR + stack (IRR WARN) even when IFERROR handles → ~10 KB log per call | G1 | ☑ |
+| [X150](#x150) | 4 | CONFIRMED | low | bug | Backend | `engine.expression` | `backend/src/main/java/dev/arc/engine/expression/ExpressionParser.java:131` | negative literal/constant rounded to 34 digits (negate(MATH)); positive exact | G1 | ☑ |
+| [X196](#x196) | 4 | CONFIRMED | low | bug | Backend | `engine.validation` | `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:159` | Reference ruleId never checked as resource ID: "Bad ID!"/5,000-char/"" save and build silently; NUL ruleId → 500 on validate/diagnostics/preview | G2 | ☑ |
+| [X225](#x225) | 4 | CONFIRMED | low | bug | Frontend | `features/editor/canvas` | `frontend/src/features/editor/canvas/graphLayout.ts:17` | Arrange ID sort uses localeCompare → locale-dependent layout | G6 | ☑ |
+| [X226](#x226) | 4 | CONFIRMED | low | bug | Backend | `source` | `backend/src/main/java/dev/arc/source/SourceBindingValidator.java:71` | static nesting check depth of first DFS visit → order-dependent; accepted root fails every run with LIMIT (live publish) | G6 | ☑ |
+| [X227](#x227) | 4 | CONFIRMED | low | bug | Backend | `source.http` | `backend/src/main/java/dev/arc/source/http/HttpSourceAdapter.java:29` | HTTP entries unbounded: {"a":1e5000} → 500 on create/update (read-back rollback) instead of 422 | G6 | ☑ |
 | [X217](#x217) | 5 | CONFIRMED | medium | efficiency | Frontend | `features/expressions` | `frontend/src/features/expressions/InlineExpressionEditor.tsx:104` | new options object per render → global Monaco config change per editor → 72–80 ms/keystroke at 20 Switch cases, 176 ms at 40 fields (vs 40/64 with memo) | G8 | ☐ |
 | [X05](#x05) | 5 | CONFIRMED | low | efficiency | Frontend | `features/execution` | `frontend/src/features/execution/usePublishedExecution.ts:69` | direct playground/docs visit reads catalog twice | G8 | ☐ |
 | [X46](#x46) | 5 | CONFIRMED | low | efficiency | Backend | `engine.execution` | `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:225` | nested pins resolved eagerly; mixed Reference+@ same pin → extra repository read per request even when cached | G1 | ☐ |
@@ -256,7 +256,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x130"></a>
 
 ### X130 · low · bug · `$GET`/`$PLUCK` path splitting drops trailing empty segments and splits fractional numbers into nested paths
-- **Status:** CONFIRMED — record: `verdicts/v-zero.md`
+- **Status:** CONFIRMED — record: `verdicts/v-zero.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.expression (`Functions.get`, `Functions.path`) / `$GET` and `$PLUCK` paths (variable property paths share `Functions.get`)
 - **Location:** `backend/src/main/java/dev/arc/engine/expression/Functions.java:157` (+ `backend/src/main/java/dev/arc/engine/expression/Functions.java:144`, `backend/src/main/java/dev/arc/engine/expression/Functions.java:132`, `backend/src/main/java/dev/arc/engine/expression/ExpressionParser.java:161`, `backend/src/main/java/dev/arc/engine/expression/ExpressionParser.java:169`)
 - **Problem:** `Functions.get` splits the path with `String.split("\\.")`, which drops trailing empty segments and returns an empty array for "." or "..", so a path ending in a dot reads its prefix and a path of only dots returns the whole value instead of the fallback. `path()` turns a numeric path into text through `ValueText.key` (line 144), so a fractional number becomes dotted text ("1.5") that `get` splits into a nested path. This contradicts docs/studio.md:201 ("Empty or missing object paths return null ($GET/$PLUCK accept a fallback)") and the parser's own rule for variable paths (ExpressionParser.java:161 rejects `customer.name.`).
@@ -269,7 +269,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x131"></a>
 
 ### X131 · low · bug · The `$REPT` length pre-check measures `String.valueOf` text instead of the text POI repeats
-- **Status:** CONFIRMED — record: `verdicts/v-zero.md`
+- **Status:** CONFIRMED — record: `verdicts/v-zero.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.expression (`ExcelFunctionAdapter.checkRepeatedLength`) / Excel functions ($REPT)
 - **Location:** `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:131` (+ `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:125`, `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:140`, `backend/src/main/java/dev/arc/engine/expression/ExcelWildcards.java:105`)
 - **Problem:** `checkRepeatedLength` estimates REPT's result length from `String.valueOf(arg)` — `BigDecimal.toString()` for numbers and "null" for a blank — instead of the text POI actually repeats (POI receives `new NumberEval(n.doubleValue())` and repeats `OperandResolver.coerceValueToString` of it). Equal numbers therefore pass or fail depending on their scale, and long quotients and null are over-counted, so valid REPT calls fail with 422. This breaks B17 ("Never turn a number into text with BigDecimal.toString()") and backend/AGENTS.md.
@@ -282,7 +282,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x132"></a>
 
 ### X132 · low · bug · Error responses go through content negotiation, so an Accept header without JSON turns every error into an empty 500
-- **Status:** CONFIRMED — record: `verdicts/v-zero.md`
+- **Status:** CONFIRMED — record: `verdicts/v-zero.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / api (`Errors`) / HTTP error responses of every endpoint
 - **Location:** `backend/src/main/java/dev/arc/api/Errors.java:21` (+ `backend/src/main/java/dev/arc/api/Errors.java:43`, `backend/src/main/java/dev/arc/api/Errors.java:50`)
 - **Problem:** The `@ExceptionHandler` methods return a `ResponseEntity` with a `Map` body and no preset content type, so Spring negotiates the error body's media type against the Accept header. When Accept excludes both JSON and `*/*`, writing the body throws `HttpMediaTypeNotAcceptableException` inside the handler; the original exception then escapes to Tomcat, and every 404, 409, 422 and 504 becomes a 500 with a WARN and an ERROR stack trace in the log.
@@ -295,7 +295,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x133"></a>
 
 ### X133 · low · bug · Rule names are validated before trimming and stored after it; the source-name copy of the policy never trims
-- **Status:** CONFIRMED — record: `verdicts/v-zero.md`
+- **Status:** CONFIRMED — record: `verdicts/v-zero.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / rule (`RuleService.metadata`), source (`SourceValidator`, `SourceService`), persistence (`StoredText`) / rule and data-source names
 - **Location:** `backend/src/main/java/dev/arc/rule/RuleService.java:79` (+ `backend/src/main/java/dev/arc/rule/RuleService.java:87`, `backend/src/main/java/dev/arc/rule/RuleService.java:101`, `backend/src/main/java/dev/arc/rule/RuleService.java:184`, `backend/src/main/java/dev/arc/source/SourceValidator.java:26`, `backend/src/main/java/dev/arc/source/SourceService.java:50`, `backend/src/main/java/dev/arc/source/SourceService.java:56`, `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:198`)
 - **Problem:** `RuleService.metadata` validates the raw name with `isBlank()` (false for control characters) and counts padding toward the 160-character limit, then `create`/`update` store `name.trim()`, which strips every character at or below U+0020, including U+0000 and U+0001; a name made only of control characters is therefore stored empty, and the NUL check (`StoredText.requireStorable`) runs on the already trimmed text. `SourceValidator.validate` is a second copy of the name policy that never trims and words its message differently ("1–160" versus "1 to 160"), and `SourceService` stores `request.name()` unchanged.
@@ -308,7 +308,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x10"></a>
 
 ### X10 · low · bug · A NUL character in a paged search or a Reference `ruleId` reaches PostgreSQL and answers 500
-- **Status:** CONFIRMED — record: `verdicts/v-text.md`
+- **Status:** CONFIRMED — record: `verdicts/v-text.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / model (`PageRequest`), api (`PageParameters`), persistence (catalog SQL), engine.validation (`DefinitionShape`, `NodeValidation`) / library, source and version-history search; Reference nodes in validate, diagnostics, preview and Code studio build
 - **Location:** `backend/src/main/java/dev/arc/model/PageRequest.java:20` (+ `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:18`, `backend/src/main/java/dev/arc/persistence/JdbcRuleRepository.java:43`, `backend/src/main/java/dev/arc/persistence/JdbcSourceRepository.java:15`, `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:108`, `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:160`, `backend/src/main/java/dev/arc/api/PageParameters.java:11`)
 - **Problem:** `PageRequest` only trims the search (`trim()` removes a leading or trailing NUL, not an interior one), and the text is bound into `strpos(lower(…), lower(?))`/`strpos(version::text, ?)`; PostgreSQL rejects U+0000 in a text parameter and the API returns 500. Separately, neither `DefinitionShape` nor `NodeValidation` checks a Reference node's `ruleId` with `Identifiers.isResourceId`, although source bindings (`InputValidation:49`) and Formula pins (`ExpressionParser:190`) are checked, so `resolver.resolve(node.ruleId(), …)` sends the NUL to SQL. Docs promise 422 for NUL text (api.md:115, :159; architecture.md:143); this is B24's class (a storage outcome reaching the client as 500) on a read path, and nothing is written, so there is no data loss.
@@ -321,7 +321,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x29"></a>
 
 ### X29 · low · bug · Unpaired UTF-16 surrogates are silently stored as "?" instead of being rejected
-- **Status:** CONFIRMED — record: `verdicts/v-text.md`
+- **Status:** CONFIRMED — record: `verdicts/v-text.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / persistence (`StoredText`, `JsonCodec`, JDBC repositories) / stored names, descriptions, drafts, published versions and source definitions (the editor's save acknowledgement then adopts the altered echo)
 - **Location:** `backend/src/main/java/dev/arc/persistence/StoredText.java:18` (+ `backend/src/main/java/dev/arc/persistence/StoredText.java:27`, `backend/src/main/java/dev/arc/persistence/JsonCodec.java:20`, `frontend/src/features/editor/documentState.ts:111`, `docs/openapi.yaml:11`)
 - **Problem:** StoredText rejects only U+0000. A lone surrogate arrives as the valid JSON escape `\ud800`, Jackson decodes it into the Java string, `JsonCodec.encode` (`writeValueAsString`) keeps it as a raw char, and pgjdbc's UTF-8 encoding silently replaces it with '?'. Names, descriptions, drafts and source definitions are stored altered with 201/200 instead of being rejected, and nothing documents the substitution (openapi.yaml:10-11 names only NUL).
@@ -334,7 +334,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x22"></a>
 
 ### X22 · low · bug · The input-type error lowercases with the JVM default locale ("must be strıng" under tr/az)
-- **Status:** CONFIRMED — record: `verdicts/v-text.md`
+- **Status:** CONFIRMED — record: `verdicts/v-text.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine (`InputTypes`) / type errors for inputs, source parameters and defaults (native dev and Maven runs)
 - **Location:** `backend/src/main/java/dev/arc/engine/InputTypes.java:26` (+ `backend/Dockerfile:14`, `Procfile.dev:1`)
 - **Problem:** `InputTypes.check` builds "Input 'x' must be <type>" with `type.toLowerCase()`, which uses the JVM default locale, so under a tr or az default locale "STRING" becomes "strıng" (dotless ı). It is the only locale-less `toLowerCase`/`toUpperCase` in backend/src/main; every other case conversion uses Locale.ROOT or Locale.US, and only the Docker entrypoint pins en-US.
@@ -360,7 +360,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x105"></a>
 
 ### X105 · low · bug · Type errors name JDK implementation classes (UnmodifiableMap, ListN, …) instead of ARC types
-- **Status:** CONFIRMED — record: `verdicts/v-text.md`
+- **Status:** CONFIRMED — record: `verdicts/v-text.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.expression (`Expressions.bool`, `Expressions.number`) / type error messages (Condition nodes, arithmetic; shown in the Test panel and API errors)
 - **Location:** `backend/src/main/java/dev/arc/engine/expression/Expressions.java:191` (+ `backend/src/main/java/dev/arc/engine/expression/Expressions.java:102`, `backend/src/main/java/dev/arc/engine/expression/Expressions.java:113`, `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:162`, `backend/src/main/java/dev/arc/model/Frozen.java:18`)
 - **Problem:** `type(Object o)` returns `o.getClass().getSimpleName()`, so "Expected a boolean, got …" and "Expected a number, got …" name the Java implementation class instead of the ARC type. The name for the same ARC type changes with where the value came from: `Frozen` wraps defaults in `Collections.unmodifiableMap/unmodifiableList`, Jackson produces `LinkedHashMap`/`ArrayList`, and literals produce `List.of` (`ListN`, `List12`).
@@ -399,7 +399,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x149"></a>
 
 ### X149 · low · bug · POI's RATE logs an ERROR with a stack trace (IRR a WARN) even when `$IFERROR` handles the result
-- **Status:** CONFIRMED — record: `verdicts/v-excel.md`
+- **Status:** CONFIRMED — record: `verdicts/v-excel.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.expression (`ExcelFunctionAdapter.calculate`), resources (`application.yaml` logging) / Excel functions ($RATE, $IRR); server logs and alerting
 - **Location:** `backend/src/main/java/dev/arc/engine/expression/ExcelFunctionAdapter.java:57` (+ `backend/src/main/resources/application.yaml` (no `logging:` section), `backend/src/test/java/dev/arc/engine/expression/ExcelTextTest.java:125`)
 - **Problem:** POI's `Rate.evaluate` calls `LOG.atError().withThrowable(e).log("Can't evaluate rate function")` for any `EvaluationException` — its exception table covers bytecode 21-192, including argument coercion and `checkValue` — so it logs an ERROR with a full stack trace for everything from #NUM! non-convergence to #VALUE! for text arguments; `Irr` logs a WARN ("Returning NaN because IRR has found an fDerivative of 0", plus denominator and max-iteration variants). Both happen even when ARC hands the error to `$IFERROR` and the request returns 200, because ARC sets no log level for org.apache.poi and log4j-to-slf4j sends these lines to logback.
@@ -412,7 +412,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x150"></a>
 
 ### X150 · low · bug · Unary minus rounds its operand to 34 digits, so negative literals and NUMBER constants lose precision that positive ones keep
-- **Status:** CONFIRMED — record: `verdicts/v-excel.md`
+- **Status:** CONFIRMED — record: `verdicts/v-excel.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.expression (`ExpressionParser.atom`) / negative number literals and NUMBER constants in Reference bindings, Outputs and Conditions
 - **Location:** `backend/src/main/java/dev/arc/engine/expression/ExpressionParser.java:131` (+ `backend/src/main/java/dev/arc/engine/expression/ExpressionParser.java:141`, `frontend/src/domain/expressions.ts:39`, `frontend/src/domain/valueBinding.ts:63`)
 - **Problem:** `case "-" -> context -> number(operand.eval(context)).negate(MATH);` rounds the operand to DECIMAL128 (34 significant digits), while a positive literal stays exact (`number(new BigDecimal(token))`, line 141) and unary plus returns its operand unrounded. The frontend writes a NUMBER constant such as "-0.5" as a minus attached to a literal ("A directly attached minus sign is ARC's unary negation of the number"), so every negative constant goes through this rounding. `-amount` alone is not distinctive — `0 - amount` rounds the same way under the documented DECIMAL128 arithmetic (architecture.md:127) — the literal and constant asymmetry is the real defect.
@@ -438,7 +438,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x74"></a>
 
 ### X74 · low · bug · Validate, diagnostics and publish never check that a pinned callee version can still be prepared
-- **Status:** CONFIRMED — record: `verdicts/v-callee.md`
+- **Status:** CONFIRMED — record: `verdicts/v-callee.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.validation (`NodeValidation.referenceParameters`, `FormulaCallValidation`), source (`SourceBindingValidator` walk), rule (`RuleDefinitionService`, `RuleService.publish`) / validate, diagnostics (Problems list) and publish of rules with References or `@id:version` calls
 - **Location:** `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:108` (+ `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:110`, `backend/src/main/java/dev/arc/engine/validation/FormulaCallValidation.java:13`, `backend/src/main/java/dev/arc/source/SourceBindingValidator.java:73`, `backend/src/main/java/dev/arc/rule/RuleDefinitionService.java:50`, `backend/src/main/java/dev/arc/rule/RuleDefinitionService.java:71`, `backend/src/main/java/dev/arc/rule/RuleService.java:110`)
 - **Problem:** Static checks resolve a pinned callee but read only its `inputs()` (`referenceParameters`, lines 110-117; `FormulaCallValidation.validate`), and the source-contract walk resolves callees transitively but walks only `Validator.dependencies(callee)` and source mappings, with no shape or compile check. A Reference or `@id:version` call pinned to a version that fails shape or compile therefore passes every static check, and every execution of the new parent then fails (or, under an error function, silently returns the fallback — X72). docs/architecture.md:64 lists what static call checks cover ("kind, pin and argument count"); no doc says broken callee versions are deliberately accepted, and the prefix docs only tell users to "update any pinned parents".
@@ -451,7 +451,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x76"></a>
 
 ### X76 · low · bug · Published executions report preparation and source-contract errors without `ruleId`/`version`
-- **Status:** CONFIRMED — record: `verdicts/v-callee.md`
+- **Status:** CONFIRMED — record: `verdicts/v-callee.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / rule (`RuleExecutionService.evaluate`) / error locations of `POST /rules/{id}/execute`
 - **Location:** `backend/src/main/java/dev/arc/rule/RuleExecutionService.java:104` (+ `backend/src/main/java/dev/arc/rule/RuleExecutionService.java:105`, `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:66`, `backend/src/test/java/dev/arc/rule/RuleExecutionServiceTest.java:137`, `docs/api.md:81`, `frontend/src/domain/graph.ts:58`)
 - **Problem:** For a published execution, `evaluate` calls `execution.prepare(id, version, definition)` and `definitions.validateSources(...)` outside any `inRule(id, version)` wrapper, so errors from preparing the root version and from the source-contract walk carry `ruleId` and `version` null at the root location, while runtime errors of the same version are wrapped by `GraphExecution.run` (lines 66-67). This contradicts docs/api.md:81 ("A published rule may also use the ID `preview`, but its locations always carry a version"; frontend/src/domain/graph.ts:58-60 says the same). The finder's editor consequence is not reachable: the editor's Test panel only calls /preview, and ApiPage renders only the message text.
@@ -479,7 +479,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x03"></a>
 
 ### X03 · low · bug · "Edit test inputs" is hidden for server-side test-input errors, which also badge a valid Input card
-- **Status:** CONFIRMED — record: `verdicts/v-exec.md`
+- **Status:** CONFIRMED — record: `verdicts/v-exec.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/execution (ExecutionError, TestPanel) / Test panel preview errors
 - **Location:** `frontend/src/features/execution/ExecutionError.tsx:66` (+ `frontend/src/features/execution/TestPanel.tsx:130`, `frontend/src/features/editor/Editor.tsx:139`, `frontend/src/features/editor/Editor.tsx:211`, `frontend/src/features/editor/useGraphProblems.ts:40-43`, `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:107-119`)
 - **Problem:** ExecutionError renders the "Edit test inputs" action only when the problem has no locations (`{!locations.length && …}`). The server puts every server-side test-input failure (missing required input, wrong type, unknown input) on the Input node, which is the documented and intended contract (docs/api.md:107: "problems of the whole graph or its inputs are located at the Input node"), so the defect is the frontend check: the action is reachable only for client-side JSON parse errors. The same preview problem also feeds `runtimeProblems` → `nodeErrorsOf`, which marks the Input card `node-error` although the graph is fine.
@@ -492,7 +492,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x04"></a>
 
 ### X04 · low · bug · API playground says "no published rules" while the catalog loads and after it fails
-- **Status:** CONFIRMED — record: `verdicts/v-exec.md`
+- **Status:** CONFIRMED — record: `verdicts/v-exec.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/execution (ApiPage, usePublishedExecution) / API playground and API docs request builder
 - **Location:** `frontend/src/features/execution/ApiPage.tsx:160` (+ `frontend/src/hooks/useAsyncResource.ts:49-53`, `frontend/src/features/execution/usePublishedExecution.ts:167-170`, `frontend/src/features/execution/usePublishedExecution.ts:72`, `frontend/src/features/library/LibraryPage.tsx:193`)
 - **Problem:** The playground's empty-state Alert checks only `!published.length`. The catalog starts as an empty page and `useAsyncResource` resets `data` to that empty page on failure, so "Publish a rule in the library to make your first API call." shows during every first catalog load and stays after a failed catalog read; with a search typed, a failed read shows "No published rules match your search.". LibraryPage guards its empty state against loading and errors; ApiPage does not.
@@ -505,7 +505,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x50"></a>
 
 ### X50 · low · bug · Returning to an earlier filter or search restores its old page instead of page 1
-- **Status:** CONFIRMED — record: `verdicts/v-exec.md`
+- **Status:** CONFIRMED — record: `verdicts/v-exec.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / hooks (usePagedResource) / catalog paging: Library, API playground catalog and version history, data-source catalog and history, VersionHistory, Code studio Reuse search, SourceBindingEditor versions
 - **Location:** `frontend/src/hooks/usePagedResource.ts:29` (+ `frontend/src/hooks/usePagedResource.ts:17`, `frontend/src/hooks/usePagedResource.ts:28`, `frontend/src/hooks/usePagedResource.ts:46`, `frontend/src/hooks/usePagedResource.ts:52-53`, `frontend/tests/catalog-pagination.spec.ts:68`)
 - **Problem:** A key change computes offset 0 (`position.key === key ? position.offset : 0`) but never stores it, so `position` keeps the old key's offset. Returning to that key (filter, search or owner) brings back its old page, which contradicts the hook's contract at line 17 ("One bounded page; changing a search or owner immediately resets the offset"). It is also inconsistent: the only writers are `setOffset` (52-53) and the last-page clamp (46, only when `offset > last`), so the old page comes back only if the user did not page under the intermediate key.
@@ -518,7 +518,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x69"></a>
 
 ### X69 · low · bug · A failed `@` Formula search is silent in Code studio and both expression dialogs
-- **Status:** CONFIRMED — record: `verdicts/v-exec.md`
+- **Status:** CONFIRMED — record: `verdicts/v-exec.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/studio (CodeStudio, useFormulaSupport, StudioLibrary), features/expressions (ExpressionDialog, InlineExpressionEditor), features/editor (NodeExpressionDialog) / `@` Formula completion
 - **Location:** `frontend/src/features/studio/CodeStudio.tsx:45` (+ `frontend/src/features/studio/useFormulaSupport.ts:176-178`, `frontend/src/features/studio/useFormulaSupport.ts:293`, `frontend/src/features/expressions/ExpressionDialog.tsx:54`, `frontend/src/features/editor/NodeExpressionDialog.tsx:49`, `frontend/src/features/expressions/InlineExpressionEditor.tsx:18`, `frontend/src/features/expressions/InlineExpressionEditor.tsx:44`, `frontend/src/features/studio/StudioLibrary.tsx:154-159`)
 - **Problem:** useFormulaSupport stores a failed `@` Formula search in `formulaError` (returned through useArcLanguageSupport). CodeStudio (:45), ExpressionDialog (:54) and NodeExpressionDialog (:49) destructure only `insertFormula`; only InlineExpressionEditor (:44, shown through `helpText` at :18) displays it. In Code studio and both dialogs a failed search looks exactly like "no Formula matches", even though these editors do show function-catalog failures (`catalogError`).
@@ -557,7 +557,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x86"></a>
 
 ### X86 · low · bug · Input and document shape problems come back unlocated from save, create, render and /variables
-- **Status:** CONFIRMED — record: `verdicts/v-shape.md`
+- **Status:** CONFIRMED — record: `verdicts/v-shape.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.validation (DefinitionShape, Validator, Problems) / error locations of draft save/create, Code studio render, node render and `/api/variables`
 - **Location:** `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:52` (+ `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:61-64`, `backend/src/main/java/dev/arc/engine/validation/Validator.java:24-26`, `backend/src/main/java/dev/arc/engine/validation/GraphValidation.java:33-34`, `backend/src/main/java/dev/arc/engine/validation/Problems.java:21-22`, `backend/src/main/java/dev/arc/rule/RuleService.java:84`, `backend/src/main/java/dev/arc/rule/RuleService.java:98`, `backend/src/main/java/dev/arc/engine/script/ArcScript.java:58`, `backend/src/main/java/dev/arc/engine/script/ArcScript.java:63`, `backend/src/main/java/dev/arc/rule/RuleDefinitionService.java:63`)
 - **Problem:** `Validator.shape` throws `DefinitionShape.located()` errors without applying `Problems.onInputNode`, so violations whose element has no owning node return `locations: []` from draft create/save, /studio/render, /studio/node/render and /variables. /validate (GraphValidation.compile wraps with onInputNode) and /diagnostics (Problems.add) put the same fault on the Input node, which is what docs/api.md:107, maintaining.md:48 and B11 promise. The record also names node and edge counts; in HEAD an over-limit node or edge list is reported at its first extra node/connection, so the unlocated cases are document-level violations (schemaVersion, missing lists, no nodes), the input list and each input declaration or source, and notes.
@@ -570,7 +570,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x57"></a>
 
 ### X57 · low · bug · ARRAY/OBJECT parameter defaults accept wrong-type and out-of-limit JSON as valid
-- **Status:** CONFIRMED — record: `verdicts/v-shape.md`
+- **Status:** CONFIRMED — record: `verdicts/v-shape.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor/inspector (InputDefaultValue), components (JsonField), domain (numericDefaults) / Input parameter defaults
 - **Location:** `frontend/src/features/editor/inspector/InputDefaultValue.tsx:17` (+ `frontend/src/components/JsonField.tsx:58-67`, `frontend/src/domain/numericDefaults.ts:71`, `frontend/src/domain/numericDefaults.ts:107-108`, `frontend/src/features/editor/inspector/NumericDefaultField.tsx:46-54`, `backend/src/main/java/dev/arc/engine/InputTypes.java:16-27`)
 - **Problem:** ARRAY and OBJECT defaults go to JsonField, which accepts any parseable JSON, forwards it to the draft and marks itself valid. This includes the wrong type (`{}` or `5` for ARRAY) and numbers beyond server limits (`[1e400]`), so a shape-invalid default enters the draft. The NUMBER field instead rejects out-of-limit values before they reach the draft. Correction from the record: the Input node does get a diagnostics badge, so the user is pointed at the node, though not at the field; the save 422 itself has no location (X86).
@@ -583,7 +583,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x103"></a>
 
 ### X103 · low · bug · Diagnostics without a scope plan drop scope-free node checks; structure checks report only the first problem
-- **Status:** CONFIRMED — record: `verdicts/v-shape.md`
+- **Status:** CONFIRMED — record: `verdicts/v-shape.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.validation (GraphDiagnostics, GraphValidation, NodeValidation) / editor diagnostics (`/api/diagnostics`)
 - **Location:** `backend/src/main/java/dev/arc/engine/validation/GraphDiagnostics.java:41` (+ `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:29-63`, `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:69-76`, `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:90`, `backend/src/main/java/dev/arc/engine/validation/GraphValidation.java:79-86`, `docs/maintaining.md:48`, `docs/architecture.md:180`)
 - **Problem:** Without a scope plan (a cycle, or branch analysis that is too complex), diagnostics run only `NodeValidation.syntax`, which compiles expressions. That silently drops node checks that need no scope: a Switch needs a case, Reference pin and binding checks, a valid result variable, and not overwriting an input — although `NodeValidation.validate` already accepts a null scope (`check()` skips the variable check at :90). Separately, `checkStructure` reports only the first connection or reachability problem. Partly by design and long-standing (maintaining.md:48: "A cyclic graph without a scope plan still gets labelled syntax and Formula checks"; GraphValidation.java:79-80: "The first input-cycle, connection or reachability problem"; baseline 49bb365 had the same syntax-only fallback), hence low severity; architecture.md:180 promises "collecting errors across nodes".
@@ -622,7 +622,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x106"></a>
 
 ### X106 · low · bug · Runtime errors in Reference bindings and source-mapping arguments do not name the binding or mapping
-- **Status:** CONFIRMED — record: `verdicts/v-be-misc.md`
+- **Status:** CONFIRMED — record: `verdicts/v-be-misc.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.execution (GraphExecution, Parameters) / runtime error messages in the Test panel, preview and execute
 - **Location:** `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:223` (+ `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:222`, `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:210-213`, `backend/src/main/java/dev/arc/engine/execution/Parameters.java:103-105`, `backend/src/main/java/dev/arc/engine/execution/Parameters.java:115-119`, `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:143-150`, `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:183-195`)
 - **Problem:** When a Reference binding fails at runtime, the error is the bare message at the Reference node without the binding name. When a source-mapping argument fails, the error is the bare message at the Input node and names neither the input nor the mapping key, because Parameters evaluates the arguments (:103-105) outside the try that adds `parameter.name() + ": "`. The record cites that prefix at :116; in HEAD it is at :119, inside the catch that starts at :115 — the arguments are outside it either way. By contrast Transform fields and Switch cases add "Field x:" / "Case y:", a failed source read adds "rate:", and static diagnostics label the same expressions "Reuse / amount" and "rate source / region". This gap already existed at the 49bb365 baseline; it is not a regression.
@@ -674,7 +674,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x196"></a>
 
 ### X196 · low · bug · Reference ruleId is never checked as a resource ID: malformed IDs save, and a NUL ID returns 500
-- **Status:** CONFIRMED — record: `verdicts/v-be-small.md`
+- **Status:** CONFIRMED — record: `verdicts/v-be-small.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.validation (DefinitionShape), engine (Identifiers) / Reference node pins (graph editor, Code studio `use`, API drafts)
 - **Location:** `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:159` (+ `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:159-167`, `backend/src/main/java/dev/arc/engine/validation/InputValidation.java:48-51`, `backend/src/main/java/dev/arc/engine/expression/ExpressionParser.java:190-191`, `backend/src/main/java/dev/arc/engine/Identifiers.java:30-36`, `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:108`, `docs/maintaining.md:34`)
 - **Problem:** Draft shape never checks a Reference node's `ruleId` for syntax or length, while source pins and `@id:version` calls both use `Identifiers.isResourceId`, so every save, Script build and static check accepts it. Malformed IDs ("Bad ID!", "") and 5,000-character ones save and build with no diagnostic and fail only later as 404 "Published rule version not found"; an ID containing U+0000 reaches SQL and returns 500 from /validate, /diagnostics and /preview. git history shows Reference pins were never checked (not a regression). A draft save of the NUL ID is 422 via StoredText, and publishing any of these drafts fails with 404, so no published version can hold such a pin.
@@ -687,7 +687,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x12"></a>
 
 ### X12 · low · bug · Comments typed into a node's code editor are silently dropped on Apply; removing `at (…)` moves the node to (0, 0)
-- **Status:** CONFIRMED — record: `verdicts/v-script.md`
+- **Status:** CONFIRMED — record: `verdicts/v-script.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.script (ArcScript.buildNode, ArcScriptNodeParser) / node code editor (`/studio/node/build`)
 - **Location:** `backend/src/main/java/dev/arc/engine/script/ArcScript.java:135` (+ `backend/src/main/java/dev/arc/engine/script/ArcScript.java:118-135`, `backend/src/main/java/dev/arc/engine/script/ArcScriptNodeParser.java:113-116`, `frontend/src/features/editor/useNodeExpressionDraft.ts:95`, `docs/studio.md:9`, `docs/architecture.md:178`)
 - **Problem:** A `//` comment typed into a node's code editor is parsed into the fragment's notes, but `ArcScript.replaceNode` always returns the containing graph's `definition.notes()` and never looks at `fragment.definition().notes()`, so the comment is discarded with no diagnostic. `useNodeExpressionDraft.apply` then calls `onApply` and closes the dialog, so the text is lost. The same comment written in Code studio is kept as a note ("Comments use `//` and are retained", docs/studio.md:9), so the two editors behave differently for the same text. Minor related effect: the node parser gives a node without `at (…)` the grid position of its index, which is (0, 0) in a one-node fragment, so deleting a fragment's `at (…)` moves the node to (0,0).
@@ -700,7 +700,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x14"></a>
 
 ### X14 · low · bug · Notes with line breaks or padding do not survive graph → code → graph; a 600-line note makes the code unbuildable
-- **Status:** CONFIRMED — record: `verdicts/v-script.md`
+- **Status:** CONFIRMED — record: `verdicts/v-script.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.script (ArcScriptRenderer, ArcScriptScanner), engine.validation (DefinitionShape.checkNotes) / Code studio round trip of graph notes
 - **Location:** `backend/src/main/java/dev/arc/engine/script/ArcScriptRenderer.java:28` (+ `backend/src/main/java/dev/arc/engine/script/ArcScriptScanner.java:50-51`, `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:94-103`, `backend/src/main/java/dev/arc/rule/RuleService.java:84`, `backend/src/main/java/dev/arc/rule/RuleService.java:98`, `docs/architecture.md:151`)
 - **Problem:** The renderer splits each note on `\R` (any line terminator, including CR, VT, form feed, NEL, U+2028/U+2029) and writes one `// ` line per piece, while the scanner ends a comment only at `\n` and `strip()`s it. So a note with a line break comes back as several notes, surrounding whitespace is removed, and a note with many line breaks renders more comments than `Limits.MAX_NOTES` (500) allows. Draft shape checks only note count and length, so API/JSON drafts can hold such notes; this breaks the renderer's contract that building the text gives the same draft back, and docs/architecture.md:151 ("comment text … retained"). Correction from the record: switching to Code view and back without editing does not rebuild; the notes change only on the next build after an edit to the code.
@@ -713,7 +713,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x15"></a>
 
 ### X15 · low · bug · A draft with duplicate same-handle connections renders to ARC Script that cannot be built
-- **Status:** CONFIRMED — record: `verdicts/v-script.md`
+- **Status:** CONFIRMED — record: `verdicts/v-script.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / engine.script (ArcScriptNodeParser) / Code studio and node code editor round trip of API-created drafts
 - **Location:** `backend/src/main/java/dev/arc/engine/script/ArcScriptNodeParser.java:153` (+ `backend/src/main/java/dev/arc/engine/script/ArcScriptNodeParser.java:150-160`, `backend/src/main/java/dev/arc/engine/script/ArcScriptRenderer.java:77-85`, `backend/src/main/java/dev/arc/engine/validation/DefinitionShape.java:250-272`, `backend/src/main/java/dev/arc/engine/validation/GraphValidation.java:134-139`)
 - **Problem:** Draft shape requires only unique edge IDs, so a draft saved through the API can hold two connections from the same handle to the same target with different edge IDs; only executable validation rejects "Duplicate connection". The renderer writes both statements, each with its explicit `edge "id"`, but the parser rejects the second with `unique(handle + ":" + target, …)`, so render works and build fails. The node editor also cannot apply that Input node's unchanged fragment. The graph editor cannot create such a draft, and the build error points at the line, so the user can recover.
@@ -806,7 +806,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x32"></a>
 
 ### X32 · medium · bug · JSON codec drops trailing fraction zeros, so UI round trips change results that depend on decimal scale
-- **Status:** CONFIRMED — record: `verdicts/v-src.md` — Fixed in `871aa5a`
+- **Status:** CONFIRMED — record: `verdicts/v-src.md` — Fixed in `871aa5a` Follow-up in `46999bf`: keeping decimal places turned the server's `400.0` node coordinates into `DecimalNumber` values, so position arithmetic (default return placement, focus, routing) concatenated text; `withNodePositions` now makes coordinates numbers wherever a draft enters the editor, and a save echo is compared after that normalization.
 - **Area / module / feature:** Frontend / domain (json.ts codec, numericDefaults.ts) / lossless numbers: lookup source saves, draft defaults, Test panel and playground inputs
 - **Location:** `frontend/src/domain/json.ts:285` (+ `frontend/src/domain/json.ts:64`, `frontend/src/domain/json.ts:9`, `frontend/src/domain/numericDefaults.ts:101`, `frontend/src/features/sources/model.ts:42`, `docs/maintaining.md:115`, `docs/maintaining.md:141`)
 - **Problem:** `JsonReader.numberValue` keeps a double whenever `sameDecimalValue(token, value)` holds, and `canonicalDecimal` ignores trailing zeros (`digits.replace(/0+$/, "")`), so 10.50, 0.070, 2.50 and 1.0 become 10.5, 0.07, 2.5 and 1; `parseNumericDefault` (numericDefaults.ts:101) uses the same predicate for typed defaults. The engine keeps scale on purpose (application.yaml `use-big-decimal-for-floats: true`; ValueText.java:24-25 "numbers keep their scale", `toPlainString()` at :30), so `$CONCAT`/`$TO_STRING` results change. docs/maintaining.md:115 and json.ts:9 accept "1.0 becomes 1" as spelling, but maintaining.md:141 promises "an unchanged lookup table saves as a new version with every digit", and nothing accepts the effect on results.
@@ -819,7 +819,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x33"></a>
 
 ### X33 · low · bug · sameDefinition compares DecimalNumber spelling, so a respelled save echo replaces the local draft
-- **Status:** CONFIRMED — record: `verdicts/v-src.md`
+- **Status:** CONFIRMED — record: `verdicts/v-src.md` — Fixed in `46999bf` Follow-up in `46999bf`: keeping decimal places turned the server's `400.0` node coordinates into `DecimalNumber` values, so position arithmetic (default return placement, focus, routing) concatenated text; `withNodePositions` now makes coordinates numbers wherever a draft enters the editor, and a save echo is compared after that normalization.
 - **Area / module / feature:** Frontend / domain (graph.ts), features/editor (documentState.ts, usePreviewExecution.ts) / draft save acknowledgement and preview session
 - **Location:** `frontend/src/domain/graph.ts:28` (+ `frontend/src/features/editor/documentState.ts:120`, `frontend/src/features/editor/usePreviewExecution.ts:34`)
 - **Problem:** `canonicalJson` writes a DecimalNumber as its token (`if (isDecimalNumber(value)) return value.text;`) and a double as `JSON.stringify(value)`, so `sameDefinition` compares numbers by spelling, not decimal value. The server echoes numbers in plain notation, so an exponent-form DecimalNumber comes back respelled, `sameDefinition(localDraft, response.draft)` is false, and `acknowledgeSave` adopts `withNodePositions(response.draft)`: the F1 symptom `sameDefinition` exists to prevent. `sameJsonNumber` already compares by value.
@@ -832,7 +832,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x121"></a>
 
 ### X121 · low · bug · parseJson lists integer-like object keys first, so displayed results differ in member order from the response
-- **Status:** CONFIRMED — record: `verdicts/v-src.md`
+- **Status:** CONFIRMED — record: `verdicts/v-src.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / domain (json.ts codec), features/execution (ExecutionResult.tsx, ApiPage.tsx) / Test panel result, trace and playground response display
 - **Location:** `frontend/src/domain/json.ts:177` (+ `frontend/src/domain/json.ts:197`, `frontend/src/features/execution/ExecutionResult.tsx:25`, `frontend/src/features/execution/ApiPage.tsx:273`)
 - **Problem:** `parseJson` builds plain JS objects (`addEntry(container.value, container.key, value)` into `value: {}`), and JavaScript enumerates array-index-like keys ("10", "2024") first in ascending order. Displayed results, traces and playground responses therefore list members in a different order from the server's response; values are never affected, and this matches the earlier `JSON.parse` behavior. Correction to the finder: the "saved order" consequence is not caused by the frontend, because JSONB normalizes key order, so typed order never survives storage whatever the client sends, and no ARC computation depends on member order.
@@ -845,7 +845,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x34"></a>
 
 ### X34 · low · bug · Provider switch replaces declared source parameters with a template; switching back does not restore them
-- **Status:** CONFIRMED — record: `verdicts/v-src.md`
+- **Status:** CONFIRMED — record: `verdicts/v-src.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/sources (sourceDocument.ts) / Data sources provider switch
 - **Location:** `frontend/src/features/sources/sourceDocument.ts:226` (+ `frontend/src/features/sources/sourceDocument.ts:210`, `frontend/src/features/sources/SourceConfigurationFields.tsx:51`, `frontend/tests/unit/sources.spec.ts:218`)
 - **Problem:** The `provider` reducer case overwrites the shared parameters buffer with a hard-coded one-parameter template (`name: action.kind === "LOOKUP" ? "key" : "customerId"`, `type: "STRING"`, `required: true`, `defaultValue: null`) and keeps no copy of the previous text, while url, timeout, entries and secret headers survive. Correction to the finder: this is not literally an F7 violation, because the parameters buffer is always active (SourceConfigurationFields.tsx:51-57 renders it for both kinds) and installing a template on a forward switch is deliberately tested (tests/unit/sources.spec.ts:218 `.toBe("customerId")`). The defect is the unrecoverable loss of the user's declarations.
@@ -871,7 +871,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x36"></a>
 
 ### X36 · low · bug · Input inspector hides a source mapping for a parameter the pinned version does not declare
-- **Status:** CONFIRMED — record: `verdicts/v-src2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-src2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/sources (SourceBindingEditor.tsx, sourceBindings.ts) / Input node source mapping inspector
 - **Location:** `frontend/src/features/sources/SourceBindingEditor.tsx:158` (+ `frontend/src/features/sources/SourceBindingEditor.tsx:116`, `frontend/src/features/sources/sourceBindings.ts:5`)
 - **Problem:** The Input inspector's source section renders one `ValueBinding` per parameter of the pinned contract (`config?.parameters.map(...)`) and never lists `source.bindings` keys that contract lacks, while diagnostics flag the Input node for them. Correction to the finder: the mapping can be removed in the graph view through the Node expression dialog (docs/studio.md:250 "The Input node includes the rule's parameters and source mappings"); the form's own escape routes (Caller / default value then re-pick; a round trip through another version, which exists only for multi-version sources) discard other state, because re-picking resets the other mappings, pointer and onError, and MUI Select does not fire onChange when the current version is picked again. This conflicts with F7 ("Hiding a field must not leave an invalid hidden payload") and maintaining.md:149 ("hidden obsolete parameters must not remain in the submitted graph").
@@ -884,7 +884,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x58"></a>
 
 ### X58 · low · bug · Reference inspector hides a binding for a parameter the pinned callee does not declare
-- **Status:** CONFIRMED — record: `verdicts/v-src2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-src2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor/inspector (ReferenceFields.tsx) / Reference node inspector
 - **Location:** `frontend/src/features/editor/inspector/ReferenceFields.tsx:152` (+ `frontend/src/features/editor/inspector/ReferenceFields.tsx:137`, `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:46`)
 - **Problem:** The Reference inspector renders parameter cards only for the pinned callee's declared inputs (`child.definition.inputs.map(...)`), and nothing iterates `node.bindings`, so a stored binding for an undeclared parameter never appears while diagnostics flag the node. Correction to the finder: the binding can be removed through the inspector's Node expression button, which shows `bind ghost = …;`. The form's only way to clear it is re-pinning another version or rule, which resets all bindings, and choosing the same version does nothing (`version.version !== node.version` guard, lines 137-140).
@@ -897,7 +897,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x37"></a>
 
 ### X37 · low · bug · A second Input node cannot be deleted in the graph view
-- **Status:** CONFIRMED — record: `verdicts/v-src2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-src2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / domain (nodeKinds.ts, graph.ts) / graph node deletion
 - **Location:** `frontend/src/domain/nodeKinds.ts:102` (+ `frontend/src/domain/graph.ts:108`, `backend/src/main/java/dev/arc/engine/validation/GraphValidation.java:115`, `backend/src/main/java/dev/arc/engine/script/ArcScript.java:107`, `docs/studio.md:244`)
 - **Problem:** Every INPUT node is non-removable (`removable: false`, read by `canRemoveGraphNode` and every delete control), which assumes a draft has one Input. ARC Script build and draft save both accept a draft with a second Input node (DefinitionShape does not count Input nodes), validation then requires exactly one (GraphValidation.java:115, architecture.md:90), and Node expression cannot delete nodes, so Code studio is the only repair. docs/studio.md:244 ("The Input node can be renamed but cannot be deleted") assumes a single Input.
@@ -910,7 +910,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x39"></a>
 
 ### X39 · low · bug · Data sources catalog error alert cannot be dismissed and offers no retry
-- **Status:** CONFIRMED — record: `verdicts/v-src2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-src2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/sources (useSourceEditor.ts, SourcesPage.tsx) / Data sources list and the embedded source manager
 - **Location:** `frontend/src/features/sources/useSourceEditor.ts:286` (+ `frontend/src/features/sources/useSourceEditor.ts:303`, `frontend/src/features/sources/SourcesPage.tsx:108`)
 - **Problem:** The Data sources error Alert shows `document?.error || listError || catalog.error`, but its close button (`dismissError`) clears only the document error and `listError`. `catalog.error` comes from the `usePagedResource` read of the source summaries and changes only when that read runs again, so a catalog failure shows an alert that × cannot dismiss, and nothing offers a retry.
@@ -923,7 +923,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x126"></a>
 
 ### X126 · low · bug · Global Snackbar closes on any click outside it, so error notices vanish at once
-- **Status:** CONFIRMED — record: `verdicts/v-src2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-src2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / app shell (App.tsx) / global notices
 - **Location:** `frontend/src/App.tsx:199` (+ `frontend/src/app/useCodeStudioTarget.ts:56`, `frontend/src/features/execution/usePublishedExecution.ts:164`)
 - **Problem:** `<Snackbar open={!!notice} autoHideDuration={4000} onClose={() => setNotice("")} …/>` ignores MUI's `reason`, and MUI calls `onClose(event, 'clickaway')` for any click outside the notice (MUI 9.4.0 useSnackbar.js:61-62). The notice therefore closes immediately instead of after the intended 4 s, including the error notices "Could not open Code studio: …" and "Clipboard unavailable. Select and copy the example below."
@@ -975,7 +975,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x17"></a>
 
 ### X17 · low · bug · nginx caps bodies at exactly Java's 1 MiB, so the web origin returns an HTML 413 without CORS instead of the JSON 413
-- **Status:** CONFIRMED — record: `verdicts/v-http.md`
+- **Status:** CONFIRMED — record: `verdicts/v-http.md` — Fixed in `46999bf`
 - **Area / module / feature:** Infra / frontend/nginx.conf (web server, port 3080) / request body limit on the web origin
 - **Location:** `frontend/nginx.conf:6` (+ `backend/src/main/java/dev/arc/api/RequestLimitFilter.java:28`, `backend/src/main/java/dev/arc/api/RequestLimitFilter.java:52`, `backend/src/main/java/dev/arc/api/RequestLimitFilter.java:55`, `frontend/src/api/http.ts:49`, `docs/architecture.md:142`)
 - **Problem:** `client_max_body_size 1m;` equals `RequestLimitFilter.MAX_BODY_BYTES = 1024 * 1024`, so no body can pass nginx and then be rejected by Java: on the web origin every oversized request gets nginx's HTML 413 without Access-Control-Allow-Origin, never the documented JSON 413 "Request body exceeds 1 MiB" that the filter writes with `Access-Control-Allow-Origin: *`. The equal caps are documented (architecture.md:142; RequestLimitFilter.java:18 "same bound … as on the Nginx proxy"), but the HTML/no-CORS consequence is not. The project already raised `proxy_read_timeout` so that the API's JSON 504 wins over nginx's HTML one (api.md "Web server" section); the body cap does not follow that rule.
@@ -1276,7 +1276,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x23"></a>
 
 ### X23 · low · bug · nginx sends two Content-Type headers on /health, and its automatic redirects drop the published port
-- **Status:** CONFIRMED — record: `verdicts/v-infra.md`
+- **Status:** CONFIRMED — record: `verdicts/v-infra.md` — Fixed in `46999bf`
 - **Area / module / feature:** Infra / frontend/nginx.conf / Docker web server (port 3080): health endpoint, `/api` and `/assets` redirects
 - **Location:** `frontend/nginx.conf:19` (+ `frontend/nginx.conf:1-5`, `frontend/nginx.conf:21-29`, `frontend/nginx.conf:34-37`, `frontend/nginx.conf:44-47`, `compose.yaml:45`, `docs/api.md:3`, `docs/openapi.yaml:14`)
 - **Problem:** `location = /health { … return 200 'ok'; add_header Content-Type text/plain; }` sends two Content-Type headers, because `add_header` adds a second header next to the `default_type` one that `return` already set. Separately, nginx's automatic absolute redirects (the trailing-slash redirect for the `/api/` proxy location, and the directory redirect that `try_files $uri $uri/` issues for `/assets`) use the container's port 80, so the published port is dropped.
@@ -1408,7 +1408,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x96"></a>
 
 ### X96 · low · bug · A no-op node-code Apply adopts the server's build echo, marking a clean draft dirty and dropping the preview
-- **Status:** CONFIRMED — record: `verdicts/v-editor1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-editor1.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor (`Editor.tsx` node-code `onApply`, `documentState`), with backend engine.script (`ArcScript.replaceNode`) / Node expression dialog "Apply to graph"
 - **Location:** `frontend/src/features/editor/Editor.tsx:384` (+ `frontend/src/features/editor/useNodeExpressionDraft.ts:95`, `frontend/src/features/editor/documentState.ts:50`, `frontend/src/features/editor/documentState.ts:120`, `backend/src/main/java/dev/arc/engine/script/ArcScript.java:120`, `frontend/tests/unit/document.spec.ts:406`)
 - **Problem:** Node-code Apply replaces the whole draft with the `/studio/node/build` echo (`edit(() => built)`). The echo writes out every node with explicit nulls in record key order, and the server's `replaceNode` moves the applied node's outgoing edges to the end of `edges` (ArcScript.java:120-124: the loop over edges, then `edges.addAll(fragment.edges())`). The reducer short-circuits only on identity (documentState.ts:50), and unlike `acknowledgeSave` (documentState.ts:120, `sameDefinition`) this path has no semantic comparison; `sameDefinition` alone would not suffice, because it respects array order (document.spec.ts:406). So an unchanged Apply marks a clean draft dirty and changes `semanticGraphKey`: the preview result and trace are dropped, and diagnostics and variables are fetched again. This is the F1/K57 symptom through a path that skips `sameDefinition`, and the trigger is broader than the finder said: it also happens on a freshly loaded rule, not only after local node creation.
@@ -1421,7 +1421,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x97"></a>
 
 ### X97 · low · bug · A route-driven switch to the graph is dropped while another command runs; a failed build then shows code under the graph URL with an inverted toggle
-- **Status:** CONFIRMED — record: `verdicts/v-editor1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-editor1.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor (`useRuleDocument` route-arrival effect, `EditorHeader`) / graph/code view switching (Code studio ↔ graph)
 - **Location:** `frontend/src/features/editor/useRuleDocument.ts:309` (+ `frontend/src/features/editor/useRuleDocument.ts:155`, `frontend/src/features/editor/useRuleDocument.ts:305`, `frontend/src/features/editor/editorCapabilities.ts:115`, `frontend/src/features/editor/EditorHeader.tsx:98`, `frontend/src/features/editor/Editor.tsx:246`, `docs/maintaining.md:131`)
 - **Problem:** The route-driven graph-switch effect runs only on `[mode]`. It calls `runTask("switch")`, which returns silently while another command holds the lock (line 155, `if (!signal || signal.aborted || !idle) return;`), and it is never retried. If that command's build fails, `sourceDirty` stays set, `shownView` keeps the code view (editorCapabilities.ts:115), and the header toggle, driven by the route `mode` (Editor.tsx:246 → EditorHeader.tsx:98), is inverted. docs/maintaining.md:131's "unbuilt code builds before the graph shows (a failed build returns to the code)" never happens. The do-not-report item covers only refusing a route switch up front; this is a separate failure of the on-arrival reconciliation.
@@ -1434,7 +1434,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x90"></a>
 
 ### X90 · low · bug · Node code opens during Arrange with a stale buffer, and Apply writes the pre-arrange position back
-- **Status:** CONFIRMED — record: `verdicts/v-editor1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-editor1.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor (`Editor.openNodeCode`, `useNodeExpressionDraft`) / Node expression dialog during Arrange graph
 - **Location:** `frontend/src/features/editor/Editor.tsx:123` (+ `frontend/src/features/editor/Editor.tsx:193`, `frontend/src/features/editor/useNodeExpressionDraft.ts:40`, `frontend/src/features/editor/canvas/GraphNode.tsx:61`)
 - **Problem:** `openNodeCode` (the card `</>` button and the inspector's Node expression) checks only invalid defaults, not the command lock, so the node-code dialog opens read-only while Arrange runs; `openNodeEditor` (193-196) checks `!can.edit`, and the GraphNode `</>` button has no disabled state. The dialog's buffer is set once from the first render (`current ?? renderedSource`) and never refreshed. When Arrange lands, the dialog becomes editable but still shows the pre-arrange `at (x, y)`, and Apply writes that stale position back.
@@ -1447,7 +1447,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x48"></a>
 
 ### X48 · low · bug · A refused route-driven view switch bounces with a history push, trapping browser Back
-- **Status:** CONFIRMED — record: `verdicts/v-editor1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-editor1.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor (`useRuleDocument` arrival effects) and app (`useWorkspaceNavigation`) / graph/code view switching and browser history
 - **Location:** `frontend/src/features/editor/useRuleDocument.ts:313` (+ `frontend/src/features/editor/useRuleDocument.ts:264`, `frontend/src/app/useWorkspaceNavigation.ts:116`, `frontend/src/app/useWorkspaceNavigation.ts:55`)
 - **Problem:** When a route-driven view switch is refused after the fact (a failed build at :313, or an invalid default at :264), the editor bounces with `navigate()`, which pushes a new history entry (`window.location.hash = path`, useWorkspaceNavigation.ts:116). Each single-step browser Back then lands on the refused route again and bounces, so Back cannot get past the rule while the condition lasts. This is a new consequence of the known "cannot be refused up front" limitation, and it goes against lesson F24 (do not damage history).
@@ -1460,7 +1460,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x98"></a>
 
 ### X98 · low · bug · "Delete connection" stays visible after the selected connection is removed with its node
-- **Status:** CONFIRMED — record: `verdicts/v-editor2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-editor2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor/canvas (`GraphCanvas`, `useGraphCommands`) and `Editor.tsx` selection state / graph canvas connection deletion
 - **Location:** `frontend/src/features/editor/canvas/GraphCanvas.tsx:312` (+ `frontend/src/features/editor/Editor.tsx:117`, `frontend/src/features/editor/canvas/useGraphCommands.ts:59`, `frontend/src/features/editor/canvas/GraphCanvas.tsx:114`, `frontend/src/features/editor/canvas/GraphCanvas.tsx:120`, `frontend/src/features/editor/documentState.ts:50`)
 - **Problem:** `selectedEdge` (EditorContent state, Editor.tsx:117) is never checked against the draft. When the selected connection is removed along with its node, through the context-menu Delete or the Inspector's "Delete node", the canvas keeps showing "Delete connection". Clicking it runs `removeEdge`, whose updater returns `current`, so the reducer returns the same state, but `edit` still returns true and the button is hidden. This is the edge counterpart of the F5/K55 node-selection fallback (`nodeSelection.ts`), which was only applied to nodes. A code build that drops the selected edge ID (the user deletes that `edge "id"` line) should have the same effect after returning to the graph, because `selectedEdge` survives the view switch; that path was not probed.
@@ -1473,7 +1473,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x99"></a>
 
 ### X99 · low · bug · Deleting an unselected node moves the selection to the Input node
-- **Status:** CONFIRMED — record: `verdicts/v-editor2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-editor2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor/canvas (`useGraphCommands.removeNode`, `GraphCanvas` context menu) / graph canvas node deletion
 - **Location:** `frontend/src/features/editor/canvas/useGraphCommands.ts:60` (+ `frontend/src/features/editor/canvas/useGraphCommands.ts:56`, `frontend/src/features/editor/canvas/GraphCanvas.tsx:109`, `frontend/src/features/editor/Editor.tsx:327`, `frontend/src/features/editor/nodeSelection.ts:16`)
 - **Problem:** After any accepted deletion, `removeNode` selects the Input node (or the first other node), even when the deleted node was not selected. The canvas context menu reuses this helper for any node, so deleting another node moves the Inspector away from the node being edited. At 5bab5f0 the only caller was the Inspector's `onDelete={removeNode}`, which always deletes the selected node; the context menu (10c2437) added `onDeleteNode={removeNode}` for any node. `selectedNode()` in nodeSelection.ts already falls back when the selected node disappears, so the unconditional move is not needed even for the selected-node case. The docs only say "Delete removes the node and its connections" (studio.md:244, architecture.md:82), and no test asserts the jump.
@@ -1486,7 +1486,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x100"></a>
 
 ### X100 · low · bug · The header's "Hide test" builds pending code first, so unbuildable code keeps the Test panel open
-- **Status:** CONFIRMED — record: `verdicts/v-editor2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-editor2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor (`useRuleDocument.toggleTest`, `EditorHeader`) / Test panel (preview) in Code studio
 - **Location:** `frontend/src/features/editor/useRuleDocument.ts:397` (+ `frontend/src/features/editor/useRuleDocument.ts:394`, `frontend/src/features/editor/Editor.tsx:259`, `frontend/src/features/execution/TestPanel.tsx:64`, `frontend/src/features/editor/editorCapabilities.ts:39`, `docs/maintaining.md:139`)
 - **Problem:** The header Test toggle awaits `buildCode()` before toggling, in both directions. The only reason given (useRuleDocument.ts:394, "since preview runs the graph") applies to opening; closing runs nothing. In the code view with unbuildable edits, "Hide test" fails with the build error and the panel stays open, while the panel's own X (`preview.close`) closes it without building. When the buffer does build, hiding the panel commits it into the graph as a side effect. This became reachable with F25 (133ca20), which keeps the panel visible while code is unbuilt; at 49bb365 the panel was not rendered while `sourceDirty` (`{!sourceDirty && testPanel}`).
@@ -1499,7 +1499,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x89"></a>
 
 ### X89 · low · bug · "Show problem" from the code view is overridden by the remounted canvas's initial fitView
-- **Status:** CONFIRMED — record: `verdicts/v-editor2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-editor2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor/canvas (`useGraphFocus`, `useGraphCanvas`, `GraphCanvas`) / "Show problem" jump from Code studio to the graph
 - **Location:** `frontend/src/features/editor/canvas/useGraphFocus.ts:63` (+ `frontend/src/features/editor/canvas/useGraphFocus.ts:58`, `frontend/src/features/editor/canvas/useGraphCanvas.ts:39`, `frontend/src/features/editor/canvas/GraphCanvas.tsx:227`)
 - **Problem:** The pending-focus gate `measurements.has(pendingFocus)` reads card sizes that useGraphCanvas keeps in EditorContent across the canvas unmount. Once the graph has been shown, "Show problem" from the code view focuses on the first frame of the remounted canvas, and React Flow's queued initial `fitView` then replaces the viewport with the whole graph, so the problem node is not centered and can end up off-screen. Mechanism: GraphCanvas unmount resets the editor's ReactFlowProvider store (StoreUpdater cleanup `reset()`). On remount, StoreUpdater applies 'nodes' before 'fitView', so the fit stays queued until the node ResizeObserver calls `updateNodeInternals`; that happens after the rAF-scheduled `setCenter` in the same frame, and d3-zoom's immediate transform interrupts the 350 ms setCenter transition. This predates the previous review: 49bb365 had `!measurements[pendingFocus]`.
@@ -1527,7 +1527,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x65"></a>
 
 ### X65 · low · bug · Cmd/Ctrl+S falls through to the browser's Save Page dialog while Code studio is read-only
-- **Status:** CONFIRMED — record: `verdicts/v-studio1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-studio1.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/studio (CodeStudio) / "Code studio keyboard save (Cmd/Ctrl+S)"
 - **Location:** `frontend/src/features/studio/CodeStudio.tsx:64` (+ `frontend/src/features/studio/CodeStudio.tsx:60`, `frontend/src/features/studio/CodeStudio.tsx:66`)
 - **Problem:** The `arc-save` action declares `precondition: "!editorReadonly"`, so Monaco leaves the Cmd/Ctrl+S keybinding unmatched whenever Code studio is read-only (a published version, or any running command; see X64). Monaco then does not call `preventDefault`, and the browser runs its native Save Page action. The `run` body already refuses when `latest.current.readOnly` is set (the F4 guard), so without the precondition the key would be swallowed and nothing written; a grep found no other Ctrl/Cmd+S handler in frontend/src.
@@ -1540,7 +1540,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x66"></a>
 
 ### X66 · low · bug · A late Reuse insertion steals the caret, so the user's next keystrokes become the new node's result name
-- **Status:** CONFIRMED — record: `verdicts/v-studio1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-studio1.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/studio (StudioLibrary, arcCompletion) / "Code studio Reuse pane"
 - **Location:** `frontend/src/features/studio/StudioLibrary.tsx:57` (+ `frontend/src/features/studio/StudioLibrary.tsx:56`, `frontend/src/features/studio/arcCompletion.ts:60`, `frontend/src/features/studio/CodeStudio.tsx:42`, `frontend/src/features/studio/useFormulaSupport.ts:270`, `docs/maintaining.md:147`)
 - **Problem:** When a Reuse card's pinned-version read finishes after the user has resumed editing, the handler checks only `signal.aborted || latest.current.readOnly` and still calls `onInsert(referenceSnippet(...), true)`. `insertSnippet` focuses the editor, moves the caret to the end and starts a snippet session with the `reusedResult` placeholder selected. The published-Formula path refuses in the same situation (useFormulaSupport.ts:270-280 throws "The expression changed while the formula loaded. Select the formula again." on a changed model version or selection). The documented contract (maintaining.md:147: reads "abort on unmount and consult the current draft/read-only state on completion") does not cover edits made meanwhile, and nothing documents this as intended.
@@ -1553,7 +1553,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x136"></a>
 
 ### X136 · low · bug · An ordinary double-click on a Reuse card still inserts two Reference nodes (K63/F30 fix incomplete)
-- **Status:** CONFIRMED — record: `verdicts/v-studio1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-studio1.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/studio (useLibraryInsertion, StudioLibrary) / "Code studio Reuse pane (library card insertion)"
 - **Location:** `frontend/src/features/studio/useLibraryInsertion.ts:48` (+ `frontend/src/features/studio/useLibraryInsertion.ts:38`, `frontend/src/features/studio/StudioLibrary.tsx:130`, `frontend/src/features/studio/PublishedFormulaLibrary.tsx:87`, `frontend/tests/studio-reuse.spec.ts:78`, `docs/studio.md:296`)
 - **Problem:** The F30/K63 guard suppresses a second click only while the first version read is still pending: `run` aborts a previous read, marks the card busy, and clears `busy` right after the insert (`pending.current = null; setState(error ? {...} : idle);`, useLibraryInsertion.ts:48-50), while the card is `disabled={readOnly || insertion.busy === rule.id}`. On a local stack the read takes about 5 ms, so the card is enabled again before the second click of an ordinary double-click, which starts a second read and inserts a second snippet. This contradicts the hook comment ("so a double click inserts once") and docs/studio.md:296 ("a Reuse card inserts once"). The finder also noted that the published-Formula cards (PublishedFormulaLibrary.tsx:87) use the same hook; the verification probed only Reuse.
@@ -1566,7 +1566,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x124"></a>
 
 ### X124 · low · bug · The Reuse snippet always names its result `reusedResult`, so two insertions write the same variable
-- **Status:** CONFIRMED — record: `verdicts/v-studio1.md`
+- **Status:** CONFIRMED — record: `verdicts/v-studio1.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/studio (snippets, StudioLibrary) / "Code studio Reuse snippet"
 - **Location:** `frontend/src/features/studio/snippets.ts:56` (+ `frontend/src/features/studio/StudioLibrary.tsx:54`, `frontend/src/features/studio/StudioLibrary.tsx:59`, `frontend/src/domain/graph.ts:156`, `docs/studio.md:296`)
 - **Problem:** `referenceSnippet` makes its node ID unique (`reuseNodeId`) but always defaults the result to the constant tab stop `${1:reusedResult}`, so two Reuse insertions that keep the default produce two Reference nodes writing the same variable, the shape lesson F19 warns about; docs/studio.md:296 also says new result variables take the first free `result_N`. Caveats from the record: the name is a selected placeholder that invites the user to overwrite it, and the Modules snippets also use constant defaults. `latest.current.definition` is the last built graph, so a fix based only on `uniqueName` over it would miss an earlier insertion that has not been built yet; it needs the buffer's names or a suffix like the node ID's.
@@ -1579,7 +1579,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x67"></a>
 
 ### X67 · low · bug · Code studio completion lists a branch-shared result twice, and hover names only the first producer
-- **Status:** CONFIRMED — record: `verdicts/v-studio2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-studio2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/studio (useArcLanguageSupport) + domain/graph / "Code studio and node-code completion and hover"
 - **Location:** `frontend/src/features/studio/useArcLanguageSupport.ts:71` (+ `frontend/src/features/studio/useArcLanguageSupport.ts:74`, `frontend/src/features/studio/useArcLanguageSupport.ts:217`, `frontend/src/domain/graph.ts:238`)
 - **Problem:** `declaredVariables` feeds Code studio and the node-code dialog; it emits one VariableOption per producing node and never groups by name, unlike `domain/graph.availableVariables` (graph.ts:238-250 groups by name and returns `label: [...labels].join(" / ")`). A result that mutually exclusive branches both assign, which architecture.md allows ("Mutually exclusive branches can assign the same result variable."), therefore appears twice in completion, and the hover (`latestVariables.current.find(...)`) names only the first producer. Duplicates cannot come from word suggestions, because `arcEditorOptions` sets `suggest: { showWords: false }`.
@@ -1592,7 +1592,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x68"></a>
 
 ### X68 · low · bug · Monarch colors keyword, type and constant fragments inside identifiers (`order.format` shows `at` as a keyword)
-- **Status:** CONFIRMED — record: `verdicts/v-studio2.md`
+- **Status:** CONFIRMED — record: `verdicts/v-studio2.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/studio (arcLanguage) / "Syntax coloring in every ARC editor (inspector inline editors, dialogs, Code studio)"
 - **Location:** `frontend/src/features/studio/arcLanguage.ts:49` (+ `frontend/src/features/studio/arcLanguage.ts:52`, `frontend/src/features/studio/arcLanguage.ts:53`, `frontend/src/features/studio/arcLanguage.ts:55`)
 - **Problem:** The Monarch root state has no rule that consumes a plain identifier; the only generic name rule, :55 `/[A-Za-z_][\w.]*(?=\s*\()/`, applies only before `(`. When nothing matches, Monarch advances one character and tests each `^(?:…)` rule against `line.substr(pos)`, where `\b` always matches at the start of that remainder. The keyword (:49), type (:52) and constant (:53) rules therefore color the tails of property segments and other names that semantic tokens do not classify; semantic tokens deliberately cover only the path root ("classify only a dotted path's root", maintaining.md).
@@ -1644,7 +1644,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x60"></a>
 
 ### X60 · low · bug · Add or Remove field remounts every Transform field binding and re-infers its editor
-- **Status:** CONFIRMED — record: `verdicts/v-insp.md`
+- **Status:** CONFIRMED — record: `verdicts/v-insp.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor/inspector (TransformFields) / "Transform field mappings"
 - **Location:** `frontend/src/features/editor/inspector/TransformFields.tsx:61` (+ `frontend/src/features/editor/inspector/TransformFields.tsx:30`, `frontend/src/features/expressions/useEditingPin.ts:14`, `frontend/src/domain/valueBinding.ts:111`, `frontend/src/features/editor/inspector/useInputParameterRows.ts:10`)
 - **Problem:** Transform field ValueBindings are keyed by `${index}:${fields.length}` (rows by `key={index}`), so Add field and Remove field remount every field's binding. Each binding loses its useEditingPin state (kept in `useState`, useEditingPin.ts:14) and re-infers its editor from the stored value, which breaks lesson F13 for fields the user did not touch. The key dates from 8712418, before useEditingPin existed; input rows already use stable identities (useInputParameterRows).
@@ -1657,7 +1657,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x63"></a>
 
 ### X63 · low · bug · Add parameter can pick a name that collides with an existing node result
-- **Status:** CONFIRMED — record: `verdicts/v-insp.md`
+- **Status:** CONFIRMED — record: `verdicts/v-insp.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor/inspector (useInputParameterRows) + domain/graph / "Input parameters: Add parameter"
 - **Location:** `frontend/src/features/editor/inspector/useInputParameterRows.ts:41` (+ `frontend/src/domain/graph.ts:156`, `frontend/src/domain/graph.ts:178`, `backend/src/main/java/dev/arc/engine/validation/NodeValidation.java:57`)
 - **Problem:** "Add parameter" computes `uniqueName("input", definition.inputs.map((input) => input.name), definition.inputs.length + 1)`, unique among input names only, and ignores node result variables. `variableNames` (graph.ts:156-160) covers inputs and node outputs, but only `createGraphNode` (:178) uses it. Add parameter can therefore create an input with the same name as an existing result, which makes that node fail validation and goes against lesson F19's rule to generate names from every input and node result.
@@ -1670,7 +1670,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x87"></a>
 
 ### X87 · low · bug · ARRAY constant fields accept arrays that the server rejects for exceeding 256 tokens
-- **Status:** CONFIRMED — record: `verdicts/v-insp.md`
+- **Status:** CONFIRMED — record: `verdicts/v-insp.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / domain (expressions, valueBinding) / "Typed ARRAY constants in Output, Reference/Formula bindings and ANY constants"
 - **Location:** `frontend/src/domain/expressions.ts:54` (+ `frontend/src/domain/valueBinding.ts:48`, `frontend/src/domain/valueBinding.ts:77`, `backend/src/main/java/dev/arc/engine/expression/ExpressionParser.java:67`, `frontend/tests/unit/literal-cases.ts:20`)
 - **Problem:** `isArrayLiteral`/`inferConstantType` treat any JSON array without objects as an ARRAY constant, but the server's compiler rejects literals over 256 tokens (`Limits.MAX_EXPRESSION_TOKENS`, i.e. 128 or more flat items), and ARRAY constant fields show no error for them, although lesson F16 says "Number and array fields report text the server would reject". The finder's NUMBER example `5e-1000000000000` falls under the documented magnitude exclusion (literal-cases.ts:19-21: magnitude limits are value errors reported by diagnostics), and the 49-level nesting case is moot, because arrays deeper than 8 levels already fail as value errors (`Limits.MAX_VALUE_DEPTH` = 8; a 47-deep array fails with "Value exceeds collection depth or size limit").
@@ -1709,7 +1709,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x53"></a>
 
 ### X53 · low · bug · The breadcrumb shows the current section's name but always navigates to the Rule library
-- **Status:** CONFIRMED — record: `verdicts/v-misc-fe.md`
+- **Status:** CONFIRMED — record: `verdicts/v-misc-fe.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / app (WorkspaceHeader) / "Workspace breadcrumb navigation"
 - **Location:** `frontend/src/app/WorkspaceHeader.tsx:31` (+ `frontend/src/app/WorkspaceHeader.tsx:4`, `frontend/src/app/Sidebar.tsx:74`, `frontend/src/app/Sidebar.tsx:83`)
 - **Problem:** The breadcrumb button shows the current section's name ("Data sources", "API playground", "API reference", "Code studio"), but its handler is always `navigate("/library")`. The sidebar sends the same labels to their own sections (Sidebar.tsx:83-86 "Data sources" → `open("/sources")`, :74-78 "Code studio" → `openCodeStudio()`). The behavior is unchanged since baseline 49bb365.
@@ -1722,7 +1722,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x08"></a>
 
 ### X08 · low · bug · Library filter buttons expose no pressed state, and the search field's aria-label lands on a div
-- **Status:** CONFIRMED — record: `verdicts/v-misc-fe.md`
+- **Status:** CONFIRMED — record: `verdicts/v-misc-fe.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/library (LibraryPage) / "Rule library kind filters and search (accessibility)"
 - **Location:** `frontend/src/features/library/LibraryPage.tsx:144` (+ `frontend/src/features/library/LibraryPage.tsx:143`, `frontend/src/features/library/LibraryPage.tsx:151`, `frontend/src/features/library/LibraryPage.tsx:153`)
 - **Problem:** The kind filter buttons show the active filter only through the "active" CSS class, with no aria-pressed and no tab role or aria-selected; the sidebar does expose its state with aria-current="page" (Sidebar.tsx:151). Separately, MUI 9.4.0 TextField spreads `aria-label="Search rules"` onto the root FormControl div (TextField.js:165-170 passes `...other` to the root slot), so the input's accessible name comes only from its placeholder.
@@ -1735,7 +1735,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x226"></a>
 
 ### X226 · low · bug · The static nesting-depth check is order-dependent; an accepted, published root fails every execution with the nesting limit
-- **Status:** CONFIRMED — record: `verdicts/v-sweep.md`
+- **Status:** CONFIRMED — record: `verdicts/v-sweep.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / source (SourceBindingValidator) / "Rule nesting limit in validate, diagnostics and publish"
 - **Location:** `backend/src/main/java/dev/arc/source/SourceBindingValidator.java:71` (+ `backend/src/main/java/dev/arc/source/SourceBindingValidator.java:66`, `backend/src/main/java/dev/arc/source/SourceBindingValidator.java:74`, `backend/src/main/java/dev/arc/engine/execution/GraphExecution.java:59`, `backend/src/main/java/dev/arc/engine/execution/Engine.java:95`, `backend/src/main/java/dev/arc/engine/Limits.java:119`)
 - **Problem:** The static rule-nesting check, the only one (validate, diagnostics and publish all run it through RuleDefinitionService), walks the dependency DAG with one `visited` set shared by the whole walk, so each pin is checked once, at the depth where depth-first search first reaches it. The verdict therefore depends on the order of the Reference nodes, and a root whose longer call path goes past 16 levels is accepted and published, then fails on every execution. This breaks the Limits.MAX_NESTING_DEPTH javadoc (Limits.java:119-121: "Static source-binding validation rejects deeper reference chains with the same limit"); the only depth checks are in SourceBindingValidator and GraphExecution, and the walk is unchanged since baseline 49bb365.
@@ -1748,7 +1748,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x227"></a>
 
 ### X227 · low · bug · HTTP source entries are unbounded: {"a":1e5000} makes create/update return 500 instead of 422
-- **Status:** CONFIRMED — record: `verdicts/v-sweep.md`
+- **Status:** CONFIRMED — record: `verdicts/v-sweep.md` — Fixed in `46999bf`
 - **Area / module / feature:** Backend / source.http (HttpSourceAdapter) + persistence (JdbcSourceRepository) / "HTTP data source create and update (API)"
 - **Location:** `backend/src/main/java/dev/arc/source/http/HttpSourceAdapter.java:29` (+ `backend/src/main/java/dev/arc/persistence/JdbcSourceRepository.java:166`, `backend/src/main/java/dev/arc/persistence/JdbcSourceRepository.java:189`, `backend/src/main/java/dev/arc/source/SourceService.java:46`, `backend/src/main/java/dev/arc/source/lookup/LookupSourceAdapter.java:38`, `backend/src/main/java/dev/arc/persistence/JsonCodec.java:17`)
 - **Problem:** Corrected by the verification: the finder's consequence (stored version unreadable, GET /api/sources returns 500) is wrong; the source is never stored and GET /api/sources is not broken. The real defect is that the HTTP provider neither rejects nor bounds the `entries` field it does not use (X31): `HttpSourceAdapter.validate` (:29-33) checks only the URL, secret headers and timeout. A POST or PUT whose entries hold a number that expands to more than 1,000 plain digits, such as {"a":1e5000}, passes validation and is inserted; the in-transaction read-back then fails Jackson's number-length limit, so the write rolls back and returns an unclassified 500 instead of 422.
@@ -1761,7 +1761,7 @@ Sorted by phase, then severity. `Section` names the part of **Findings in detail
 <a id="x225"></a>
 
 ### X225 · low · bug · Arrange graph sorts IDs with localeCompare, so the layout depends on the browser locale
-- **Status:** CONFIRMED — record: `verdicts/v-sweep.md`
+- **Status:** CONFIRMED — record: `verdicts/v-sweep.md` — Fixed in `46999bf`
 - **Area / module / feature:** Frontend / features/editor/canvas (graphLayout) / "Arrange graph"
 - **Location:** `frontend/src/features/editor/canvas/graphLayout.ts:17` (+ `frontend/src/features/editor/canvas/graphLayout.ts:56`, `frontend/src/features/editor/canvas/graphLayout.ts:59`, `docs/architecture.md:76`, `frontend/tests/layout.spec.ts:77`)
 - **Problem:** `compareId` orders nodes and edges for ELK with locale-sensitive `String.prototype.localeCompare` (`a.id.localeCompare(b.id)`, used at :56-57 and :59-60). The same graph therefore arranges differently in different browser locales (da-DK sorts "aa" after "z"), and in th-TH IDs that differ only by '-' or '_' compare equal, so the layout depends on the draft's node-array order, which the ID sort is meant to remove. The bug predates the review (49bb365 had the same compareId); node IDs are ASCII `[A-Za-z0-9_-]` (DefinitionShape.java:18-19), so a code-point comparison fixes it.

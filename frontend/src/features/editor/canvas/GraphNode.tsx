@@ -5,7 +5,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, memo, useEffect, useRef } from "react";
 import { AlertCircle, Check, Code2, ExternalLink } from "lucide-react";
 import { Tooltip } from "@mui/material";
 import type { NodeType, RuleNode } from "../../../types";
@@ -30,7 +30,14 @@ export type FlowNode = Node<
   },
   "arc"
 >;
-export default function GraphNode({ data, selected }: NodeProps<FlowNode>) {
+/**
+ * A card renders only when its own node object, selection, errors or trace
+ * status changes: flowElements keeps the data object of an unchanged card, and
+ * the memo keeps every other card out of an edit's render.
+ */
+export default memo(GraphNode);
+
+function GraphNode({ data, selected }: NodeProps<FlowNode>) {
   const n = data.model;
   const kind = nodeKinds[n.type];
   const ports = sourcePorts(n);

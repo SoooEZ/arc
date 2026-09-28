@@ -2,11 +2,8 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { sourceApi } from "../../api/sources";
 import { errorMessage } from "../../api/errors";
 import { useNavigationGuard } from "../../app/navigationGuards";
-import {
-  searchDelayMs,
-  useDebouncedValue,
-} from "../../hooks/useDebouncedValue";
 import { usePagedResource } from "../../hooks/usePagedResource";
+import { usePagedSearch } from "../../hooks/usePagedSearch";
 import type { DataSource, SourceConfig, SourceSummary } from "../../types";
 import {
   parseSourceTestInputs,
@@ -40,18 +37,20 @@ export function useSourceEditor({
   notify: (message: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const query = useDebouncedValue(search, searchDelayMs);
   const [catalogRevision, setCatalogRevision] = useState(0);
   // Saves allocate increasing catalog revisions, even when several finish together.
   const lastCatalogRevision = useRef(0);
   // Retry reloads the shown page after a failed catalog read, keeping its offset.
   const [catalogAttempt, setCatalogAttempt] = useState(0);
-  const catalog = usePagedResource(
-    JSON.stringify([query, catalogRevision]),
-    (offset, limit, signal) =>
+  const catalog = usePagedSearch(
+    search,
+    (query, offset, limit, signal) =>
       sourceApi.catalog({ offset, limit, search: query }, { signal }),
-    true,
-    { keepPrevious: true, refresh: catalogAttempt },
+    {
+      key: String(catalogRevision),
+      keepPrevious: true,
+      refresh: catalogAttempt,
+    },
   );
   const [savedSources, setSavedSources] = useState<SavedSource[]>([]);
   // The catalog revision of the last successful read; later saves still await listing.

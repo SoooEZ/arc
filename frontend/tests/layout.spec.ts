@@ -1,10 +1,22 @@
 import { expect, test } from "@playwright/test";
-import { arrangeGraph } from "../src/features/editor/canvas/graphLayout";
+import ELK from "elkjs/lib/elk.bundled.js";
+import {
+  arrangeGraph as arrangeWith,
+  type ElkLayout,
+} from "../src/features/editor/canvas/graphLayout";
 import type { Definition, RuleNode } from "../src/types";
 import {
   branchHandleX,
   defaultNodeSize,
 } from "../src/features/editor/canvas/graphGeometry";
+
+// Node tests lay out in-thread; the browser runs ELK in a worker (graphLayoutWorker).
+const elk = new ELK();
+const inThread: ElkLayout = (graph) => elk.layout(graph);
+const arrangeGraph = (
+  definition: Parameters<typeof arrangeWith>[0],
+  sizes: Parameters<typeof arrangeWith>[1] = new Map(),
+) => arrangeWith(definition, sizes, inThread);
 
 function node(
   id: string,

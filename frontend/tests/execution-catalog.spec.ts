@@ -537,3 +537,33 @@ test("the empty-catalog notice waits for a settled, successful catalog read", as
   ).toHaveCount(0);
   expect(state.unexpected).toEqual([]);
 });
+
+test("a direct visit reads the published catalog once and never disables the Rule selector again", async ({
+  page,
+}) => {
+  for (const route of ["/#/playground", "/#/docs"]) {
+    // A direct visit: a fresh document, not a hash change of the open one.
+    await page.goto("about:blank");
+    const state = await mockCatalog(page, true, 1);
+    const reads: string[] = [];
+    page.on("request", (outgoing) => {
+      const url = new URL(outgoing.url());
+      if (url.pathname === "/api/rule-summaries")
+        reads.push(
+          url.searchParams.get("publishedOnly") === "true"
+            ? "published"
+            : "library",
+        );
+    });
+    await page.goto(route);
+    const select = page.getByRole("combobox", { name: "Rule", exact: true });
+    await expect(select).toBeEnabled();
+    // Keyed on the hidden library page, the playground read the catalog again once
+    // that page arrived; now the settled page has sent one published read.
+    await page.waitForTimeout(1200);
+    expect(reads.filter((read) => read === "published")).toHaveLength(1);
+    await expect(select).toBeEnabled();
+    expect(state.unexpected).toEqual([]);
+    await page.unroute("**/api/**");
+  }
+});

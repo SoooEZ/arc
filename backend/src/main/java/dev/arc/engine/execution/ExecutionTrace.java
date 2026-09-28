@@ -1,17 +1,24 @@
 package dev.arc.engine.execution;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Retains a whole-step prefix within an exact serialized JSON byte budget. */
+/**
+ * Retains a whole-step prefix within an exact serialized JSON byte budget. Each retained step is
+ * serialized once, to count its bytes and to write the response ({@link RetainedTrace}).
+ */
 final class ExecutionTrace {
   private final ObjectMapper json;
   private final boolean enabled;
   private final int maximumBytes;
   private final List<Engine.Step> steps = new ArrayList<>();
+
+  /** The steps' JSON, comma-separated, without the array's brackets. */
+  private final ByteArrayOutputStream serialized = new ByteArrayOutputStream();
+
   private int bytes = 2; // The trace array's brackets, including an empty trace.
   private boolean truncated;
 
@@ -24,23 +31,30 @@ final class ExecutionTrace {
   void add(Engine.Step step) {
     if (!enabled || truncated) return;
     int separator = steps.isEmpty() ? 0 : 1;
-    var counter = new ByteCounter(maximumBytes - bytes - separator);
+    byte[] encoded;
     try {
-      json.writeValue(counter, step);
-    } catch (IOException error) {
-      if (!counter.exceeded)
-        throw new IllegalStateException("Could not measure execution trace", error);
+      encoded = json.writeValueAsBytes(step);
+    } catch (JsonProcessingException error) {
+      throw new IllegalStateException("Could not serialize an execution trace step", error);
     }
-    if (counter.exceeded) {
+    if (encoded.length > maximumBytes - bytes - separator) {
       truncated = true;
       return;
     }
+    if (separator == 1) serialized.write(',');
+    serialized.write(encoded, 0, encoded.length);
     steps.add(step);
-    bytes += counter.count + separator;
+    bytes += encoded.length + separator;
   }
 
+  /** The retained steps with the JSON array they were counted as. */
   List<Engine.Step> steps() {
-    return List.copyOf(steps);
+    byte[] body = serialized.toByteArray();
+    byte[] array = new byte[body.length + 2];
+    array[0] = '[';
+    System.arraycopy(body, 0, array, 1, body.length);
+    array[array.length - 1] = ']';
+    return new RetainedTrace(List.copyOf(steps), array);
   }
 
   boolean enabled() {
@@ -53,33 +67,5 @@ final class ExecutionTrace {
 
   int bytes() {
     return bytes;
-  }
-
-  private static final class ByteCounter extends OutputStream {
-    private final int maximum;
-    private int count;
-    private boolean exceeded;
-
-    ByteCounter(int maximum) {
-      this.maximum = maximum;
-    }
-
-    @Override
-    public void write(int value) throws IOException {
-      add(1);
-    }
-
-    @Override
-    public void write(byte[] value, int offset, int length) throws IOException {
-      add(length);
-    }
-
-    private void add(int length) throws IOException {
-      if (length > maximum - count) {
-        exceeded = true;
-        throw new IOException("Trace byte limit reached");
-      }
-      count += length;
-    }
   }
 }

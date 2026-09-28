@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { monaco } from "./arcLanguage";
 import type { Diagnostic } from "../../types";
 
@@ -20,6 +20,78 @@ export const arcEditorOptions: monaco.editor.IStandaloneEditorConstructionOption
     "semanticHighlighting.enabled": true,
     suggest: { showWords: false },
   };
+
+type EditorOptions = monaco.editor.IStandaloneEditorConstructionOptions;
+
+/** A compact single-field editor: no gutter, suggestions only while typing code. */
+export const inlineExpressionEditorOptions: EditorOptions = {
+  ...arcEditorOptions,
+  lineNumbers: "off",
+  folding: false,
+  glyphMargin: false,
+  lineDecorationsWidth: 0,
+  lineNumbersMinChars: 0,
+  renderLineHighlight: "none",
+  overviewRulerLanes: 0,
+  hideCursorInOverviewRuler: true,
+  padding: { top: 6, bottom: 6 },
+  scrollbar: { vertical: "auto", horizontal: "hidden" },
+  tabCompletion: "on",
+  wordBasedSuggestions: "off",
+  quickSuggestions: { other: true, comments: false, strings: false },
+  acceptSuggestionOnEnter: "off",
+  suggest: { showWords: false, preview: false },
+};
+
+/** The whole-graph editor of Code studio, with a minimap. */
+export const codeStudioOptions: EditorOptions = {
+  ...arcEditorOptions,
+  lineHeight: 23,
+  minimap: { enabled: true },
+  padding: { top: 20, bottom: 20 },
+};
+
+/** The node code dialog. */
+export const nodeCodeOptions: EditorOptions = { ...arcEditorOptions };
+
+/** The expression editor dialog. */
+export const expressionDialogOptions: EditorOptions = {
+  ...arcEditorOptions,
+  fontSize: 13,
+};
+
+/** The JSON input editors of the Test panel and the playground. */
+export const jsonInputOptions: EditorOptions = {
+  ...arcEditorOptions,
+  lineNumbersMinChars: 3,
+  lineHeight: 20,
+  folding: false,
+  glyphMargin: false,
+  renderLineHighlight: "none",
+  lineDecorationsWidth: 6,
+  padding: { top: 10, bottom: 10 },
+  quickSuggestions: false,
+  wordBasedSuggestions: "off",
+  tabCompletion: "off",
+};
+
+/**
+ * One options object per preset, read-only flag and label. A new object on
+ * every render made @monaco-editor/react call `updateOptions`, which writes
+ * the page-wide configuration and, for an object-valued option such as
+ * `quickSuggestions`, fires a global configuration change that every mounted
+ * model processes: a keystroke cost grew with the square of the editors.
+ */
+export function useEditorOptions(
+  preset: EditorOptions,
+  readOnly: boolean,
+  ariaLabel: string,
+): EditorOptions {
+  return useMemo(
+    () => ({ ...preset, readOnly, ariaLabel }),
+    [preset, readOnly, ariaLabel],
+  );
+}
 
 const noDiagnostics: Diagnostic[] = [];
 

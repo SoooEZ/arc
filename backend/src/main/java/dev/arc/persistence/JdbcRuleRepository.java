@@ -45,16 +45,24 @@ public class JdbcRuleRepository implements RuleRepository {
       " WHERE rule_id = ? AND (? = '' OR strpos(version::text, ?) > 0)";
 
   /**
-   * A cheap text search that narrows the exact dependency check. Rule IDs contain only lowercase
-   * letters, digits and hyphens, which JSON never escapes, so every call of the ID matches.
+   * A cheap filter that narrows the exact dependency check to the two ways a definition can call a
+   * rule: a Reference pin, found by JSONB containment on any node's {@code ruleId} (with or without
+   * a version), and a Formula call, whose token is {@code @id:version} with no spaces. Rule IDs
+   * contain only lowercase letters, digits and hyphens, which JSON never escapes. Searching the
+   * bare ID matched every stored definition for IDs such as {@code type} or {@code id}, so a delete
+   * decoded them all under the rule's row lock.
    */
   private static final String DEFINITIONS_MENTIONING =
       """
       SELECT id AS rule_id, NULL::integer AS version, draft AS definition FROM rules
-      WHERE id <> ? AND strpos(draft::text, ?) > 0
+      WHERE id <> ?
+        AND (draft @> jsonb_build_object('nodes', jsonb_build_array(jsonb_build_object('ruleId', ?::text)))
+             OR strpos(draft::text, '@' || ? || ':') > 0)
       UNION ALL
       SELECT rule_id, version, definition FROM rule_versions
-      WHERE rule_id <> ? AND strpos(definition::text, ?) > 0
+      WHERE rule_id <> ?
+        AND (definition @> jsonb_build_object('nodes', jsonb_build_array(jsonb_build_object('ruleId', ?::text)))
+             OR strpos(definition::text, '@' || ? || ':') > 0)
       ORDER BY rule_id, version NULLS FIRST
       """;
 
@@ -290,6 +298,8 @@ public class JdbcRuleRepository implements RuleRepository {
                 row.getString("rule_id"),
                 row.getObject("version", Integer.class),
                 decode(row.getString("definition"))),
+        id,
+        id,
         id,
         id,
         id,

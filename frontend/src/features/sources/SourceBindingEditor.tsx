@@ -20,6 +20,10 @@ import {
   withoutSourceParameterBindings,
 } from "./sourceBindings";
 import ValueBinding from "../expressions/ValueBinding";
+import {
+  pinnedSourceVersions,
+  readSourceVersion,
+} from "../studio/pinnedVersions";
 import UndeclaredBindings from "../expressions/UndeclaredBindings";
 import SourceProviderSelect from "./SourceProviderSelect";
 import type { VariableOption } from "../../domain/graph";
@@ -39,15 +43,19 @@ export default function SourceBindingEditor({
   const source = input.source;
   const [managerOpen, setManagerOpen] = useState(false);
   const [catalogRevision, setCatalogRevision] = useState(0);
+  // The mutable version list loads once the Source version control opens, as
+  // the picker's pages do: N cards bound to one source read no lists on mount.
+  const [versionsRequested, setVersionsRequested] = useState(false);
   const versionsResource = usePagedResource(
     JSON.stringify([source?.id, catalogRevision]),
     (offset, limit, signal) =>
       sourceApi.versionSummaries(source!.id, { offset, limit }, { signal }),
-    !!source,
+    !!source && versionsRequested,
   );
+  // The pinned version is immutable: the page-wide cache serves every card.
   const detail = useAsyncResource<DataSource | null>(
     JSON.stringify([source?.id, source?.version, catalogRevision]),
-    (signal) => sourceApi.source(source!.id, source!.version, { signal }),
+    (signal) => readSourceVersion(source!.id, source!.version, signal),
     null,
     0,
     !!source,
@@ -78,9 +86,11 @@ export default function SourceBindingEditor({
     pending.current = controller;
     setSelectionError("");
     try {
-      const selected = await sourceApi.source(source.id, version, {
-        signal: controller.signal,
-      });
+      const selected = await readSourceVersion(
+        source.id,
+        version,
+        controller.signal,
+      );
       const current = latest.current;
       if (
         !controller.signal.aborted &&
@@ -95,7 +105,9 @@ export default function SourceBindingEditor({
   };
   const closeManager = () => {
     setManagerOpen(false);
-    // Managed sources may have new versions or names.
+    // Managed sources may have new versions or names: the bound source's cached
+    // versions are read again, so a rename shows here.
+    if (source) pinnedSourceVersions.forget(source.id);
     setCatalogRevision((value) => value + 1);
   };
   const versions = versionsResource.data.items;
@@ -146,7 +158,10 @@ export default function SourceBindingEditor({
             select
             label="Source version"
             value={source.version}
-            disabled={readOnly || versionsResource.loading}
+            disabled={readOnly}
+            slotProps={{
+              select: { onOpen: () => setVersionsRequested(true) },
+            }}
             onChange={(event) => void chooseVersion(Number(event.target.value))}
           >
             {!versions.some((item) => item.version === source.version) && (

@@ -207,6 +207,75 @@ function search(start: Point, end: Point, rects: Rect[]): Point[] | null {
   return null;
 }
 
+/** A card moved by the drag in progress: where it was and where it is. */
+export interface MovedCard {
+  id: string;
+  before: RoutingNode;
+  after: RoutingNode;
+}
+
+/** A route with what it was computed from, kept per edge while a drag runs. */
+export interface CachedRoute {
+  source: Endpoint;
+  target: Endpoint;
+  route: Route | null;
+}
+
+const samePoint = (a: Endpoint, b: Endpoint) => a.x === b.x && a.y === b.y;
+
+/** Whether a moved card's old or new body, plus the routing margin, meets the route's box. */
+function meets(route: Route, card: RoutingNode): boolean {
+  const margin = 20;
+  let left = Infinity,
+    right = -Infinity,
+    top = Infinity,
+    bottom = -Infinity;
+  for (const point of route.points) {
+    left = Math.min(left, point.x);
+    right = Math.max(right, point.x);
+    top = Math.min(top, point.y);
+    bottom = Math.max(bottom, point.y);
+  }
+  return !(
+    card.x - margin > right ||
+    card.x + card.width + margin < left ||
+    card.y - margin > bottom ||
+    card.y + card.height + margin < top
+  );
+}
+
+/**
+ * Routing during a drag: the edge is routed again only when an endpoint moved,
+ * it is attached to a moved card, or a moved card's old or new body meets its
+ * current route; every other edge keeps its route object. Without `moved` (no
+ * drag in progress) every edge is routed, so the settled drawing is a full
+ * routeEdge pass, whose obstacle grid depends on every card.
+ */
+export function routeWithCache(
+  cached: CachedRoute | undefined,
+  source: Endpoint,
+  target: Endpoint,
+  nodes: RoutingNode[],
+  moved: MovedCard[] | null,
+  router: typeof routeEdge = routeEdge,
+): CachedRoute {
+  if (cached && moved) {
+    const unchanged =
+      samePoint(cached.source, source) &&
+      samePoint(cached.target, target) &&
+      !moved.some(
+        (card) =>
+          card.id === source.nodeId ||
+          card.id === target.nodeId ||
+          (cached.route !== null &&
+            (meets(cached.route, card.before) ||
+              meets(cached.route, card.after))),
+      );
+    if (unchanged) return cached;
+  }
+  return { source, target, route: router(source, target, nodes) };
+}
+
 /** Route around every node, including the source/target bodies after leaving their ports.
  * Geometry is transient: no layout, connections, or rule semantics are changed.
  * Return null for covered ports instead of silently drawing through a node.

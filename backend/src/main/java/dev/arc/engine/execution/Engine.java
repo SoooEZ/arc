@@ -1,6 +1,7 @@
 package dev.arc.engine.execution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.SourceReader;
@@ -26,7 +27,7 @@ public class Engine {
 
   public record Result(
       Object result,
-      List<Step> trace,
+      @JsonSerialize(using = RetainedTrace.Serializer.class) List<Step> trace,
       long durationMicros,
       List<Parameters.Read> sources,
       boolean traceEnabled,

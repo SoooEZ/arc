@@ -1,7 +1,9 @@
 package dev.arc.model;
 
 import dev.arc.model.Definition.BranchCase;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -115,11 +117,24 @@ public enum NodeKind {
     return slots().contains(slot);
   }
 
+  /** Each kind's property set, computed once from the exhaustive switch below. */
+  private static final Map<NodeKind, Set<Property>> PROPERTIES = propertySets();
+
+  private static Map<NodeKind, Set<Property>> propertySets() {
+    var sets = new EnumMap<NodeKind, Set<Property>>(NodeKind.class);
+    for (NodeKind kind : values()) sets.put(kind, kind.ownProperties());
+    return sets;
+  }
+
   /**
    * The optional properties a node of this kind may set. Draft-shape validation rejects a node that
    * sets any other, including in stored drafts and published versions.
    */
   public Set<Property> properties() {
+    return PROPERTIES.get(this);
+  }
+
+  private Set<Property> ownProperties() {
     return switch (this) {
       case INPUT -> Set.of();
       case FORMULA -> Set.of(Property.EXPRESSION, Property.OUTPUT);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Button,
@@ -133,6 +133,46 @@ export default function GraphCanvas({
     connect,
   } = canvas;
   const flow = useReactFlow<FlowNode>();
+  // The selection setters change identity with the selection; React Flow
+  // hands these handlers to every memoized card, so they read the latest ones
+  // through a ref and keep their own identity for the canvas's lifetime.
+  const latestSelection = useRef({ setSelected, setSelectedEdge });
+  latestSelection.current = { setSelected, setSelectedEdge };
+  const handlers = useMemo(() => {
+    const closeMenu = () => setContextMenu(null);
+    const menuAt = (
+      kind: "node" | "edge",
+      id: string,
+      event: { clientX: number; clientY: number; preventDefault: () => void },
+    ) => {
+      event.preventDefault();
+      setContextMenu({ kind, id, left: event.clientX, top: event.clientY });
+    };
+    return {
+      closeMenu,
+      onNodeClick: (_: unknown, node: { id: string }) => {
+        closeMenu();
+        latestSelection.current.setSelected(node.id);
+        latestSelection.current.setSelectedEdge(null);
+      },
+      onNodeContextMenu: (
+        event: { clientX: number; clientY: number; preventDefault: () => void },
+        node: { id: string },
+      ) => menuAt("node", node.id, event),
+      onPaneClick: () => {
+        closeMenu();
+        latestSelection.current.setSelectedEdge(null);
+      },
+      onEdgeClick: (_: unknown, edge: { id: string }) => {
+        closeMenu();
+        latestSelection.current.setSelectedEdge(edge.id);
+      },
+      onEdgeContextMenu: (
+        event: { clientX: number; clientY: number; preventDefault: () => void },
+        edge: { id: string },
+      ) => menuAt("edge", edge.id, event),
+    };
+  }, []);
   // Decided once per mount: React Flow would otherwise fit on a later node
   // measurement once the pending focus has cleared and the prop turns true.
   const [fitOnMount] = useState(!initialFocus);
@@ -192,39 +232,13 @@ export default function GraphCanvas({
             connectionLineComponent={RoutedConnectionLine}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            onNodeClick={(_, n) => {
-              setContextMenu(null);
-              setSelected(n.id);
-              setSelectedEdge(null);
-            }}
-            onNodeContextMenu={(event, node) => {
-              event.preventDefault();
-              setContextMenu({
-                kind: "node",
-                id: node.id,
-                left: event.clientX,
-                top: event.clientY,
-              });
-            }}
-            onPaneClick={() => {
-              setContextMenu(null);
-              setSelectedEdge(null);
-            }}
-            onPaneContextMenu={() => setContextMenu(null)}
-            onMoveStart={() => setContextMenu(null)}
-            onEdgeClick={(_, e) => {
-              setContextMenu(null);
-              setSelectedEdge(e.id);
-            }}
-            onEdgeContextMenu={(event, edge) => {
-              event.preventDefault();
-              setContextMenu({
-                kind: "edge",
-                id: edge.id,
-                left: event.clientX,
-                top: event.clientY,
-              });
-            }}
+            onNodeClick={handlers.onNodeClick}
+            onNodeContextMenu={handlers.onNodeContextMenu}
+            onPaneClick={handlers.onPaneClick}
+            onPaneContextMenu={handlers.closeMenu}
+            onMoveStart={handlers.closeMenu}
+            onEdgeClick={handlers.onEdgeClick}
+            onEdgeContextMenu={handlers.onEdgeContextMenu}
             onConnect={connect}
             nodesDraggable={can.edit}
             nodesConnectable={can.edit}

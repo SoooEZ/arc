@@ -6,7 +6,6 @@ import dev.arc.error.ArcException;
 import java.math.*;
 import java.util.*;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 
 /** Stable expression-facing facade: decimal built-ins, catalog, and Excel adapter. */
 public final class Functions {
@@ -34,8 +33,15 @@ public final class Functions {
   }
 
   public static Object call(String name, List<Object> args) {
+    return call(name, args, new RangeValues());
+  }
+
+  /** Calls with the evaluation's range values, so POI sees each unchanged range converted once. */
+  static Object call(String name, List<Object> args, RangeValues ranges) {
     var function = ARC_FUNCTIONS.get(name);
-    return function == null ? ExcelFunctionAdapter.evaluate(name, args) : function.apply(args);
+    return function == null
+        ? ExcelFunctionAdapter.evaluate(name, args, ranges)
+        : function.apply(args);
   }
 
   /** Names that ARC, not POI, evaluates from evaluated arguments. */
@@ -159,17 +165,30 @@ public final class Functions {
     return list;
   }
 
-  /** An array index: at most six digits, so it always fits an int. */
-  private static final Pattern INDEX = Pattern.compile("\\d{1,6}");
+  /**
+   * An array index: one to six ASCII digits (leading zeros allowed, as {@code \\d{1,6}} read them),
+   * parsed once; -1 for any other segment. A character loop, because a regex compiled per access.
+   */
+  static int arrayIndex(String part) {
+    if (part.isEmpty() || part.length() > 6) return -1;
+    int index = 0;
+    for (int at = 0; at < part.length(); at++) {
+      char c = part.charAt(at);
+      if (c < '0' || c > '9') return -1;
+      index = index * 10 + (c - '0');
+    }
+    return index;
+  }
 
   /** Follows {@code segments} into nested objects and arrays; a missing one gives the fallback. */
   public static Object get(Object value, List<String> segments, Object fallback) {
     for (String part : segments) {
       if (value instanceof Map<?, ?> m && m.containsKey(part)) value = m.get(part);
-      else if (value instanceof List<?> a
-          && INDEX.matcher(part).matches()
-          && Integer.parseInt(part) < a.size()) value = a.get(Integer.parseInt(part));
-      else return fallback;
+      else if (value instanceof List<?> a) {
+        int index = arrayIndex(part);
+        if (index < 0 || index >= a.size()) return fallback;
+        value = a.get(index);
+      } else return fallback;
     }
     return value;
   }

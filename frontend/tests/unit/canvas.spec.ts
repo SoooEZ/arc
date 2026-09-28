@@ -9,6 +9,14 @@ import {
   type FlowNodeInputs,
 } from "../../src/features/editor/canvas/flowElements";
 import { nodeSummary } from "../../src/domain/nodeKinds";
+import {
+  routeEdge,
+  routeWithCache,
+  type CachedRoute,
+  type Endpoint,
+  type MovedCard,
+  type RoutingNode,
+} from "../../src/features/editor/canvas/edgeRouting";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -205,4 +213,85 @@ test("every node kind has a card summary", () => {
   expect(nodeSummary(node({ type: "OUTPUT", expression: "1" }), 0)).toBe("1");
   expect(nodeSummary(node({ type: "CONDITION" }), 0)).toBe("Add an expression");
   expect(nodeSummary(node({ expression: "amount * 2" }), 0)).toBe("amount * 2");
+});
+
+test("a drag routes again only the edges the moved card can affect, and the settled graph routes fully", () => {
+  // 100 cards in a chain plus skip-2 edges: every drag step re-routed all 199 edges.
+  const cards: RoutingNode[] = Array.from({ length: 100 }, (_, index) => ({
+    id: `n${index}`,
+    x: (index % 10) * 300,
+    y: Math.floor(index / 10) * 200,
+    width: 230,
+    height: 94,
+  }));
+  const endpoints = (from: number, to: number): [Endpoint, Endpoint] => [
+    {
+      x: cards[from].x + 115,
+      y: cards[from].y + 94,
+      nodeId: cards[from].id,
+      side: "bottom",
+    },
+    { x: cards[to].x + 115, y: cards[to].y, nodeId: cards[to].id, side: "top" },
+  ];
+  const edges: [string, number, number][] = [];
+  for (let index = 0; index + 1 < cards.length; index++)
+    edges.push([`e${index}`, index, index + 1]);
+  for (let index = 0; index + 2 < cards.length; index++)
+    edges.push([`s${index}`, index, index + 2]);
+  let calls = 0;
+  const counting: typeof routeEdge = (source, target, nodes) => {
+    calls += 1;
+    return routeEdge(source, target, nodes);
+  };
+  const cache = new Map<string, CachedRoute>();
+  const routeAll = (nodes: RoutingNode[], moved: MovedCard[] | null) => {
+    for (const [id, from, to] of edges) {
+      const [source, target] = endpoints(from, to);
+      cache.set(
+        id,
+        routeWithCache(cache.get(id), source, target, nodes, moved, counting),
+      );
+    }
+  };
+  routeAll(cards, null);
+  expect(calls).toBe(edges.length);
+  const before = new Map([...cache].map(([id, cached]) => [id, cached.route]));
+  // Card n55 moves 30px right during a drag.
+  calls = 0;
+  const moved: MovedCard = {
+    id: "n55",
+    before: cards[55],
+    after: { ...cards[55], x: cards[55].x + 30 },
+  };
+  const draggedCards = cards.map((card) =>
+    card.id === "n55" ? moved.after : card,
+  );
+  // Endpoints of the moved card move with it.
+  cards[55] = moved.after;
+  routeAll(draggedCards, [moved]);
+  const affected = edges.filter(([id, from, to]) => {
+    const route = before.get(id);
+    const touched = from === 55 || to === 55;
+    return (
+      touched ||
+      (route !== null && route !== undefined && cache.get(id)!.route !== route)
+    );
+  });
+  expect(calls).toBeLessThan(edges.length / 4);
+  expect(calls).toBeGreaterThanOrEqual(
+    affected.filter(([, from, to]) => from === 55 || to === 55).length,
+  );
+  for (const [id, from, to] of edges)
+    if (from !== 55 && to !== 55 && !affected.some(([other]) => other === id))
+      expect(cache.get(id)!.route).toBe(before.get(id));
+  // The drag ends: every edge equals a fresh routeEdge result.
+  calls = 0;
+  routeAll(draggedCards, null);
+  expect(calls).toBe(edges.length);
+  for (const [id, from, to] of edges) {
+    const [source, target] = endpoints(from, to);
+    expect(cache.get(id)!.route).toEqual(
+      routeEdge(source, target, draggedCards),
+    );
+  }
 });

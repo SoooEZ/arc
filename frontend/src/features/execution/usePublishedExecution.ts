@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Definition, RuleSummary, Version } from "../../types";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { usePagedResource } from "../../hooks/usePagedResource";
-import {
-  searchDelayMs,
-  useDebouncedValue,
-} from "../../hooks/useDebouncedValue";
+import { usePagedSearch } from "../../hooks/usePagedSearch";
 import { ruleApi } from "../../api/rules";
 import {
   curlExample,
@@ -13,7 +10,6 @@ import {
   sampleInputsJson,
   tryParseExecutionInputs,
 } from "../../domain/executionInputs";
-import { sameRule } from "../../domain/ruleIdentity";
 import { useExecutionRequest } from "./useExecutionRequest";
 import { useInputBuffer } from "./useInputBuffer";
 import {
@@ -28,36 +24,27 @@ function sampleText(definition: Definition | undefined): string {
   return definition ? sampleInputsJson(definition) : "{}";
 }
 
-export function usePublishedExecution(
-  rules: RuleSummary[],
-  notify: (message: string) => void,
-) {
+export function usePublishedExecution(notify: (message: string) => void) {
   const [search, setSearch] = useState("");
   const [retry, setRetry] = useState(0);
   const [selectedRule, setSelectedRule] = useState<RuleSummary | null>(null);
   const [pinnedVersion, setPinnedVersion] = useState<number | null>(null);
   const [trace, setTrace] = useState(true);
   const [timeoutMs, setTimeoutMs] = useState(30000);
-  const query = useDebouncedValue(search, searchDelayMs);
-  const libraryReleases = rules.map((rule) => [
-    rule.id,
-    rule.revision,
-    rule.publishedVersion,
-  ]);
-  // A new search starts at the first page; a library change or Retry reloads
-  // the page that is shown.
-  const catalog = usePagedResource(
-    query,
-    (offset, limit, signal) =>
+  // A new search starts at the first page; Retry reloads the page that is
+  // shown. The hidden library page is not an input: keying on it read the
+  // catalog twice on a direct visit, once more when that page arrived.
+  const catalog = usePagedSearch(
+    search,
+    (query, offset, limit, signal) =>
       ruleApi.catalog(
         { offset, limit, search: query, publishedOnly: true },
         { signal },
       ),
-    true,
-    { refresh: JSON.stringify([libraryReleases, retry]), keepPrevious: true },
+    { refresh: retry, keepPrevious: true },
   );
   // Until the typed search applies, the shown page answers an older search.
-  const catalogLoading = catalog.loading || query !== search;
+  const catalogLoading = catalog.loading || catalog.searching;
   const catalogRules = catalog.data.items;
   useEffect(() => {
     setSelectedRule((current) =>
@@ -65,13 +52,9 @@ export function usePublishedExecution(
     );
   }, [catalogRules]);
   const id = selectedRule?.id ?? "";
-  // The library list can lag behind the catalog, and the reverse; a row of
-  // another incarnation of the ID says nothing about the selected rule.
-  const listedVersion = Math.max(
-    rules.find((rule) => selectedRule && sameRule(rule, selectedRule))
-      ?.publishedVersion ?? 0,
-    selectedRule?.publishedVersion ?? 0,
-  );
+  // History page 0 holds the newest release; the selected catalog row is the
+  // other place a release is learned.
+  const listedVersion = selectedRule?.publishedVersion ?? 0;
   const history = usePagedResource(
     id,
     (offset, limit, signal) =>

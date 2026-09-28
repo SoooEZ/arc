@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { ruleApi } from "../api/rules";
-import { searchDelayMs, useDebouncedValue } from "../hooks/useDebouncedValue";
-import { usePagedResource } from "../hooks/usePagedResource";
+import { usePagedSearch } from "../hooks/usePagedSearch";
 import type { Kind } from "../types";
 
 /**
@@ -12,18 +11,16 @@ import type { Kind } from "../types";
 export function useRuleLibrary(visible: boolean) {
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<Kind | "ALL">("ALL");
-  const query = useDebouncedValue(search, searchDelayMs);
   const [refresh, setRefresh] = useState(0);
   const [stale, setStale] = useState(false);
-  const page = usePagedResource(
-    JSON.stringify([query, kind]),
-    (offset, limit, signal) =>
+  const page = usePagedSearch(
+    search,
+    (query, offset, limit, signal) =>
       ruleApi.catalog(
         { offset, limit, search: query, kind: kind === "ALL" ? "" : kind },
         { signal },
       ),
-    true,
-    { refresh, keepPrevious: true },
+    { key: kind, refresh, keepPrevious: true },
   );
   useEffect(() => {
     if (!visible || !stale) return;

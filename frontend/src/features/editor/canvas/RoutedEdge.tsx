@@ -1,18 +1,33 @@
-import { createContext, memo, useContext, useEffect, useMemo } from "react";
+import {
+  createContext,
+  memo,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import {
   BaseEdge,
   type ConnectionLineComponentProps,
   type EdgeProps,
 } from "@xyflow/react";
-import { routeEdge, type RoutingNode } from "./edgeRouting";
+import {
+  routeEdge,
+  routeWithCache,
+  type CachedRoute,
+  type MovedCard,
+  type RoutingNode,
+} from "./edgeRouting";
 
 export const RoutingContext = createContext<{
   nodes: RoutingNode[];
+  /** The cards a drag in progress has moved, or null between drags. */
+  moved: MovedCard[] | null;
   reportBlocked: (id: string, blocked: boolean) => void;
-}>({ nodes: [], reportBlocked: () => {} });
+}>({ nodes: [], moved: null, reportBlocked: () => {} });
 
 export default memo(function RoutedEdge(props: EdgeProps) {
-  const { nodes, reportBlocked } = useContext(RoutingContext);
+  const { nodes, moved, reportBlocked } = useContext(RoutingContext);
   const {
     id,
     source,
@@ -32,15 +47,20 @@ export default memo(function RoutedEdge(props: EdgeProps) {
     labelBgPadding,
     labelBgBorderRadius,
   } = props;
-  const route = useMemo(
-    () =>
-      routeEdge(
-        { x: sourceX, y: sourceY, nodeId: source, side: "bottom" },
-        { x: targetX, y: targetY, nodeId: target, side: "top" },
-        nodes,
-      ),
-    [source, target, sourceX, sourceY, targetX, targetY, nodes],
-  );
+  // While a card is dragged, only the edges the moved card can affect are
+  // routed again; the drag's end routes every edge once more.
+  const cache = useRef<CachedRoute | undefined>(undefined);
+  const route = useMemo(() => {
+    const cached = routeWithCache(
+      cache.current,
+      { x: sourceX, y: sourceY, nodeId: source, side: "bottom" },
+      { x: targetX, y: targetY, nodeId: target, side: "top" },
+      nodes,
+      moved,
+    );
+    cache.current = cached;
+    return cached.route;
+  }, [source, target, sourceX, sourceY, targetX, targetY, nodes, moved]);
   const blocked = !route;
   useEffect(() => {
     reportBlocked(id, blocked);

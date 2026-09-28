@@ -246,7 +246,9 @@ class SourceExecutionServiceTest {
   }
 
   @Test
-  void configurationCacheSeparatesVersionsAndDoesNotSurviveTheRequest() {
+  void pinnedVersionsAreReadOncePerProcessAndSeparatedByVersion() {
+    // Every request read, decoded and copied the whole immutable version again; versions are
+    // immutable and sources are never deleted, so a frozen copy is kept between requests.
     when(repository.get("memory", 1)).thenReturn(source(1, true));
     when(repository.get("memory", 2)).thenReturn(source(2, false));
     var session = execution.openSession();
@@ -254,11 +256,26 @@ class SourceExecutionServiceTest {
     assertThat(session.definition("memory", 1).parameters().getFirst().required()).isTrue();
     assertThat(session.definition("memory", 2).parameters().getFirst().required()).isFalse();
     session.definition("memory", 1);
-    execution.openSession().definition("memory", 1);
+    var later = execution.openSession();
+    assertThat(later.definition("memory", 1)).isSameAs(session.definition("memory", 1));
+    later.definition("memory", 1);
 
-    verify(repository, times(2)).get("memory", 1);
+    verify(repository).get("memory", 1);
     verify(repository).get("memory", 2);
     verify(adapter, never()).fetch(any(), any(), any(), any());
+    // The shared copy is frozen: no request can change what another sees.
+    assertThatThrownBy(() -> later.definition("memory", 1).parameters().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
+  void aMissingVersionIsNeverCachedAndIsReadAgain() {
+    when(repository.get("memory", 9)).thenThrow(new ArcException(404, "Source version not found"));
+    for (int attempt = 0; attempt < 2; attempt++)
+      assertThatThrownBy(() -> execution.openSession().definition("memory", 9))
+          .isInstanceOfSatisfying(
+              ArcException.class, error -> assertThat(error.status()).isEqualTo(404));
+    verify(repository, times(2)).get("memory", 9);
   }
 
   @Test

@@ -337,4 +337,70 @@ class FormulaCallExecutionTest {
         .isInstanceOfSatisfying(
             ArcException.class, error -> assertThat(error.status()).isEqualTo(504));
   }
+
+  @Test
+  void nestedPinsAreReadOnlyUntilTheirPlansAreCached() {
+    // Every request read each reached nested pin through the resolver, cached plan or not.
+    var reads = new AtomicInteger();
+    var child = graph(List.of(new Input("amount", "NUMBER", true, null)), "amount * 2");
+    RuleResolver counting =
+        new RuleResolver() {
+          @Override
+          public Definition resolve(String id, int version) {
+            if (!id.equals("child") || version != 1)
+              throw new ArcException(404, "Missing published rule");
+            reads.incrementAndGet();
+            return child;
+          }
+
+          @Override
+          public Definition resolveFormula(String id, int version) {
+            return resolve(id, version);
+          }
+        };
+    var root =
+        script.parse(
+            "inputs { amount: NUMBER required; }\n"
+                + "node in INPUT \"Input\" { next -> reuse; }\n"
+                + "node reuse REFERENCE \"Reuse\" { use \"child\" version 1; bind amount = amount;"
+                + " as r; next -> out; }\n"
+                + "node out OUTPUT \"Output\" { return r + @child:1(amount); }");
+    // The first request reads the pin while compiling the root and its calls; the plans are then
+    // cached, and later requests reach them without a read.
+    int readsByFirstRequest = 0;
+    for (int request = 0; request < 3; request++) {
+      var result =
+          engine
+              .session(counting, ExecutionDeadline.start(30_000))
+              .execute(
+                  "root",
+                  1,
+                  () -> root,
+                  Map.of("amount", 5),
+                  new Parameters(SourceReader.unavailable()),
+                  true);
+      assertThat(result.result()).isEqualTo(new BigDecimal("20"));
+      if (request == 0) readsByFirstRequest = reads.get();
+      else assertThat(reads).as("request " + (request + 1)).hasValue(readsByFirstRequest);
+    }
+    assertThat(readsByFirstRequest).isPositive();
+    var missing = graph(List.of(), "@missing:1()");
+    assertThatThrownBy(
+            () ->
+                engine
+                    .session(counting, ExecutionDeadline.start(30_000))
+                    .execute(
+                        "root-missing",
+                        1,
+                        () -> missing,
+                        Map.of(),
+                        new Parameters(SourceReader.unavailable()),
+                        true))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(404);
+              assertThat(error.kind()).isEqualTo(ArcException.Kind.DEFINITION);
+            });
+  }
 }

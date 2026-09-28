@@ -46,13 +46,18 @@ final class ExcelFunctionAdapter {
   }
 
   static Object evaluate(String name, List<Object> args) {
+    return evaluate(name, args, new RangeValues());
+  }
+
+  /** Evaluates with the calling evaluation's range values, so a repeated range converts once. */
+  static Object evaluate(String name, List<Object> args, RangeValues ranges) {
     try {
       FunctionMetadata metadata = FunctionMetadataRegistry.getFunctionByName(name);
       checkSingleValues(name, metadata, args);
       if (args.stream().anyMatch(ExcelFunctionAdapter::isEmptyRange))
         return emptyRangeResult(name, args);
       checkArgumentBounds(name, args);
-      ValueEval[] values = args.stream().map(ExcelFunctionAdapter::value).toArray(ValueEval[]::new);
+      ValueEval[] values = args.stream().map(ranges::value).toArray(ValueEval[]::new);
       ExcelMatchingWork.checkMatchingWork(name, args);
       return converted(inExcelLocale(() -> calculate(name, metadata, values)), name);
     } catch (ArcException e) {

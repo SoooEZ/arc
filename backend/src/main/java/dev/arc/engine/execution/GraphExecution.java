@@ -13,6 +13,7 @@ import dev.arc.model.Definition.*;
 import dev.arc.model.Handles;
 import dev.arc.model.NodeKind;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /** One execution session; nested rules share its trace, recursion guard and source-read budget. */
@@ -56,13 +57,27 @@ final class GraphExecution {
       Supplier<Definition> definition,
       Map<String, Object> inputs,
       int depth) {
+    return invoke(ruleId, version, definition, depth, compiled -> inputs);
+  }
+
+  /**
+   * Runs one rule invocation whose inputs may depend on the prepared plan (positional Formula
+   * arguments are mapped onto the callee's declared inputs). Nested pins pass their read as the
+   * supplier, so a cached plan costs no repository read and no decoding.
+   */
+  private Object invoke(
+      String ruleId,
+      Integer version,
+      Supplier<Definition> definition,
+      int depth,
+      Function<CompiledGraph, Map<String, Object>> inputsFor) {
     if (depth > Limits.MAX_NESTING_DEPTH)
       throw ArcException.limit("Rule nesting exceeds " + Limits.MAX_NESTING_DEPTH + " levels");
     String key = ruleId + "@" + version;
     if (!activeRules.add(key)) throw ArcException.invalid("Circular rule reference: " + key);
     try {
       CompiledGraph compiled = prepare(ruleId, version, definition);
-      return new RuleRun(ruleId, version, compiled, depth).execute(inputs);
+      return new RuleRun(ruleId, version, compiled, depth).execute(inputsFor.apply(compiled));
     } catch (ArcException error) {
       throw error.inRule(ruleId, version);
     } finally {
@@ -77,15 +92,6 @@ final class GraphExecution {
   private CompiledGraph prepare(String ruleId, Integer version, Supplier<Definition> definition) {
     try {
       return plans.prepare(ruleId, version, definition);
-    } catch (ArcException error) {
-      throw error.asDefinitionFailure();
-    }
-  }
-
-  /** Reads a pin; a missing version or a rule that is not a Formula fails the definition too. */
-  private static Definition pinned(Supplier<Definition> read) {
-    try {
-      return read.get();
     } catch (ArcException error) {
       throw error.asDefinitionFailure();
     }
@@ -249,26 +255,47 @@ final class GraphExecution {
           }
         }
       }
-      Definition child = pinned(() -> resolver.resolve(node.ruleId(), node.version()));
-      return run(node.ruleId(), node.version(), () -> child, inputs, depth + 1);
+      // The read is the supplier: a plan this session or the process already holds needs none.
+      // A missing version fails the definition through prepare(), as before.
+      return run(
+          node.ruleId(),
+          node.version(),
+          () -> resolver.resolve(node.ruleId(), node.version()),
+          inputs,
+          depth + 1);
     }
 
+    /**
+     * The Formula kind is checked when the pin is read (resolveFormula). A cached plan skips the
+     * read, which is sound: the caller's compile already resolved this call as a Formula, a rule's
+     * kind never changes for its ID, and deleting a rule evicts its plans.
+     */
     private Object callFormula(Expressions.FormulaCall call, List<Object> arguments) {
       try {
         deadline.check();
-        Definition child = pinned(() -> resolver.resolveFormula(call.id(), call.version()));
-        if (arguments.size() > child.inputs().size())
-          throw ArcException.invalid("Too many arguments for @" + call.id() + ":" + call.version());
-        var inputs = new LinkedHashMap<String, Object>();
-        for (int index = 0; index < arguments.size(); index++)
-          inputs.put(child.inputs().get(index).name(), arguments.get(index));
-        return run(call.id(), call.version(), () -> child, inputs, depth + 1);
+        return invoke(
+            call.id(),
+            call.version(),
+            () -> resolver.resolveFormula(call.id(), call.version()),
+            depth + 1,
+            compiled -> positionalInputs(call, compiled.definition(), arguments));
       } catch (ArcException error) {
         if (error.locations().isEmpty())
           throw error.atNode(
               call.id(), call.version(), null, "@" + call.id() + ":" + call.version());
         throw error.inRule(call.id(), call.version());
       }
+    }
+
+    /** Positional arguments mapped onto the callee's declared inputs, in declaration order. */
+    private static Map<String, Object> positionalInputs(
+        Expressions.FormulaCall call, Definition child, List<Object> arguments) {
+      if (arguments.size() > child.inputs().size())
+        throw ArcException.invalid("Too many arguments for @" + call.id() + ":" + call.version());
+      var inputs = new LinkedHashMap<String, Object>();
+      for (int index = 0; index < arguments.size(); index++)
+        inputs.put(child.inputs().get(index).name(), arguments.get(index));
+      return inputs;
     }
 
     /** Registers a reached Output under its result field and returns its trace value. */

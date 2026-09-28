@@ -7,7 +7,12 @@ import type { Definition, Diagnostic, Rule } from "../../types";
 import { useFunctionCatalog } from "./useFunctionCatalog";
 import { useArcLanguageSupport, insertSnippet } from "./useArcLanguageSupport";
 import { captureEditorState, unchangedSince } from "./arcCompletion";
-import { adoptSource, useArcEditor, arcEditorOptions } from "./useArcEditor";
+import {
+  adoptSource,
+  codeStudioOptions,
+  useArcEditor,
+  useEditorOptions,
+} from "./useArcEditor";
 import StudioLibrary from "./StudioLibrary";
 import StudioOutline from "./StudioOutline";
 import StudioProblems from "./StudioProblems";
@@ -37,6 +42,11 @@ export default function CodeStudio({
   onSave,
 }: Props) {
   const { editor, model, onMount, reveal } = useArcEditor(diagnostics);
+  const options = useEditorOptions(
+    codeStudioOptions,
+    readOnly,
+    "ARC code editor",
+  );
   const { data: functions, error: catalogError } = useFunctionCatalog();
   const latest = useRef({ onBuild, onSave, readOnly });
   latest.current = { onBuild, onSave, readOnly };
@@ -150,14 +160,7 @@ export default function CodeStudio({
             if (!adopting.current) onChange(value ?? "");
           }}
           onMount={mount}
-          options={{
-            ...arcEditorOptions,
-            readOnly,
-            lineHeight: 23,
-            minimap: { enabled: true },
-            padding: { top: 20, bottom: 20 },
-            ariaLabel: "ARC code editor",
-          }}
+          options={options}
         />
         <StudioProblems
           diagnostics={diagnostics}

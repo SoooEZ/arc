@@ -70,8 +70,11 @@ export function useGraphCommands({
   // neither may keep the document locked (F8).
   const arrange = () =>
     arrangeDocument(async (draft) => {
-      const { arrangeGraph } = await import("./graphLayout");
-      return arrangeGraph(draft, measurements);
+      const [{ arrangeGraph }, { layoutInWorker }] = await Promise.all([
+        import("./graphLayout"),
+        import("./graphLayoutWorker"),
+      ]);
+      return arrangeGraph(draft, measurements, layoutInWorker);
     }, requestFit);
 
   return { patchNode, addNode, removeNode, arrange };

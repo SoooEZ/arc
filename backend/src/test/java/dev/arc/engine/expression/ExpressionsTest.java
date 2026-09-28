@@ -278,4 +278,55 @@ class ExpressionsTest {
         .hasMessage("Expected a number, got object");
     assertThatThrownBy(() -> Expressions.number(true)).hasMessage("Expected a number, got boolean");
   }
+
+  @Test
+  void operatorsKeepTheirMeaningWhenClassifiedAtParseTime() {
+    // Every operator was re-classified by matching its token against sets on each evaluation.
+    assertThat(eval("1 = 1 && 2 <> 3")).isEqualTo(true);
+    assertThat(eval("1 == 2 || 2 != 2")).isEqualTo(false);
+    assertThat(eval("true AND false OR true")).isEqualTo(true);
+    assertThat(eval("false OR false AND true")).isEqualTo(false);
+    assertThat(eval("\"b\" > \"a\" && \"a\" <= \"a\" && 2 >= 3 == false")).isEqualTo(true);
+    assertThat(eval("2 ^ 3 ^ 2")).isEqualTo(new BigDecimal("512"));
+    assertThat(eval("-2 ^ 2")).isEqualTo(new BigDecimal("-4"));
+    assertThat(eval("2 * 3 ^ 2 - 10 % 4 / 2")).isEqualTo(new BigDecimal("17"));
+    assertThat(eval("7 % 3 + 1")).isEqualTo(new BigDecimal("2"));
+    assertThatThrownBy(() -> eval("1 / 0")).hasMessage("Division by zero");
+    assertThatThrownBy(() -> eval("1 % 0")).hasMessage("Division by zero");
+    assertThatThrownBy(() -> eval("2 ^ 0.5")).hasMessage("Exponent must be an integer");
+    assertThatThrownBy(() -> eval("2 ^ 101")).hasMessage("Exponent must be -100 to 100");
+  }
+
+  @Test
+  void indexSegmentsAreReadAsAsciiDigitsWithoutARegex() {
+    var row = new LinkedHashMap<String, Object>();
+    row.put("tags", List.of("a", "b"));
+    var scope = Map.<String, Object>of("r", row, "rows", List.of(row));
+    assertThat(Expressions.evaluate("r.tags.0", scope)).isEqualTo("a");
+    assertThat(Expressions.evaluate("r.tags.01", scope)).isEqualTo("b");
+    assertThat(Expressions.evaluate("$PLUCK(rows, \"tags.1\")", scope)).isEqualTo(List.of("b"));
+    assertThat(Expressions.evaluate("$GET(r, \"tags.0\", \"none\")", scope)).isEqualTo("a");
+    // Seven digits, a non-ASCII digit and an index past the end all fall back.
+    for (String path : List.of("tags.0000000", "tags.\uff11", "tags.2", "tags.-1"))
+      assertThat(Expressions.evaluate("$GET(r, \"" + path + "\", \"none\")", scope))
+          .as(path)
+          .isEqualTo("none");
+    assertThat(Functions.arrayIndex("000001")).isEqualTo(1);
+    assertThat(Functions.arrayIndex("1234567")).isEqualTo(-1);
+    assertThat(Functions.arrayIndex("")).isEqualTo(-1);
+  }
+
+  @Test
+  void aRangeIsConvertedOncePerEvaluationAndNeverAcrossEvaluations() {
+    var compiled = Expressions.compile("$SUM($MAP(keys, k, $VLOOKUP(k, table, 2, FALSE)))");
+    List<Object> table = List.of(List.of("a", 1), List.of("b", 2), List.of("c", 3));
+    var scope = Map.<String, Object>of("keys", List.of("a", "b", "c", "a"), "table", table);
+    assertThat(compiled.evaluate(scope)).isEqualTo(new BigDecimal("7"));
+    List<Object> other = List.of(List.of("a", 10), List.of("b", 20), List.of("c", 30));
+    assertThat(compiled.evaluate(Map.of("keys", List.of("a", "c"), "table", other)))
+        .isEqualTo(new BigDecimal("40"));
+    // Separate calls give the same values as the calls inside one $MAP.
+    assertThat(Expressions.evaluate("$VLOOKUP(\"b\", table, 2, FALSE)", scope))
+        .isEqualTo(new BigDecimal("2"));
+  }
 }

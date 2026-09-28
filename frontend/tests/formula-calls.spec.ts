@@ -102,12 +102,12 @@ test("at completion pins a formula and hover explains input, formula and result 
   );
   await setEditorText(page, expression, "");
   // Arguments are filled from the node's scope when the suggestion is
-  // accepted. Every edit re-reads the scope, and no variable is offered while
-  // that read is pending (lesson F10), so accept once the read for the typed
-  // text has finished and rendered.
+  // accepted. An expression edit keeps the scope (it depends on structure
+  // only) and reads diagnostics, so accept once the read for the typed text
+  // has finished and rendered.
   const scopeRead = page.waitForResponse(
     (response) =>
-      response.url().endsWith("/api/variables") &&
+      response.url().endsWith("/api/diagnostics") &&
       (response.request().postData() ?? "").includes(
         `"expression":"@${callee}"`,
       ),

@@ -82,4 +82,25 @@ class ArcExceptionTest {
               new ArcException.Location("parent", 1, "call", "Call"));
     }
   }
+
+  @Test
+  void noStackTraceIsRecorded() {
+    // Capturing a trace for every fallback-caught value error and every rewrap was most of their
+    // cost; nothing reads it, because the HTTP body carries locations and Errors never logs one.
+    for (var error :
+        List.of(
+            ArcException.invalid("bad"),
+            ArcException.notAvailable("bad"),
+            ArcException.limit("bad"),
+            ArcException.deadline("bad"),
+            new ArcException(409, "taken"),
+            new ArcException(404, "missing", List.of("a", "b")),
+            ArcException.invalid("bad").asDefinitionFailure(),
+            ArcException.invalid("bad").atNode("rule", 1, "node", "Node"),
+            ArcException.invalid("bad").inRule("rule", 1),
+            ArcException.invalid("bad").withContext("Field total"))) {
+      assertThat(error.getStackTrace()).as(error.getMessage()).isEmpty();
+      assertThat(error.getCause()).isNull();
+    }
+  }
 }

@@ -14,6 +14,34 @@ interface ResourceOptions {
    */
   keepPrevious?: boolean;
 }
+type Stored<T> = Resource<T> & { key: string; enabled: boolean };
+
+/**
+ * The state to store when a read starts: the pending view of `key`. It returns
+ * `previous` untouched when that view is already what the hook renders, so a
+ * key change costs one render, not two: for another stored key the render
+ * derives the pending view itself, and a fresh mount already stored it.
+ */
+export function pendingResourceState<T>(
+  previous: Stored<T>,
+  {
+    key,
+    enabled,
+    keepData,
+    initial,
+  }: { key: string; enabled: boolean; keepData: boolean; initial: T },
+): Stored<T> {
+  if (previous.key !== key || previous.enabled !== enabled) return previous;
+  const data = keepData ? previous.data : initial;
+  const pending =
+    previous.loading === enabled &&
+    previous.error === "" &&
+    previous.status === null &&
+    previous.data === data;
+  if (pending) return previous;
+  return { key, enabled, data, error: "", status: null, loading: enabled };
+}
+
 /** Cancel stale reads, including servers that finish after the selected resource changes. */
 export function useAsyncResource<T>(
   key: string,
@@ -25,20 +53,20 @@ export function useAsyncResource<T>(
 ): Resource<T> {
   const latest = useRef(load);
   latest.current = load;
-  const [state, setState] = useState<
-    Resource<T> & { key: string; enabled: boolean }
-  >({ key, enabled, data: initial, error: "", status: null, loading: enabled });
+  const [state, setState] = useState<Stored<T>>({
+    key,
+    enabled,
+    data: initial,
+    error: "",
+    status: null,
+    loading: enabled,
+  });
   const keepData = keepPrevious && enabled;
   useEffect(() => {
     const controller = new AbortController();
-    setState((previous) => ({
-      key,
-      enabled,
-      data: keepData ? previous.data : initial,
-      error: "",
-      status: null,
-      loading: enabled,
-    }));
+    setState((previous) =>
+      pendingResourceState(previous, { key, enabled, keepData, initial }),
+    );
     if (!enabled) return;
     const timer = setTimeout(() => {
       latest

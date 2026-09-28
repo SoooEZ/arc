@@ -161,3 +161,57 @@ test("each inserted Reuse card gets its own result name", async ({
       .map((node) => node.output),
   ).toEqual(["result_1", "result_2"]);
 });
+
+test("the Reuse search waits for a pause in typing and keeps its cards until the answer", async ({
+  page,
+  request,
+}) => {
+  const suffix = Date.now().toString(36);
+  const child = `reuse-search-child-${suffix}`;
+  const parent = `reuse-search-parent-${suffix}`;
+  await createRule(request, child, `Discount ${suffix}`, true);
+  await createRule(request, parent, `Reuse search caller ${suffix}`);
+  const searches: string[] = [];
+  page.on("request", (outgoing) => {
+    const url = new URL(outgoing.url());
+    if (
+      url.pathname === "/api/rule-summaries" &&
+      url.searchParams.get("publishedOnly") === "true" &&
+      url.searchParams.get("search")
+    )
+      searches.push(url.searchParams.get("search")!);
+  });
+  await page.goto(`/#/studio/${parent}`);
+  await expect(page.locator(".monaco-editor")).toBeVisible();
+  await page.getByRole("button", { name: "reuse", exact: true }).click();
+  const card = page.getByRole("button", {
+    name: `Discount ${suffix} v1 · formula +`,
+    exact: true,
+  });
+  await expect(card).toBeVisible();
+  // Every keystroke sent a search and blanked the list; the settled text sends one.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/rule-summaries?*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get("search") === suffix) await held;
+    await route.fallback();
+  });
+  // The suffix names only this test's rules; typing it sent one request per key.
+  await page
+    .getByLabel("Find reusable rule")
+    .pressSequentially(suffix, { delay: 40 });
+  await expect.poll(() => searches.at(-1)).toBe(suffix);
+  // The settled text sends one request; a slow development build may let a
+  // few keystrokes settle on their own, never every one of them.
+  expect(searches.length, JSON.stringify(searches)).toBeLessThan(suffix.length);
+  await expect(card).toBeVisible();
+  release();
+  await expect(card).toBeVisible();
+  await expect
+    .poll(() => page.getByRole("button", { name: / v1 · formula \+$/ }).count())
+    .toBe(1);
+  expect(searches.length).toBeLessThan(suffix.length);
+});

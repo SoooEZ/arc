@@ -3,8 +3,10 @@ package dev.arc.engine.execution;
 import static dev.arc.support.GraphFixtures.inputNode;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.*;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.SourceReader;
@@ -187,6 +189,40 @@ class ExecutionTraceTest {
                           enabled))
           .isInstanceOf(ArcException.class)
           .hasMessageContaining("1,000 steps");
+    }
+  }
+
+  @Test
+  void theTraceIsSerializedOnceAndTheResponseWritesThoseBytes() throws Exception {
+    // Each step was serialized to count its bytes and again for the response.
+    var plain = new ObjectMapper().enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN);
+    Definition graph = ExecutionPlansTest.graph("$ROUND(123, -2)");
+    for (int maximum : List.of(256 * 1024, 120)) {
+      var result =
+          new Engine(new Validator(), plain, maximum)
+              .session(
+                  (id, v) -> {
+                    throw new AssertionError();
+                  },
+                  ExecutionDeadline.start(30_000))
+              .execute(
+                  "preview",
+                  null,
+                  () -> graph,
+                  Map.of(),
+                  new Parameters(SourceReader.unavailable()),
+                  true);
+      byte[] steps = plain.writeValueAsBytes(new ArrayList<>(result.trace()));
+      String written = plain.writeValueAsString(result);
+      assertThat(written)
+          .as("maximum " + maximum)
+          .contains("\"trace\":" + new String(steps, UTF_8));
+      assertThat(result.traceBytes()).isEqualTo(steps.length);
+      assertThat(result.traceTruncated()).isEqualTo(maximum == 120);
+      // The engine's mapper writes the decimal plain, as the response does (1E+2 → 100).
+      assertThat(written).contains("\"result\":100").doesNotContain("1E+2");
+      if (!result.traceTruncated())
+        assertThat(new String(steps, UTF_8)).contains("\"value\":100").doesNotContain("1E+2");
     }
   }
 }

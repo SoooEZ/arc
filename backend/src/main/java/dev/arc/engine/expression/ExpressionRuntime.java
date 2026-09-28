@@ -22,22 +22,28 @@ final class ExpressionRuntime {
     private final Map<String, Object> scope;
     private final Local locals;
     private final Budget budget;
+
+    /** Shared with nested contexts like the budget: one conversion per range per evaluation. */
+    private final RangeValues ranges;
+
     private final ExecutionDeadline deadline;
     private final FormulaCaller formulas;
 
     Context(Map<String, Object> scope, ExecutionDeadline deadline, FormulaCaller formulas) {
-      this(scope, null, new Budget(), deadline, formulas);
+      this(scope, null, new Budget(), new RangeValues(), deadline, formulas);
     }
 
     private Context(
         Map<String, Object> scope,
         Local locals,
         Budget budget,
+        RangeValues ranges,
         ExecutionDeadline deadline,
         FormulaCaller formulas) {
       this.scope = scope;
       this.locals = locals;
       this.budget = budget;
+      this.ranges = ranges;
       this.deadline = deadline;
       this.formulas = formulas;
     }
@@ -53,7 +59,7 @@ final class ExpressionRuntime {
     Context bind(String itemName, Object item, String accumulatorName, Object total) {
       Local bound = new Local(itemName, item, locals);
       if (accumulatorName != null) bound = new Local(accumulatorName, total, bound);
-      return new Context(scope, bound, budget, deadline, formulas);
+      return new Context(scope, bound, budget, ranges, deadline, formulas);
     }
 
     void tick() {
@@ -109,54 +115,63 @@ final class ExpressionRuntime {
     return result;
   }
 
-  static Object binary(String op, Object a, Object b) {
-    if (Set.of("==", "!=", "=", "<>").contains(op)) {
-      boolean same = equal(a, b);
-      return (op.equals("==") || op.equals("=")) == same;
-    }
-    if (Set.of("<", "<=", ">", ">=").contains(op)) {
-      int cmp;
-      if (a instanceof String x && b instanceof String y) cmp = x.compareTo(y);
-      else cmp = number(a).compareTo(number(b));
-      return switch (op) {
-        case "<" -> cmp < 0;
-        case "<=" -> cmp <= 0;
-        case ">" -> cmp > 0;
-        default -> cmp >= 0;
-      };
-    }
+  /** The parser evaluates AND and OR itself, because they short-circuit. */
+  static Object binary(BinaryOperator op, Object a, Object b) {
+    return switch (op) {
+      case EQUAL -> equal(a, b);
+      case NOT_EQUAL -> !equal(a, b);
+      case LESS, LESS_OR_EQUAL, GREATER, GREATER_OR_EQUAL -> compare(op, a, b);
+      case ADD, SUBTRACT, MULTIPLY, DIVIDE, REMAINDER, POWER -> arithmetic(op, a, b);
+      case AND, OR -> throw new IllegalArgumentException(op + " short-circuits in the parser");
+    };
+  }
+
+  private static boolean compare(BinaryOperator op, Object a, Object b) {
+    int cmp;
+    if (a instanceof String x && b instanceof String y) cmp = x.compareTo(y);
+    else cmp = number(a).compareTo(number(b));
+    return switch (op) {
+      case LESS -> cmp < 0;
+      case LESS_OR_EQUAL -> cmp <= 0;
+      case GREATER -> cmp > 0;
+      default -> cmp >= 0;
+    };
+  }
+
+  private static Object arithmetic(BinaryOperator op, Object a, Object b) {
     BigDecimal x = number(a), y = number(b);
-    if ((op.equals("/") || op.equals("%")) && y.signum() == 0)
+    if ((op == BinaryOperator.DIVIDE || op == BinaryOperator.REMAINDER) && y.signum() == 0)
       throw ArcException.invalid("Division by zero");
     try {
       return bounded(
           switch (op) {
-            case "+" -> x.add(y, MATH);
-            case "-" -> x.subtract(y, MATH);
-            case "*" -> x.multiply(y, MATH);
-            case "/" -> x.divide(y, MATH);
-            case "%" -> x.remainder(y, MATH);
-            case "^" -> {
-              int exponent;
-              try {
-                exponent = y.intValueExact();
-              } catch (ArithmeticException e) {
-                throw ArcException.invalid("Exponent must be an integer");
-              }
-              if (Math.abs((long) exponent) > 100)
-                throw ArcException.invalid("Exponent must be -100 to 100");
-              try {
-                yield exponent < 0
-                    ? BigDecimal.ONE.divide(x.pow(-exponent, MATH), MATH)
-                    : x.pow(exponent, MATH);
-              } catch (ArithmeticException e) {
-                throw ArcException.invalid("Invalid power");
-              }
-            }
-            default -> throw ArcException.invalid("Unknown operator: " + op);
+            case ADD -> x.add(y, MATH);
+            case SUBTRACT -> x.subtract(y, MATH);
+            case MULTIPLY -> x.multiply(y, MATH);
+            case DIVIDE -> x.divide(y, MATH);
+            case REMAINDER -> x.remainder(y, MATH);
+            case POWER -> power(x, y);
+            default -> throw new IllegalArgumentException(op + " is not arithmetic");
           });
     } catch (ArithmeticException error) {
       throw ArcException.invalid("Decimal operation exceeds supported precision");
+    }
+  }
+
+  private static BigDecimal power(BigDecimal x, BigDecimal y) {
+    int exponent;
+    try {
+      exponent = y.intValueExact();
+    } catch (ArithmeticException e) {
+      throw ArcException.invalid("Exponent must be an integer");
+    }
+    if (Math.abs((long) exponent) > 100) throw ArcException.invalid("Exponent must be -100 to 100");
+    try {
+      return exponent < 0
+          ? BigDecimal.ONE.divide(x.pow(-exponent, MATH), MATH)
+          : x.pow(exponent, MATH);
+    } catch (ArithmeticException e) {
+      throw ArcException.invalid("Invalid power");
     }
   }
 
@@ -164,7 +179,8 @@ final class ExpressionRuntime {
     context.tick();
     LazyFunction lazy = LAZY_FUNCTIONS.get(name);
     if (lazy != null) return lazy.evaluate(args, context);
-    Object result = Functions.call(name, args.stream().map(a -> a.eval(context)).toList());
+    Object result =
+        Functions.call(name, args.stream().map(a -> a.eval(context)).toList(), context.ranges);
     // POI cannot be interrupted, so a slow Excel calculation is caught as soon as it returns.
     context.deadline.check();
     return bounded(result);

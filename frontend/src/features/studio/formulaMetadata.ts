@@ -1,6 +1,7 @@
 import { ruleApi } from "../../api/rules";
 import type { Page, RuleSummary, Version } from "../../types";
 import type { FormulaEntry } from "./formulaCalls";
+import { pinnedRuleVersions, readRuleVersion } from "./pinnedVersions";
 
 /** The reads behind the cache; tests supply their own. */
 export interface FormulaReads {
@@ -10,6 +11,8 @@ export interface FormulaReads {
   ): Promise<Pick<RuleSummary, "kind" | "name" | "createdAt">>;
   version(id: string, version: number, signal: AbortSignal): Promise<Version>;
   search(query: string, signal: AbortSignal): Promise<Page<RuleSummary>>;
+  /** Drops cached versions of a rule created again under its ID, ahead of the next read. */
+  forgetVersions?(id: string): void;
 }
 
 /** A cached pin remembers which incarnation of the rule it was read from. */
@@ -53,6 +56,8 @@ export class FormulaMetadata {
       throw new Error(
         "Only published Formula rules can be called in an expression.",
       );
+    // Another incarnation of the ID: the shared version cache is stale for it too.
+    if (cached) this.reads.forgetVersions?.(id);
     const published = await this.reads.version(id, version, signal);
     const formula: CachedFormula = {
       id,
@@ -96,10 +101,11 @@ export class FormulaMetadata {
   }
 }
 
-/** Shared by every editor on the page. */
+/** Shared by every editor on the page; pinned versions come from the page-wide cache. */
 export const formulaMetadata = new FormulaMetadata({
   rule: (id, signal) => ruleApi.get(id, { signal }),
-  version: (id, version, signal) => ruleApi.version(id, version, { signal }),
+  version: (id, version, signal) => readRuleVersion(id, version, signal),
+  forgetVersions: (id) => pinnedRuleVersions.forget(id),
   search: (query, signal) =>
     ruleApi.catalog(
       {

@@ -17,6 +17,7 @@ import { useAsyncResource } from "./hooks/useAsyncResource";
 import { ruleApi } from "./api/rules";
 import { sameRule } from "./domain/ruleIdentity";
 import { formulaMetadata } from "./features/studio/formulaMetadata";
+import { pinnedRuleVersions } from "./features/studio/pinnedVersions";
 import type { Rule } from "./types";
 
 // The rule editor and React Flow download only when a rule opens.
@@ -107,6 +108,7 @@ export default function App() {
     library.markChanged();
     codeStudio.forget(id);
     formulaMetadata.forget(id);
+    pinnedRuleVersions.forget(id);
   };
 
   const ruleContent = (rule: RuleRoute): ReactNode => {
@@ -161,9 +163,7 @@ export default function App() {
         return <SourcesPage notify={setNotice} />;
       case "playground":
       case "docs":
-        return (
-          <ApiPage mode={view.page} rules={library.rules} notify={setNotice} />
-        );
+        return <ApiPage mode={view.page} notify={setNotice} />;
       case "library":
         return (
           <Library

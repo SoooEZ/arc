@@ -291,6 +291,7 @@ These editor changes shipped with [the second full review](reviews/2026-09-27-se
 - A Reuse card inserts only while the code and selection are unchanged since the click; typing while its pinned version loads shows "The code changed while the rule loaded. Choose the rule again." on the card, as a published Formula card does. A double or triple click on a Reuse or Formula card inserts once, however fast the read answers. Each Reuse snippet names its result `result_N`, unique among the built definition's variables and the names the unbuilt code declares, so two inserted cards no longer both write `reusedResult`.
 - A variable that several nodes assign is listed once in completion, and its hover names every producer ("From: High fee / Low fee"). Property paths such as `order.format`, `order.lowercase`, `order.isnull`, `order.ACCOUNT_NUMBER` or `order.wallet` take no keyword, type or constant color; standalone `let`, `NUMBER`, `null` and `case` keep theirs.
 - A failed `@` Formula search shows "Formula suggestions unavailable: …" in Code studio's library, in the Expression editor and in the node code dialog, not only under inline fields, and clears with the next successful search.
+- The Reuse pane's **Find reusable rule** waits for a pause in typing, like the library search, and keeps the shown cards until the settled search answers instead of sending a request per keystroke and blanking the list.
 - Node code refuses comments ("Comments belong to the whole graph; add them in Code studio") instead of dropping them, and a node fragment without `at (x, y)` keeps the node's stored position. Rule notes are stored as single trimmed lines.
 - The editor marks every broken node, also in a cyclic graph, and reports every missing connection and unreachable node.
 
@@ -304,6 +305,8 @@ These editor changes shipped with [the second full review](reviews/2026-09-27-se
 
 - A graph/code arrival the document refuses (unbuilt code at the graph route, an invalid default at the code route) is corrected without adding a history entry: Back then continues past the rule instead of bouncing again, and a sidebar click that bounced leaves history as it was. The arrival rule also applies once a running command ends, and the header toggle always names the view on screen ("Graph view" while the code editor is visible).
 - The breadcrumb names the shown section and leads away only from a rule's graph view ("Rule library"); "Data sources", "API playground", "API reference" and "Code studio" are plain text.
+- Renaming a node, a case or a field, or editing an expression, no longer blanks the variables in scope for a moment: the scope is read again only when the graph's structure changes (inputs, nodes, result names, cases, connections), so bindings never flicker to "unavailable" while typing.
+- **Arrange graph** lays out large graphs in a background worker, so the page keeps painting; the layout is unchanged.
 - Notices such as "Rule created" stay until they time out; a click elsewhere no longer closes them.
 
 **Library**

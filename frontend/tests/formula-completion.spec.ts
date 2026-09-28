@@ -159,8 +159,10 @@ test("a variable scope that finishes loading leaves an open formula suggestion l
   const expression = page.getByLabel("Expression", { exact: true });
   await setEditorText(page, expression, "");
   holding = true;
+  // An expression edit reads diagnostics (the scope depends on structure only);
+  // their answer re-renders the inspector the same way.
   const heldScope = page.waitForRequest((outgoing) =>
-    outgoing.url().endsWith("/api/variables"),
+    outgoing.url().endsWith("/api/diagnostics"),
   );
   await page.keyboard.type(`@${callee}`);
   await expect(suggestion(page, callee)).toBeVisible();
@@ -168,7 +170,7 @@ test("a variable scope that finishes loading leaves an open formula suggestion l
   const searches = traffic.searches;
 
   const scope = page.waitForResponse((response) =>
-    response.url().endsWith("/api/variables"),
+    response.url().endsWith("/api/diagnostics"),
   );
   holding = false;
   release();

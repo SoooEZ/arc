@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { monaco } from "../studio/arcLanguage";
-import { arcEditorOptions } from "../studio/useArcEditor";
+import { jsonInputOptions, useEditorOptions } from "../studio/useArcEditor";
 
 const language = "arc-input-json";
 monaco.languages.register({ id: language });
@@ -48,6 +48,7 @@ export default function InputJsonEditor({
   useEffect(() => {
     if (focusRequest > 0) editor?.focus();
   }, [editor, focusRequest]);
+  const options = useEditorOptions(jsonInputOptions, false, label);
 
   return (
     <div className="execution-json-editor">
@@ -57,20 +58,7 @@ export default function InputJsonEditor({
         value={value}
         onChange={(text) => onChange(text ?? "")}
         onMount={setEditor}
-        options={{
-          ...arcEditorOptions,
-          ariaLabel: label,
-          lineNumbersMinChars: 3,
-          lineHeight: 20,
-          folding: false,
-          glyphMargin: false,
-          renderLineHighlight: "none",
-          lineDecorationsWidth: 6,
-          padding: { top: 10, bottom: 10 },
-          quickSuggestions: false,
-          wordBasedSuggestions: "off",
-          tabCompletion: "off",
-        }}
+        options={options}
       />
     </div>
   );

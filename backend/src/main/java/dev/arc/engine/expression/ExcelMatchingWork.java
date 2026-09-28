@@ -3,6 +3,7 @@ package dev.arc.engine.expression;
 import dev.arc.engine.Limits;
 import dev.arc.error.ArcException;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.apache.poi.ss.formula.eval.OperandResolver;
 import org.apache.poi.ss.formula.functions.Countif;
@@ -62,42 +63,64 @@ final class ExcelMatchingWork {
 
   private ExcelMatchingWork() {}
 
-  /** Rejects the call when its criteria or number parsing would need too much work in POI. */
+  /**
+   * Rejects the call when its criteria or number parsing would need too much work in POI. The
+   * criteria are compiled first: a lookup without a wildcard, the common case, never collects the
+   * range's text, which cost more than POI's own lookup.
+   */
   static void checkMatchingWork(String function, List<Object> args) {
     var budget = new Budget(function);
     switch (function) {
       case "COUNTIF", "SUMIF" -> {
         Object criterion = args.get(1);
+        List<Wildcard> wildcards = wildcards(criteriaPattern(criterion));
+        boolean parsesNumbers = parsesCellsAsNumbers(criterion, budget);
+        if (wildcards.isEmpty() && !parsesNumbers) return;
         List<String> cells = texts(args.getFirst());
-        replay(budget, criteriaPattern(criterion), cells, Compilation.ONCE);
-        if (parsesCellsAsNumbers(criterion, budget)) replayNumbers(budget, cells);
+        replay(budget, wildcards, cells, Compilation.ONCE);
+        if (parsesNumbers) replayNumbers(budget, cells);
       }
       case "MATCH", "LOOKUP" ->
-          replay(budget, lookupPattern(args.getFirst()), texts(args.get(1)), Compilation.ONCE);
+          replayWildcards(budget, lookupPattern(args.getFirst()), () -> texts(args.get(1)));
       case "VLOOKUP" ->
-          replay(
-              budget,
-              lookupPattern(args.getFirst()),
-              texts(firstColumn(args.get(1))),
-              Compilation.ONCE);
+          replayWildcards(
+              budget, lookupPattern(args.getFirst()), () -> texts(firstColumn(args.get(1))));
       case "HLOOKUP" ->
-          replay(
-              budget,
-              lookupPattern(args.getFirst()),
-              texts(firstRow(args.get(1))),
-              Compilation.ONCE);
+          replayWildcards(
+              budget, lookupPattern(args.getFirst()), () -> texts(firstRow(args.get(1))));
       default -> {
-        if (DATABASE_FUNCTIONS.contains(function))
-          replay(
-              budget,
-              databasePatterns(args.get(2)),
-              databaseTexts(args.getFirst()),
-              Compilation.PER_TEST);
+        if (DATABASE_FUNCTIONS.contains(function)) {
+          List<Wildcard> wildcards = wildcards(databasePatterns(args.get(2)));
+          if (!wildcards.isEmpty())
+            replay(budget, wildcards, databaseTexts(args.getFirst()), Compilation.PER_TEST);
+        }
         if (TWO_RANGE_STATISTICS.contains(function))
           for (Object range : args.subList(args.size() - 2, args.size()))
             replayNumbers(budget, texts(range));
       }
     }
+  }
+
+  /** A criterion with a wildcard, compiled as POI compiles it. */
+  private record Wildcard(String source, Pattern pattern) {}
+
+  /**
+   * The criteria POI would match as wildcards; text without {@code *} or {@code ?} needs no replay.
+   */
+  private static List<Wildcard> wildcards(List<String> sources) {
+    var wildcards = new ArrayList<Wildcard>();
+    for (String source : sources) {
+      Pattern pattern = Countif.StringMatcher.getWildCardPattern(source);
+      if (pattern != null) wildcards.add(new Wildcard(source, pattern));
+    }
+    return wildcards;
+  }
+
+  /** Collects the range's text only when a wildcard has to be replayed over it. */
+  private static void replayWildcards(
+      Budget budget, List<String> sources, Supplier<List<String>> texts) {
+    List<Wildcard> wildcards = wildcards(sources);
+    if (!wildcards.isEmpty()) replay(budget, wildcards, texts.get(), Compilation.ONCE);
   }
 
   /**
@@ -158,14 +181,13 @@ final class ExcelMatchingWork {
   }
 
   private static void replay(
-      Budget budget, List<String> patterns, List<String> texts, Compilation compilation) {
-    for (String source : patterns) {
-      Pattern pattern = Countif.StringMatcher.getWildCardPattern(source);
-      if (pattern == null) continue;
+      Budget budget, List<Wildcard> wildcards, List<String> texts, Compilation compilation) {
+    for (Wildcard wildcard : wildcards) {
+      int start = compilation == Compilation.PER_TEST ? wildcard.source().length() + 1 : 1;
       for (String text : texts) {
         // Starting a match costs work even when it reads nothing, and so does compiling again.
-        budget.spend(compilation == Compilation.PER_TEST ? source.length() + 1 : 1, Work.WILDCARDS);
-        pattern.matcher(new MeteredText(text, budget, Work.WILDCARDS)).matches();
+        budget.spend(start, Work.WILDCARDS);
+        wildcard.pattern().matcher(new MeteredText(text, budget, Work.WILDCARDS)).matches();
       }
     }
   }
@@ -198,14 +220,19 @@ final class ExcelMatchingWork {
     return texts;
   }
 
+  /** Every cell of a nested range in reading order, into one list rather than one per element. */
   private static List<Object> cells(Object value) {
     var cells = new ArrayList<Object>();
-    if (value instanceof List<?> items) {
-      for (Object item : items) cells.addAll(cells(item));
-    } else {
-      cells.add(value);
-    }
+    collectCells(value, cells);
     return cells;
+  }
+
+  private static void collectCells(Object value, List<Object> into) {
+    if (value instanceof List<?> items) {
+      for (Object item : items) collectCells(item, into);
+    } else {
+      into.add(value);
+    }
   }
 
   /** Whether POI compiles a criterion once per call or again for every value it tests. */
