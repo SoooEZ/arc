@@ -450,19 +450,18 @@ test("a deep link to a wide Switch centres the whole card in the pane", async ({
   const card = page.locator('.react-flow__node[data-id="wide"]');
   const pane = page.locator(".react-flow__pane");
   await expect(card).toBeVisible();
+  // The focus animates: poll until the card rests centred, not only inside.
   await expect
     .poll(async () => {
       const box = (await card.boundingBox())!;
       const area = (await pane.boundingBox())!;
+      const offset = Math.abs(
+        box.x + box.width / 2 - (area.x + area.width / 2),
+      );
       return {
-        centred: Math.abs(box.x + box.width / 2 - (area.x + area.width / 2)),
+        centred: offset <= 1,
         inside: box.x + box.width <= area.x + area.width,
       };
     })
-    .toEqual({ centred: expect.any(Number), inside: true });
-  const box = (await card.boundingBox())!;
-  const area = (await pane.boundingBox())!;
-  expect(
-    Math.abs(box.x + box.width / 2 - (area.x + area.width / 2)),
-  ).toBeLessThanOrEqual(1);
+    .toEqual({ centred: true, inside: true });
 });

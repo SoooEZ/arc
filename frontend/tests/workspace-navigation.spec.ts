@@ -432,8 +432,12 @@ test("a pushed graph arrival with unbuildable code steps back once and shows why
   }, id);
   await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
   await expect(code).toBeVisible();
+  // The document shows the build's first diagnostic, whatever its wording.
+  const problem = page.getByRole("button", { name: /^Ln \d+:\d+ · / });
+  await expect(problem).toBeVisible();
+  const message = (await problem.innerText()).replace(/^Ln \d+:\d+ · /, "");
   await expect(
-    page.getByRole("alert").filter({ hasText: /expected/i }),
+    page.getByRole("alert").filter({ hasText: message }),
   ).toBeVisible();
   const bounced = await sessionHistory(page);
   expect(bounced.index).toBe(before.index);
