@@ -11,7 +11,7 @@ async function fixture(request: APIRequestContext, versions = 2) {
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
-      { name: "amount", type: "NUMBER", required: true },
+      { name: "amount", type: "NUMBER", required: true, defaultValue: null },
       { name: "rate", type: "NUMBER", required: false, defaultValue: 0.2 },
     ],
     nodes: [
@@ -61,7 +61,7 @@ async function fixture(request: APIRequestContext, versions = 2) {
         label: "Reuse child",
         ruleId: child.id,
         version: 1,
-        bindings: { amount: 7 },
+        bindings: { amount: "7" },
         output: "answer",
         position: { x: 200, y: 180 },
       },
@@ -531,4 +531,38 @@ test("selecting a Reference node again does not read its pinned version again", 
   }
   // The immutable pin was read on every selection.
   expect(reads).toHaveLength(1);
+});
+
+test("a child renamed behind a listed library page shows its current name in the picker and the viewer", async ({
+  page,
+  request,
+}) => {
+  const { parent, child } = await fixture(request, 1);
+  // The library lists the child under its old name before it is renamed.
+  await page.goto("/#/library");
+  await page.getByLabel("Search rules", { exact: true }).fill(child.id);
+  await expect(
+    page.getByRole("heading", { name: child.name, exact: true }),
+  ).toBeVisible();
+  const renamed = `Renamed child ${Date.now().toString(36)}`;
+  const saved = await request.put(`/api/rules/${child.id}`, {
+    data: {
+      name: renamed,
+      description: child.description,
+      revision: child.revision,
+      definition: child.draft,
+    },
+  });
+  expect(saved.ok(), await saved.text()).toBeTruthy();
+  await page.goto(`/#/rules/${parent.id}?node=ref`);
+  const inspector = sidebar(page);
+  await expect(
+    inspector.getByRole("combobox", { name: "Published rule" }),
+  ).toHaveValue(renamed);
+  await inspector.getByRole("button", { name: "Open referenced rule" }).click();
+  const viewer = page.getByRole("dialog", { name: "Referenced rule viewer" });
+  await expect(
+    viewer.getByRole("heading", { name: renamed, exact: true }),
+  ).toBeVisible();
+  await expect(viewer.locator(".reference-breadcrumb")).toContainText(renamed);
 });

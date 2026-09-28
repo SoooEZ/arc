@@ -8,6 +8,7 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleSamples;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -21,8 +22,7 @@ class ValidatorTest {
 
   @Test
   void templatesAreValid() {
-    for (String kind : List.of("FORMULA", "RULE", "DECISION_TREE"))
-      validator.validate(RuleSamples.blank(kind), resolver);
+    for (RuleKind kind : RuleKind.values()) validator.validate(RuleSamples.blank(kind), resolver);
   }
 
   @Test
@@ -41,7 +41,7 @@ class ValidatorTest {
             List.of(node("input", "INPUT", null, null), node("loop", "FORMULA", "1", "x")),
             List.of(edge("input", "loop", "next"), edge("loop", "loop", "next")));
     assertThatThrownBy(() -> validator.validate(d, resolver)).hasMessageContaining("cycles");
-    var base = RuleSamples.blank("FORMULA");
+    var base = RuleSamples.blank(RuleKind.FORMULA);
     var nodes = new ArrayList<>(base.nodes());
     nodes.add(node("orphan", "OUTPUT", "0", null));
     assertThatThrownBy(
@@ -93,7 +93,7 @@ class ValidatorTest {
 
   @Test
   void duplicateAndInvalidInputsAreRejected() {
-    var base = RuleSamples.blank("FORMULA");
+    var base = RuleSamples.blank(RuleKind.FORMULA);
     assertThatThrownBy(
             () ->
                 validator.shape(
@@ -120,7 +120,7 @@ class ValidatorTest {
   @Test
   void inputAndDocumentProblemsAppearOnTheInputNodeWhereverTheShapeIsChecked() {
     // Save, render and /variables returned them unlocated, unlike /validate and /diagnostics.
-    var base = RuleSamples.blank("FORMULA");
+    var base = RuleSamples.blank(RuleKind.FORMULA);
     var input = base.inputNode().orElseThrow();
     var amount = new Input("amount", "NUMBER", true, null);
     var duplicated = new Definition(1, List.of(amount, amount), base.nodes(), base.edges());
@@ -162,7 +162,7 @@ class ValidatorTest {
 
   @Test
   void inputNamesRejectWhitespaceAndFunctionPrefixesWithoutReservingFunctionNames() {
-    var base = RuleSamples.blank("FORMULA");
+    var base = RuleSamples.blank(RuleKind.FORMULA);
     for (String name :
         List.of("unit price", "price\t", "price\u00a0", "$ROUND", "round$", "@price", "price@")) {
       var definition =
@@ -259,8 +259,8 @@ class ValidatorTest {
         new Definition(
             1,
             List.of(new Input("amount", "NUMBER", true, null)),
-            RuleSamples.blank("FORMULA").nodes(),
-            RuleSamples.blank("FORMULA").edges());
+            RuleSamples.blank(RuleKind.FORMULA).nodes(),
+            RuleSamples.blank(RuleKind.FORMULA).edges());
     assertThatThrownBy(() -> validator.validate(d, (id, v) -> child))
         .hasMessageContaining("missing binding for amount");
   }

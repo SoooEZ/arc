@@ -1,11 +1,7 @@
 import type { ElkExtendedEdge, ElkNode, ElkPort } from "elkjs/lib/elk-api.js";
 import type { Definition, RuleNode } from "../../../types";
-import { defaultNodeSize, type NodeSizes } from "./graphGeometry";
-import {
-  hasTargetPort,
-  nodeWidth,
-  sourcePorts,
-} from "../../../domain/nodePorts";
+import { cardSize, type NodeSizes } from "./graphGeometry";
+import { hasTargetPort, sourcePorts } from "../../../domain/nodePorts";
 
 /** Lays out an ELK graph: the worker-backed instance in the browser, the bundled one in tests. */
 export type ElkLayout = (graph: ElkNode) => Promise<ElkNode>;
@@ -26,11 +22,7 @@ const isFiniteNumber = (value: number | undefined): value is number =>
 
 /** One layout box per node, with ports where GraphNode draws its handles. */
 function layoutNode(node: RuleNode, sizes: NodeSizes) {
-  const measured = sizes.get(node.id);
-  const width =
-    measured && measured.width > 0 ? measured.width : nodeWidth(node);
-  const height =
-    measured && measured.height > 0 ? measured.height : defaultNodeSize.height;
+  const { width, height } = cardSize(node, sizes);
   const port = (handle: string, ratio: number, source: boolean): ElkPort => ({
     id: portId(node.id, handle),
     width: 0,

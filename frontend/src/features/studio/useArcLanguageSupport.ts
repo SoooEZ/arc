@@ -230,21 +230,22 @@ export function useArcLanguageSupport(
         if (!explicitFunction && !/^\s*\(/.test(afterWord)) return null;
         const name = explicitFunction ? w.word : "$" + w.word;
         const f = functions.find((f) => f.name === name.toUpperCase());
-        return f
-          ? {
-              contents: [
-                ...(!explicitFunction
-                  ? [
-                      {
-                        value: `Function calls require a $ prefix. Use \`${f.name}(...)\`.`,
-                      },
-                    ]
-                  : []),
-                { value: "```arc\n" + f.signature + "\n```" },
-                { value: f.description },
-              ],
-            }
-          : null;
+        if (!f) return null;
+        // A call without the prefix is shown how to write it before its help.
+        const prefixHint = explicitFunction
+          ? []
+          : [
+              {
+                value: `Function calls require a $ prefix. Use \`${f.name}(...)\`.`,
+              },
+            ];
+        return {
+          contents: [
+            ...prefixHint,
+            { value: "```arc\n" + f.signature + "\n```" },
+            { value: f.description },
+          ],
+        };
       },
     });
     return () => {

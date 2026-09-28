@@ -16,7 +16,7 @@ export default function ResultFields({
       <IdentifierField
         label="Result variable"
         value={node.output || ""}
-        onChange={(output) => patch({ output })}
+        onChange={(output) => patch({ output: output || null })}
         helperText="Use this variable in later nodes."
         disabled={readOnly}
       />

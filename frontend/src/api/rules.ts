@@ -8,19 +8,20 @@ import type {
   RuleSummary,
   VersionSummary,
 } from "../types";
-import { http, pathId, type RequestOptions } from "./http";
-export interface RuleCatalogQuery {
+import { http, pathId, queryString, type RequestOptions } from "./http";
+// A type alias, not an interface: only aliases satisfy queryString's index signature.
+export type RuleCatalogQuery = {
   offset?: number;
   limit?: number;
   search?: string;
   kind?: Kind | "";
   publishedOnly?: boolean;
-}
+};
 const executePath = (id: string) => `/rules/${pathId(id)}/execute`;
 export const ruleApi = {
   catalog: (query: RuleCatalogQuery = {}, options?: RequestOptions) =>
     http.get<Page<RuleSummary>>(
-      `/rule-summaries?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`,
+      `/rule-summaries?${queryString(query)}`,
       options,
     ),
   versionSummaries: (
@@ -29,7 +30,7 @@ export const ruleApi = {
     options?: RequestOptions,
   ) =>
     http.get<Page<VersionSummary>>(
-      `/rules/${pathId(id)}/version-summaries?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`,
+      `/rules/${pathId(id)}/version-summaries?${queryString(query)}`,
       options,
     ),
   get: (id: string, options?: RequestOptions) =>

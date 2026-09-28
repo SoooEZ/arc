@@ -188,6 +188,70 @@ class ErrorRecoveryTest {
     }
   }
 
+  /**
+   * Preparation resolves the {@code @} pins inside cases, fields and source mappings with the
+   * deadline-checking resolver, so the deadline can expire there: it keeps its plain message and
+   * status at the node that holds the pin, as it does at run time (maintaining.md, api.md).
+   */
+  @Test
+  void aDeadlineWhilePreparingAPinKeepsItsMessageAtTheNodeThatHoldsThePin() {
+    RuleResolver expired =
+        new RuleResolver() {
+          @Override
+          public Definition resolve(String id, int version) {
+            throw ArcException.deadline("Rule execution deadline exceeded");
+          }
+
+          @Override
+          public Definition resolveFormula(String id, int version) {
+            throw ArcException.deadline("Rule execution deadline exceeded");
+          }
+        };
+    var sites = new LinkedHashMap<String, Definition>();
+    sites.put(
+        "field",
+        callFrom(
+            "node action TRANSFORM \"Action\" { field \"cost\" = @%s:1(); as data; next -> out; }",
+            "f"));
+    sites.put(
+        "case",
+        callFrom(
+            "node action SWITCH \"Action\" { case \"one\" \"One\" when @%s:1();"
+                + " case:one -> out; default -> out; }",
+            "f"));
+    for (var site : sites.entrySet())
+      assertThatThrownBy(() -> engine.execute("parent", 1, site.getValue(), Map.of(), expired))
+          .as(site.getKey())
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(504);
+                assertThat(error.kind()).isEqualTo(ArcException.Kind.DEADLINE);
+                assertThat(error.getMessage()).isEqualTo("Rule execution deadline exceeded");
+                assertThat(error.issues()).containsExactly("Rule execution deadline exceeded");
+                assertThat(error.locations())
+                    .last()
+                    .isEqualTo(new ArcException.Location("parent", 1, "action", "Action"));
+              });
+    var mapping =
+        new Input(
+            "value",
+            "NUMBER",
+            true,
+            null,
+            new SourceBinding("table", 1, Map.of("key", "@f:1()"), "", "FAIL"));
+    assertThatThrownBy(
+            () -> engine.execute("parent", 1, graph(List.of(mapping), "value"), Map.of(), expired))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(504);
+              assertThat(error.getMessage()).isEqualTo("Rule execution deadline exceeded");
+              assertThat(error.locations())
+                  .contains(new ArcException.Location("parent", 1, "in", "Input"));
+            });
+  }
+
   private Definition callFrom(String actionTemplate, String child) {
     return script.parse(
         "node in INPUT \"Input\" { next -> action; } "

@@ -11,6 +11,7 @@ import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleSamples;
 import dev.arc.source.JsonPointerExtractor;
 import java.math.BigDecimal;
@@ -233,7 +234,7 @@ class ParametersTest {
             true,
             null,
             new SourceBinding("source", 1, Map.of("key", "a"), "", "FAIL"));
-    var blank = RuleSamples.blank("FORMULA");
+    var blank = RuleSamples.blank(RuleKind.FORMULA);
     var d = new Definition(1, List.of(a, b), blank.nodes(), blank.edges());
     assertThatThrownBy(() -> new Validator().validate(d, (id, v) -> null))
         .hasMessageContaining("Circular source");

@@ -4,23 +4,31 @@ import dev.arc.engine.MemoizingRuleResolver;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
-import dev.arc.engine.script.ArcScript;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.NodeKind;
-import dev.arc.model.SourceDefinition;
 import dev.arc.source.SourceBindingValidator;
+import dev.arc.source.SourceConfigurations;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiFunction;
 import org.springframework.stereotype.Service;
 
 /** Static graph checks and source contracts. Never fetches external parameter values. */
 @Service
 public class RuleDefinitionService {
+  /**
+   * Result of {@code /studio/expression/check}: the free variables and Formula calls of a valid
+   * expression, or the error of an invalid one. The field order is the JSON order.
+   */
+  public record ExpressionCheck(
+      boolean valid,
+      Set<String> variables,
+      String error,
+      List<Expressions.FormulaCall> formulaCalls) {}
+
   private final Validator validator;
   private final RuleResolver rules;
   private final SourceBindingValidator sources;
@@ -36,20 +44,19 @@ public class RuleDefinitionService {
     validate(definition, new MemoizingRuleResolver(rules));
   }
 
-  public ArcScript.ExpressionCheck checkExpression(String source) {
+  public ExpressionCheck checkExpression(String source) {
     try {
       var expression = Expressions.compile(source);
       Validator.validateFormulaCalls(expression, new MemoizingRuleResolver(rules));
-      return new ArcScript.ExpressionCheck(
-          true, expression.variables(), null, expression.formulaCalls());
+      return new ExpressionCheck(true, expression.variables(), null, expression.formulaCalls());
     } catch (ArcException error) {
-      return new ArcScript.ExpressionCheck(false, Set.of(), error.getMessage(), List.of());
+      return new ExpressionCheck(false, Set.of(), error.getMessage(), List.of());
     }
   }
 
   public void validate(Definition definition, RuleResolver resolver) {
     validator.validate(definition, resolver);
-    sources.validate(definition, resolver, this::prepareCallee);
+    sources.validatePinnedContracts(definition, resolver, this::prepareCallee);
   }
 
   /**
@@ -60,11 +67,10 @@ public class RuleDefinitionService {
     validator.compile(callee, resolver);
   }
 
+  /** Execution's source-contract check, over the request session's configuration snapshot. */
   public void validateSources(
-      Definition definition,
-      RuleResolver resolver,
-      BiFunction<String, Integer, SourceDefinition> lookup) {
-    sources.validate(definition, resolver, lookup);
+      Definition definition, RuleResolver resolver, SourceConfigurations session) {
+    sources.validateForExecution(definition, resolver, session);
   }
 
   /** Scopes depend on the graph's structure alone: invalid structure or a cycle still fails. */
@@ -83,7 +89,8 @@ public class RuleDefinitionService {
     var problems = new ArrayList<>(diagnosis.problems());
     if (diagnosis.shaped() && hasOneInputNode(definition)) {
       try {
-        sources.validate(definition, resolver, diagnosis.dependencies(), this::prepareCallee);
+        sources.validateRemainingPins(
+            definition, resolver, diagnosis.dependencies(), this::prepareCallee);
       } catch (ArcException error) {
         problems.add(Validator.Problem.from(error));
       }

@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import type { Definition, Rule } from "../src/types";
+import type { Definition } from "../src/types";
+import { createRule as createApiRule, publishRule } from "./helpers/api";
 import { editorLines } from "./helpers/editor";
 
 const definition: Definition = {
@@ -24,17 +25,8 @@ async function createRule(
   name: string,
   publish = false,
 ) {
-  const response = await request.post("/api/rules", {
-    data: { id, name, kind: "FORMULA", definition },
-  });
-  expect(response.ok()).toBeTruthy();
-  const rule: Rule = await response.json();
-  if (publish) {
-    const published = await request.post(`/api/rules/${id}/publish`, {
-      data: { revision: rule.revision },
-    });
-    expect(published.ok()).toBeTruthy();
-  }
+  const rule = await createApiRule(request, { id, name, definition });
+  if (publish) await publishRule(request, rule);
 }
 
 test("reused rule names remain literal while Monaco placeholders remain editable", async ({

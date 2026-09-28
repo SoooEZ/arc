@@ -25,15 +25,14 @@ import {
 } from "./sourceCatalog";
 
 // Leaving unmounts the editor: unsaved edits are lost and a pending save's result is never shown.
-const unsavedSourceWarning = "Discard unsaved data source changes?";
+/** The one wording for discarding source edits: leaving, closing the manager, selecting another source. */
+export const unsavedSourceWarning = "Discard unsaved data source changes?";
 const pendingSaveWarning =
   "A data source is still being saved. Leave without waiting for the result?";
 
 export function useSourceEditor({
-  onDirty,
   notify,
 }: {
-  onDirty?: (dirty: boolean) => void;
   notify: (message: string) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -83,9 +82,10 @@ export function useSourceEditor({
   const selected = document?.source;
   const versions = usePagedResource(
     JSON.stringify([selected?.id, selected?.version]),
-    (offset, limit, signal) =>
-      sourceApi.versionSummaries(selected!.id, { offset, limit }, { signal }),
-    !!selected?.version,
+    selected?.version
+      ? (offset, limit, signal) =>
+          sourceApi.versionSummaries(selected.id, { offset, limit }, { signal })
+      : null,
   );
   const listed = catalogRows(catalog.data, savedSources, listedRevision);
   useNavigationGuard(dirty ? unsavedSourceWarning : null);
@@ -104,12 +104,8 @@ export function useSourceEditor({
       versionRequest.current?.abort();
     };
   }, []);
-  useEffect(() => {
-    onDirty?.(dirty);
-  }, [dirty, onDirty]);
-
   const select = async (source: SourceSummary | DataSource) => {
-    if (dirty && !window.confirm("Discard unsaved source changes?")) return;
+    if (dirty && !window.confirm(unsavedSourceWarning)) return;
     const currentSelection = ++selection.current;
     selectionRequest.current?.abort();
     versionRequest.current?.abort();
@@ -317,3 +313,5 @@ export function useSourceEditor({
     },
   };
 }
+
+export type SourceEditor = ReturnType<typeof useSourceEditor>;

@@ -11,9 +11,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.error.ArcException;
 import dev.arc.model.PageRequest;
+import dev.arc.model.RuleKind;
+import dev.arc.rule.RuleSamples;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -98,6 +103,46 @@ class JdbcRuleRepositoryTest {
     when(jdbc.update(claim)).thenReturn(1, 0);
     assertThat(repository.claimSampleSeeding()).isTrue();
     assertThat(repository.claimSampleSeeding()).isFalse();
+  }
+
+  /**
+   * The row mapper returns the version with its rule's kind; the rule layer's default method
+   * decides that only a published Formula is callable, and a missing version stays a 404.
+   */
+  @Test
+  void formulaCallsResolveOnlyPublishedFormulasFromTheKindStorageReturns() {
+    var definition = RuleSamples.blank(RuleKind.FORMULA);
+    String encoded = new JsonCodec(new ObjectMapper()).encode(definition);
+    var byKind = new HashMap<String, String>();
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              Object[] values = call.getArguments();
+              String kind = byKind.get(values[2]);
+              if (kind == null) return List.of();
+              RowMapper<Object> mapper = call.getArgument(1);
+              ResultSet row = mock(ResultSet.class);
+              when(row.getString("kind")).thenReturn(kind);
+              when(row.getString("definition")).thenReturn(encoded);
+              return List.of(mapper.mapRow(row, 0));
+            });
+    byKind.put("discount", "FORMULA");
+    byKind.put("pricing", "DECISION_TREE");
+    byKind.put("shipping", "RULE");
+
+    assertThat(repository.resolveFormula("discount", 1)).isEqualTo(definition);
+    for (String other : List.of("pricing", "shipping"))
+      assertThatThrownBy(() -> repository.resolveFormula(other, 1))
+          .as(other)
+          .hasMessage("@ calls require a published Formula: " + other);
+    assertThatThrownBy(() -> repository.resolveFormula("missing", 3))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(404);
+              assertThat(error.getMessage())
+                  .isEqualTo("Published Formula version not found: missing v3");
+            });
   }
 
   /** Versions reference their rule, so they are removed before it. */

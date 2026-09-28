@@ -24,7 +24,8 @@ test("own-value lookups still return entries that use prototype names", () => {
   expect(ownValue(scope, "constructor")).toEqual(["amount"]);
   expect(ownValue(scope, "__proto__")).toEqual(["rate"]);
   expect(ownValue(scope, "toString")).toEqual([]);
+  // A record without a prototype may name a member of Object.prototype.
   const bare: Record<string, number> = Object.create(null);
-  bare.valueOf = 3;
+  Object.defineProperty(bare, "valueOf", { value: 3, enumerable: true });
   expect(ownValue(bare, "valueOf")).toBe(3);
 });

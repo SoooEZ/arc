@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.graph.GraphPlan;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
@@ -272,6 +273,24 @@ class DraftRoundTripTest {
 
   private static String unset(String name) {
     return name == null || name.isEmpty() ? null : name;
+  }
+
+  /** The code view reads an empty result name as unset, so the scopes must not change with it. */
+  @Test
+  void anEmptyResultNameGivesTheSameScopesBeforeAndAfterACodeRoundTrip() {
+    for (Node node :
+        List.of(
+            formula("", "amount * 2"),
+            transform("", fieldList("1"), null),
+            reference("", "child", 2, Map.of("amount", "1")))) {
+      Definition draft = graph(node);
+      var built = script.build(script.render(draft));
+      assertThat(built.diagnostics()).isEmpty();
+      assertThat(new GraphPlan(draft).available())
+          .as(node.type())
+          .isEqualTo(new GraphPlan(built.definition()).available());
+      assertThat(new GraphPlan(draft).available().get("out")).containsExactly("amount");
+    }
   }
 
   @Test

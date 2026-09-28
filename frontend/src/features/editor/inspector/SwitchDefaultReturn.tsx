@@ -1,11 +1,13 @@
 import { Button } from "@mui/material";
 import { Plus } from "lucide-react";
 import {
+  canAddSwitchDefaultReturn,
   setSwitchDefaultReturn,
   switchDefaultOutput,
 } from "../../../domain/switchBranches";
 import { patchGraphNode } from "../../../domain/graph";
 import { shortId } from "../../../domain/ids";
+import { handles } from "../../../domain/nodePorts";
 import OutputValueFields from "./OutputValueFields";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
@@ -62,7 +64,8 @@ function DefaultRoute({
     );
   const destinations = rule.draft.edges
     .filter(
-      (edge) => edge.source === node.id && edge.sourceHandle === "default",
+      (edge) =>
+        edge.source === node.id && edge.sourceHandle === handles.default,
     )
     .map(
       (edge) =>
@@ -85,11 +88,7 @@ function DefaultRoute({
       </p>
       <Button
         startIcon={<Plus size={14} />}
-        disabled={
-          readOnly ||
-          rule.draft.nodes.length >= 100 ||
-          rule.draft.edges.length >= 200
-        }
+        disabled={readOnly || !canAddSwitchDefaultReturn(rule.draft, node.id)}
         onClick={() => {
           // Document updaters can run more than once, so the IDs are chosen here.
           const outputId = shortId("default-");

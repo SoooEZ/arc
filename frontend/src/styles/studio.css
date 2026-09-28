@@ -10,6 +10,18 @@
 .studio-editor > .expression-color-key {
   padding-inline: 20px;
 }
+.expression-color-key > [data-role="function"] {
+  color: var(--color-symbol-function);
+}
+.expression-color-key > [data-role="formula"] {
+  color: var(--color-symbol-formula);
+}
+.expression-color-key > [data-role="parameter"] {
+  color: var(--color-symbol-parameter);
+}
+.expression-color-key > [data-role="result"] {
+  color: var(--color-symbol-result);
+}
 .code-studio {
   flex: 1;
   display: grid;

@@ -195,7 +195,7 @@
   background: #eff6e8;
   color: #8cad6c;
 }
-.trace-branch.false {
+.trace-branch.fallback {
   color: #b79b75;
   background: #faf5eb;
 }

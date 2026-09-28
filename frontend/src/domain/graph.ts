@@ -14,6 +14,7 @@ import {
   stringifyJson,
 } from "./json";
 import { nodeKinds } from "./nodeKinds";
+import { canAddEdge } from "./limits";
 import { hasTargetPort, sourcePorts } from "./nodePorts";
 export type DefinitionChange = (definition: Definition) => Definition;
 export const ruleSnapshot = (
@@ -301,6 +302,7 @@ export function connectGraphNodes(
   )
     return definition;
   if (
+    !canAddEdge(definition) ||
     definition.edges.some(
       (edge) =>
         edge.source === source &&

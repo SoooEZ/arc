@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { createHttpClient, pathId } from "../../src/api/http";
+import {
+  apiBaseUrl,
+  createHttpClient,
+  pathId,
+  queryString,
+} from "../../src/api/http";
 import { ApiError, errorDetails } from "../../src/api/errors";
 import { ruleApi } from "../../src/api/rules";
 
@@ -113,8 +118,11 @@ test("API errors keep the body's issues, and only issues beyond the message are 
         { status: 409 },
       ),
   );
-  const error = await refused.delete("/rules/x").catch((error) => error);
-  expect(error).toBeInstanceOf(ApiError);
+  const failure: unknown = await refused
+    .delete("/rules/x")
+    .catch((thrown: unknown) => thrown);
+  expect(failure).toBeInstanceOf(ApiError);
+  const error = failure as ApiError;
   expect(error.issues).toEqual(["a (draft)", "b v1", "c v2"]);
   expect(errorDetails(error)).toEqual(["a (draft)", "b v1", "c v2"]);
   const stale = new ApiError("This rule changed", [], 409, [
@@ -182,4 +190,18 @@ test("resource URLs share the client's base and encode rule IDs", () => {
   expect(ruleApi.executeUrl("a/b c?", "http://localhost:3080")).toBe(
     "http://localhost:3080/api/rules/a%2Fb%20c%3F/execute",
   );
+});
+
+test("catalog query strings omit undefined fields and keep empty ones", () => {
+  expect(queryString({ offset: 0, limit: 5, search: undefined })).toBe(
+    "offset=0&limit=5",
+  );
+  expect(queryString({ kind: "" })).toBe("kind=");
+  expect(queryString({ publishedOnly: true })).toBe("publishedOnly=true");
+  expect(queryString({ search: "a b&c" })).toBe("search=a+b%26c");
+});
+
+test("the reference page's base URL comes from the transport", () => {
+  expect(apiBaseUrl("https://arc.example")).toBe("https://arc.example/api");
+  expect(apiBaseUrl("http://localhost:3080")).toBe("http://localhost:3080/api");
 });

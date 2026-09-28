@@ -37,7 +37,7 @@ export default function RulePreview({ rule }: { rule: Rule }) {
                 markerHeight="5"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 0 L 8 4 L 0 8 z" fill="#879e93" />
+                <path d="M 0 0 L 8 4 L 0 8 z" className="preview-arrowhead" />
               </marker>
             </defs>
             {graph.connections.map(({ edge, path, label, sx, sy }) => (
@@ -48,7 +48,7 @@ export default function RulePreview({ rule }: { rule: Rule }) {
                   className="preview-connection"
                   markerEnd={`url(#${markerId})`}
                 />
-                {readable && label && label !== "next" && (
+                {readable && label && (
                   <text x={sx + 4} y={sy + 13} className="preview-branch-label">
                     {label}
                   </text>

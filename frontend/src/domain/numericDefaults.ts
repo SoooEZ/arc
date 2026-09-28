@@ -1,20 +1,17 @@
 import {
   DecimalNumber,
+  decimalTextParts,
   doubleKeepsDecimal,
   isDecimalNumber,
   sameJsonNumber,
+  significantDigits,
+  type DecimalParts,
 } from "./json";
 import { MAX_NUMBER_PRECISION, MAX_NUMBER_SCALE } from "./limits";
 
 export type NumericDefault =
   | { valid: true; value: number | DecimalNumber | null }
   | { valid: false; error: string };
-
-/**
- * Decimal text as users type it: "+1", ".5", "5." and "1e3" are numbers; "1e",
- * "." and "0x10" are not. JSON number tokens are a subset.
- */
-const decimalText = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
 
 /**
  * The server's number limits (backend Limits.MAX_NUMBER_PRECISION and
@@ -28,26 +25,6 @@ const maxScale = BigInt(MAX_NUMBER_SCALE);
 
 const invalidNumber = "Enter a valid number before saving";
 export const unsupportedNumber = `This number is too large or too precise. Use at most ${MAX_NUMBER_PRECISION} digits and ${MAX_NUMBER_SCALE} decimal places.`;
-
-interface DecimalParts {
-  negative: boolean;
-  integer: string;
-  fraction: string;
-  exponent: bigint;
-}
-
-function decimalParts(text: string): DecimalParts | null {
-  const parts = decimalText.exec(text);
-  if (!parts) return null;
-  const [, sign, integer, fraction = "", exponent = "0"] = parts;
-  if (!integer && !fraction) return null;
-  return {
-    negative: sign === "-",
-    integer,
-    fraction,
-    exponent: BigInt(exponent),
-  };
-}
 
 /** The JSON token for typed text, keeping its digits: "+007.50" -> "7.50", ".5e3" -> "0.5e3". */
 function jsonNumberToken({
@@ -69,20 +46,18 @@ function withinLimits(precision: bigint, scale: bigint): boolean {
 
 /** Whether the server accepts the JSON number `token`, before and after storing it. */
 export function withinServerLimits(token: string): boolean {
-  const parts = decimalParts(token);
+  const parts = decimalTextParts(token);
   if (!parts) return false;
-  const digits = (parts.integer + parts.fraction).replace(/^0+/, "");
+  const { digits, trailingZeros } = significantDigits(parts);
   // Precision counts the significant digits; scale counts decimal places.
   const precision = BigInt(digits.length);
   const scale = BigInt(parts.fraction.length) - parts.exponent;
   // A zero has no digits to strip, so its scale counts as written.
   if (!digits) return -maxScale <= scale && scale <= maxScale;
-  const trailingZeros = BigInt(
-    digits.length - digits.replace(/0+$/, "").length,
-  );
+  const zeros = BigInt(trailingZeros);
   return (
     withinLimits(precision, scale) ||
-    withinLimits(precision - trailingZeros, scale - trailingZeros)
+    withinLimits(precision - zeros, scale - zeros)
   );
 }
 
@@ -96,7 +71,7 @@ export function withinServerLimits(token: string): boolean {
 export function parseNumericDefault(raw: string): NumericDefault {
   const text = raw.trim();
   if (!text) return { valid: true, value: null };
-  const parts = decimalParts(text);
+  const parts = decimalTextParts(text);
   if (!parts) return { valid: false, error: invalidNumber };
   const double = Number(text);
   // Compare what the server would read from the JSON, not binary floating-point precision.

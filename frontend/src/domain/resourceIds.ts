@@ -1,7 +1,10 @@
-const resourceId = /^[a-z][a-z0-9-]{0,79}$/;
+import { MAX_RESOURCE_ID_CHARACTERS } from "./limits";
 
-export const resourceIdGuidance =
-  "Use lowercase letters, digits and hyphens; start with a letter. No spaces, $ or @. Maximum 80 characters.";
+const resourceId = new RegExp(
+  `^[a-z][a-z0-9-]{0,${MAX_RESOURCE_ID_CHARACTERS - 1}}$`,
+);
+
+export const resourceIdGuidance = `Use lowercase letters, digits and hyphens; start with a letter. No spaces, $ or @. Maximum ${MAX_RESOURCE_ID_CHARACTERS} characters.`;
 
 /** Rule and source IDs are API slugs, distinct from expression variable identifiers. */
 export function isResourceId(value: string): boolean {
@@ -14,5 +17,8 @@ export function suggestedRuleId(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
   if (!slug) return "";
-  return (/^[a-z]/.test(slug) ? slug : `rule-${slug}`).slice(0, 80);
+  return (/^[a-z]/.test(slug) ? slug : `rule-${slug}`).slice(
+    0,
+    MAX_RESOURCE_ID_CHARACTERS,
+  );
 }

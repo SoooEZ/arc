@@ -6,6 +6,8 @@ import dev.arc.engine.ExecutionDeadline;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.SourceDefinition;
+import dev.arc.source.SourceAdapters;
+import dev.arc.source.SourceValidator;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -93,21 +95,28 @@ class LookupSourceAdapterTest {
         .hasMessage("Lookup key must not be null");
   }
 
+  /**
+   * The table declares that it reads only its entries; the shared validator refuses secret headers
+   * and a URL from that declaration, so the adapter no longer checks them itself.
+   */
   @Test
-  void lookupTablesCannotCarrySecretHeaders() {
+  void lookupTablesDeclareOnlyTheirEntriesAndCannotCarrySecretHeaders() {
+    assertThat(adapter.fields()).containsExactly(SourceDefinition.Field.ENTRIES);
+    var validator = new SourceValidator(new SourceAdapters(List.of(adapter)));
     var entries = Map.<String, Object>of("US", 0.07);
     var key = List.of(new Input("key", "STRING", true, null));
     assertThatThrownBy(
             () ->
-                adapter.validate(
+                validator.validate(
                     new SourceDefinition(
                         "LOOKUP", null, key, entries, Map.of("X-Unused", "TOKEN"), 0)))
         .hasMessage("Lookup tables do not use secret headers");
     assertThatCode(
-            () -> adapter.validate(new SourceDefinition("LOOKUP", null, key, entries, Map.of(), 0)))
+            () ->
+                validator.validate(new SourceDefinition("LOOKUP", null, key, entries, Map.of(), 0)))
         .doesNotThrowAnyException();
     assertThatCode(
-            () -> adapter.validate(new SourceDefinition("LOOKUP", null, key, entries, null, 0)))
+            () -> validator.validate(new SourceDefinition("LOOKUP", null, key, entries, null, 0)))
         .doesNotThrowAnyException();
   }
 

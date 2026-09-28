@@ -251,6 +251,10 @@
   background: #faf4e6;
   color: #b9a675;
 }
+.method-delete {
+  background: #f9eeec;
+  color: #c08a84;
+}
 .api-notes {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

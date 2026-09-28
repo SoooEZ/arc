@@ -11,6 +11,7 @@ import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.Edge;
 import dev.arc.model.Definition.Node;
+import dev.arc.model.NodeKind;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -172,6 +173,63 @@ class ArcScriptContractTest {
             canonical.substring(0, canonical.indexOf("\nnode \"calc\"")).replace("// kinds\n", ""));
     assertThat(script.renderNode(built.definition(), "done"))
         .isEqualTo("schema 1;\n\n" + canonical.substring(canonical.indexOf("\nnode \"done\"")));
+  }
+
+  /**
+   * Every kind's declarations round-trip, and the parser's keyword table is exhaustive over the
+   * kinds, as this helper is: a new kind fails to compile here until it decides its statements.
+   */
+  @Test
+  void everyNodeKindRoundTripsItsDeclarationsAndAsNamesTheRightProperty() {
+    for (NodeKind kind : NodeKind.values()) {
+      for (Node node : representatives(kind)) {
+        var graph = new Definition(1, List.of(), List.of(node), List.of());
+        var built = script.build(script.render(graph));
+        assertThat(built.diagnostics()).as(kind.name()).isEmpty();
+        assertThat(built.definition().nodes()).as(kind.name()).containsExactly(node);
+        assertThat(node.outputName() != null)
+            .as(kind + " as names the Output field")
+            .isEqualTo(kind == NodeKind.OUTPUT);
+        assertThat(node.output() != null)
+            .as(kind + " names a result variable")
+            .isEqualTo(kind.storesResult());
+      }
+    }
+    var unsupported = script.build("node n FORMULA \"N\" {\n  let total = 1;\n  as alias;\n}");
+    assertThat(unsupported.definition()).isNull();
+    assertThat(unsupported.diagnostics())
+        .containsExactly(
+            new ArcScript.Diagnostic("Unsupported statement for FORMULA: as alias", 3, 3));
+  }
+
+  /** A complete node of the kind, with every statement the kind declares (Transform twice). */
+  private static List<Node> representatives(NodeKind kind) {
+    var node = nodeOf("n", kind.name(), "N").at(0, 0);
+    return switch (kind) {
+      case INPUT -> List.of(node.build());
+      case FORMULA -> List.of(node.expression("amount * 2").output("total").build());
+      case CONDITION -> List.of(node.expression("amount > 1").build());
+      case SWITCH ->
+          List.of(
+              node.selector("amount")
+                  .cases(List.of(new Definition.BranchCase("big", "Big", "100")))
+                  .build());
+      case TRANSFORM ->
+          List.of(
+              nodeOf("n", kind.name(), "N")
+                  .at(0, 0)
+                  .fields(List.of(new Definition.Field("value", "amount")))
+                  .output("data")
+                  .build(),
+              node.expression("[amount]").output("items").build());
+      case REFERENCE ->
+          List.of(
+              node.rule("apply-discount", 1)
+                  .bindings(Map.of("rate", "0.2"))
+                  .output("price")
+                  .build());
+      case OUTPUT -> List.of(node.expression("price").outputName("total").build());
+    };
   }
 
   @Test

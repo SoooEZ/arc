@@ -84,6 +84,29 @@ class GraphPlanTest {
     assertThat(planCycle(definition)).containsExactly("n1", "n2");
   }
 
+  /**
+   * An empty result name means that no name is chosen yet, as draft shape and the code view read
+   * it, so a Formula, Transform or Reference with {@code output: ""} names no variable downstream.
+   */
+  @Test
+  void anEmptyResultNameContributesNoVariableDownstream() {
+    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE")) {
+      for (String output : Arrays.asList(null, "")) {
+        var unnamed = nodeOf("calc", type, "Calc").output(output).build();
+        var definition =
+            new Definition(
+                1,
+                amount,
+                List.of(
+                    node("input", "INPUT", null, null), unnamed, node("out", "OUTPUT", "1", null)),
+                List.of(edge("input", "calc", "next"), edge("calc", "out", "next")));
+        assertThat(new GraphPlan(definition).available().get("out"))
+            .as(type + " with output " + (output == null ? "null" : "\"\""))
+            .containsExactly("amount");
+      }
+    }
+  }
+
   @Test
   void aSelfLoopAndALongerCycleReportOnlyTheirOwnNodes() {
     var selfLoop =

@@ -62,6 +62,15 @@ public record Definition(
       this(name, type, required, defaultValue, null);
     }
 
+    /**
+     * Whether a caller must bind or pass this input: it is required and has neither a default nor a
+     * source to fall back on. Reference bindings, {@code @id:version} arguments and source mappings
+     * are all checked against this one rule.
+     */
+    public boolean needsCallerValue() {
+      return required && defaultValue == null && source == null;
+    }
+
     Input detached() {
       return new Input(
           name,
@@ -108,6 +117,20 @@ public record Definition(
 
     public boolean storesResult() {
       return kind().storesResult();
+    }
+
+    /**
+     * The result variable this node stores, or null: empty and missing both mean that no name is
+     * chosen yet, as the code view writes and reads it, so scope analysis, draft shape and the
+     * renderer never see an empty name.
+     */
+    public String resultName() {
+      return output == null || output.isEmpty() ? null : output;
+    }
+
+    /** An Output's field name, or null: empty and missing both mean no name is chosen yet. */
+    public String outputFieldName() {
+      return outputName == null || outputName.isEmpty() ? null : outputName;
     }
 
     /** Whether the node sets the property: an unset property is null. */

@@ -10,6 +10,7 @@ import {
   type DefinitionChange,
 } from "../../../domain/graph";
 import { shortId } from "../../../domain/ids";
+import { canAddNode } from "../../../domain/limits";
 import type { DraftLayout } from "../useRuleDocument";
 
 interface Options {
@@ -19,9 +20,9 @@ interface Options {
   edit: (change: DefinitionChange) => boolean;
   /** The document's Arrange command. */
   arrange: (layout: DraftLayout, onArranged: () => void) => Promise<void>;
-  /** The selected node's ID; deleting another node leaves the selection alone. */
-  selected: string;
   selectNode: (id: string) => void;
+  /** Whether the selection may change for `action` now (no invalid default holds it). */
+  mayChangeSelection: (action: string) => boolean;
   /** Asks the mounted canvas to fit the viewport once it shows the new layout. */
   requestFit: () => void;
 }
@@ -32,8 +33,8 @@ export function useGraphCommands({
   measurements,
   edit,
   arrange: arrangeDocument,
-  selected,
   selectNode,
+  mayChangeSelection,
   requestFit,
 }: Options) {
   const flow = useReactFlow<FlowNode>();
@@ -42,6 +43,9 @@ export function useGraphCommands({
     edit((current) => patchGraphNode(current, id, patch));
 
   const addNode = (type: NodeType) => {
+    // Entry points re-check what the toolbar shows: a full draft adds nothing.
+    // The new node is selected, so a held selection refuses the whole command.
+    if (!canAddNode(definition) || !mayChangeSelection("adding a node")) return;
     const position = flow.screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
@@ -54,15 +58,11 @@ export function useGraphCommands({
     if (added) selectNode(id);
   };
 
+  // Deleting only edits: the selection owner keeps an unrelated selection and
+  // falls back to the default node when the selected node is gone.
   const removeNode = (id: string) => {
-    if (!canRemoveGraphNode(definition, id)) return;
-    // The context menu deletes any node; only deleting the selected one moves the
-    // selection (to the Input node), so the Inspector stays on the node being edited.
-    const next =
-      definition.nodes.find((node) => node.type === "INPUT") ||
-      definition.nodes.find((node) => node.id !== id);
-    if (edit((current) => removeGraphNode(current, id)) && id === selected)
-      selectNode(next?.id || "");
+    if (canRemoveGraphNode(definition, id))
+      edit((current) => removeGraphNode(current, id));
   };
 
   // The viewport fit after Arrange is optional presentation: the canvas may

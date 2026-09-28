@@ -289,3 +289,54 @@ test("save commands disable all graph mutation actions until the submitted draft
     release();
   }
 });
+
+test("the playground explains a disabled or truncated trace in the Test panel's words", async ({
+  page,
+}) => {
+  let variant: "truncated" | "disabled" = "truncated";
+  await page.route("**/api/rules/*/execute", async (route) => {
+    const response = await route.fetch();
+    const execution = (await response.json()) as Execution;
+    await route.fulfill({
+      json:
+        variant === "truncated"
+          ? {
+              ...execution,
+              trace: execution.trace.slice(0, 1),
+              executedSteps: 3,
+              traceTruncated: true,
+            }
+          : { ...execution, trace: [], traceEnabled: false },
+    });
+  });
+  await page.goto("/#/playground");
+  await page
+    .getByLabel("Find published rules", { exact: true })
+    .fill("order-pricing");
+  await page.getByRole("combobox", { name: "Rule", exact: true }).click();
+  await page
+    .getByRole("option", { name: "Order pricing", exact: true })
+    .click();
+  const execute = page.getByRole("button", {
+    name: "Execute rule",
+    exact: true,
+  });
+  await expect(execute).toBeEnabled();
+  await execute.click();
+  // One owner for both surfaces: the wording the Test panel tests assert,
+  // without the graph-highlight clause that only the editor adds.
+  await expect(
+    page.getByText("Trace size limit reached.", { exact: false }),
+  ).toHaveText(
+    "Trace size limit reached. Showing the first 1 of 3 executed steps. The final result is complete.",
+  );
+  await page.getByRole("button", { name: "Show cURL request" }).click();
+  variant = "disabled";
+  await execute.click();
+  await expect(page.getByText("Trace disabled.", { exact: false })).toHaveText(
+    "Trace disabled. The result includes all executed calculations.",
+  );
+  await expect(
+    page.getByText("Trace size limit reached.", { exact: false }),
+  ).toHaveCount(0);
+});

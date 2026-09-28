@@ -424,6 +424,11 @@ test("the cURL preview sends only JSON-object inputs to the encoded execute URL"
   await expect(curl).toContainText(
     `curl -X POST '${origin}/api/rules/${ruleId}/execute'`,
   );
+  // The endpoint line names the path of the URL the cURL example calls.
+  const shown = /curl -X POST '([^']+)'/.exec((await curl.textContent()) ?? "");
+  await expect(page.locator(".endpoint code")).toHaveText(
+    new URL(shown![1]).pathname,
+  );
   await expect(curl).toContainText('"amount": 10');
   const inputs = page.getByLabel("API input JSON", { exact: true });
   for (const invalid of ["null", "5", "[1, 2]", '"text"', '{"amount":']) {

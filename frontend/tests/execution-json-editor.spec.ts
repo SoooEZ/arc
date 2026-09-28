@@ -5,7 +5,8 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-import type { Definition, Rule } from "../src/types";
+import type { Definition } from "../src/types";
+import { createRule as createApiRule, publishRule } from "./helpers/api";
 import { editorLines, setEditorText } from "./helpers/editor";
 
 const definition: Definition = {
@@ -35,17 +36,8 @@ const definition: Definition = {
 
 async function createRule(request: APIRequestContext, publish = false) {
   const id = `json-editor-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
-  });
-  expect(created.ok()).toBe(true);
-  const rule: Rule = await created.json();
-  if (publish) {
-    const published = await request.post(`/api/rules/${id}/publish`, {
-      data: { revision: rule.revision },
-    });
-    expect(published.ok()).toBe(true);
-  }
+  const rule = await createApiRule(request, { id, definition });
+  if (publish) await publishRule(request, rule);
   return id;
 }
 

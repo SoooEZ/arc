@@ -1,5 +1,6 @@
 import type { Definition, Input } from "../../../types";
 import { newInputParameter } from "../../../domain/graph";
+import { canAddInput } from "../../../domain/limits";
 import { useRowIdentities } from "./useRowIdentities";
 
 /** Row identity belongs to the editing session, never to the persisted input schema. */
@@ -24,11 +25,16 @@ export function useInputParameterRows(
       ),
     }));
   };
+  // The entry point checks the same limit the button shows; a full draft is left unchanged.
   const add = () => {
-    onDefinitionChange((definition) => ({
-      ...definition,
-      inputs: [...definition.inputs, newInputParameter(definition)],
-    }));
+    onDefinitionChange((definition) =>
+      canAddInput(definition)
+        ? {
+            ...definition,
+            inputs: [...definition.inputs, newInputParameter(definition)],
+          }
+        : definition,
+    );
   };
   return {
     rows: inputs.map((input, index) => ({ input, index, id: identity(input) })),

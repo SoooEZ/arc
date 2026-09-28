@@ -12,10 +12,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiFunction;
 import org.springframework.stereotype.Component;
 
-/** Validates pinned contracts only. It never performs external IO. */
+/**
+ * Validates pinned contracts only: every source mapping of the definition and of each rule it
+ * reaches names declared parameters and maps the ones a caller must supply. It never performs
+ * external IO. The three entry points differ in where configurations come from and which pins are
+ * walked; {@link #validateContracts} is the one algorithm behind them.
+ */
 @Component
 public final class SourceBindingValidator {
   private final SourceRepository sources;
@@ -36,11 +40,19 @@ public final class SourceBindingValidator {
     void check(Definition callee, RuleResolver resolver);
   }
 
-  public void validate(Definition definition, RuleResolver resolver) {
-    validate(definition, resolver, CalleeCheck.NONE);
+  /**
+   * {@link #validatePinnedContracts(Definition, RuleResolver, CalleeCheck)} without a callee check.
+   */
+  public void validatePinnedContracts(Definition definition, RuleResolver resolver) {
+    validatePinnedContracts(definition, resolver, CalleeCheck.NONE);
   }
 
-  public void validate(Definition definition, RuleResolver resolver, CalleeCheck calleeCheck) {
+  /**
+   * Validate and publish: reads the stored configurations and walks every pin the definition
+   * reaches, checking each callee version once.
+   */
+  public void validatePinnedContracts(
+      Definition definition, RuleResolver resolver, CalleeCheck calleeCheck) {
     validateContracts(
         definition,
         Validator.dependencies(definition),
@@ -51,32 +63,33 @@ public final class SourceBindingValidator {
         0);
   }
 
-  /** Execution: the engine prepares the callees itself. */
-  public void validate(
-      Definition definition,
-      RuleResolver resolver,
-      BiFunction<String, Integer, SourceDefinition> configurations) {
+  /**
+   * Execution: reads configurations through the request's session, so validation and the runtime
+   * reads share one snapshot per version, and walks every pin; the engine prepares the callees.
+   */
+  public void validateForExecution(
+      Definition definition, RuleResolver resolver, SourceConfigurations session) {
     validateContracts(
         definition,
         Validator.dependencies(definition),
         resolver,
-        configurations,
+        session,
         CalleeCheck.NONE,
         new Walk(),
         0);
   }
 
   /**
-   * Diagnostics: visits the given dependencies instead of the definition's own, so the caller can
-   * leave out pins whose problems it has already reported.
+   * Diagnostics: reads the stored configurations and walks only {@code unreported}, the pins whose
+   * problems the graph checks have not reported already, so each fault has one owner.
    */
-  public void validate(
+  public void validateRemainingPins(
       Definition definition,
       RuleResolver resolver,
-      List<Validator.Dependency> dependencies,
+      List<Validator.Dependency> unreported,
       CalleeCheck calleeCheck) {
     validateContracts(
-        definition, dependencies, resolver, pinnedSources(), calleeCheck, new Walk(), 0);
+        definition, unreported, resolver, pinnedSources(), calleeCheck, new Walk(), 0);
   }
 
   /**
@@ -102,7 +115,8 @@ public final class SourceBindingValidator {
     }
   }
 
-  private BiFunction<String, Integer, SourceDefinition> pinnedSources() {
+  /** The stored configurations, each version read once per check. */
+  private SourceConfigurations pinnedSources() {
     var configurations = new HashMap<String, SourceDefinition>();
     return (id, version) ->
         configurations.computeIfAbsent(
@@ -113,7 +127,7 @@ public final class SourceBindingValidator {
       Definition definition,
       List<Validator.Dependency> dependencies,
       RuleResolver resolver,
-      BiFunction<String, Integer, SourceDefinition> configurations,
+      SourceConfigurations configurations,
       CalleeCheck calleeCheck,
       Walk walk,
       int depth) {
@@ -144,19 +158,16 @@ public final class SourceBindingValidator {
   }
 
   private void validateSourceMappings(
-      Definition definition,
-      Input input,
-      BiFunction<String, Integer, SourceDefinition> configurations) {
+      Definition definition, Input input, SourceConfigurations configurations) {
     try {
       var binding = input.source();
-      var configuration = configurations.apply(binding.id(), binding.version());
+      var configuration = configurations.get(binding.id(), binding.version());
       var names = configuration.parameters().stream().map(Input::name).toList();
       for (String key : binding.bindings().keySet())
         if (!names.contains(key)) throw ArcException.invalid("Unknown source parameter: " + key);
+      // Source parameters are never sourced themselves (SourceValidator), so the one rule applies.
       for (Input parameter : configuration.parameters())
-        if (parameter.required()
-            && parameter.defaultValue() == null
-            && !binding.bindings().containsKey(parameter.name()))
+        if (parameter.needsCallerValue() && !binding.bindings().containsKey(parameter.name()))
           throw ArcException.invalid(
               input.name() + ": missing source mapping for " + parameter.name());
     } catch (ArcException error) {

@@ -8,6 +8,8 @@ interface Resource<T> {
   loading: boolean;
 }
 interface ResourceOptions {
+  /** Milliseconds to wait before reading, so a key that keeps changing reads once. */
+  delay?: number;
   /**
    * While a new key loads, keep returning the previous key's data (with
    * `loading` true) instead of `initial`, so lists do not blank and remount.
@@ -15,6 +17,9 @@ interface ResourceOptions {
   keepPrevious?: boolean;
 }
 type Stored<T> = Resource<T> & { key: string; enabled: boolean };
+
+/** Reads the resource; null when nothing can be read yet (the resource is disabled). */
+export type ResourceLoader<T> = (signal: AbortSignal) => Promise<T>;
 
 /**
  * The state to store when a read starts: the pending view of `key`. It returns
@@ -42,15 +47,20 @@ export function pendingResourceState<T>(
   return { key, enabled, data, error: "", status: null, loading: enabled };
 }
 
-/** Cancel stale reads, including servers that finish after the selected resource changes. */
+/**
+ * Cancel stale reads, including servers that finish after the selected resource
+ * changes. The loader carries its own guard: pass null while the resource has no
+ * identity yet (no rule selected, no version pinned), and the hook reports
+ * `initial` without loading. The key is the resource identity; a changed loader
+ * closure alone does not read again.
+ */
 export function useAsyncResource<T>(
   key: string,
-  load: (signal: AbortSignal) => Promise<T>,
+  load: ResourceLoader<T> | null,
   initial: T,
-  delay = 0,
-  enabled = true,
-  { keepPrevious = false }: ResourceOptions = {},
+  { delay = 0, keepPrevious = false }: ResourceOptions = {},
 ): Resource<T> {
+  const enabled = load !== null;
   const latest = useRef(load);
   latest.current = load;
   const [state, setState] = useState<Stored<T>>({
@@ -69,8 +79,9 @@ export function useAsyncResource<T>(
     );
     if (!enabled) return;
     const timer = setTimeout(() => {
-      latest
-        .current(controller.signal)
+      const read = latest.current;
+      if (!read) return;
+      read(controller.signal)
         .then((data) => {
           if (!controller.signal.aborted)
             setState({

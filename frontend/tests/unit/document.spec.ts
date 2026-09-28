@@ -25,6 +25,7 @@ import { sampleInputsJson } from "../../src/domain/executionInputs";
 import { nodeWidth } from "../../src/domain/nodePorts";
 import { setSwitchDefaultReturn } from "../../src/domain/switchBranches";
 import {
+  defaultSelection,
   selectedEdgeId,
   selectedNode,
 } from "../../src/features/editor/nodeSelection";
@@ -753,3 +754,36 @@ const switchNode: Definition["nodes"][number] = {
   position: { x: 300, y: 500 },
   cases: [{ id: "one", label: "One", expression: "amount > 1" }],
 };
+
+test("the selected node falls back to the default node once its node is removed", () => {
+  const draft: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      { id: "input", type: "INPUT", label: "In", position: { x: 0, y: 0 } },
+      {
+        id: "check",
+        type: "CONDITION",
+        label: "Check",
+        expression: "true",
+        position: { x: 0, y: 100 },
+      },
+      {
+        id: "out",
+        type: "OUTPUT",
+        label: "Out",
+        expression: "1",
+        position: { x: 0, y: 200 },
+      },
+    ],
+    edges: [],
+  };
+  expect(selectedNode(draft, "out").id).toBe("out");
+  const without = {
+    ...draft,
+    nodes: draft.nodes.filter((n) => n.id !== "out"),
+  };
+  // Not the Input first: the same default a build or a version load selects.
+  expect(selectedNode(without, "out")).toBe(defaultSelection(without));
+  expect(selectedNode(without, "out").id).toBe("check");
+});

@@ -499,7 +499,11 @@ test("nested source management keeps its staged parent and blocks closing during
       .getByRole("button", { name: "Save new version", exact: true })
       .click();
     await expect.poll(() => held).toBe(true);
-    page.once("dialog", (dialog) => dialog.accept());
+    const prompts: string[] = [];
+    page.once("dialog", (dialog) => {
+      prompts.push(dialog.message());
+      void dialog.accept();
+    });
     await manager
       .locator(".source-list > button")
       .filter({ hasText: "Provider 01" })
@@ -520,7 +524,10 @@ test("nested source management keeps its staged parent and blocks closing during
     await expect(manager.getByLabel("Name", { exact: true })).toHaveValue(
       "Keep second edit",
     );
-    page.once("dialog", (dialog) => dialog.dismiss());
+    page.once("dialog", (dialog) => {
+      prompts.push(dialog.message());
+      void dialog.dismiss();
+    });
     await manager
       .getByRole("button", { name: "Close data sources", exact: true })
       .click();
@@ -530,6 +537,11 @@ test("nested source management keeps its staged parent and blocks closing during
       .getByRole("button", { name: "Close data sources", exact: true })
       .click();
     await expect(manager).toHaveCount(0);
+    // Selecting another source and closing the manager ask in the same words.
+    expect(prompts).toEqual([
+      "Discard unsaved data source changes?",
+      "Discard unsaved data source changes?",
+    ]);
     await expect(
       parent.getByLabel("Parameter name", { exact: true }),
     ).toHaveValue("stagedAmount");

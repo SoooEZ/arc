@@ -39,11 +39,6 @@ export function createNavigationGuards() {
         active.delete(registration);
       };
     },
-    /** The message of the earliest registered active guard, or null. */
-    first(): string | null {
-      for (const guard of active.values()) return guard.message;
-      return null;
-    },
     /**
      * Every distinct message that `change` must confirm, earliest registration
      * first. Without a change (the page unloads) every active guard applies.
@@ -73,10 +68,6 @@ export function useNavigationGuard(
     if (message === null) return;
     return workspaceGuards.register(message, applies);
   }, [message, applies]);
-}
-
-export function activeNavigationGuard(): string | null {
-  return workspaceGuards.first();
 }
 
 /** The messages that `change` must confirm; without a change, those for unloading the page. */

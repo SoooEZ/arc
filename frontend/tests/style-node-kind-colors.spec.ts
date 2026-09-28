@@ -34,7 +34,9 @@ test("library previews colour every node kind like its canvas icon", async ({
           label: `${type.toLowerCase()} step`,
           position: { x: 0, y: index * 160 },
         })),
-        edges: [],
+        edges: [
+          { id: "e", source: "input", target: "formula", sourceHandle: "next" },
+        ],
       },
     },
   });
@@ -42,6 +44,17 @@ test("library previews colour every node kind like its canvas icon", async ({
 
   await page.goto("/#/library");
   const card = page.locator(".rule-card", { hasText: name });
+  await expect(card).toBeVisible();
+  // The arrowhead and the connection it ends read one token.
+  const arrowhead = await card
+    .locator("marker path")
+    .first()
+    .evaluate((path) => getComputedStyle(path).fill);
+  const connection = await card
+    .locator(".preview-connection")
+    .first()
+    .evaluate((path) => getComputedStyle(path).stroke);
+  expect(arrowhead).toBe(connection);
   const previewColors = new Map<NodeType, string>();
   for (const type of kinds) {
     const node = card.locator(`g[data-preview-node="${type.toLowerCase()}"]`);

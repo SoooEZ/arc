@@ -155,6 +155,14 @@ test("the sidebar header follows node selection and name edits, retaining the ex
   await expect(page.locator('.react-flow__node[data-id="output"]')).toHaveCount(
     0,
   );
+  // The selection falls back to the default node (the first Condition), the
+  // same fallback a build or a version load uses; it used to jump to the Input.
+  await expect(header.getByLabel("Node name", { exact: true })).toHaveValue(
+    "Check account",
+  );
+  await expect(deleteNode).toBeEnabled();
+  await expect(header.locator(".inspector-delete-slot")).toHaveCount(1);
+  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
   await expect(header.getByLabel("Node name", { exact: true })).toHaveValue(
     "Inputs",
   );

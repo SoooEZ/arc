@@ -57,8 +57,13 @@ class ArcExceptionTest {
       assertThat(kept.asDefinitionFailure()).isSameAs(kept);
   }
 
+  /**
+   * Field, case, binding and mapping context names where a value error happened. A limit, the
+   * deadline and a definition failure belong to the whole execution and keep their plain message
+   * (maintaining.md, api.md), so the gate lives in {@code withContext} rather than at each caller.
+   */
   @Test
-  void locationsAndContextKeepTheKind() {
+  void locationsAndContextKeepTheKindAndOnlyRecoverableErrorsTakeContext() {
     for (var original :
         List.of(
             ArcException.invalid("bad"),
@@ -72,15 +77,23 @@ class ArcExceptionTest {
               .inRule("rule", 2)
               .withContext("Field total")
               .atNode("parent", 1, "call", "Call");
-      assertThat(located.kind()).isEqualTo(original.kind());
+      String expected =
+          original.recoverable() ? "Field total: " + original.getMessage() : original.getMessage();
+      assertThat(located.kind()).as(original.kind().name()).isEqualTo(original.kind());
       assertThat(located.status()).isEqualTo(original.status());
-      assertThat(located.getMessage()).isEqualTo("Field total: " + original.getMessage());
-      assertThat(located.issues()).containsExactly("Field total: " + original.getMessage());
+      assertThat(located.getMessage()).as(original.kind().name()).isEqualTo(expected);
+      assertThat(located.issues()).containsExactly(expected);
       assertThat(located.locations())
           .containsExactly(
               new ArcException.Location("rule", 2, "node", "Node"),
               new ArcException.Location("parent", 1, "call", "Call"));
     }
+    for (var kept :
+        List.of(
+            ArcException.limit("Execution exceeds 1,000 steps"),
+            ArcException.deadline("Rule execution deadline exceeded"),
+            ArcException.invalid("bad").asDefinitionFailure()))
+      assertThat(kept.withContext("Field total")).as(kept.kind().name()).isSameAs(kept);
   }
 
   @Test

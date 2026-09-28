@@ -559,11 +559,15 @@ test("source history pages load only the inspected version definition", async ({
   await page.goto("/#/sources");
   await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
   expect(details).toEqual([45]);
+  const inspect = page.getByRole("combobox", { name: "Inspect version" });
+  await expect(inspect).toHaveText("v45 · latest");
   await page
     .getByRole("navigation", { name: "Source history pages" })
     .getByRole("button", { name: "Next" })
     .click();
-  await page.getByRole("combobox", { name: "Inspect version" }).click();
+  // The viewed version is not on the older page, yet keeps the page's wording.
+  await expect(inspect).toHaveText("v45 · latest");
+  await inspect.click();
   await page.getByRole("option", { name: "v25 · immutable" }).click();
   await expect(page.locator(".source-json")).toContainText('"US": 25');
   expect(details).toEqual([45, 25]);

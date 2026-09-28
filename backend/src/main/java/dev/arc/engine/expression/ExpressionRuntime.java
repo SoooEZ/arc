@@ -258,8 +258,15 @@ final class ExpressionRuntime {
     if (!error.recoverable()) throw error;
   }
 
+  /** The per-item step's answer while a collection function has not decided its value yet. */
+  private static final Object UNDECIDED = new Object();
+
+  /**
+   * Runs a collection function's body once per item. Both switches are expressions, so a new
+   * constant does not compile until it decides its per-item step and its final value.
+   */
   static Object collection(
-      String name,
+      CollectionFunction function,
       Expr collection,
       String local,
       String accumulator,
@@ -273,26 +280,32 @@ final class ExpressionRuntime {
       context.tick();
       Context child = context.bind(local, item, accumulator, total);
       Object value = body.eval(child);
-      switch (name) {
-        case "MAP" -> result.add(value);
-        case "FILTER" -> {
-          if (bool(value)) result.add(item);
-        }
-        case "ALL" -> {
-          if (!bool(value)) return false;
-        }
-        case "ANY" -> {
-          if (bool(value)) return true;
-        }
-        case "REDUCE" -> total = value;
-      }
+      // ALL and ANY stop at the first deciding item; the others visit every item.
+      Object decided =
+          switch (function) {
+            case MAP -> {
+              result.add(value);
+              yield UNDECIDED;
+            }
+            case FILTER -> {
+              if (bool(value)) result.add(item);
+              yield UNDECIDED;
+            }
+            case ALL -> bool(value) ? UNDECIDED : false;
+            case ANY -> bool(value) ? true : UNDECIDED;
+            case REDUCE -> {
+              total = value;
+              yield UNDECIDED;
+            }
+          };
+      if (decided != UNDECIDED) return decided;
     }
     return bounded(
-        switch (name) {
-          case "REDUCE" -> total;
-          case "ALL" -> true;
-          case "ANY" -> false;
-          default -> result;
+        switch (function) {
+          case MAP, FILTER -> result;
+          case ALL -> true;
+          case ANY -> false;
+          case REDUCE -> total;
         });
   }
 }

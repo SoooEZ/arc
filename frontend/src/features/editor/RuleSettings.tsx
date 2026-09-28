@@ -9,6 +9,7 @@ import {
   TextField,
 } from "@mui/material";
 import { kindLabel, kindDescription } from "../../types";
+import { ruleMetadataProblem } from "../../domain/limits";
 import type { Rule } from "../../types";
 import type { DeletionRefusal } from "./useRuleDocument";
 export default function RuleSettings({
@@ -99,9 +100,7 @@ export default function RuleSettings({
         {!readOnly && (
           <Button
             variant="contained"
-            disabled={
-              !name.trim() || name.length > 160 || description.length > 2000
-            }
+            disabled={!!ruleMetadataProblem({ name, description })}
             onClick={() => {
               if (onApply({ name, description })) onClose();
             }}

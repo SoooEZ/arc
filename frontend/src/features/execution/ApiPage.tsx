@@ -1,4 +1,3 @@
-import { lazy } from "react";
 import { Alert, Button, Chip, MenuItem, TextField } from "@mui/material";
 import {
   ArrowRight,
@@ -13,10 +12,11 @@ import ApiReference from "./ApiReference";
 import { usePublishedExecution } from "./usePublishedExecution";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
 import ExecutionTiming from "./ExecutionTiming";
+import TraceNotices from "./TraceNotices";
+import LazyInputJsonEditor from "./LazyInputJsonEditor";
 import CatalogPagination from "../../components/CatalogPagination";
-import { LazyBoundary } from "../../components/LazyBoundary";
-
-const InputJsonEditor = lazy(() => import("./InputJsonEditor"));
+import PagedVersionSelect from "../../components/PagedVersionSelect";
+import { paginationProps } from "../../hooks/usePagedResource";
 
 export default function ApiPage({
   mode,
@@ -106,11 +106,8 @@ export default function ApiPage({
             />
             <CatalogPagination
               label="Published rules"
-              offset={request.catalog.offset}
-              limit={request.catalog.limit}
-              total={request.catalog.data.total}
+              {...paginationProps(request.catalog)}
               loading={request.catalog.loading}
-              onPage={request.catalog.setOffset}
             />
             <div className="api-select-row">
               <TextField
@@ -128,31 +125,18 @@ export default function ApiPage({
                   </MenuItem>
                 ))}
               </TextField>
-              <TextField
-                select
+              <PagedVersionSelect
                 label="Version"
-                value={version ?? ""}
-                onChange={(e) => request.selectVersion(Number(e.target.value))}
+                value={version}
+                versions={versions}
                 disabled={running || request.history.loading || !id}
-              >
-                {version !== null &&
-                  !versions.some(
-                    (candidate) => candidate.version === version,
-                  ) && <MenuItem value={version}>v{version}</MenuItem>}
-                {versions.map((v) => (
-                  <MenuItem key={v.version} value={v.version}>
-                    v{v.version}
-                  </MenuItem>
-                ))}
-              </TextField>
+                onChange={request.selectVersion}
+              />
             </div>
             <CatalogPagination
               label="Published versions"
-              offset={request.history.offset}
-              limit={request.history.limit}
-              total={request.history.data.total}
+              {...paginationProps(request.history)}
               loading={request.history.loading || !id}
-              onPage={request.history.setOffset}
             />
             {!request.catalog.loading &&
               !request.catalog.error &&
@@ -165,26 +149,17 @@ export default function ApiPage({
               )}
             <div className="endpoint">
               <strong>POST</strong>
-              <code>/api/rules/{id || "{id}"}/execute</code>
+              <code>{request.endpointPath}</code>
             </div>
             <label className="field-label">
               Input parameters <span>application/json</span>
             </label>
-            <LazyBoundary
-              label="JSON editor"
-              fallback={
-                <div className="execution-json-editor" role="status">
-                  Loading JSON editor…
-                </div>
-              }
-            >
-              <InputJsonEditor
-                key={JSON.stringify([id, version])}
-                label="API input JSON"
-                value={inputs}
-                onChange={request.setInputs}
-              />
-            </LazyBoundary>
+            <LazyInputJsonEditor
+              key={JSON.stringify([id, version])}
+              label="API input JSON"
+              value={inputs}
+              onChange={request.setInputs}
+            />
             {definition && (
               <div className="parameter-chips">
                 {definition.inputs.map((p) => (
@@ -258,16 +233,7 @@ export default function ApiPage({
                 requestDurationMs={request.requestDurationMs}
               />
             )}
-            {result?.traceTruncated && (
-              <Alert severity="warning">
-                Trace size limit reached. {result.trace.length} of{" "}
-                {result.executedSteps} executed steps are included; the final
-                result is complete.
-              </Alert>
-            )}
-            {result?.traceEnabled === false && (
-              <Alert severity="info">Execution trace is disabled.</Alert>
-            )}
+            {result && <TraceNotices result={result} />}
             <pre data-testid="api-response">
               {result ? stringifyJson(result, 2) : curl}
             </pre>

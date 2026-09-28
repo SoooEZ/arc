@@ -298,5 +298,5 @@ test("mutually exclusive Outputs can share an alias and retain single-Output wra
     "amount * 2",
     '{ "low": amount * 2, … }',
   ]);
-  await run(page, 50);
+  await run(page, "50");
 });

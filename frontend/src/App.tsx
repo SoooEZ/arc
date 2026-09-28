@@ -8,7 +8,7 @@ import Sidebar from "./app/Sidebar";
 import CreateRuleDialog from "./app/CreateRuleDialog";
 import { RecoverableBoundary } from "./app/RecoverableBoundary";
 import { LazyBoundary } from "./components/LazyBoundary";
-import { parseRoute, type RuleRoute } from "./app/routing";
+import { pagePath, parseRoute, rulePath, type RuleRoute } from "./app/routing";
 import { useWorkspaceNavigation } from "./app/useWorkspaceNavigation";
 import { useRuleLibrary } from "./app/useRuleLibrary";
 import { useCodeStudioTarget } from "./app/useCodeStudioTarget";
@@ -71,10 +71,8 @@ export default function App() {
   const [detailAttempt, setDetailAttempt] = useState(0);
   const detail = useAsyncResource<Rule | null>(
     `${ruleId}:${requestedVersion}:${detailAttempt}`,
-    (signal) => ruleApi.get(ruleId!, { signal }),
+    ruleId ? (signal) => ruleApi.get(ruleId, { signal }) : null,
     null,
-    0,
-    !!ruleId,
   );
   // The saved copy stands in for the fresh read only for the same rule, not
   // for a rule created again under a deleted ID, whatever its revision.
@@ -122,7 +120,6 @@ export default function App() {
         >
           <Editor
             rule={selected}
-            rules={library.rules}
             mode={rule.mode}
             requestedVersion={rule.version}
             requestedNode={rule.node}
@@ -140,7 +137,9 @@ export default function App() {
       return (
         <div className="center-state">
           <h2>Rule not found</h2>
-          <Button onClick={() => navigate("/library")}>Back to library</Button>
+          <Button onClick={() => navigate(pagePath("library"))}>
+            Back to library
+          </Button>
         </div>
       );
     if (detail.error)
@@ -168,9 +167,9 @@ export default function App() {
         return (
           <Library
             library={library}
-            onOpen={(rule) => navigate(`/rules/${rule.id}`)}
+            onOpen={(rule) => navigate(rulePath({ ruleId: rule.id }))}
             onCreate={newRule}
-            onDocs={() => navigate("/docs")}
+            onDocs={() => navigate(pagePath("docs"))}
           />
         );
       default:
@@ -202,7 +201,7 @@ export default function App() {
           onCreated={(rule) => {
             acknowledgeSave(rule);
             setCreateOpen(false);
-            navigate(`/rules/${rule.id}`);
+            navigate(rulePath({ ruleId: rule.id }));
             setNotice("Rule created. Make it yours.");
           }}
         />

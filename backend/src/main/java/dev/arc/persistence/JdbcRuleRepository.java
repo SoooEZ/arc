@@ -22,7 +22,8 @@ public class JdbcRuleRepository implements RuleRepository {
 
   /**
    * Chooses the page's IDs before reading drafts. PostgreSQL would otherwise compute the JSONB
-   * counts for every matching rule before sorting, although only one page is returned.
+   * counts for every matching rule before sorting, although only one page is returned. The counted
+   * node type is spelled by {@link NodeKind}, the one vocabulary of node types.
    */
   private static final String CATALOG_PAGE =
       """
@@ -35,11 +36,11 @@ public class JdbcRuleRepository implements RuleRepository {
         jsonb_array_length(r.draft->'nodes') AS node_count,
         jsonb_array_length(r.draft->'inputs') AS input_count,
         jsonb_array_length(
-          jsonb_path_query_array(r.draft, '$.nodes[*] ? (@.type == "REFERENCE")')) AS reference_count
+          jsonb_path_query_array(r.draft, '$.nodes[*] ? (@.type == "%s")')) AS reference_count
       FROM page JOIN rules r ON r.id = page.id
       ORDER BY r.updated_at DESC, r.id
       """
-          .formatted(CATALOG_FILTER);
+          .formatted(CATALOG_FILTER, NodeKind.REFERENCE.name());
 
   private static final String VERSION_FILTER =
       " WHERE rule_id = ? AND (? = '' OR strpos(version::text, ?) > 0)";
@@ -313,15 +314,12 @@ public class JdbcRuleRepository implements RuleRepository {
   }
 
   @Override
-  public Definition resolveFormula(String id, int version) {
+  public KindedVersion versionWithKind(String id, int version) {
     var rows =
         jdbc.query(
             "SELECT r.kind, v.definition FROM rule_versions v JOIN rules r ON r.id = v.rule_id WHERE v.rule_id = ? AND v.version = ?",
-            (row, index) -> {
-              if (!"FORMULA".equals(row.getString("kind")))
-                throw ArcException.invalid("@ calls require a published Formula: " + id);
-              return decode(row.getString("definition"));
-            },
+            (row, index) ->
+                new KindedVersion(row.getString("kind"), decode(row.getString("definition"))),
             id,
             version);
     if (rows.isEmpty())

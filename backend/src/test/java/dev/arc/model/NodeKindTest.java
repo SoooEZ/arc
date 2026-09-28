@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.arc.model.Definition.BranchCase;
 import dev.arc.model.NodeKind.Property;
-import dev.arc.model.NodeKind.Slot;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -36,25 +35,31 @@ class NodeKindTest {
               Set.of(NodeKind.FORMULA, NodeKind.TRANSFORM, NodeKind.REFERENCE).contains(kind));
   }
 
-  /** A result variable is the property of the kinds that store a result; every slot is one. */
+  /**
+   * {@code properties()} is the one table of what each kind owns: its expressions, result variable,
+   * pin and Output name. Storing a result is the same fact as using the result variable.
+   */
   @Test
-  void propertiesCoverTheResultVariableAndEveryExpressionSlot() {
-    var slotProperties =
+  void eachKindOwnsExactlyItsProperties() {
+    var expected =
         Map.of(
-            Slot.EXPRESSION, Property.EXPRESSION,
-            Slot.SELECTOR, Property.SELECTOR,
-            Slot.CASES, Property.CASES,
-            Slot.FIELDS, Property.FIELDS,
-            Slot.BINDINGS, Property.BINDINGS);
+            NodeKind.INPUT, Set.<Property>of(),
+            NodeKind.FORMULA, Set.of(Property.EXPRESSION, Property.OUTPUT),
+            NodeKind.CONDITION, Set.of(Property.EXPRESSION),
+            NodeKind.SWITCH, Set.of(Property.SELECTOR, Property.CASES),
+            NodeKind.TRANSFORM, Set.of(Property.FIELDS, Property.EXPRESSION, Property.OUTPUT),
+            NodeKind.REFERENCE, Set.of(Property.RULE, Property.BINDINGS, Property.OUTPUT),
+            NodeKind.OUTPUT, Set.of(Property.EXPRESSION, Property.OUTPUT_NAME));
     for (NodeKind kind : NodeKind.values()) {
+      assertThat(kind.properties()).as(kind.name()).isEqualTo(expected.get(kind));
       assertThat(kind.uses(Property.OUTPUT)).as(kind.name()).isEqualTo(kind.storesResult());
-      for (Slot slot : kind.slots())
-        assertThat(kind.uses(slotProperties.get(slot))).as(kind + " " + slot).isTrue();
+      for (Property property : Property.values())
+        assertThat(kind.uses(property))
+            .as(kind + " " + property)
+            .isEqualTo(expected.get(kind).contains(property));
+      // The set is computed once; a per-call allocation made draft-shape passes expensive.
+      assertThat(kind.properties()).isSameAs(kind.properties());
     }
-    assertThat(NodeKind.REFERENCE.uses(Property.RULE)).isTrue();
-    assertThat(NodeKind.OUTPUT.properties())
-        .containsExactlyInAnyOrder(Property.EXPRESSION, Property.OUTPUT_NAME);
-    assertThat(NodeKind.INPUT.properties()).isEmpty();
   }
 
   @Test
@@ -81,17 +86,5 @@ class NodeKindTest {
       assertThat(kind.choosesOneExit())
           .as(kind.name())
           .isEqualTo(kind == NodeKind.CONDITION || kind == NodeKind.SWITCH);
-  }
-
-  @Test
-  void eachKindOwnsTheExpressionSlotsItEvaluates() {
-    assertThat(NodeKind.INPUT.slots()).isEmpty();
-    for (NodeKind kind : List.of(NodeKind.FORMULA, NodeKind.CONDITION, NodeKind.OUTPUT))
-      assertThat(kind.slots()).as(kind.name()).containsExactly(Slot.EXPRESSION);
-    assertThat(NodeKind.SWITCH.slots()).containsExactlyInAnyOrder(Slot.SELECTOR, Slot.CASES);
-    assertThat(NodeKind.TRANSFORM.slots()).containsExactlyInAnyOrder(Slot.FIELDS, Slot.EXPRESSION);
-    assertThat(NodeKind.REFERENCE.slots()).containsExactly(Slot.BINDINGS);
-    assertThat(NodeKind.REFERENCE.owns(Slot.BINDINGS)).isTrue();
-    assertThat(NodeKind.FORMULA.owns(Slot.BINDINGS)).isFalse();
   }
 }

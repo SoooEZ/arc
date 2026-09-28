@@ -1,6 +1,7 @@
 package dev.arc.rule;
 
 import dev.arc.engine.RuleResolver;
+import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import java.util.Collection;
 import java.util.List;
@@ -9,6 +10,9 @@ import java.util.List;
 public interface RuleRepository extends RuleResolver {
   /** A rule's draft ({@code version} null) or one of its published versions. */
   record StoredDefinition(String ruleId, Integer version, Definition definition) {}
+
+  /** A published version read together with the {@link RuleKind} name of its rule. */
+  record KindedVersion(String kind, Definition definition) {}
 
   List<Rule> list();
 
@@ -58,6 +62,12 @@ public interface RuleRepository extends RuleResolver {
   RuleVersion version(String id, int version);
 
   /**
+   * A published version with its rule's kind, read in one statement for {@link #resolveFormula}; a
+   * missing version is a 404 "Published Formula version not found: id vN".
+   */
+  KindedVersion versionWithKind(String id, int version);
+
+  /**
    * The drafts and published versions of other rules that may call the rule: every definition with
    * a Reference pin to the ID or a Formula call {@code @id:version}, and possibly more, for the
    * caller to check exactly.
@@ -70,5 +80,17 @@ public interface RuleRepository extends RuleResolver {
   @Override
   default Definition resolve(String id, int version) {
     return version(id, version).definition();
+  }
+
+  /**
+   * Only a published Formula may be called with {@code @id:version}. The policy reads the kind that
+   * storage returns and is decided here, in the rule layer, not inside a row mapper.
+   */
+  @Override
+  default Definition resolveFormula(String id, int version) {
+    KindedVersion stored = versionWithKind(id, version);
+    if (RuleKind.parse(stored.kind()).filter(RuleKind::callableByFormula).isEmpty())
+      throw ArcException.invalid("@ calls require a published Formula: " + id);
+    return stored.definition();
   }
 }

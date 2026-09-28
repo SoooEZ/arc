@@ -1,6 +1,7 @@
 import { Alert, CircularProgress, IconButton } from "@mui/material";
 import { Clock3, X } from "lucide-react";
 import { ruleApi } from "../../api/rules";
+import { rulePath } from "../../app/routing";
 import { usePagedResource } from "../../hooks/usePagedResource";
 import CatalogPagination from "../../components/CatalogPagination";
 export default function VersionHistory({
@@ -39,7 +40,7 @@ export default function VersionHistory({
           versions.map((v) => (
             <button
               key={v.version}
-              onClick={() => navigate(`/rules/${ruleId}?version=${v.version}`)}
+              onClick={() => navigate(rulePath({ ruleId, version: v.version }))}
             >
               v{v.version}
               <small>{new Date(v.publishedAt).toLocaleDateString()}</small>

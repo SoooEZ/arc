@@ -217,3 +217,43 @@ test("a notice survives clicks elsewhere and clears on its own", async ({
   await expect(notice).toBeVisible();
   await expect(notice).toBeHidden({ timeout: 8000 });
 });
+
+test("a name beyond the server's limit disables Create and shows the server's message", async ({
+  page,
+}) => {
+  const submitted: unknown[] = [];
+  page.on("request", (sent) => {
+    if (
+      sent.method() === "POST" &&
+      new URL(sent.url()).pathname === "/api/rules"
+    )
+      submitted.push(sent.postDataJSON());
+  });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Create rule", exact: true })
+    .last()
+    .click();
+  const dialog = page.getByRole("dialog");
+  const name = dialog.getByLabel("Rule name", { exact: true });
+  const create = dialog.getByRole("button", {
+    name: "Create rule",
+    exact: true,
+  });
+  await name.fill("n".repeat(161));
+  await expect(name).toHaveAttribute("aria-invalid", "true");
+  await expect(
+    dialog.getByText("Rule name must contain 1 to 160 characters"),
+  ).toBeVisible();
+  await expect(create).toBeDisabled();
+  await name.fill("n".repeat(160));
+  await expect(name).toHaveAttribute("aria-invalid", "false");
+  await expect(create).toBeEnabled();
+  const description = dialog.getByLabel("Description", { exact: true });
+  await description.fill("d".repeat(2001));
+  await expect(
+    dialog.getByText("Description exceeds 2,000 characters"),
+  ).toBeVisible();
+  await expect(create).toBeDisabled();
+  expect(submitted).toEqual([]);
+});

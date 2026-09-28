@@ -16,13 +16,30 @@ import java.util.stream.Collectors;
  */
 final class NodeValidation {
   /**
-   * An expression and the label its problems carry, such as {@code "Route / Case Premium"}. The
-   * enumerations below are the only places that name an expression's position, so every check
-   * reports one fault with the same text.
+   * An expression, the node that owns it and its position in that node ({@link
+   * ExpressionPositions}); a source mapping has a position and no node. The enumerations below are
+   * the only places that build these, so every check reports one fault with the same label, such as
+   * {@code "Route / Case Premium"} or {@code "rate source / region"}.
    */
-  record OwnedExpression(String source, String label, String bindingName) {
-    OwnedExpression(String source, String label) {
-      this(source, label, null);
+  record OwnedExpression(String source, String nodeLabel, String position, String bindingName) {
+    /** A node's whole expression: its label alone names it. */
+    static OwnedExpression whole(Node node) {
+      return new OwnedExpression(node.expression(), node.label(), null, null);
+    }
+
+    static OwnedExpression at(Node node, String source, String position) {
+      return new OwnedExpression(source, node.label(), position, null);
+    }
+
+    static OwnedExpression sourceMapping(String source, String input, String key) {
+      return new OwnedExpression(source, null, ExpressionPositions.sourceMapping(input, key), null);
+    }
+
+    /** The label its problems carry. */
+    String label() {
+      if (position == null) return nodeLabel;
+      if (nodeLabel == null) return position;
+      return nodeLabel + " / " + position;
     }
   }
 
@@ -65,8 +82,9 @@ final class NodeValidation {
 
   /**
    * Checks an owned expression's syntax, variables and Formula calls, compiling it once per pass.
-   * Problems are prefixed with the expression's label. A null scope skips the variable check, for
-   * graphs without a scope plan.
+   * Value problems are prefixed with the expression's label; the deadline, which the resolver may
+   * raise while a pin is prepared, keeps its message (see {@link ArcException#withContext}). A null
+   * scope skips the variable check, for graphs without a scope plan.
    */
   static Expressions.Compiled check(
       OwnedExpression expression,
@@ -97,10 +115,7 @@ final class NodeValidation {
     Map<String, String> bindings = node.bindings() == null ? Map.of() : node.bindings();
     for (Input parameter : child.inputs())
       require(
-          !parameter.required()
-              || parameter.defaultValue() != null
-              || parameter.source() != null
-              || bindings.containsKey(parameter.name()),
+          !parameter.needsCallerValue() || bindings.containsKey(parameter.name()),
           node.label() + ": missing binding for " + parameter.name());
     return child.inputs().stream().map(Input::name).collect(Collectors.toSet());
   }
@@ -120,12 +135,12 @@ final class NodeValidation {
   }
 
   private static OwnedExpression whole(Node node) {
-    return new OwnedExpression(node.expression(), node.label());
+    return OwnedExpression.whole(node);
   }
 
   private static List<OwnedExpression> selector(Node node) {
     if (node.selector() == null) return List.of();
-    return List.of(new OwnedExpression(node.selector(), node.label() + " / Selector"));
+    return List.of(OwnedExpression.at(node, node.selector(), ExpressionPositions.SELECTOR));
   }
 
   private static List<OwnedExpression> bindings(Node node) {
@@ -134,7 +149,10 @@ final class NodeValidation {
       for (var binding : node.bindings().entrySet())
         bindings.add(
             new OwnedExpression(
-                binding.getValue(), node.label() + " / " + binding.getKey(), binding.getKey()));
+                binding.getValue(),
+                node.label(),
+                ExpressionPositions.referenceBinding(binding.getKey()),
+                binding.getKey()));
     return bindings;
   }
 
@@ -143,7 +161,7 @@ final class NodeValidation {
     if (node.cases() != null)
       for (BranchCase option : node.cases())
         cases.add(
-            new OwnedExpression(option.expression(), node.label() + " / Case " + option.label()));
+            OwnedExpression.at(node, option.expression(), ExpressionPositions.switchCase(option)));
     return cases;
   }
 
@@ -153,7 +171,7 @@ final class NodeValidation {
     var fields = new ArrayList<OwnedExpression>();
     for (Field field : node.fields())
       fields.add(
-          new OwnedExpression(field.expression(), node.label() + " / Field " + field.name()));
+          OwnedExpression.at(node, field.expression(), ExpressionPositions.transformField(field)));
     return fields;
   }
 
@@ -175,8 +193,7 @@ final class NodeValidation {
       var owned = new ArrayList<OwnedExpression>();
       for (var mapping : input.source().bindings().entrySet())
         owned.add(
-            new OwnedExpression(
-                mapping.getValue(), Validator.sourceMappingLabel(input.name(), mapping.getKey())));
+            OwnedExpression.sourceMapping(mapping.getValue(), input.name(), mapping.getKey()));
       mappings.put(input.name(), owned);
     }
     return mappings;

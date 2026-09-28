@@ -54,7 +54,9 @@ final class BranchScopes {
         }
       }
       available.put(node.id(), Collections.unmodifiableSet(guaranteed));
-      if (node.storesResult() && node.output() != null) scope.put(node.output(), active);
+      // An unfinished draft may store no result name yet; an empty one is unset as well.
+      String result = node.resultName();
+      if (node.storesResult() && result != null) scope.put(result, active);
       activation.put(node.id(), active);
       scopes.put(node.id(), scope);
     }

@@ -1,5 +1,5 @@
 import type { Definition, RuleNode } from "../types";
-import { sourcePorts } from "./nodePorts";
+import { sourcePort } from "./nodePorts";
 
 export const previewNodeWidth = 132;
 export const previewNodeHeight = 40;
@@ -66,9 +66,7 @@ export function rulePreview(definition: Definition) {
   const connections = edges.map((edge) => {
     const source = positions.get(edge.source)!;
     const target = positions.get(edge.target)!;
-    const port = sourcePorts(source.node).find(
-      (port) => port.id === edge.sourceHandle,
-    );
+    const port = sourcePort(source.node, edge.sourceHandle);
     const sx = source.x + previewNodeWidth * (port?.ratio ?? 0.5);
     const sy = source.y + previewNodeHeight;
     const tx = target.x + previewNodeWidth / 2;
@@ -82,7 +80,8 @@ export function rulePreview(definition: Definition) {
       const sideX = Math.max(source.x, target.x) + previewNodeWidth + 20;
       path = `M ${sx} ${sy} C ${sideX} ${sy + 20}, ${sideX} ${ty - 20}, ${tx} ${ty}`;
     }
-    return { edge, path, label: port?.label || edge.sourceHandle, sx, sy };
+    // A port's label; the `next` exit has none, and an unknown handle cannot reach here.
+    return { edge, path, label: port?.label ?? "", sx, sy };
   });
   return {
     nodes,

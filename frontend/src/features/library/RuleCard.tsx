@@ -21,14 +21,14 @@ export default function RuleCard({
   // Only mounted cards on the current catalog page fetch; unmount aborts old previews.
   const detail = useAsyncResource<Rule | null>(
     `${rule.id}:${rule.createdAt}:${rule.revision}:${attempt}`,
-    async (signal) => {
-      const loaded = await ruleApi.get(rule.id, { signal });
-      rememberPreview(rule, loaded);
-      return loaded;
-    },
+    cached
+      ? null
+      : async (signal) => {
+          const loaded = await ruleApi.get(rule.id, { signal });
+          rememberPreview(rule, loaded);
+          return loaded;
+        },
     null,
-    0,
-    !cached,
   );
   const preview = cached ?? detail.data;
   return (

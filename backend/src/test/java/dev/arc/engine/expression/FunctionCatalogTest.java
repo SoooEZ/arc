@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.Limits;
 import dev.arc.error.ArcException;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -75,16 +76,61 @@ class FunctionCatalogTest {
     assertThat(arcEntries).hasSize(BuiltinFunctionCatalog.specs().size());
     var evaluatedByArc = new TreeSet<String>(Functions.arcFunctionNames());
     evaluatedByArc.addAll(ExpressionRuntime.lazyFunctionNames());
-    for (String name : arcEntries) {
-      if (BuiltinFunctionCatalog.isCollectionFunction(name)) evaluatedByArc.add(name);
-    }
+    // A collection function is credited by its constant, which owns its runtime code, not by a
+    // name list that the runtime could silently fall through.
+    for (CollectionFunction function : CollectionFunction.values())
+      evaluatedByArc.add(function.name());
     // An ARC entry without ARC code would silently fall through to POI's floating point.
     assertThat(evaluatedByArc).containsAll(arcEntries);
     // Lazy Excel functions such as ISNA and CHOOSE keep their Excel catalog entries.
     assertThat(Functions.catalog().stream().map(entry -> entry.name().substring(1)))
         .containsAll(evaluatedByArc);
-    assertThat(arcEntries).containsAll(BuiltinFunctionCatalog.DECIMAL_AGGREGATES);
-    assertThat(Functions.arcFunctionNames()).containsAll(BuiltinFunctionCatalog.DECIMAL_AGGREGATES);
+    for (CollectionFunction function : CollectionFunction.values())
+      assertThat(Functions.catalog())
+          .filteredOn(entry -> entry.name().equals("$" + function.name()))
+          .extracting(Functions.Entry::category)
+          .containsExactly("Collections");
+    for (DecimalAggregate aggregate : DecimalAggregate.values()) {
+      assertThat(arcEntries).contains(aggregate.name());
+      assertThat(Functions.arcFunctionNames()).contains(aggregate.name());
+    }
+    assertThat(BuiltinFunctionCatalog.DECIMAL_AGGREGATES)
+        .containsExactly("SUM", "MIN", "MAX", "AVG", "AVERAGE", "COUNT", "MUL");
+    assertThat(BuiltinFunctionCatalog.ITEM_FUNCTIONS)
+        .containsExactly("MAP", "FILTER", "ALL", "ANY");
+    assertThat(BuiltinFunctionCatalog.REDUCE).isEqualTo("REDUCE");
+  }
+
+  /** Help and messages state a limit from the constant that enforces it, never a retyped number. */
+  @Test
+  void helpAndMessagesStateTheirLimitsFromTheConstants() {
+    assertThat(Functions.catalog())
+        .filteredOn(entry -> entry.name().equals("$REPT"))
+        .extracting(Functions.Entry::description)
+        .containsExactly(
+            "Repeats text. ARC limits the result to "
+                + Limits.format(Limits.MAX_STRING_CHARACTERS)
+                + " characters.");
+    String bound = "-" + Functions.MAX_ROUND_DIGITS + "…" + Functions.MAX_ROUND_DIGITS;
+    assertThat(Functions.catalog())
+        .filteredOn(entry -> List.of("$ROUND", "$ROUNDDOWN", "$ROUNDUP").contains(entry.name()))
+        .hasSize(3)
+        .allSatisfy(
+            entry ->
+                assertThat(entry.description())
+                    .startsWith("Rounds to " + bound + " decimal places."));
+    for (String name : List.of("ROUND", "ROUNDDOWN", "ROUNDUP")) {
+      Expressions.evaluate("$" + name + "(1, " + Functions.MAX_ROUND_DIGITS + ")", Map.of());
+      Expressions.evaluate("$" + name + "(1, -" + Functions.MAX_ROUND_DIGITS + ")", Map.of());
+      for (int digits : new int[] {Functions.MAX_ROUND_DIGITS + 1, -Functions.MAX_ROUND_DIGITS - 1})
+        assertThatThrownBy(() -> Expressions.evaluate("$" + name + "(1, " + digits + ")", Map.of()))
+            .as(name + " " + digits)
+            .hasMessage(
+                "Round precision must be -"
+                    + Functions.MAX_ROUND_DIGITS
+                    + " to "
+                    + Functions.MAX_ROUND_DIGITS);
+    }
   }
 
   @Test

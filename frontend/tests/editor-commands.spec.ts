@@ -4,7 +4,8 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import type { Definition, Rule } from "../src/types";
+import type { Definition } from "../src/types";
+import { createRule as createApiRule, readRule } from "./helpers/api";
 import { editorLines } from "./helpers/editor";
 
 const definition: Definition = {
@@ -38,15 +39,8 @@ const definition: Definition = {
 
 async function createRule(request: APIRequestContext, prefix: string) {
   const id = `${prefix}-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: `Commands ${id}`, kind: "FORMULA", definition },
-  });
-  expect(created.ok()).toBeTruthy();
+  await createApiRule(request, { id, name: `Commands ${id}`, definition });
   return id;
-}
-
-async function readRule(request: APIRequestContext, id: string) {
-  return (await (await request.get(`/api/rules/${id}`)).json()) as Rule;
 }
 
 /** Holds the first matching request until released; reports whether the page aborted it. */

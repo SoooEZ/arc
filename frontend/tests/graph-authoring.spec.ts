@@ -6,7 +6,7 @@ import {
   type Page,
   type Locator,
 } from "@playwright/test";
-import type { Definition } from "../src/types";
+import type { Definition, RuleNode } from "../src/types";
 
 async function create(request: APIRequestContext, source: string) {
   const built = await (
@@ -376,4 +376,70 @@ test("late expression checks cannot override newer text or reenable Apply", asyn
   } finally {
     release();
   }
+});
+
+test("a draft at the server's node or input limit disables Add node and Add parameter", async ({
+  page,
+  request,
+}) => {
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const nodes: RuleNode[] = [
+    { id: "input", type: "INPUT", label: "Inputs", position: { x: 0, y: 0 } },
+  ];
+  for (let index = 1; index < 99; index++)
+    nodes.push({
+      id: `n${index}`,
+      type: "FORMULA",
+      label: `Step ${index}`,
+      expression: index === 1 ? "amount" : `v${index - 1}`,
+      output: `v${index}`,
+      position: { x: (index % 8) * 300, y: Math.floor(index / 8) * 160 + 160 },
+    });
+  nodes.push({
+    id: "out",
+    type: "OUTPUT",
+    label: "Result",
+    expression: "v98",
+    position: { x: 0, y: 2200 },
+  });
+  const full: Definition = {
+    schemaVersion: 1,
+    inputs: Array.from({ length: 50 }, (_, index) => ({
+      name: index === 0 ? "amount" : `p${index}`,
+      type: "NUMBER",
+      required: true,
+      defaultValue: 1,
+    })),
+    nodes,
+    edges: nodes.slice(1).map((node, index) => ({
+      id: `e${index}`,
+      source: nodes[index].id,
+      target: node.id,
+      sourceHandle: "next",
+    })),
+  };
+  const id = `graph-limits-${stamp}`;
+  const created = await request.post("/api/rules", {
+    data: { id, name: id, kind: "FORMULA", definition: full },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  await page.goto(`/#/rules/${id}?node=input`);
+  await expect(page.locator(".react-flow__node")).toHaveCount(100);
+  const addNode = page.getByRole("button", { name: "Add node", exact: true });
+  await expect(addNode).toBeDisabled();
+  await addNode.locator("..").hover();
+  await expect(
+    page.getByRole("tooltip", { name: "A draft holds at most 100 nodes" }),
+  ).toBeVisible();
+  const addParameter = page.getByRole("button", {
+    name: "Add parameter",
+    exact: true,
+  });
+  await expect(addParameter).toBeDisabled();
+  await addParameter.locator("..").hover();
+  await expect(
+    page.getByRole("tooltip", {
+      name: "A rule declares at most 50 input parameters",
+    }),
+  ).toBeVisible();
 });

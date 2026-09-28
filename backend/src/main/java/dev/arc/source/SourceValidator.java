@@ -6,6 +6,7 @@ import dev.arc.engine.Limits;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.SourceDefinition;
+import dev.arc.model.SourceDefinition.Field;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -41,7 +42,27 @@ public final class SourceValidator {
       if (p.defaultValue() != null) InputTypes.check(p.name(), p.type(), p.defaultValue());
     }
     validateSecretHeaderShape(definition.secretHeaders());
+    rejectUnusedFields(adapter, definition);
     adapter.validate(definition);
+  }
+
+  /**
+   * A provider rejects the configuration it does not use, from the fields it declares: what it
+   * would ignore was stored unbounded (HTTP entries of {@code 1E+5000} failed the read-back with a
+   * 500) or reached executions that copy every stored value.
+   */
+  private static void rejectUnusedFields(SourceAdapter adapter, SourceDefinition definition) {
+    for (Field field : Field.values())
+      if (!adapter.fields().contains(field) && definition.sets(field))
+        throw ArcException.invalid(adapter.noun() + " do not use " + describe(field));
+  }
+
+  private static String describe(Field field) {
+    return switch (field) {
+      case URL -> "a URL";
+      case ENTRIES -> "lookup entries";
+      case SECRET_HEADERS -> "secret headers";
+    };
   }
 
   /**

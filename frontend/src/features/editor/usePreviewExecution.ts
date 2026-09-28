@@ -5,10 +5,10 @@ import {
   sampleInputsJson,
 } from "../../domain/executionInputs";
 import type { Definition } from "../../types";
+import { useExecutionOptions } from "../execution/useExecutionOptions";
 import { useExecutionRequest } from "../execution/useExecutionRequest";
 import { useInputBuffer } from "../execution/useInputBuffer";
 
-export const defaultPreviewTimeoutMs = 30_000;
 /** The Test panel shows the input buffer or the equivalent cURL request. */
 export type PreviewInputView = "json" | "curl";
 
@@ -28,8 +28,7 @@ export function usePreviewExecution(definition: Definition, graphKey: string) {
   const [inputView, setInputView] = useState<PreviewInputView>("json");
   // One target: once edited, the buffer stays for the whole editor session.
   const inputBuffer = useInputBuffer("preview", sampleInputsJson(definition));
-  const [trace, setTrace] = useState(true);
-  const [timeoutMs, setTimeoutMs] = useState(defaultPreviewTimeoutMs);
+  const { trace, setTrace, timeoutMs, setTimeoutMs } = useExecutionOptions();
   const input = inputBuffer.text;
   const execution = useExecutionRequest(
     JSON.stringify([graphKey, input, trace, timeoutMs]),

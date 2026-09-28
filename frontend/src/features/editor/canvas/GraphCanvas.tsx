@@ -23,6 +23,7 @@ import {
   canRemoveGraphNode,
   type DefinitionChange,
 } from "../../../domain/graph";
+import { canAddNode } from "../../../domain/limits";
 import { nodeKinds } from "../../../domain/nodeKinds";
 import type { useGraphCanvas } from "./useGraphCanvas";
 import type { EditorCapabilities } from "../editorCapabilities";
@@ -193,6 +194,7 @@ export default function GraphCanvas({
     <div className="graph-workspace">
       <GraphToolbar
         nodeCount={definition.nodes.length}
+        canAddNode={canAddNode(definition)}
         readOnly={readOnly}
         capabilities={can}
         arranging={arranging}

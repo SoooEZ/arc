@@ -13,6 +13,7 @@ import {
 import { Plus } from "lucide-react";
 import { ruleApi } from "../api/rules";
 import { errorMessage } from "../api/errors";
+import { ruleMetadataProblem } from "../domain/limits";
 import { isResourceId, suggestedRuleId } from "../domain/resourceIds";
 import ResourceIdField from "../components/ResourceIdField";
 import type { Kind, Rule } from "../types";
@@ -32,8 +33,16 @@ export default function CreateRuleDialog({
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  // The server's own rule, so a long name is refused here, not by a 422.
+  const metadataProblem = ruleMetadataProblem({ name, description });
+  const nameProblem = metadataProblem?.startsWith("Rule name")
+    ? metadataProblem
+    : null;
+  const descriptionProblem = metadataProblem?.startsWith("Description")
+    ? metadataProblem
+    : null;
   const create = async () => {
-    if (creating || !name.trim() || !isResourceId(id)) return;
+    if (creating || metadataProblem || !isResourceId(id)) return;
     setCreating(true);
     setCreateError("");
     try {
@@ -56,6 +65,8 @@ export default function CreateRuleDialog({
             autoFocus
             label="Rule name"
             value={name}
+            error={!!name && !!nameProblem}
+            helperText={name ? nameProblem : undefined}
             onChange={(event) => {
               setName(event.target.value);
               if (!idChosen) setId(suggestedRuleId(event.target.value));
@@ -89,6 +100,8 @@ export default function CreateRuleDialog({
             multiline
             rows={2}
             value={description}
+            error={!!descriptionProblem}
+            helperText={descriptionProblem ?? undefined}
             onChange={(e) => setDescription(e.target.value)}
           />
           {createError && <Alert severity="error">{createError}</Alert>}
@@ -106,7 +119,7 @@ export default function CreateRuleDialog({
           variant="contained"
           startIcon={<Plus size={16} />}
           onClick={create}
-          disabled={creating || !name.trim() || !isResourceId(id)}
+          disabled={creating || !!metadataProblem || !isResourceId(id)}
         >
           {creating ? "Creating…" : "Create rule"}
         </Button>

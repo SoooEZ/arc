@@ -1,7 +1,6 @@
 package dev.arc.engine.script;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.script.ArcScriptParser.Parsed;
 import dev.arc.engine.script.ArcScriptScanner.SyntaxException;
 import dev.arc.engine.validation.ShapeViolation;
@@ -13,7 +12,6 @@ import dev.arc.model.Definition.Node;
 import dev.arc.model.NodeKind;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /** Studio boundary: build and render graphs without evaluating expressions or fetching data. */
@@ -26,13 +24,6 @@ public class ArcScript {
   public record Diagnostic(String message, int line, int column) {}
 
   public record Build(Definition definition, String source, List<Diagnostic> diagnostics) {}
-
-  /** Result of {@code /studio/expression/check}; the application layer produces it. */
-  public record ExpressionCheck(
-      boolean valid,
-      Set<String> variables,
-      String error,
-      List<Expressions.FormulaCall> formulaCalls) {}
 
   public ArcScript(ObjectMapper json, Validator validator) {
     this.validator = validator;

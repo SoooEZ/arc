@@ -1,60 +1,25 @@
+import { apiBaseUrl } from "../../api/http";
+// The rows are data (scripts/check_mirrors.test.mjs checks every one against
+// docs/openapi.yaml, and that every /rules operation of the spec is listed).
+import apiEndpoints from "./apiEndpoints.json";
+
 export default function ApiReference() {
   return (
     <>
       <div className="api-reference-heading">
         <h2>One API. A few clear endpoints.</h2>
         <p>
-          Base URL: <code>{window.location.origin}/api</code>
+          Base URL: <code>{apiBaseUrl()}</code>
         </p>
       </div>
       <div className="endpoint-table">
-        {[
-          ["GET", "/rule-summaries", "Search a bounded page of rule metadata"],
-          ["GET", "/rules", "Legacy full rule list, including drafts"],
-          [
-            "POST",
-            "/rules",
-            "Create a rule from a template or a graph definition",
-          ],
-          ["GET", "/rules/{id}", "Read a rule and its revision"],
-          [
-            "PUT",
-            "/rules/{id}",
-            "Save a draft with optimistic concurrency protection",
-          ],
-          [
-            "POST",
-            "/rules/{id}/publish",
-            "Validate and publish an immutable version",
-          ],
-          [
-            "POST",
-            "/rules/{id}/execute",
-            "Execute a published rule with typed inputs",
-          ],
-          [
-            "GET",
-            "/rules/{id}/version-summaries",
-            "Search and page through published version metadata",
-          ],
-          [
-            "GET",
-            "/rules/{id}/versions/{version}",
-            "Read one immutable version",
-          ],
-          ["POST", "/preview", "Test a graph without saving or publishing it"],
-          [
-            "POST",
-            "/validate",
-            "Check graph structure, expressions, and references",
-          ],
-        ].map(([method, path, desc]) => (
+        {apiEndpoints.map(({ method, path, summary }) => (
           <div key={method + path}>
             <span className={`method method-${method.toLowerCase()}`}>
               {method}
             </span>
             <code>{path}</code>
-            <span>{desc}</span>
+            <span>{summary}</span>
           </div>
         ))}
       </div>
@@ -82,7 +47,8 @@ export default function ApiReference() {
           <p>
             Invalid inputs and graphs return <code>422</code>. Missing resources
             return <code>404</code>. Stale revisions or unpublished rules return{" "}
-            <code>409</code>. Exhausting the execution deadline returns{" "}
+            <code>409</code>, as does deleting a rule that other rules call,
+            naming the callers. Exhausting the execution deadline returns{" "}
             <code>504</code>, with a readable error message.
           </p>
         </div>

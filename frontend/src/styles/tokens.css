@@ -43,6 +43,15 @@
   --color-studio-border: #e4eae6;
   --color-studio-border-strong: #dde5df;
 
+  /* Symbol roles in expressions: the Monaco theme (arcLanguage.ts reads these
+     when it defines arc-light), the color key and the Available variables list. */
+  --color-symbol-function: #8b682f;
+  --color-symbol-formula: #007c83;
+  --color-symbol-parameter: #205fa6;
+  --color-symbol-result: #7b3f98;
+  /* Library preview connections and their arrowheads. */
+  --color-preview-connection: #879e93;
+
   /* One colour per node kind: canvas icons, library previews and every other
      kind-coloured mark. */
   --node-kind-input: #829276;

@@ -136,7 +136,7 @@ All three conversions preserve null. Use `$COALESCE` for null defaults or `$IFER
 
 `$IFERROR`, `$ISERROR`, `$ISERR` and `$ISNA` handle value errors only; an exhausted execution limit or the deadline still fails the request. `$ISNA` is true only for an Excel #N/A result, such as an unmatched `$MATCH`, and never because an error message mentions "#N/A".
 
-`$CONCAT`, `$CONTAINS`, `$GET` and `$PLUCK` read numbers as `$TO_STRING` writes them: `$CONCAT("Year ", $YEAR(date))` is `Year 2020`, and `$GET(items, 10.0)` reads index 10. `$CONCAT` skips null and rejects objects. `$CONTAINS` is false when the text or the searched value is null; with an array it tests membership, comparing arrays and objects by value. `$GET`/`$PLUCK` need a text or number path.
+`$CONCAT`, `$CONTAINS`, `$GET` and `$PLUCK` read numbers as `$TO_STRING` writes them: `$CONCAT("Year ", $YEAR(date))` is `Year 2020`, and `$GET(items, 10.0)` reads index 10. `$CONCAT` skips null and rejects objects. `$CONTAINS` is false when the text or the searched value is null; with an array it tests membership, comparing arrays and objects by value; searching an object, or searching text for an array or object, is an error, so the value must be a scalar when searching text. `$GET`/`$PLUCK` need a text or number path.
 
 ## Example
 
@@ -348,6 +348,7 @@ These editor changes shipped with [the 2026-09-27 full review](reviews/2026-09-2
 - Save and publish keep the local draft when the server's copy is the same, so test inputs, results and diagnostics are not reset. The Test panel keeps inputs, options, tab and result across view switches and code edits, and moving cards keeps the result and the highlighted path. Arrange no longer waits for the viewport fit.
 - One node dialog opens at a time, with Cancel while it loads and Close if it fails. Version history refreshes after a publish. The selection falls back to the default node when its node disappears. Drafts created through the API without node positions open at (0, 0) without becoming unsaved. Export keeps its download URL valid for 40 s.
 - **Rule settings** can delete the rule. The dialog asks first, and a published rule also asks for its ID, because API clients call it by that ID. Deleting removes the draft and every version and returns to the library without asking about unsaved changes. A rule that other rules call stays, and the dialog names the callers.
+- Second review, Phase 6: **Add node**, **Add parameter** and a new connection stop at the server's limits (100 nodes, 50 parameters, 200 connections) with the reason in a tooltip, and **Create rule** refuses a name over 160 characters or a description over 2,000 with the server's message instead of a 422. Deleting the selected node selects the default node (the first Condition, else the first node), the same fallback a build or a version load uses, instead of the Input; while a parameter default is invalid, **Add node** is refused whole ("Fix the invalid parameter default before adding a node") instead of adding the node and refusing only its selection. A name or ID field's refusal ends when the value changes from outside, so a name repaired in the node dialog is no longer marked invalid in the sidebar.
 - Deletion follow-ups from the second review: the dialog stays open while the deletion is pending and lists every caller of a rule that cannot be deleted, not only the first five; a deletion sends the revision the editor read, so a rule published or replaced elsewhere is kept with "This rule changed in another editor" instead of vanishing behind a draft-only confirmation; leaving during a deletion no longer loses its outcome, which the workspace reports as "Rule X deleted" or "Rule X was not deleted: …" and forgets the rule everywhere; a deleted or unknown rule's route shows "Rule not found" with "Back to library" instead of a retry that cannot succeed; and a rule created again under a deleted ID is another rule for the editor's saved copy, library card previews, `@` Formula completion and hover, and the API playground, which no longer serve the deleted rule's graph, parameters or versions.
 
 **Inspector**
@@ -355,11 +356,23 @@ These editor changes shipped with [the 2026-09-27 full review](reviews/2026-09-2
 - Binding controls keep the chosen mode and constant type while you edit. Literal detection matches the server: `.5e3`, `1.`, `1.e5`, a backslash before a line break, arrays of objects and no-break-space padding open as expressions, and `and`/`or` or identifiers longer than 64 characters are expressions, not variables. Identifier fields accept deletions in stored invalid names. Parameters named like object members, such as `constructor` or `__proto__`, work everywhere.
 - A node that sets a property its kind does not use, such as parameter bindings on a Formula, shows which ones above its sections, and **Remove** clears them from the draft. The server rejects such nodes when saving, publishing, previewing and executing, so a published version that still holds one fails until a fixed draft is published.
 
+**Second review, Phase 6 (structure)**
+
+- A Reference node and the referenced-rule viewer show the rule's current name: the editor reads it, instead of a name remembered from the last library page. A direct visit to the playground or the API reference reads the published catalog once.
+- The playground explains a disabled or truncated trace in the same words as the Test panel ("Trace disabled. …", "Trace size limit reached. …"), and its endpoint line names the rule the cURL example calls (the sample rule until one is selected).
+- The source editor's **Inspect version** keeps the wording "vN · latest" or "vN · immutable" for the viewed version while an older history page is shown.
+
 **Code studio and completion**
 
 - New result variables take the first free `result_N`. Reuse node IDs have the form `reuse-<up to 69 characters of the rule ID>-<4 hex digits>` (at most 80 characters), and a Reuse card inserts once and shows *loading…*. Placeholders are `false` for BOOLEAN and `$OBJECT()` for OBJECT.
 - Outline navigation is exact: case-sensitive, ignoring comments and strings. `@` Formula search waits for a 150 ms pause in typing, open suggestion lists refresh when the scope loads, and `/api/functions` is read once per page load.
 - Unfinished nodes keep their gaps in code (`return;`, `when;`, `let total;`, `use "rule-id";`) instead of invented values such as `when true;`, and build errors point at the statement that caused them.
+- Second review, Phase 6: a declaration's type reads in any case (`amount: number required;`), as the server's grammar does, so its parameter and type take their colours before a rebuild; the input type menu and the code studio share one list of types.
+
+**Expressions**
+
+- `$CONTAINS` no longer compares Java text: searching an object fails with "CONTAINS searches text or an array", and searching text for an array or object with "CONTAINS can only search text for a scalar value", in the Test panel, preview and published executions alike.
+- A property path with an empty segment (`customer.`, `customer..name`) is a syntax error the editor reports, instead of reading null.
 
 **Library, sources and playground**
 
@@ -369,3 +382,4 @@ These editor changes shipped with [the 2026-09-27 full review](reviews/2026-09-2
 **Presentation**
 
 - Programming ligatures are off on every code surface: canvas previews, JSON fields, code blocks and studio chips. Library preview node colors now match the canvas node colors, with one color token per node kind.
+- Second review, Phase 6: a Switch's Default connection draws in the same fallback colours as a Condition's False connection, and a Switch step in the execution trace shows the case it took as a badge (its label, or *Default*). The four symbol-role colours, the canvas colour behind connection labels and the preview arrowhead read design tokens, so the Monaco theme, the colour key and the Available variables list cannot drift apart. Focusing a card centres it on its own size, so a wide Switch is no longer cut off at the right.

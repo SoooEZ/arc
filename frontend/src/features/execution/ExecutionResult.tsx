@@ -1,16 +1,36 @@
 import { CheckCircle2, ChevronRight } from "lucide-react";
-import { Alert } from "@mui/material";
 import { NodeIcon } from "../../components/Icons";
-import type { Execution } from "../../types";
+import type { Definition, Execution, Step } from "../../types";
 import { stringifyJson } from "../../domain/json";
+import { sourcePort } from "../../domain/nodePorts";
 import ExecutionTiming from "./ExecutionTiming";
+import TraceNotices from "./TraceNotices";
+
+/** The badge a traced branch shows: the exit's caption for this graph's nodes, the raw handle elsewhere. */
+export function branchBadge(
+  step: Step,
+  definition: Definition,
+): { text: string; fallback: boolean } | null {
+  if (step.branch === null) return null;
+  const node =
+    step.depth === 0
+      ? definition.nodes.find((candidate) => candidate.id === step.nodeId)
+      : undefined;
+  const port = node && sourcePort(node, step.branch);
+  if (!port) return { text: step.branch, fallback: false };
+  if (!port.label) return null;
+  return { text: port.label, fallback: port.fallback };
+}
 
 export default function ExecutionResult({
   result,
+  definition,
   onNode,
   requestDurationMs,
 }: {
   result: Execution;
+  /** The shown graph, whose exits name the traced branches. */
+  definition: Definition;
   onNode: (id: string) => void;
   requestDurationMs: number | null;
 }) {
@@ -41,18 +61,7 @@ export default function ExecutionResult({
           ))}
         </div>
       )}
-      {result.traceEnabled === false && (
-        <Alert severity="info">
-          Trace disabled. The result includes all executed calculations.
-        </Alert>
-      )}
-      {result.traceTruncated && (
-        <Alert severity="warning">
-          Trace size limit reached. Showing the first {result.trace.length} of{" "}
-          {result.executedSteps} executed steps. The final result is complete;
-          graph highlights show only the recorded steps.
-        </Alert>
-      )}
+      <TraceNotices result={result} graphHighlights />
       <div className="trace-label">
         EXECUTION TRACE{" "}
         <span>
@@ -61,36 +70,41 @@ export default function ExecutionResult({
         </span>
       </div>
       <div className="trace-list">
-        {result.trace.map((step, i) => (
-          <button
-            key={i}
-            onClick={() => step.depth === 0 && onNode(step.nodeId)}
-            disabled={step.depth > 0}
-            style={{ paddingLeft: 6 + step.depth * 12 }}
-          >
-            <span className="trace-number">{i + 1}</span>
-            <NodeIcon type={step.type} size={13} />
-            <span>
-              {step.label}
-              {step.depth > 0 && (
-                <small>
-                  {" "}
-                  · {step.ruleId} v{step.version}
-                </small>
-              )}
-            </span>
-            <code>
-              {step.type === "INPUT" ? "received" : stringifyJson(step.value)}
-            </code>
-            {step.branch === "true" || step.branch === "false" ? (
-              <span className={`trace-branch ${step.branch}`}>
-                {step.branch}
+        {result.trace.map((step, i) => {
+          const badge = branchBadge(step, definition);
+          return (
+            <button
+              key={i}
+              onClick={() => step.depth === 0 && onNode(step.nodeId)}
+              disabled={step.depth > 0}
+              style={{ paddingLeft: 6 + step.depth * 12 }}
+            >
+              <span className="trace-number">{i + 1}</span>
+              <NodeIcon type={step.type} size={13} />
+              <span>
+                {step.label}
+                {step.depth > 0 && (
+                  <small>
+                    {" "}
+                    · {step.ruleId} v{step.version}
+                  </small>
+                )}
               </span>
-            ) : (
-              <ChevronRight size={12} />
-            )}
-          </button>
-        ))}
+              <code>
+                {step.type === "INPUT" ? "received" : stringifyJson(step.value)}
+              </code>
+              {badge ? (
+                <span
+                  className={`trace-branch ${badge.fallback ? "fallback" : ""}`}
+                >
+                  {badge.text}
+                </span>
+              ) : (
+                <ChevronRight size={12} />
+              )}
+            </button>
+          );
+        })}
       </div>
     </>
   );

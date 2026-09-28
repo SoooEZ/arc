@@ -219,3 +219,28 @@ test("opening node code locks defaults while its editor module is loading", asyn
     release();
   }
 });
+
+test("adding a node is refused whole while a parameter default is invalid", async ({
+  page,
+  request,
+}) => {
+  const id = `buffer-guards-add-${Date.now()}`;
+  const created = await request.post("/api/rules", {
+    data: { id, name: "Buffer guards add", kind: "FORMULA", definition },
+  });
+  expect(created.ok()).toBeTruthy();
+  await page.goto(`/#/rules/${id}`);
+  const field = page.getByLabel("Default JSON (optional)", { exact: true });
+  await field.fill("[");
+  await page.getByRole("button", { name: "Add node", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Formula", exact: true }).click();
+  // The command is refused before it edits: no node appears, and the message says why.
+  await expect(
+    page.getByRole("alert").filter({ hasText: "before adding a node" }),
+  ).toBeVisible();
+  await expect(page.locator(".react-flow__node")).toHaveCount(2);
+  await expect(field).toHaveValue("[");
+  await expect(page.getByLabel("Node name", { exact: true })).toHaveValue(
+    "Inputs",
+  );
+});

@@ -25,12 +25,9 @@ import { exportDefinition } from "./exportDefinition";
 import { usePreviewExecution } from "./usePreviewExecution";
 import { useNodeDialog } from "./useNodeDialog";
 import LazyNodeDialog from "./LazyNodeDialog";
-import {
-  defaultSelection,
-  selectedEdgeId,
-  selectedNode,
-} from "./nodeSelection";
+import { useNodeSelection } from "./useNodeSelection";
 import type { EditorProps, ReferenceTarget } from "./types";
+import { rulePath } from "../../app/routing";
 const CodeStudio = lazy(() => import("../studio/CodeStudio"));
 const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
 const NodeEditDialog = lazy(() => import("./NodeEditDialog"));
@@ -52,7 +49,6 @@ export default function Editor(props: EditorProps) {
 function EditorContent({
   mode,
   rule: initial,
-  rules,
   requestedVersion,
   requestedNode,
   onSaved,
@@ -111,22 +107,18 @@ function EditorContent({
   } = document;
   const graphKey = useMemo(() => semanticGraphKey(rule.draft), [rule.draft]);
   const preview = usePreviewExecution(rule.draft, graphKey);
-  const [requestedSelection, setRequestedSelection] = useState(
-    () => defaultSelection(initial.draft).id,
-  );
-  const node = selectedNode(rule.draft, requestedSelection);
-  const selected = node.id;
-  /** Selects a node unless an invalid default must be fixed before `action`. */
-  const selectNode = useCallback(
-    (id: string, action = "selecting another node") => {
-      if (id !== selected && blockedByInvalidDefault(action)) return false;
-      setRequestedSelection(id);
-      return true;
-    },
-    [selected, blockedByInvalidDefault],
-  );
-  const [requestedEdge, setSelectedEdge] = useState<string | null>(null);
-  const selectedEdge = selectedEdgeId(rule.draft, requestedEdge);
+  const {
+    node,
+    selected,
+    selectNode,
+    mayChangeSelection,
+    selectedEdge,
+    setSelectedEdge,
+  } = useNodeSelection({
+    definition: rule.draft,
+    initial: initial.draft,
+    blockedByInvalidDefault,
+  });
   const nodeNameInput = useRef<HTMLInputElement>(null);
   const nodeDialog = useNodeDialog(rule.draft.nodes);
   const { openCode, openEdit, active: activeDialog } = nodeDialog;
@@ -175,8 +167,8 @@ function EditorContent({
     measurements,
     edit,
     arrange: document.arrange,
-    selected,
     selectNode,
+    mayChangeSelection,
     requestFit,
   });
   const { focusNode, jumpToNode, focusPending } = useGraphFocus({
@@ -229,6 +221,7 @@ function EditorContent({
     <TestPanel
       preview={preview}
       ruleId={rule.id}
+      definition={rule.draft}
       version={requestedVersion}
       publishedVersion={requestedVersion ?? rule.publishedVersion}
       buildPending={sourceDirty}
@@ -254,7 +247,7 @@ function EditorContent({
         </Alert>
         <Button onClick={retryVersion}>Retry version</Button>
         {!embedded && (
-          <Button onClick={() => navigate(`/rules/${rule.id}`)}>
+          <Button onClick={() => navigate(rulePath({ ruleId: rule.id }))}>
             Open current draft
           </Button>
         )}
@@ -354,7 +347,6 @@ function EditorContent({
           <Inspector
             rule={rule}
             node={node}
-            rules={rules}
             readOnly={!can.edit || !!activeDialog}
             nameInputRef={nodeNameInput}
             onNodeChange={patchNode}
@@ -370,7 +362,6 @@ function EditorContent({
       {referenceTarget && (
         <ReferenceDialog
           target={referenceTarget}
-          rules={rules}
           problems={allProblems}
           onClose={() => setReferenceTarget(null)}
         />
@@ -384,7 +375,6 @@ function EditorContent({
           <NodeEditDialog
             rule={rule}
             nodeId={activeDialog.node.id}
-            rules={rules}
             readOnly={!can.edit}
             onApply={edit}
             onClose={nodeDialog.close}

@@ -61,7 +61,7 @@ export default function ExpressionDialog({
     source,
     (signal) => studioApi.checkExpression(source, { signal }),
     null,
-    250,
+    { delay: 250 },
   );
   const names = variables.map((variable) => variable.name);
   const { insertFormula, formulaError } = useArcLanguageSupport(

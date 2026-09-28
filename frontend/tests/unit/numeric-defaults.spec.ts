@@ -4,6 +4,7 @@ import {
   parseNumericDefault,
   sameNumericDefault,
 } from "../../src/domain/numericDefaults";
+import { decimalTexts } from "./decimal-texts";
 
 test("numeric defaults retain values across decimal and JSON notation", () => {
   for (const [text, value] of [
@@ -128,4 +129,10 @@ test("numeric default identity compares decimal values, not spelling or instance
     [1, "1"],
   ] as const)
     expect(sameNumericDefault(left, right), `${left} ${right}`).toBe(false);
+});
+
+test("numeric defaults accept exactly the texts of the shared decimal grammar", () => {
+  for (const [text, accepted] of decimalTexts)
+    if (text.trim())
+      expect(parseNumericDefault(text).valid, text).toBe(accepted);
 });

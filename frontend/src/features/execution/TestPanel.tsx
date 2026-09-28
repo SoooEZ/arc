@@ -1,12 +1,7 @@
-import { lazy, useState } from "react";
+import { useState } from "react";
 import { Button, IconButton, Tab, Tabs } from "@mui/material";
 import { Hammer, Play, Terminal, X } from "lucide-react";
-import { ruleApi } from "../../api/rules";
-import { LazyBoundary } from "../../components/LazyBoundary";
-import {
-  curlExample,
-  tryParseExecutionInputs,
-} from "../../domain/executionInputs";
+import type { Definition } from "../../types";
 import type {
   PreviewExecution,
   PreviewInputView,
@@ -15,12 +10,14 @@ import type { ReferenceTarget } from "../editor/types";
 import ExecutionError from "./ExecutionError";
 import ExecutionResult from "./ExecutionResult";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
-
-const InputJsonEditor = lazy(() => import("./InputJsonEditor"));
+import LazyInputJsonEditor from "./LazyInputJsonEditor";
+import { publishedCurl } from "./publishedCurl";
 
 interface Props {
   preview: PreviewExecution;
   ruleId: string;
+  /** The shown graph, whose exits caption the trace's branches. */
+  definition: Definition;
   /** The version shown in the editor; null for the draft. */
   version: number | null;
   /** The version the published endpoint runs, for the cURL example. */
@@ -37,6 +34,7 @@ interface Props {
 export default function TestPanel({
   preview,
   ruleId,
+  definition,
   version,
   publishedVersion,
   buildPending,
@@ -88,33 +86,22 @@ export default function TestPanel({
             <Tab value="curl" label="cURL" />
           </Tabs>
           {preview.inputView === "json" ? (
-            <LazyBoundary
-              label="JSON editor"
-              fallback={
-                <div className="execution-json-editor" role="status">
-                  Loading JSON editor…
-                </div>
-              }
-            >
-              <InputJsonEditor
-                label="Test input JSON"
-                value={preview.input}
-                onChange={preview.changeInput}
-                focusRequest={inputFocusRequest}
-              />
-            </LazyBoundary>
+            <LazyInputJsonEditor
+              label="Test input JSON"
+              value={preview.input}
+              onChange={preview.changeInput}
+              focusRequest={inputFocusRequest}
+            />
           ) : (
             <div className="curl-preview">
               {!publishedVersion && (
                 <span>Publish this rule to enable its endpoint.</span>
               )}
               <pre>
-                {curlExample(
-                  ruleApi.executeUrl(ruleId),
-                  tryParseExecutionInputs(preview.input),
-                  publishedVersion,
-                  { trace: preview.trace, timeoutMs: preview.timeoutMs },
-                )}
+                {publishedCurl(ruleId, preview.input, publishedVersion, {
+                  trace: preview.trace,
+                  timeoutMs: preview.timeoutMs,
+                })}
               </pre>
               <small>
                 cURL executes the published version. Preview uses the graph
@@ -126,6 +113,7 @@ export default function TestPanel({
         <div className="test-output">
           <PreviewOutput
             preview={preview}
+            definition={definition}
             shown={{ ruleId, version }}
             inputNodeId={inputNodeId}
             buildPending={buildPending}
@@ -144,6 +132,7 @@ export default function TestPanel({
 
 function PreviewOutput({
   preview,
+  definition,
   shown,
   inputNodeId,
   buildPending,
@@ -152,6 +141,7 @@ function PreviewOutput({
   onEditInputs,
 }: {
   preview: PreviewExecution;
+  definition: Definition;
   shown: { ruleId: string; version: number | null };
   inputNodeId: string | null;
   buildPending: boolean;
@@ -189,6 +179,7 @@ function PreviewOutput({
     return (
       <ExecutionResult
         result={preview.result}
+        definition={definition}
         onNode={onNode}
         requestDurationMs={preview.requestDurationMs}
       />

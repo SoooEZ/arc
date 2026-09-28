@@ -37,8 +37,9 @@ export function usePagedSearch<T>(
   const query = useDebouncedValue(search, searchDelayMs);
   const page = usePagedResource(
     JSON.stringify([query, key]),
-    (offset, limit, signal) => load(query, offset, limit, signal),
-    enabled,
+    enabled
+      ? (offset, limit, signal) => load(query, offset, limit, signal)
+      : null,
     { refresh, keepPrevious },
   );
   return { ...page, query, searching: query !== search };

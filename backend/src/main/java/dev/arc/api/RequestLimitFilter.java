@@ -1,5 +1,7 @@
 package dev.arc.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.Limits;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
@@ -27,6 +29,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class RequestLimitFilter extends OncePerRequestFilter {
   static final int MAX_BODY_BYTES = 1024 * 1024;
 
+  private final ObjectMapper json;
+
+  public RequestLimitFilter(ObjectMapper json) {
+    this.json = json;
+  }
+
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -46,13 +54,14 @@ public class RequestLimitFilter extends OncePerRequestFilter {
     return body.length > MAX_BODY_BYTES ? null : body;
   }
 
-  private static void rejectOversized(HttpServletResponse response) throws IOException {
+  /** The same error envelope as {@link Errors}, with the limit stated from its constant. */
+  private void rejectOversized(HttpServletResponse response) throws IOException {
     response.setStatus(413);
     response.setContentType("application/json");
     response.setHeader("Access-Control-Allow-Origin", "*");
-    response
-        .getWriter()
-        .write("{\"status\":413,\"message\":\"Request body exceeds 1 MiB\",\"issues\":[]}");
+    var body =
+        ErrorBody.transport(413, "Request body exceeds " + Limits.formatBytes(MAX_BODY_BYTES));
+    response.getWriter().write(json.writeValueAsString(body));
   }
 
   /** Replays the bounded body to later filters and controllers. */

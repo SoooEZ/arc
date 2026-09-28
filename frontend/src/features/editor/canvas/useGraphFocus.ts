@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useReactFlow } from "@xyflow/react";
 import type { Definition } from "../../../types";
 import type { FlowNode } from "./GraphNode";
-import type { NodeSizes } from "./graphGeometry";
+import { cardCenter, type NodeSizes } from "./graphGeometry";
+import { rulePath } from "../../../app/routing";
 
 interface Options {
   definition: Definition;
@@ -37,22 +38,19 @@ export function useGraphFocus({
       if (!selectNode(id)) return;
       selectEdge(null);
       const node = definition.nodes.find((candidate) => candidate.id === id);
-      if (node)
-        void flow.setCenter(node.position.x + 115, node.position.y + 50, {
-          zoom: 1,
-          duration: 350,
-        });
+      if (!node) return;
+      // The card's own centre: a wide Switch is centred, not cut at the right.
+      const center = cardCenter(node, measurements);
+      void flow.setCenter(center.x, center.y, { zoom: 1, duration: 350 });
     },
-    [definition.nodes, flow, selectNode, selectEdge],
+    [definition.nodes, measurements, flow, selectNode, selectEdge],
   );
 
   const jumpToNode = (id: string) => {
     if (!selectNode(id)) return;
     setPendingFocus(id);
     if (mode === "code")
-      navigate(
-        `/rules/${ruleId}${requestedVersion ? `?version=${requestedVersion}` : ""}`,
-      );
+      navigate(rulePath({ ruleId, version: requestedVersion }));
   };
 
   useEffect(() => {

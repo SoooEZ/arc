@@ -16,6 +16,7 @@ import {
   type DefinitionChange,
 } from "../../../domain/graph";
 import { newId } from "../../../domain/ids";
+import { handles } from "../../../domain/nodePorts";
 import type { NodeErrors } from "../useGraphProblems";
 interface Options {
   definition: Definition;
@@ -190,7 +191,7 @@ export function useGraphCanvas({
           definition,
           source,
           target,
-          sourceHandle || "next",
+          sourceHandle || handles.next,
           edgeId,
         ),
       );

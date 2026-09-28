@@ -49,7 +49,7 @@ export function useNodeVariables(
     scopeGraphKey(definition),
     (signal) => studioApi.variables(definition, { signal }),
     noScopes,
-    150,
+    { delay: 150 },
   );
   // The same options keep the previous array, so memoized rows see one prop.
   const previous = useRef<VariableOption[]>([]);

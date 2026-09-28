@@ -128,6 +128,10 @@ for (const scenario of [
     await page.getByRole("button", { name: "Test rule", exact: true }).click();
     await page.getByRole("button", { name: "Run test", exact: true }).click();
     await expect(page.getByTestId("test-result")).toHaveText('"matched"');
+    // The Switch step shows the case it took by its label, and Default as the fallback.
+    const badge = page.locator(".trace-list .trace-branch");
+    await expect(badge).toHaveText("Match");
+    await expect(badge).not.toHaveClass(/fallback/);
     await setEditorText(
       page,
       page.getByLabel("Test input JSON", { exact: true }),
@@ -135,6 +139,8 @@ for (const scenario of [
     );
     await page.getByRole("button", { name: "Run test", exact: true }).click();
     await expect(page.getByTestId("test-result")).toHaveText('"No match"');
+    await expect(badge).toHaveText("Default");
+    await expect(badge).toHaveClass(/fallback/);
     await page
       .getByRole("button", { name: "Close test panel", exact: true })
       .click();

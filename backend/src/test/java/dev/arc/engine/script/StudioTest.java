@@ -9,6 +9,7 @@ import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.expression.Functions;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition.*;
+import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleSamples;
 import java.math.BigDecimal;
 import java.util.*;
@@ -19,7 +20,7 @@ class StudioTest {
 
   @Test
   void graphAndCodeRoundTripPreservesExecutionAndLayout() {
-    for (String kind : List.of("RULE", "FORMULA", "DECISION_TREE")) {
+    for (RuleKind kind : RuleKind.values()) {
       var before = RuleSamples.blank(kind);
       var build = script.build(script.render(before));
       assertThat(build.diagnostics()).isEmpty();

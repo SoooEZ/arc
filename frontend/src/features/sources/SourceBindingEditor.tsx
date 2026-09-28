@@ -1,6 +1,10 @@
 import { lazy, useEffect, useRef, useState } from "react";
-import { usePagedResource } from "../../hooks/usePagedResource";
+import {
+  paginationProps,
+  usePagedResource,
+} from "../../hooks/usePagedResource";
 import CatalogPagination from "../../components/CatalogPagination";
+import PagedVersionSelect from "../../components/PagedVersionSelect";
 import { LazyBoundary } from "../../components/LazyBoundary";
 import { errorMessage } from "../../api/errors";
 import { ownValue } from "../../domain/records";
@@ -48,17 +52,18 @@ export default function SourceBindingEditor({
   const [versionsRequested, setVersionsRequested] = useState(false);
   const versionsResource = usePagedResource(
     JSON.stringify([source?.id, catalogRevision]),
-    (offset, limit, signal) =>
-      sourceApi.versionSummaries(source!.id, { offset, limit }, { signal }),
-    !!source && versionsRequested,
+    source && versionsRequested
+      ? (offset, limit, signal) =>
+          sourceApi.versionSummaries(source.id, { offset, limit }, { signal })
+      : null,
   );
   // The pinned version is immutable: the page-wide cache serves every card.
   const detail = useAsyncResource<DataSource | null>(
     JSON.stringify([source?.id, source?.version, catalogRevision]),
-    (signal) => readSourceVersion(source!.id, source!.version, signal),
+    source
+      ? (signal) => readSourceVersion(source.id, source.version, signal)
+      : null,
     null,
-    0,
-    !!source,
   );
   const lastLabel = useRef<{ id: string; name: string } | null>(null);
   useEffect(() => {
@@ -154,32 +159,17 @@ export default function SourceBindingEditor({
       {source && (
         <>
           <p>Fetch only when the caller omits this parameter.</p>
-          <TextField
-            select
+          <PagedVersionSelect
             label="Source version"
             value={source.version}
+            versions={versions}
             disabled={readOnly}
-            slotProps={{
-              select: { onOpen: () => setVersionsRequested(true) },
-            }}
-            onChange={(event) => void chooseVersion(Number(event.target.value))}
-          >
-            {!versions.some((item) => item.version === source.version) && (
-              <MenuItem value={source.version}>v{source.version}</MenuItem>
-            )}
-            {versions.map((item) => (
-              <MenuItem value={item.version} key={item.version}>
-                v{item.version}
-              </MenuItem>
-            ))}
-          </TextField>
+            onOpen={() => setVersionsRequested(true)}
+            onChange={(version) => void chooseVersion(version)}
+          />
           <CatalogPagination
             label="Source versions"
-            offset={versionsResource.offset}
-            limit={versionsResource.limit}
-            total={versionsResource.data.total}
-            loading={versionsResource.loading}
-            onPage={versionsResource.setOffset}
+            {...paginationProps(versionsResource)}
           />
           {config?.parameters.map((p) => (
             <ValueBinding

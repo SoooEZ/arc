@@ -22,24 +22,9 @@ public enum NodeKind {
   REFERENCE,
   OUTPUT;
 
-  /** A node field that holds expressions. */
-  public enum Slot {
-    /** The node's own {@code expression}. */
-    EXPRESSION,
-    /** A Switch's optional {@code selector}. */
-    SELECTOR,
-    /** The expressions of a Switch's {@code cases}. */
-    CASES,
-    /** The expressions of a Transform's {@code fields}. */
-    FIELDS,
-    /** The parameter {@code bindings} of a Reference. */
-    BINDINGS
-  }
-
   /**
-   * An optional node property beyond {@code id}, {@code type}, {@code label} and {@code position}.
-   * Every expression {@link Slot} is one, and so are the result variable, the pinned rule and an
-   * Output's name.
+   * An optional node property beyond {@code id}, {@code type}, {@code label} and {@code position}:
+   * the expression fields, the result variable, the pinned rule and an Output's name.
    */
   public enum Property {
     /** {@code expression} */
@@ -66,12 +51,12 @@ public enum NodeKind {
     return Optional.empty();
   }
 
-  /** Whether a node of this kind assigns its {@code output} variable for downstream nodes. */
+  /**
+   * Whether a node of this kind assigns its {@code output} variable for downstream nodes: exactly
+   * the kinds whose properties include the result variable.
+   */
   public boolean storesResult() {
-    return switch (this) {
-      case FORMULA, TRANSFORM, REFERENCE -> true;
-      case INPUT, CONDITION, SWITCH, OUTPUT -> false;
-    };
+    return uses(Property.OUTPUT);
   }
 
   /**
@@ -99,42 +84,26 @@ public enum NodeKind {
     };
   }
 
-  /**
-   * The expression slots a node of this kind owns. A Transform uses its field expressions, or its
-   * own expression when it has no fields.
-   */
-  public Set<Slot> slots() {
-    return switch (this) {
-      case INPUT -> Set.of();
-      case FORMULA, CONDITION, OUTPUT -> Set.of(Slot.EXPRESSION);
-      case SWITCH -> Set.of(Slot.SELECTOR, Slot.CASES);
-      case TRANSFORM -> Set.of(Slot.FIELDS, Slot.EXPRESSION);
-      case REFERENCE -> Set.of(Slot.BINDINGS);
-    };
-  }
-
-  public boolean owns(Slot slot) {
-    return slots().contains(slot);
-  }
-
   /** Each kind's property set, computed once from the exhaustive switch below. */
   private static final Map<NodeKind, Set<Property>> PROPERTIES = propertySets();
 
   private static Map<NodeKind, Set<Property>> propertySets() {
     var sets = new EnumMap<NodeKind, Set<Property>>(NodeKind.class);
-    for (NodeKind kind : values()) sets.put(kind, kind.ownProperties());
+    for (NodeKind kind : values()) sets.put(kind, kind.declaredProperties());
     return sets;
   }
 
   /**
-   * The optional properties a node of this kind may set. Draft-shape validation rejects a node that
-   * sets any other, including in stored drafts and published versions.
+   * The optional properties a node of this kind may set: the one table of which expressions, result
+   * variable, pin and Output name each kind owns. Draft-shape validation rejects a node that sets
+   * any other, including in stored drafts and published versions.
    */
   public Set<Property> properties() {
     return PROPERTIES.get(this);
   }
 
-  private Set<Property> ownProperties() {
+  /** A Transform uses its field expressions, or its own expression when it has no fields. */
+  private Set<Property> declaredProperties() {
     return switch (this) {
       case INPUT -> Set.of();
       case FORMULA -> Set.of(Property.EXPRESSION, Property.OUTPUT);

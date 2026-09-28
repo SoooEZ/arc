@@ -124,11 +124,8 @@ public class SourceExecutionService {
   private Object fetch(DataSource source, Map<String, Object> inputs, ExecutionDeadline deadline) {
     SourceDefinition definition = source.definition();
     Map<String, Object> values = normalizeInputs(definition, inputs);
-    deadline.check();
-    Object value =
-        adapters.require(definition.kind()).fetch(source.id(), definition, values, deadline);
-    deadline.check();
-    return value;
+    return deadline.within(
+        () -> adapters.require(definition.kind()).fetch(source.id(), definition, values, deadline));
   }
 
   private Map<String, Object> normalizeInputs(

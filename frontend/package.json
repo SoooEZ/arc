@@ -10,7 +10,8 @@
     "test:e2e": "playwright test",
     "format": "prettier --write src tests *.ts *.json",
     "format:check": "prettier --check src tests *.ts *.json",
-    "test:unit": "playwright test tests/unit"
+    "test:unit": "playwright test tests/unit",
+    "typecheck:tests": "tsc -p tsconfig.tests.json"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

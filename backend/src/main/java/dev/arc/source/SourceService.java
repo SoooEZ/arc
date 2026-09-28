@@ -52,10 +52,18 @@ public class SourceService {
     return repository.create(request.id(), name, request.definition());
   }
 
+  /**
+   * Lock, revision check, validation, then the write, in that order like a rule save: a stale
+   * editor learns of the conflict before its configuration is judged, and nothing is validated for
+   * a source that does not exist.
+   */
   @Transactional
   public DataSource update(String id, Update request) {
+    int current = repository.lock(id);
+    if (current != request.revision())
+      throw new ArcException(409, "Source changed in another editor; reload before saving");
     String name = DisplayNames.normalize("Source", request.name());
     validator.validate(request.definition());
-    return repository.update(id, name, request.revision(), request.definition());
+    return repository.appendVersion(id, name, current, request.definition());
   }
 }

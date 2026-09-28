@@ -1,5 +1,6 @@
 package dev.arc.engine.expression;
 
+import dev.arc.engine.Limits;
 import dev.arc.engine.expression.Functions.Entry;
 import java.util.*;
 
@@ -90,7 +91,9 @@ final class ExcelFunctionHelp {
         "REPT",
         "Text",
         "REPT(text, count)",
-        "Repeats text. ARC limits the result to 2,000 characters.",
+        "Repeats text. ARC limits the result to "
+            + Limits.format(Limits.MAX_STRING_CHARACTERS)
+            + " characters.",
         "REPT(${1:\"x\"}, ${2:3})");
     add(
         help,

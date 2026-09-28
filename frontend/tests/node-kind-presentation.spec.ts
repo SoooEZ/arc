@@ -5,7 +5,8 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-import type { Definition, Rule } from "../src/types";
+import type { Definition } from "../src/types";
+import { createRule as createApiRule, publishRule } from "./helpers/api";
 
 /*
  * Cards, menus, the inspector, library previews, the Script outline and the
@@ -21,16 +22,13 @@ async function createRule(
   definition: Definition,
   publish: boolean,
 ) {
-  const created = await request.post("/api/rules", {
-    data: { id, name, kind: "DECISION_TREE", definition },
+  const rule = await createApiRule(request, {
+    id,
+    name,
+    kind: "DECISION_TREE",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
-  if (!publish) return;
-  const rule: Rule = await created.json();
-  const published = await request.post(`/api/rules/${id}/publish`, {
-    data: { revision: rule.revision },
-  });
-  expect(published.ok()).toBeTruthy();
+  if (publish) await publishRule(request, rule);
 }
 
 function childRule(): Definition {
@@ -272,6 +270,14 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
       nodeId,
     ).toHaveCount(kind.sources);
   }
+  // Fallback exits (False, Default) draw their connections alike, unlike the others.
+  const stroke = (edgeId: string) =>
+    page
+      .locator(`.react-flow__edge-path#${edgeId}`)
+      .evaluate((path) => getComputedStyle(path).stroke);
+  expect(await stroke("g")).toBe(await stroke("c"));
+  expect(await stroke("e")).toBe(await stroke("b"));
+  expect(await stroke("g")).not.toBe(await stroke("e"));
   // Fallback exits (False, Default) have their own caption style.
   const caption = (nodeId: string, text: string) =>
     card(page, nodeId).locator(".handle-caption", { hasText: exactly(text) });

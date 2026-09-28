@@ -7,6 +7,7 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
 import dev.arc.engine.validation.CompiledGraph;
+import dev.arc.engine.validation.ExpressionPositions;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
@@ -211,11 +212,13 @@ final class GraphExecution {
       return Handles.DEFAULT;
     }
 
+    // A value error names the position it failed in, as static diagnostics name it; a limit or
+    // the deadline keeps its message, which withContext decides.
     private Object selector(Node node, Map<String, Object> scope) {
       try {
         return switchValue(eval(node.selector(), scope));
       } catch (ArcException error) {
-        throw inContext(error, "Selector");
+        throw error.withContext(ExpressionPositions.SELECTOR);
       }
     }
 
@@ -226,7 +229,7 @@ final class GraphExecution {
             ? Expressions.bool(value)
             : Expressions.equal(selector, switchValue(value));
       } catch (ArcException error) {
-        throw inContext(error, "Case " + option.label());
+        throw error.withContext(ExpressionPositions.switchCase(option));
       }
     }
 
@@ -237,7 +240,7 @@ final class GraphExecution {
         try {
           transformed.put(field.name(), eval(field.expression(), scope));
         } catch (ArcException error) {
-          throw inContext(error, "Field " + field.name());
+          throw error.withContext(ExpressionPositions.transformField(field));
         }
       }
       return Expressions.bounded(transformed);
@@ -250,8 +253,7 @@ final class GraphExecution {
           try {
             inputs.put(binding.getKey(), eval(binding.getValue(), scope));
           } catch (ArcException error) {
-            // Names the failed binding, as fields and cases are named; limits keep their message.
-            throw inContext(error, binding.getKey());
+            throw error.withContext(ExpressionPositions.referenceBinding(binding.getKey()));
           }
         }
       }
@@ -328,15 +330,17 @@ final class GraphExecution {
   }
 
   private static String outputField(Node node) {
-    if (node.outputName() != null && !node.outputName().isEmpty()) return node.outputName();
+    String name = node.outputFieldName();
+    if (name != null) return name;
     String expression = node.expression().trim();
     return Identifiers.isValid(expression) ? expression : node.id();
   }
 
   private static Object namedOutput(Node node, Object value) {
-    if (node.outputName() == null || node.outputName().isEmpty()) return value;
+    String name = node.outputFieldName();
+    if (name == null) return value;
     var named = new LinkedHashMap<String, Object>();
-    named.put(node.outputName(), value);
+    named.put(name, value);
     return named;
   }
 
@@ -344,11 +348,6 @@ final class GraphExecution {
     if (!(value instanceof Boolean || value instanceof Number || value instanceof String))
       throw ArcException.invalid("Expected a boolean, number or string");
     return value;
-  }
-
-  /** Names the failing field or case; exhausted budgets and the deadline keep their message. */
-  private static ArcException inContext(ArcException error, String context) {
-    return error.recoverable() ? error.withContext(context) : error;
   }
 
   private void checkStepBudget() {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ruleApi } from "../api/rules";
 import { errorMessage } from "../api/errors";
+import { rulePath } from "./routing";
 
 /**
  * Opens Code studio for the rule in view, else the last rule opened in this
@@ -36,7 +37,7 @@ export function useCodeStudioTarget({
   const open = async () => {
     const known = routeRuleId ?? lastOpened;
     if (known) {
-      navigate(`/studio/${known}`);
+      navigate(rulePath({ ruleId: known, mode: "code" }));
       return;
     }
     if (lookup.current && !lookup.current.signal.aborted) return;
@@ -49,7 +50,7 @@ export function useCodeStudioTarget({
       );
       if (controller.signal.aborted) return;
       const [newest] = latest.items;
-      if (newest) navigate(`/studio/${newest.id}`);
+      if (newest) navigate(rulePath({ ruleId: newest.id, mode: "code" }));
       else createRule();
     } catch (failure) {
       if (!controller.signal.aborted)

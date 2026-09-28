@@ -19,9 +19,12 @@
 }
 .preview-connection {
   fill: none;
-  stroke: #879e93;
+  stroke: var(--color-preview-connection);
   stroke-width: 1.2;
   vector-effect: non-scaling-stroke;
+}
+.preview-arrowhead {
+  fill: var(--color-preview-connection);
 }
 /* Node kind colours, shared with the canvas icons. */
 .preview-node-input {

@@ -9,6 +9,10 @@ import {
 } from "../../src/domain/executionInputs";
 import { DecimalNumber, stringifyJson } from "../../src/domain/json";
 import { referenceSnippet } from "../../src/features/studio/snippets";
+import {
+  defaultExecutionOptions,
+  executionTimeoutChoicesMs,
+} from "../../src/features/execution/executionOptions";
 import type { Definition, Input } from "../../src/types";
 
 const endpoint = "https://arc.example/api/rules/rule/execute";
@@ -176,4 +180,11 @@ test("rule inputs and source parameters share typed sample values", () => {
     [parameter("toString", "NUMBER"), 150],
   ] as const)
     expect(sampleValue(input), input.name).toEqual(value);
+});
+
+test("the offered execution timeouts include the default both surfaces start from", () => {
+  expect(executionTimeoutChoicesMs).toContain(
+    defaultExecutionOptions.timeoutMs,
+  );
+  expect(defaultExecutionOptions).toEqual({ trace: true, timeoutMs: 30_000 });
 });

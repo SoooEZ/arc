@@ -38,6 +38,33 @@ class DefinitionTest {
     assertThat(new Definition(1, List.of(), nodes, List.of()).inputNode()).containsSame(input);
   }
 
+  /** An unfinished draft leaves a name null or empty; both mean that no name is chosen yet. */
+  @Test
+  void emptyAndMissingResultAndOutputNamesAreBothUnset() {
+    for (String unset : Arrays.asList(null, "")) {
+      var node = nodeOf("n", "FORMULA", "N").output(unset).outputName(unset).build();
+      assertThat(node.resultName()).as(String.valueOf(unset)).isNull();
+      assertThat(node.outputFieldName()).as(String.valueOf(unset)).isNull();
+    }
+    var named = nodeOf("n", "OUTPUT", "N").output("total").outputName("payable").build();
+    assertThat(named.resultName()).isEqualTo("total");
+    assertThat(named.outputFieldName()).isEqualTo("payable");
+  }
+
+  /** The one rule behind Reference bindings, {@code @id:version} arguments and source mappings. */
+  @Test
+  void anInputNeedsACallerValueOnlyWhenRequiredWithoutADefaultOrASource() {
+    var source = new SourceBinding("rates", 1, Map.of(), "", "FAIL");
+    for (boolean required : new boolean[] {true, false})
+      for (Object defaultValue : Arrays.asList(null, 0))
+        for (SourceBinding binding : Arrays.asList(null, source)) {
+          var input = new Input("amount", "NUMBER", required, defaultValue, binding);
+          assertThat(input.needsCallerValue())
+              .as(input.toString())
+              .isEqualTo(required && defaultValue == null && binding == null);
+        }
+  }
+
   @Test
   void aDetachedCopyKeepsEveryFieldButSharesNoCollectionWithTheCaller() {
     var items = new ArrayList<Object>(List.of(new BigDecimal("1")));

@@ -1,8 +1,8 @@
 import type { Edge } from "@xyflow/react";
 import type { Definition, Execution, RuleNode } from "../../../types";
-import { nodeWidth, sourcePorts } from "../../../domain/nodePorts";
+import { nodeWidth, sourcePort } from "../../../domain/nodePorts";
 import type { FlowNode } from "./GraphNode";
-import { defaultNodeSize, type NodeSizes } from "./graphGeometry";
+import { cardSize, type NodeSizes } from "./graphGeometry";
 
 /** A card as an obstacle for edge routing, in flow coordinates. */
 export interface CardBounds {
@@ -16,10 +16,7 @@ export interface CardBounds {
 /** Card bounds from saved positions and measured sizes (default size until measured). */
 export function cardBounds(nodes: RuleNode[], sizes: NodeSizes): CardBounds[] {
   return nodes.map((node) => {
-    const size = sizes.get(node.id) ?? {
-      width: nodeWidth(node),
-      height: defaultNodeSize.height,
-    };
+    const size = cardSize(node, sizes);
     return {
       id: node.id,
       x: node.position.x,
@@ -103,12 +100,14 @@ const edgeLabelStyles = {
   fallback: { fill: "#956a4a", fontSize: 10, fontWeight: 550 },
   ordinary: { fill: "#47765d", fontSize: 10, fontWeight: 550 },
 };
-const edgeLabelBackground = { fill: "#f8faf8", fillOpacity: 1 };
+// The canvas token: a custom property resolves in the SVG style attribute.
+const edgeLabelBackground = { fill: "var(--color-canvas)", fillOpacity: 1 };
 const edgeLabelPadding: [number, number] = [5, 3];
 
-function edgeStroke(active: boolean, sourceHandle: string): string {
+/** A fallback exit (False, Default) draws in the caption's brown; an active edge in the trace green. */
+function edgeStroke(active: boolean, fallback: boolean): string {
   if (active) return "#278765";
-  return sourceHandle === "false" ? "#b7a696" : "#a5b4ae";
+  return fallback ? "#b7a696" : "#a5b4ae";
 }
 
 export function flowEdges(
@@ -121,11 +120,10 @@ export function flowEdges(
     const selected = inputs.selectedEdge === edge.id;
     const active = inputs.taken.has(branchKey(edge.source, edge.sourceHandle));
     const source = nodes.get(edge.source);
-    const label =
-      (source &&
-        sourcePorts(source).find((port) => port.id === edge.sourceHandle)
-          ?.label) ||
-      undefined;
+    // The port the edge leaves through: its label and whether it is the fallback exit.
+    const port = source && sourcePort(source, edge.sourceHandle);
+    const label = port?.label || undefined;
+    const fallback = port?.fallback ?? false;
     const earlier = previous.get(edge.id);
     if (
       earlier &&
@@ -134,7 +132,9 @@ export function flowEdges(
       earlier.sourceHandle === edge.sourceHandle &&
       earlier.selected === selected &&
       earlier.animated === active &&
-      earlier.label === label
+      earlier.label === label &&
+      earlier.labelStyle ===
+        (fallback ? edgeLabelStyles.fallback : edgeLabelStyles.ordinary)
     )
       return earlier;
     return {
@@ -143,14 +143,13 @@ export function flowEdges(
       selected,
       animated: active,
       style: {
-        stroke: edgeStroke(active, edge.sourceHandle),
+        stroke: edgeStroke(active, fallback),
         strokeWidth: active || selected ? 2.3 : 1.6,
       },
       label,
-      labelStyle:
-        edge.sourceHandle === "false"
-          ? edgeLabelStyles.fallback
-          : edgeLabelStyles.ordinary,
+      labelStyle: fallback
+        ? edgeLabelStyles.fallback
+        : edgeLabelStyles.ordinary,
       labelBgStyle: edgeLabelBackground,
       labelBgPadding: edgeLabelPadding,
     };

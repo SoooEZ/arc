@@ -58,7 +58,50 @@ export function isJsonObject(value: unknown): value is Record<string, unknown> {
   );
 }
 
-const decimalParts = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
+/**
+ * Decimal text as users type it: "+1", ".5", "5." and "1e3" are numbers; "1e",
+ * "." and "0x10" are not. JSON number tokens are a subset. This is the one
+ * grammar for typed decimals; numeric defaults and the codec both read it.
+ */
+const decimalGrammar = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
+
+export interface DecimalParts {
+  negative: boolean;
+  /** The digits before the point, as written (leading zeros included). */
+  integer: string;
+  /** The digits after the point, as written (trailing zeros included). */
+  fraction: string;
+  exponent: bigint;
+}
+
+/** The parts of typed decimal text, or null when it is not a number. */
+export function decimalTextParts(text: string): DecimalParts | null {
+  const parts = decimalGrammar.exec(text);
+  if (!parts) return null;
+  const [, sign, integer, fraction = "", exponent = "0"] = parts;
+  if (!integer && !fraction) return null;
+  return {
+    negative: sign === "-",
+    integer,
+    fraction,
+    exponent: BigInt(exponent),
+  };
+}
+
+/**
+ * The written digits without leading zeros, and how many of them are trailing
+ * zeros: "012.50" -> "1250" with one trailing zero. A zero has no digits.
+ */
+export function significantDigits({ integer, fraction }: DecimalParts): {
+  digits: string;
+  trailingZeros: number;
+} {
+  const digits = (integer + fraction).replace(/^0+/, "");
+  return {
+    digits,
+    trailingZeros: digits.length - digits.replace(/0+$/, "").length,
+  };
+}
 
 interface Decimal {
   /** Coefficient/exponent form of the value, e.g. "-012.50e1" -> "-125e0"; "0" for every zero. */
@@ -68,18 +111,19 @@ interface Decimal {
 }
 
 function decimal(text: string): Decimal | null {
-  const parts = decimalParts.exec(text);
+  const parts = decimalTextParts(text);
   if (!parts) return null;
-  const [, sign, integer, fraction = "", exponent = "0"] = parts;
-  if (!integer && !fraction) return null;
-  const scale = BigInt(fraction.length) - BigInt(exponent);
+  const scale = BigInt(parts.fraction.length) - parts.exponent;
   const places = scale > 0n ? scale : 0n;
-  const digits = (integer + fraction).replace(/^0+/, "");
+  const { digits, trailingZeros } = significantDigits(parts);
   // Zero has one value whatever its sign or exponent; only its places remain.
   if (!digits) return { value: "0", places };
-  const coefficient = digits.replace(/0+$/, "");
-  const power = -scale + BigInt(digits.length - coefficient.length);
-  return { value: `${sign === "-" ? "-" : ""}${coefficient}e${power}`, places };
+  const coefficient = digits.slice(0, digits.length - trailingZeros);
+  const power = -scale + BigInt(trailingZeros);
+  return {
+    value: `${parts.negative ? "-" : ""}${coefficient}e${power}`,
+    places,
+  };
 }
 
 /**

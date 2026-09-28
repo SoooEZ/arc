@@ -106,12 +106,8 @@ public class RuleExecutionService {
       definitions.validateSources(
           prepared.definition(),
           resolver,
-          (sourceId, sourceVersion) -> {
-            deadline.check();
-            var source = sourceSession.definition(sourceId, sourceVersion);
-            deadline.check();
-            return source;
-          });
+          (sourceId, sourceVersion) ->
+              deadline.within(() -> sourceSession.definition(sourceId, sourceVersion)));
     } catch (ArcException error) {
       // A published version names itself in its root location, as its runtime failures do; a
       // preview (null version) keeps the shown graph's locations unnamed.
@@ -132,23 +128,20 @@ public class RuleExecutionService {
         id, version, result, new Timing(preparationMicros, result.durationMicros(), totalMicros));
   }
 
+  /**
+   * Every definition read runs inside the deadline, so an expired request starts no later query.
+   */
   private RuleResolver resolver(ExecutionDeadline deadline) {
     return new MemoizingRuleResolver(
         new RuleResolver() {
           @Override
           public Definition resolve(String id, int version) {
-            deadline.check();
-            Definition definition = rules.resolve(id, version);
-            deadline.check();
-            return definition;
+            return deadline.within(() -> rules.resolve(id, version));
           }
 
           @Override
           public Definition resolveFormula(String id, int version) {
-            deadline.check();
-            Definition definition = rules.resolveFormula(id, version);
-            deadline.check();
-            return definition;
+            return deadline.within(() -> rules.resolveFormula(id, version));
           }
         });
   }

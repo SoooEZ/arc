@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import dev.arc.engine.ExecutionDeadline;
+import dev.arc.engine.Limits;
 import dev.arc.engine.ValueText;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
@@ -196,7 +197,8 @@ public class HttpSource implements AutoCloseable {
     try (var stream = response.getEntity().getContent()) {
       body = stream.readNBytes(MAX_RESPONSE_BYTES + 1);
       if (body.length > MAX_RESPONSE_BYTES)
-        throw abort(request, "HTTP source response exceeds 1 MiB");
+        throw abort(
+            request, "HTTP source response exceeds " + Limits.formatBytes(MAX_RESPONSE_BYTES));
     }
     return Expressions.bounded(responses.readValue(body));
   }

@@ -7,20 +7,24 @@ import {
   DialogContent,
   DialogTitle,
 } from "@mui/material";
-import SourcesPage from "./SourcesPage";
+import SourceWorkspace from "./SourceWorkspace";
+import { unsavedSourceWarning, useSourceEditor } from "./useSourceEditor";
 
+/**
+ * The source editor inside a rule editor. The dialog owns the controller, so
+ * Close reads the editor's own dirty and pending state; route changes and
+ * page unloads are guarded by the editor's navigation guards.
+ */
 export default function SourceManagerDialog({
   onClose,
 }: {
   onClose: () => void;
 }) {
-  const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  // Route changes and page unloads are guarded by the source editor's navigation guard.
+  const editor = useSourceEditor({ notify: setNotice });
   const close = () => {
-    if (busy) return;
-    if (dirty && !window.confirm("Discard unsaved source changes?")) return;
+    if (editor.pending) return;
+    if (editor.dirty && !window.confirm(unsavedSourceWarning)) return;
     onClose();
   };
   return (
@@ -39,13 +43,13 @@ export default function SourceManagerDialog({
             {notice}
           </Alert>
         )}
-        <SourcesPage onDirty={setDirty} onBusy={setBusy} notify={setNotice} />
+        <SourceWorkspace editor={editor} />
       </DialogContent>
       <DialogActions>
-        {busy && (
+        {editor.pending && (
           <span role="status">Wait for the source operation to finish.</span>
         )}
-        <Button onClick={close} disabled={busy}>
+        <Button onClick={close} disabled={editor.pending}>
           Close data sources
         </Button>
       </DialogActions>

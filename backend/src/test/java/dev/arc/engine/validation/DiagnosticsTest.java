@@ -9,6 +9,7 @@ import dev.arc.error.ArcException;
 import dev.arc.error.ArcException.Location;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleSamples;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -199,7 +200,7 @@ class DiagnosticsTest {
 
   @Test
   void inputCyclesNameTheFirstDeclaredInput() {
-    var blank = RuleSamples.blank("FORMULA");
+    var blank = RuleSamples.blank(RuleKind.FORMULA);
     var zeta =
         new Input(
             "zeta",

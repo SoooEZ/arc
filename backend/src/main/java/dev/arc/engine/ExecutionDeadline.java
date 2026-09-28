@@ -2,6 +2,7 @@ package dev.arc.engine;
 
 import dev.arc.error.ArcException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /** One monotonic deadline shared by preparation, nested rules, and provider calls. */
 public final class ExecutionDeadline {
@@ -29,6 +30,19 @@ public final class ExecutionDeadline {
 
   public void check() {
     remainingNanos();
+  }
+
+  /**
+   * Runs a read or an evaluation inside the deadline: no work starts after expiry, and a value that
+   * arrives after it is discarded with the deadline error, whichever reader or resolver returned
+   * it. Work already in flight, such as a JDBC query, is not interrupted. An error the work throws
+   * propagates unchanged.
+   */
+  public <T> T within(Supplier<T> work) {
+    check();
+    T value = work.get();
+    check();
+    return value;
   }
 
   /** Round up so a transport timer never cancels before this deadline has expired. */

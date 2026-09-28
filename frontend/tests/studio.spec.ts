@@ -446,9 +446,11 @@ for (const [name, command] of Object.entries(commands)) {
     await expect(editorLines(code)).toContainText("return 10;");
     // A trailing comment is hoisted into the header by the canonical renderer.
     await page.locator(".monaco-editor").click({ position: { x: 300, y: 60 } });
-    await page.keyboard.press(
-      process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End",
+    // Monaco binds "go to document end" per platform (Cmd+Down on macOS).
+    const mac = (await page.evaluate(() => navigator.platform)).startsWith(
+      "Mac",
     );
+    await page.keyboard.press(mac ? "Meta+ArrowDown" : "Control+End");
     await page.keyboard.press("End");
     await page.keyboard.press("Enter");
     await page.keyboard.type("// note");

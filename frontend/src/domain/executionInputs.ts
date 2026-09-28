@@ -1,4 +1,4 @@
-import type { Definition, ExecutionOptions, Input } from "../types";
+import type { Definition, ExecutionOptions, Input, InputType } from "../types";
 import { isJsonObject, parseJsonObject, stringifyJson } from "./json";
 
 /** Placeholder text that makes the bundled pricing rule and tax lookup take a meaningful path. */
@@ -11,19 +11,17 @@ const sampleNumbers = new Map([["rate", 0.1]]);
 /** Example value for a rule input or source parameter: its default, else a typed placeholder. */
 export function sampleValue(parameter: Input): unknown {
   if (parameter.defaultValue != null) return parameter.defaultValue;
-  switch (parameter.type) {
-    case "NUMBER":
-      return sampleNumbers.get(parameter.name) ?? 150;
-    case "STRING":
-      return sampleTexts.get(parameter.name) ?? "example";
-    case "BOOLEAN":
-      return true;
-    case "ARRAY":
-      return [];
-    case "OBJECT":
-      return {};
-  }
+  return samplePlaceholders[parameter.type](parameter.name);
 }
+
+// Exhaustive: a new input type fails to compile until it has a placeholder.
+const samplePlaceholders: Record<InputType, (name: string) => unknown> = {
+  NUMBER: (name) => sampleNumbers.get(name) ?? 150,
+  STRING: (name) => sampleTexts.get(name) ?? "example",
+  BOOLEAN: () => true,
+  ARRAY: () => [],
+  OBJECT: () => ({}),
+};
 
 /** Example inputs: required or defaulted inputs that no data source supplies. */
 export function sampleInputs(definition: Definition): Record<string, unknown> {

@@ -15,7 +15,7 @@ import {
   type GraphProblem,
 } from "../../api/errors";
 import { useNavigationGuard } from "../../app/navigationGuards";
-import { leavesRuleDocument } from "../../app/routing";
+import { leavesRuleDocument, pagePath, rulePath } from "../../app/routing";
 import type { Definition, Rule } from "../../types";
 import { ruleSnapshot, type DefinitionChange } from "../../domain/graph";
 import { documentReducer, initialDocument } from "./documentState";
@@ -275,7 +275,7 @@ export function useRuleDocument({
     // Code cannot open while a default is invalid: return to the graph.
     if (mode !== "code" || !hasInvalidDefaults) return;
     setError(invalidDefaultMessage("changing views"));
-    redirect(`/rules/${rule.id}`);
+    redirect(rulePath({ ruleId: rule.id, version: requestedVersion }));
   }, [mode, hasInvalidDefaults, redirect, rule.id]);
   // The code view shows the draft rendered as ARC Script.
   useEffect(() => {
@@ -307,6 +307,7 @@ export function useRuleDocument({
     sourceDirty,
     buildCode,
     ruleId: rule.id,
+    requestedVersion,
     redirect,
     runTask,
   });
@@ -315,6 +316,7 @@ export function useRuleDocument({
     sourceDirty,
     buildCode,
     ruleId: rule.id,
+    requestedVersion,
     redirect,
     runTask,
   };
@@ -328,7 +330,13 @@ export function useRuleDocument({
     if (mode !== "graph" || busy !== "" || !current.current.sourceDirty) return;
     const latest = current.current;
     if (latest.source !== null && latest.source === failedArrival.current) {
-      latest.redirect(`/studio/${latest.ruleId}`);
+      latest.redirect(
+        rulePath({
+          ruleId: latest.ruleId,
+          mode: "code",
+          version: latest.requestedVersion,
+        }),
+      );
       return;
     }
     void latest.runTask("switch", async (signal) => {
@@ -337,7 +345,13 @@ export function useRuleDocument({
       } catch (failure) {
         if (!signal.aborted) {
           failedArrival.current = latest.source;
-          latest.redirect(`/studio/${latest.ruleId}`);
+          latest.redirect(
+            rulePath({
+              ruleId: latest.ruleId,
+              mode: "code",
+              version: latest.requestedVersion,
+            }),
+          );
         }
         throw failure;
       }
@@ -352,7 +366,11 @@ export function useRuleDocument({
       if (view === "code") await buildCode();
       signal.throwIfAborted();
       navigate(
-        `/${view === "code" ? "rules" : "studio"}/${rule.id}${requestedVersion ? `?version=${requestedVersion}` : ""}`,
+        rulePath({
+          ruleId: rule.id,
+          mode: view === "code" ? "graph" : "code",
+          version: requestedVersion,
+        }),
       );
     });
   const acknowledge = (submitted: Rule, response: Rule) => {
@@ -465,7 +483,7 @@ export function useRuleDocument({
       notify(`Rule ${rule.id} deleted`);
       if (signal.aborted) return;
       onDirty(false);
-      navigate("/library");
+      navigate(pagePath("library"));
     });
     return refusal;
   };

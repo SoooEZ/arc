@@ -5,7 +5,7 @@ import dev.arc.engine.InputTypes;
 import dev.arc.engine.Limits;
 import dev.arc.engine.SourceReader;
 import dev.arc.engine.expression.Expressions;
-import dev.arc.engine.validation.Validator;
+import dev.arc.engine.validation.ExpressionPositions;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.*;
 import java.util.*;
@@ -106,11 +106,10 @@ public final class Parameters {
           argumentValues.put(
               argument.getKey(), argument.getValue().evaluate(resolved, deadline, formulas));
         } catch (ArcException error) {
-          // Named like the static diagnostic; limits and the deadline keep their plain message.
+          // Named like the static diagnostic; an expired deadline is reported as such first.
           deadline.check();
-          if (!error.recoverable()) throw error;
           throw error.withContext(
-              Validator.sourceMappingLabel(parameter.name(), argument.getKey()));
+              ExpressionPositions.sourceMapping(parameter.name(), argument.getKey()));
         }
       }
       if (++fetches > Limits.MAX_SOURCE_READS)
@@ -118,7 +117,8 @@ public final class Parameters {
       Object value;
       String status = "RESOLVED";
       try {
-        value = readWithin(deadline, source, argumentValues);
+        // A value that arrives after the deadline is never used, whichever reader returned it.
+        value = deadline.within(() -> sources.read(source, argumentValues, deadline));
         if (value == null && parameter.required())
           throw ArcException.invalid("Source returned null for required input");
         if (value != null) value = InputTypes.check(parameter.name(), parameter.type(), value);
@@ -132,15 +132,6 @@ public final class Parameters {
       }
       long durationMicros = (System.nanoTime() - start) / 1000;
       reads.add(new Read(parameter.name(), source.id(), source.version(), status, durationMicros));
-      return value;
-    }
-
-    /** A value that arrives after the deadline is never used, whichever reader returned it. */
-    private Object readWithin(
-        ExecutionDeadline deadline, SourceBinding source, Map<String, Object> arguments) {
-      deadline.check();
-      Object value = sources.read(source, arguments, deadline);
-      deadline.check();
       return value;
     }
 

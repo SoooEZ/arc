@@ -86,7 +86,7 @@ class FormulaSourceContractsTest {
                         Map.of(),
                         null,
                         0)));
-      assertThatThrownBy(() -> validator.validate(parent, resolver))
+      assertThatThrownBy(() -> validator.validatePinnedContracts(parent, resolver))
           .isInstanceOfSatisfying(
               ArcException.class,
               error -> {

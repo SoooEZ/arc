@@ -147,3 +147,18 @@ node last OUTPUT "Last" { return reused; as reused; }`,
     { text: "reused", kind: "variable" },
   ]);
 });
+
+test("a declaration's type reads in any case, as the server's grammar does", () => {
+  for (const type of ["NUMBER", "number", "Number"])
+    expect(
+      names(
+        `inputs { amount: ${type} required; }
+node out OUTPUT "Result" { return amount * 2; }`,
+        true,
+      ),
+      type,
+    ).toEqual([
+      { text: "amount", kind: "parameter" },
+      { text: "amount", kind: "parameter" },
+    ]);
+});

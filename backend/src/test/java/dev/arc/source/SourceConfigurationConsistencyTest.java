@@ -105,16 +105,22 @@ class SourceConfigurationConsistencyTest {
   void providersRejectConfigurationTheyDoNotUse() {
     // HTTP entries were stored unbounded: {"a":1E+5000} was inserted, and the read-back of the
     // new version failed with a 500 that rolled the write back.
-    var http =
-        new SourceDefinition(
-            "HTTP",
-            "https://example.test/rates",
-            List.of(),
-            Map.of("a", new BigDecimal("1E+5000")),
-            null,
-            1000);
-    assertThatThrownBy(() -> service.create(new SourceService.Create("remote", "Remote", http)))
-        .hasMessage("HTTP sources do not use lookup entries");
+    for (Map<String, Object> entries :
+        List.of(
+            Map.<String, Object>of("a", new BigDecimal("1E+5000")),
+            Map.<String, Object>of("unused", Map.of("deep", List.of(1, 2, 3))))) {
+      var http =
+          new SourceDefinition(
+              "HTTP", "https://example.test/rates", List.of(), entries, null, 1000);
+      assertThatThrownBy(() -> service.create(new SourceService.Create("remote", "Remote", http)))
+          .as(entries.toString())
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(422);
+                assertThat(error.getMessage()).isEqualTo("HTTP sources do not use lookup entries");
+              });
+    }
     var lookupWithUrl =
         new SourceDefinition(
             "LOOKUP",
@@ -193,7 +199,13 @@ class SourceConfigurationConsistencyTest {
     }
 
     @Override
-    public DataSource update(String id, String name, int revision, SourceDefinition definition) {
+    public int lock(String id) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public DataSource appendVersion(
+        String id, String name, int currentVersion, SourceDefinition definition) {
       throw new UnsupportedOperationException();
     }
   }

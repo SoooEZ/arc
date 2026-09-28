@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.execution.Parameters;
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.Rule;
@@ -81,6 +82,44 @@ class PayloadSnapshotTest {
                         + "\"executedSteps\":7,\"traceBytes\":321,"
                         + "\"timing\":{\"preparationMicros\":10,\"executionMicros\":1234,"
                         + "\"totalMicros\":1300}}"));
+  }
+
+  /**
+   * Every error body has the documented fields in the documented order on every JVM: a graph error
+   * with its locations, a 404 and the 400 for malformed JSON with empty issues and locations.
+   */
+  @Test
+  void errorBodiesKeepTheDocumentedFieldOrder() throws Exception {
+    when(rules.get("missing")).thenThrow(new ArcException(404, "Rule not found: missing"));
+    mvc.perform(get("/api/rules/missing"))
+        .andExpect(status().isNotFound())
+        .andExpect(
+            content()
+                .string(
+                    "{\"status\":404,\"message\":\"Rule not found: missing\","
+                        + "\"issues\":[\"Rule not found: missing\"],\"locations\":[]}"));
+    when(execution.preview(any()))
+        .thenThrow(
+            ArcException.invalid("Missing required input: amount")
+                .atNode("preview", null, "input", "Inputs"));
+    mvc.perform(
+            post("/api/preview").contentType(MediaType.APPLICATION_JSON).content("{\"inputs\":{}}"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(
+            content()
+                .string(
+                    "{\"status\":422,\"message\":\"Missing required input: amount\","
+                        + "\"issues\":[\"Missing required input: amount\"],"
+                        + "\"locations\":[{\"ruleId\":\"preview\",\"version\":null,"
+                        + "\"nodeId\":\"input\",\"label\":\"Inputs\"}]}"));
+    mvc.perform(
+            post("/api/preview").contentType(MediaType.APPLICATION_JSON).content("{\"inputs\":"))
+        .andExpect(status().isBadRequest())
+        .andExpect(
+            content()
+                .string(
+                    "{\"status\":400,\"message\":\"Request contains malformed JSON or an invalid"
+                        + " value\",\"issues\":[],\"locations\":[]}"));
   }
 
   @Test

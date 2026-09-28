@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -144,5 +145,24 @@ class ResourceErrorsTest {
     mvc.perform(get("/api/rules/misspelled/versions"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.message").value("Rule not found: misspelled"));
+  }
+
+  /** A missing source is the same 404 on every path, including a save and a version read. */
+  @Test
+  void anUnknownSourceIsNotFoundWhenSavedOrReadByVersion() throws Exception {
+    mvc.perform(
+            put("/api/sources/misspelled")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"name":"Renamed","revision":1,"definition":
+                      {"kind":"LOOKUP","parameters":[],"entries":{},"timeoutMs":3000}}
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.message").value("Source not found"));
+    mvc.perform(get("/api/sources/misspelled/versions/3"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.message").value("Source not found"));
+    verify(jdbc, never()).update(anyString(), any(Object[].class));
   }
 }

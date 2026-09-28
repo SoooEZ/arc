@@ -529,7 +529,8 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataSource'}
-        '409': {description: Stale revision (Source changed in another editor; reload before saving)}
+        '404': {description: Source not found (unknown source ID)}
+        '409': {description: Stale revision (Source changed in another editor; reload before saving), checked before the configuration is validated}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         default: {$ref: '#/components/responses/Error'}
   /sources/{id}/versions:
@@ -557,6 +558,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataSource'}
+        '404': {description: Source not found (unknown source ID), or Data source version not found for a known source}
         default: {$ref: '#/components/responses/Error'}
   /sources/{id}/test:
     parameters:
@@ -893,7 +895,7 @@ components:
       required: [kind, parameters, timeoutMs]
       properties:
         kind: {type: string, enum: [LOOKUP, HTTP]}
-        url: {type: string, maxLength: 2000}
+        url: {type: string, maxLength: 2000, description: 'HTTP only: a LOOKUP definition with a non-blank url is refused with 422 "Lookup tables do not use a URL"'}
         parameters:
           type: array
           maxItems: 20
@@ -905,7 +907,7 @@ components:
               type: {type: string, enum: [NUMBER, STRING, BOOLEAN]}
               required: {type: boolean}
               defaultValue: {nullable: true}
-        entries: {type: object, maxProperties: 1000, additionalProperties: true}
+        entries: {type: object, maxProperties: 1000, additionalProperties: true, description: 'LOOKUP only: an HTTP definition with non-empty entries is refused with 422 "HTTP sources do not use lookup entries"'}
         secretHeaders: {type: object, maxProperties: 10, additionalProperties: {type: string}, description: 'Header names mapped to ARC_SECRET_ environment aliases; never raw credentials. HTTP only: LOOKUP definitions omit it or send {}. Names and aliases must not be null.'}
         timeoutMs: {type: integer, minimum: 100, maximum: 10000}
     DataSource:

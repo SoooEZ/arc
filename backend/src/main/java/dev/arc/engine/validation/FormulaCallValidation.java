@@ -16,7 +16,7 @@ final class FormulaCallValidation {
         throw ArcException.invalid(name + " accepts at most " + inputs.size() + " arguments");
       for (int index = call.argumentCount(); index < inputs.size(); index++) {
         var input = inputs.get(index);
-        if (input.required() && input.defaultValue() == null && input.source() == null)
+        if (input.needsCallerValue())
           throw ArcException.invalid(
               name + " needs argument " + (index + 1) + " (" + input.name() + ")");
       }

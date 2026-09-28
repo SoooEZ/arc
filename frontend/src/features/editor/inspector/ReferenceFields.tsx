@@ -21,40 +21,37 @@ type RuleChoice = Pick<RuleSummary, "id" | "name" | "publishedVersion">;
 
 export default function ReferenceFields({
   node,
-  rules,
   readOnly,
   patch,
   variables,
   scopeKnown,
   onOpenReference,
 }: NodeFieldsProps) {
+  const { ruleId, version } = node;
+  // The picker's own summary is fresh; any other pin reads the rule it names,
+  // so a renamed rule shows its current name.
   const [chosenRule, setChosenRule] = useState<RuleChoice | null>(null);
-  const knownRule =
-    chosenRule?.id === node.ruleId
-      ? chosenRule
-      : rules.find((rule) => rule.id === node.ruleId);
+  const knownRule = chosenRule?.id === ruleId ? chosenRule : null;
   const selectedRule = useAsyncResource<RuleChoice | null>(
-    node.ruleId || "",
-    (signal) => ruleApi.get(node.ruleId!, { signal }),
+    ruleId || "",
+    ruleId && !knownRule ? (signal) => ruleApi.get(ruleId, { signal }) : null,
     null,
-    0,
-    !!node.ruleId && !knownRule,
   );
-  const ruleValue: RuleChoice | null = node.ruleId
+  const ruleValue: RuleChoice | null = ruleId
     ? knownRule ||
       selectedRule.data || {
-        id: node.ruleId,
-        name: node.ruleId,
-        publishedVersion: node.version ?? null,
+        id: ruleId,
+        name: ruleId,
+        publishedVersion: version ?? null,
       }
     : null;
   // The pinned version is immutable: the page-wide cache serves every selection.
   const detail = useAsyncResource<Version | null>(
-    `${node.ruleId}:${node.version}`,
-    (signal) => readRuleVersion(node.ruleId!, node.version!, signal),
+    `${ruleId}:${version}`,
+    ruleId && version
+      ? (signal) => readRuleVersion(ruleId, version, signal)
+      : null,
     null,
-    0,
-    !!node.ruleId && !!node.version,
   );
   const child = detail.data;
   const refError = selectedRule.error || detail.error;

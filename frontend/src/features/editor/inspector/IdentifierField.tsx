@@ -1,18 +1,18 @@
-import { useState } from "react";
 import { TextField } from "@mui/material";
 import {
   acceptsIdentifierEdit,
   identifierError,
   identifierGuidance,
 } from "../../../domain/identifiers";
+import { useRefusedEdit } from "../../../hooks/useRefusedEdit";
 
 /** A refused edit explains the rule; an empty optional name is valid. */
 function fieldError(
   value: string,
   optional: boolean,
-  rejectedEdit: boolean,
+  refused: boolean,
 ): string | null {
-  if (rejectedEdit) return identifierGuidance;
+  if (refused) return identifierGuidance;
   if (optional && value === "") return null;
   return identifierError(value);
 }
@@ -33,8 +33,8 @@ export default function IdentifierField({
   helperText?: string;
   onChange: (value: string) => void;
 }) {
-  const [rejectedEdit, setRejectedEdit] = useState(false);
-  const error = fieldError(value, optional, rejectedEdit);
+  const edit = useRefusedEdit(value);
+  const error = fieldError(value, optional, edit.refused);
   return (
     <TextField
       label={label}
@@ -47,17 +47,14 @@ export default function IdentifierField({
       onChange={(event) => {
         if (disabled) return;
         const name = event.target.value;
-        const accepted = acceptsIdentifierEdit(value, name);
-        setRejectedEdit(!accepted);
-        if (accepted) onChange(name);
-      }}
-      onPaste={(event) => {
-        // Single-line inputs strip tabs/newlines before onChange sees the text.
-        if (/[\s$@]/u.test(event.clipboardData.getData("text"))) {
-          event.preventDefault();
-          setRejectedEdit(true);
+        if (!acceptsIdentifierEdit(value, name)) {
+          edit.refuse();
+          return;
         }
+        edit.clear();
+        onChange(name);
       }}
+      onPaste={edit.onPaste}
     />
   );
 }

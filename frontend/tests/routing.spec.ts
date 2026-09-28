@@ -384,3 +384,85 @@ test("zooming as Arrange fits the viewport cannot leave the draft locked", async
   );
   expect(saved().draft.edges).toEqual(definition.edges);
 });
+
+test("connection labels mask the line with the canvas token", async ({
+  page,
+}) => {
+  // A Condition's True/False exits are the labelled connections.
+  await fixture(page, {
+    ...definition,
+    nodes: [
+      ...definition.nodes,
+      {
+        id: "check",
+        type: "CONDITION",
+        label: "Check",
+        expression: "true",
+        position: { x: 600, y: 200 },
+      },
+    ],
+    edges: [
+      ...definition.edges,
+      { id: "third", source: "input", target: "check", sourceHandle: "next" },
+      { id: "yes", source: "check", target: "out", sourceHandle: "true" },
+    ],
+  });
+  await page.goto("/#/rules/routing-fixture");
+  await expect(page.locator(".react-flow__edge-path")).toHaveCount(5);
+  const background = page.locator(".react-flow__edge-textbg").first();
+  await expect(background).toBeAttached();
+  const [fill, canvas] = await background.evaluate((rect) => [
+    getComputedStyle(rect).fill,
+    (() => {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--color-canvas)";
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    })(),
+  ]);
+  expect(fill).toBe(canvas);
+});
+
+test("a deep link to a wide Switch centres the whole card in the pane", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await fixture(page, {
+    ...definition,
+    nodes: [
+      ...definition.nodes,
+      {
+        id: "wide",
+        type: "SWITCH",
+        label: "Wide",
+        cases: Array.from({ length: 6 }, (_, index) => ({
+          id: `c${index}`,
+          label: `Case ${index + 1}`,
+          expression: "true",
+        })),
+        position: { x: 900, y: 900 },
+      },
+    ],
+  });
+  await page.goto("/#/rules/routing-fixture?node=wide");
+  const card = page.locator('.react-flow__node[data-id="wide"]');
+  const pane = page.locator(".react-flow__pane");
+  await expect(card).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = (await card.boundingBox())!;
+      const area = (await pane.boundingBox())!;
+      return {
+        centred: Math.abs(box.x + box.width / 2 - (area.x + area.width / 2)),
+        inside: box.x + box.width <= area.x + area.width,
+      };
+    })
+    .toEqual({ centred: expect.any(Number), inside: true });
+  const box = (await card.boundingBox())!;
+  const area = (await pane.boundingBox())!;
+  expect(
+    Math.abs(box.x + box.width / 2 - (area.x + area.width / 2)),
+  ).toBeLessThanOrEqual(1);
+});

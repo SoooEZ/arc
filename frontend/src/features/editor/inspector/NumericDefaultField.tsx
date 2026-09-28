@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
 import { TextField } from "@mui/material";
 import type { DecimalNumber } from "../../../domain/json";
 import {
   parseNumericDefault,
   sameNumericDefault,
 } from "../../../domain/numericDefaults";
+import { useParsedTextBuffer } from "../../../hooks/useParsedTextBuffer";
 
 const defaultText = (value: unknown) => (value == null ? "" : String(value));
 
@@ -19,40 +19,23 @@ export default function NumericDefaultField({
   onChange: (value: number | DecimalNumber | null) => void;
   onValidity: (valid: boolean) => void;
 }) {
-  const [text, setText] = useState(() => defaultText(value));
-  const [error, setError] = useState("");
-  const acceptedValue = useRef(value);
-  const validity = useRef(onValidity);
-  validity.current = onValidity;
-  useEffect(() => () => validity.current(true), []);
-  useEffect(() => {
-    // The field's own value returns through the draft; keep the text as typed.
-    if (sameNumericDefault(value, acceptedValue.current)) return;
-    acceptedValue.current = value;
-    setText(defaultText(value));
-    setError("");
-    validity.current(true);
-  }, [value]);
-
+  const buffer = useParsedTextBuffer<unknown, number | DecimalNumber | null>({
+    value,
+    format: defaultText,
+    parse: parseNumericDefault,
+    same: sameNumericDefault,
+    onChange,
+    onValidity,
+  });
   return (
     <TextField
       label="Default value (optional)"
-      value={text}
+      value={buffer.text}
       disabled={disabled}
-      error={!!error}
-      helperText={error}
+      error={!!buffer.error}
+      helperText={buffer.error}
       slotProps={{ htmlInput: { inputMode: "decimal" } }}
-      onChange={(event) => {
-        const raw = event.target.value;
-        setText(raw);
-        const parsed = parseNumericDefault(raw);
-        setError(parsed.valid ? "" : parsed.error);
-        onValidity(parsed.valid);
-        if (parsed.valid) {
-          acceptedValue.current = parsed.value;
-          onChange(parsed.value);
-        }
-      }}
+      onChange={(event) => buffer.change(event.target.value)}
     />
   );
 }

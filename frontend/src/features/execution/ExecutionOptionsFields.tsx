@@ -5,6 +5,7 @@ import {
   Switch,
   TextField,
 } from "@mui/material";
+import { executionTimeoutChoicesMs } from "./executionOptions";
 
 export default function ExecutionOptionsFields({
   trace,
@@ -42,7 +43,7 @@ export default function ExecutionOptionsFields({
         onChange={(event) => onTimeout(Number(event.target.value))}
         sx={{ minWidth: 155 }}
       >
-        {[1000, 5000, 10000, 30000].map((value) => (
+        {executionTimeoutChoicesMs.map((value) => (
           <MenuItem key={value} value={value}>
             {value / 1000} seconds
           </MenuItem>

@@ -90,13 +90,13 @@ final class ArcScriptRenderer {
   private String declarations(Node node) {
     return switch (node.kind()) {
       case INPUT -> ""; // The inputs block declares the Input node's parameters.
-      case FORMULA -> let(node.output(), node.expression());
+      case FORMULA -> let(node.resultName(), node.expression());
       case CONDITION -> statement("when", node.expression());
       case SWITCH -> switchDeclarations(node);
       case TRANSFORM -> transformDeclarations(node);
       case REFERENCE -> referenceDeclarations(node);
       case OUTPUT ->
-          statement("return", node.expression()) + statement("as", name(node.outputName()));
+          statement("return", node.expression()) + statement("as", node.outputFieldName());
     };
   }
 
@@ -115,13 +115,14 @@ final class ArcScriptRenderer {
   /** Field mappings and the result name, or one {@code let} for a whole-value expression. */
   private String transformDeclarations(Node node) {
     boolean fieldMapping = node.fields() != null && !node.fields().isEmpty();
-    if (!fieldMapping && node.expression() != null) return let(node.output(), node.expression());
+    if (!fieldMapping && node.expression() != null)
+      return let(node.resultName(), node.expression());
     // A Transform without an expression maps fields, even before its first field exists.
     var out = new StringBuilder();
     if (fieldMapping)
       for (Field field : node.fields())
         out.append(statement("field " + write(field.name()) + " =", field.expression()));
-    return out.append(statement("as", name(node.output()))).toString();
+    return out.append(statement("as", node.resultName())).toString();
   }
 
   private String referenceDeclarations(Node node) {
@@ -134,15 +135,14 @@ final class ArcScriptRenderer {
     if (node.bindings() != null)
       for (Map.Entry<String, String> binding : new TreeMap<>(node.bindings()).entrySet())
         out.append(statement("bind " + binding.getKey() + " =", binding.getValue()));
-    return out.append(statement("as", name(node.output()))).toString();
+    return out.append(statement("as", node.resultName())).toString();
   }
 
   /**
    * {@code let name = expression;} with either part left out while unset: {@code let total;} has no
-   * expression yet and {@code let = amount;} no result name.
+   * expression yet and {@code let = amount;} no result name ({@link Node#resultName()}).
    */
-  private static String let(String output, String expression) {
-    String name = name(output);
+  private static String let(String name, String expression) {
     if (name == null && expression == null) return "";
     String declaration = name == null ? "let" : "let " + name;
     if (expression == null) return statement(declaration, "");
@@ -153,11 +153,6 @@ final class ArcScriptRenderer {
   private static String statement(String start, String value) {
     if (value == null) return "";
     return "  " + start + (value.isEmpty() ? "" : " " + value) + ";\n";
-  }
-
-  /** Result and Output names: empty and missing both mean that no name is chosen yet. */
-  private static String name(String name) {
-    return name == null || name.isEmpty() ? null : name;
   }
 
   private String write(Object value) {

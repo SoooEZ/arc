@@ -18,11 +18,13 @@ import {
 } from "lucide-react";
 import { NodeIcon } from "../../../components/Icons";
 import type { NodeType } from "../../../types";
+import { MAX_NODES } from "../../../domain/limits";
 import { addableNodeTypes, nodeKinds } from "../../../domain/nodeKinds";
 import type { EditorCapabilities } from "../editorCapabilities";
 
 export default function GraphToolbar({
   nodeCount,
+  canAddNode,
   readOnly,
   capabilities: can,
   arranging,
@@ -34,6 +36,8 @@ export default function GraphToolbar({
   onAddNode,
 }: {
   nodeCount: number;
+  /** False once the draft holds the maximum number of nodes. */
+  canAddNode: boolean;
   /** A published version: no editing controls are offered. */
   readOnly: boolean;
   capabilities: EditorCapabilities;
@@ -92,16 +96,22 @@ export default function GraphToolbar({
           Validate
         </Button>
         {!readOnly && (
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Plus size={15} />}
-            endIcon={<ChevronDown size={13} />}
-            disabled={!can.edit}
-            onClick={(event) => setAddAnchor(event.currentTarget)}
+          <Tooltip
+            title={canAddNode ? "" : `A draft holds at most ${MAX_NODES} nodes`}
           >
-            Add node
-          </Button>
+            <span>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Plus size={15} />}
+                endIcon={<ChevronDown size={13} />}
+                disabled={!can.edit || !canAddNode}
+                onClick={(event) => setAddAnchor(event.currentTarget)}
+              >
+                Add node
+              </Button>
+            </span>
+          </Tooltip>
         )}
       </div>
       <Menu

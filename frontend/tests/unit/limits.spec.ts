@@ -1,0 +1,96 @@
+import { expect, test } from "@playwright/test";
+import {
+  canAddEdge,
+  canAddInput,
+  canAddNode,
+  MAX_DESCRIPTION_CHARACTERS,
+  MAX_EDGES,
+  MAX_INPUTS,
+  MAX_NAME_CHARACTERS,
+  MAX_NODES,
+  ruleMetadataProblem,
+} from "../../src/domain/limits";
+import { canAddSwitchDefaultReturn } from "../../src/domain/switchBranches";
+import { connectGraphNodes } from "../../src/domain/graph";
+import type { Definition, RuleEdge, RuleNode } from "../../src/types";
+
+const node = (id: string): RuleNode => ({
+  id,
+  type: "FORMULA",
+  label: id,
+  expression: "1",
+  position: { x: 0, y: 0 },
+});
+const filled = (nodes: number, edges: number, inputs = 0): Definition => ({
+  schemaVersion: 1,
+  inputs: Array.from({ length: inputs }, (_, index) => ({
+    name: `p${index}`,
+    type: "NUMBER",
+    required: true,
+    defaultValue: null,
+  })),
+  nodes: Array.from({ length: nodes }, (_, index) => node(`n${index}`)),
+  edges: Array.from({ length: edges }, (_, index): RuleEdge => ({
+    id: `e${index}`,
+    source: "n0",
+    target: `n${index + 1}`,
+    sourceHandle: "next",
+  })),
+});
+
+test("the add predicates refuse exactly at the server's counts", () => {
+  expect(canAddNode(filled(MAX_NODES - 1, 0))).toBe(true);
+  expect(canAddNode(filled(MAX_NODES, 0))).toBe(false);
+  expect(canAddEdge(filled(0, MAX_EDGES - 1))).toBe(true);
+  expect(canAddEdge(filled(0, MAX_EDGES))).toBe(false);
+  expect(canAddInput(filled(0, 0, MAX_INPUTS - 1))).toBe(true);
+  expect(canAddInput(filled(0, 0, MAX_INPUTS))).toBe(false);
+});
+
+test("a full draft takes no new connection and no Default return", () => {
+  const full = {
+    ...filled(3, MAX_EDGES),
+    nodes: [
+      node("n0"),
+      { ...node("choose"), type: "SWITCH" as const, cases: [] },
+      { ...node("out"), type: "OUTPUT" as const },
+    ],
+  };
+  expect(connectGraphNodes(full, "n0", "out", "next", "new")).toBe(full);
+  expect(canAddSwitchDefaultReturn(full, "choose")).toBe(false);
+  const room = { ...full, edges: full.edges.slice(1) };
+  expect(
+    connectGraphNodes(room, "n0", "out", "next", "new").edges,
+  ).toHaveLength(MAX_EDGES);
+  expect(canAddSwitchDefaultReturn(room, "choose")).toBe(true);
+});
+
+test("rule metadata problems repeat the server's messages at its boundaries", () => {
+  expect(
+    ruleMetadataProblem({
+      name: "a".repeat(MAX_NAME_CHARACTERS),
+      description: "",
+    }),
+  ).toBeNull();
+  expect(
+    ruleMetadataProblem({
+      name: "a".repeat(MAX_NAME_CHARACTERS + 1),
+      description: "",
+    }),
+  ).toBe("Rule name must contain 1 to 160 characters");
+  expect(ruleMetadataProblem({ name: "   ", description: "" })).toBe(
+    "Rule name must contain 1 to 160 characters",
+  );
+  expect(
+    ruleMetadataProblem({
+      name: "Tax",
+      description: "d".repeat(MAX_DESCRIPTION_CHARACTERS),
+    }),
+  ).toBeNull();
+  expect(
+    ruleMetadataProblem({
+      name: "Tax",
+      description: "d".repeat(MAX_DESCRIPTION_CHARACTERS + 1),
+    }),
+  ).toBe("Description exceeds 2,000 characters");
+});

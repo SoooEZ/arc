@@ -19,6 +19,12 @@ public final class Functions {
       String origin) {}
 
   /**
+   * Decimal places, either side of the point, that {@code ROUND}, {@code ROUNDDOWN} and {@code
+   * ROUNDUP} accept.
+   */
+  static final int MAX_ROUND_DIGITS = 12;
+
+  /**
    * Functions ARC evaluates from already evaluated arguments. Lazy and collection functions are
    * evaluated by {@link ExpressionRuntime}; every other name is an Excel function for POI.
    */
@@ -51,8 +57,8 @@ public final class Functions {
 
   private static Map<String, Function<List<Object>, Object>> arcFunctions() {
     var functions = new HashMap<String, Function<List<Object>, Object>>();
-    for (String name : BuiltinFunctionCatalog.DECIMAL_AGGREGATES)
-      functions.put(name, args -> aggregate(name, args));
+    for (DecimalAggregate aggregate : DecimalAggregate.values())
+      functions.put(aggregate.name(), args -> aggregate.apply(numbers(args)));
     functions.put("OBJECT", DataFunctions::object);
     functions.put("MERGE", DataFunctions::merge);
     functions.put("TO_NUMBER", args -> DataFunctions.number(args.getFirst()));
@@ -75,23 +81,9 @@ public final class Functions {
     return Map.copyOf(functions);
   }
 
-  private static Object aggregate(String name, List<Object> args) {
-    List<BigDecimal> numbers = flatten(args).stream().map(Expressions::number).toList();
-    if (name.equals("COUNT")) return BigDecimal.valueOf(numbers.size());
-    if (numbers.isEmpty() && !name.equals("SUM") && !name.equals("MUL"))
-      throw ArcException.invalid(name + " requires values");
-    return switch (name) {
-      case "MIN" -> numbers.stream().min(BigDecimal::compareTo).orElseThrow();
-      case "MAX" -> numbers.stream().max(BigDecimal::compareTo).orElseThrow();
-      case "MUL" ->
-          numbers.stream().reduce(BigDecimal.ONE, (a, b) -> a.multiply(b, Expressions.MATH));
-      default -> {
-        var sum = numbers.stream().reduce(BigDecimal.ZERO, (a, b) -> a.add(b, Expressions.MATH));
-        yield name.equals("AVG") || name.equals("AVERAGE")
-            ? sum.divide(BigDecimal.valueOf(numbers.size()), Expressions.MATH)
-            : sum;
-      }
-    };
+  /** The numbers an aggregate receives: its arguments with nested arrays flattened. */
+  private static List<BigDecimal> numbers(List<Object> args) {
+    return flatten(args).stream().map(Expressions::number).toList();
   }
 
   private static BigDecimal round(List<Object> args, RoundingMode mode) {
@@ -101,7 +93,9 @@ public final class Functions {
     } catch (ArithmeticException e) {
       throw ArcException.invalid("Round precision must be an integer");
     }
-    if (scale < -12 || scale > 12) throw ArcException.invalid("Round precision must be -12 to 12");
+    if (scale < -MAX_ROUND_DIGITS || scale > MAX_ROUND_DIGITS)
+      throw ArcException.invalid(
+          "Round precision must be -" + MAX_ROUND_DIGITS + " to " + MAX_ROUND_DIGITS);
     return Expressions.number(args.getFirst()).setScale(scale, mode);
   }
 

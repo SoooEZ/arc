@@ -3,19 +3,33 @@ import { Alert, Button, CircularProgress, Dialog } from "@mui/material";
 import { ArrowLeft, X } from "lucide-react";
 import { ruleApi } from "../../api/rules";
 import type { GraphProblem } from "../../api/errors";
+import { parseRoute, type RuleRoute } from "../../app/routing";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
-import type { RuleSummary } from "../../types";
 import Editor from "./Editor";
 
 import type { ReferenceTarget } from "./types";
+
+/**
+ * The entry after the embedded editor navigated within its rule: the view it
+ * asked for, and the version it asked for or the viewer's pinned one.
+ */
+export function withRoute(
+  entry: ReferenceTarget,
+  route: RuleRoute,
+): ReferenceTarget {
+  return {
+    ...entry,
+    mode: route.mode,
+    version: route.version ?? entry.version,
+  };
+}
+
 export default function ReferenceDialog({
   target,
-  rules,
   problems,
   onClose,
 }: {
   target: ReferenceTarget;
-  rules: RuleSummary[];
   problems: GraphProblem[];
   onClose: () => void;
 }) {
@@ -26,6 +40,18 @@ export default function ReferenceDialog({
     (signal) => ruleApi.get(current.ruleId, { signal }),
     null,
   );
+  // The names the viewer has read; an entry shows its ID until its rule loads.
+  const [names, setNames] = useState<ReadonlyMap<string, string>>(
+    () => new Map(),
+  );
+  useEffect(() => {
+    if (!loaded) return;
+    setNames((known) =>
+      known.get(loaded.id) === loaded.name
+        ? known
+        : new Map(known).set(loaded.id, loaded.name),
+    );
+  }, [loaded]);
   const [notice, setNotice] = useState("");
   useEffect(() => setNotice(""), [current.ruleId, current.version]);
   return (
@@ -55,8 +81,7 @@ export default function ReferenceDialog({
           {stack.map((s, i) => (
             <span key={i}>
               {i > 0 && " / "}
-              {rules.find((r) => r.id === s.ruleId)?.name || s.ruleId}{" "}
-              <small>v{s.version}</small>
+              {names.get(s.ruleId) || s.ruleId} <small>v{s.version}</small>
             </span>
           ))}
         </div>
@@ -77,7 +102,6 @@ export default function ReferenceDialog({
             key={`${stack.length}:${current.ruleId}:${current.version}`}
             mode={current.mode || "graph"}
             rule={loaded}
-            rules={rules}
             requestedVersion={current.version}
             requestedNode={current.nodeId}
             embedded
@@ -97,19 +121,12 @@ export default function ReferenceDialog({
               ])
             }
             navigate={(path) => {
-              const [route, query] = path.split("?");
-              const params = new URLSearchParams(query);
-              setStack((s) =>
-                s.map((entry, i) =>
-                  i === s.length - 1
-                    ? {
-                        ...entry,
-                        mode: route.startsWith("/studio/") ? "code" : "graph",
-                        version: Number(params.get("version")) || entry.version,
-                      }
-                    : entry,
-                ),
-              );
+              const route = parseRoute(path);
+              if (route.page !== "rule") return;
+              setStack((s) => [
+                ...s.slice(0, -1),
+                withRoute(s[s.length - 1], route),
+              ]);
             }}
           />
         )

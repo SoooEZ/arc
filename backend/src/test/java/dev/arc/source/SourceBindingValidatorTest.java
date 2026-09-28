@@ -5,10 +5,14 @@ import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.error.ArcException.Location;
 import dev.arc.model.DataSource;
@@ -17,6 +21,7 @@ import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.Node;
 import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.SourceDefinition;
+import dev.arc.source.SourceBindingValidator.CalleeCheck;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +57,7 @@ class SourceBindingValidatorTest {
   @Test
   void mappingProblemsAppearOnTheInputNodeAndADraftWithoutOneStillGetsTheProblem() {
     var withInput = draft(List.of(inputNode("in", "Inputs"), outputNode("out", "Out", "1")));
-    assertThatThrownBy(() -> validator.validate(withInput, noRules))
+    assertThatThrownBy(() -> validator.validatePinnedContracts(withInput, noRules))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -62,7 +67,7 @@ class SourceBindingValidatorTest {
             });
 
     var withoutInput = draft(List.of(outputNode("out", "Out", "1")));
-    assertThatThrownBy(() -> validator.validate(withoutInput, noRules))
+    assertThatThrownBy(() -> validator.validatePinnedContracts(withoutInput, noRules))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -88,7 +93,7 @@ class SourceBindingValidatorTest {
       nodes.addAll(order);
       nodes.add(outputNode("out", "Out", "1"));
       var root = new Definition(1, List.of(), nodes, List.of());
-      assertThatThrownBy(() -> validator.validate(root, resolver))
+      assertThatThrownBy(() -> validator.validatePinnedContracts(root, resolver))
           .as(order.toString())
           .hasMessage("Rule nesting exceeds 16 levels");
     }
@@ -99,7 +104,112 @@ class SourceBindingValidatorTest {
             List.of(),
             List.of(inputNode("in", "Inputs"), direct, outputNode("out", "Out", "1")),
             List.of());
-    validator.validate(deepest, resolver);
+    validator.validatePinnedContracts(deepest, resolver);
+  }
+
+  /**
+   * The three entry points differ in where configurations come from and which pins are walked:
+   * execution reads only the session it is given, and diagnostics walk only the pins the graph
+   * checks have not reported.
+   */
+  @Test
+  void executionReadsOnlyItsSessionAndDiagnosticsWalkOnlyTheUnreportedPins() {
+    var rates =
+        new SourceDefinition(
+            "LOOKUP", null, List.of(new Input("key", "STRING", true, null)), Map.of(), null, 1000);
+    var mapped =
+        new Input(
+            "amount",
+            "NUMBER",
+            false,
+            null,
+            new SourceBinding("rates", 1, Map.of("key", "\"US\""), null, "FAIL"));
+    var root =
+        new Definition(
+            1,
+            List.of(mapped),
+            List.of(inputNode("in", "Inputs"), outputNode("out", "Out", "1")),
+            List.of());
+    var sessionReads = new ArrayList<String>();
+    SourceConfigurations session =
+        (id, version) -> {
+          sessionReads.add(id + "@" + version);
+          return rates;
+        };
+    validator.validateForExecution(root, noRules, session);
+    assertThat(sessionReads).containsExactly("rates@1");
+    verifyNoInteractions(repository);
+
+    when(repository.get("rates", 1)).thenReturn(new DataSource("rates", "Rates", 1, rates));
+    var resolved = new ArrayList<String>();
+    RuleResolver counting =
+        (id, version) -> {
+          resolved.add(id + "@" + version);
+          return leaf();
+        };
+    var reported = nodeOf("reported", "REFERENCE", "Reported").rule("bad", 1).output("a").build();
+    var walked = nodeOf("walked", "REFERENCE", "Walked").rule("good", 1).output("b").build();
+    var withPins =
+        new Definition(
+            1,
+            List.of(mapped),
+            List.of(inputNode("in", "Inputs"), reported, walked, outputNode("out", "Out", "1")),
+            List.of());
+    var unreported = List.of(Validator.dependencies(withPins).get(1));
+    assertThat(unreported.getFirst().ruleId()).isEqualTo("good");
+    validator.validateRemainingPins(withPins, counting, unreported, CalleeCheck.NONE);
+    assertThat(resolved).containsExactly("good@1");
+    verify(repository).get("rates", 1);
+  }
+
+  /**
+   * "A caller must supply this parameter" is one rule (Definition.Input.needsCallerValue): the
+   * static mapping check and the runtime normalization agree for every declaration a source
+   * parameter can have.
+   */
+  @Test
+  void staticMappingChecksAndRuntimeNormalizationAgreeOnRequiredParameters() {
+    var adapter = mock(SourceAdapter.class);
+    when(adapter.kind()).thenReturn("LOOKUP");
+    when(adapter.fetch(any(), any(), any(), any())).thenReturn("value");
+    var execution =
+        new SourceExecutionService(
+            repository, new SourceAdapters(List.of(adapter)), new JsonPointerExtractor());
+    for (boolean required : new boolean[] {true, false})
+      for (Object defaultValue : java.util.Arrays.asList(null, "US")) {
+        var parameter = new Input("key", "STRING", required, defaultValue);
+        var table = new SourceDefinition("LOOKUP", null, List.of(parameter), Map.of(), null, 1000);
+        when(repository.get("table", 1)).thenReturn(new DataSource("table", "Table", 1, table));
+        var unmapped =
+            new Input(
+                "amount",
+                "NUMBER",
+                false,
+                null,
+                new SourceBinding("table", 1, Map.of(), null, "FAIL"));
+        var graph =
+            new Definition(
+                1,
+                List.of(unmapped),
+                List.of(inputNode("in", "Inputs"), outputNode("out", "Out", "1")),
+                List.of());
+        boolean mustMap = parameter.needsCallerValue();
+        assertThat(mustMap).as(parameter.toString()).isEqualTo(required && defaultValue == null);
+        if (mustMap) {
+          assertThatThrownBy(() -> validator.validatePinnedContracts(graph, noRules))
+              .as(parameter.toString())
+              .hasMessage("amount: missing source mapping for key");
+          assertThatThrownBy(
+                  () -> execution.test("table", new SourceExecutionService.Test(Map.of(), 1)))
+              .as(parameter.toString())
+              .hasMessage("Missing source parameter: key");
+        } else {
+          validator.validatePinnedContracts(graph, noRules);
+          assertThat(execution.test("table", new SourceExecutionService.Test(Map.of(), 1)))
+              .as(parameter.toString())
+              .isEqualTo("value");
+        }
+      }
   }
 
   private static Definition referencing(String ruleId) {

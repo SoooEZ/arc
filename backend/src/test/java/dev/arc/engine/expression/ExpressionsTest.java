@@ -316,6 +316,63 @@ class ExpressionsTest {
     assertThat(Functions.arrayIndex("")).isEqualTo(-1);
   }
 
+  /**
+   * One row per constant: each aggregate and collection function owns its behavior, and the
+   * switches over them are exhaustive, so this table fails to compile for a constant it misses.
+   */
+  @Test
+  void everyDecimalAggregateAndCollectionFunctionHasItsOwnBehavior() {
+    for (DecimalAggregate aggregate : DecimalAggregate.values()) {
+      BigDecimal expected =
+          switch (aggregate) {
+            case SUM -> new BigDecimal("13");
+            case MIN -> new BigDecimal("1");
+            case MAX -> new BigDecimal("10");
+            case AVG, AVERAGE -> new BigDecimal("13").divide(new BigDecimal("3"), Expressions.MATH);
+            case COUNT -> new BigDecimal("3");
+            case MUL -> new BigDecimal("20");
+          };
+      assertThat(eval("$" + aggregate.name() + "(1, 2, 10)"))
+          .as(aggregate.name())
+          .isEqualTo(expected);
+      assertThat(eval("$" + aggregate.name() + "([1, [2, 10]])"))
+          .as(aggregate.name())
+          .isEqualTo(expected);
+      String empty = "$" + aggregate.name() + "([])";
+      switch (aggregate) {
+        case SUM, COUNT -> assertThat(eval(empty)).as(empty).isEqualTo(BigDecimal.ZERO);
+        case MUL -> assertThat(eval(empty)).as(empty).isEqualTo(BigDecimal.ONE);
+        case MIN, MAX, AVG, AVERAGE ->
+            assertThatThrownBy(() -> eval(empty))
+                .as(empty)
+                .hasMessage(aggregate.name() + " requires values");
+      }
+    }
+    for (CollectionFunction function : CollectionFunction.values()) {
+      String call =
+          switch (function) {
+            case MAP -> "$MAP([1, 2, 3], item, item * 2)";
+            case FILTER -> "$FILTER([1, 2, 3], item, item > 1)";
+            case ALL -> "$ALL([1, 2, 3], item, item > 1)";
+            case ANY -> "$ANY([1, 2, 3], item, item > 1)";
+            case REDUCE -> "$REDUCE([1, 2, 3], item, acc, 0, acc + item)";
+          };
+      Object expected =
+          switch (function) {
+            case MAP -> List.of(new BigDecimal("2"), new BigDecimal("4"), new BigDecimal("6"));
+            case FILTER -> List.of(new BigDecimal("2"), new BigDecimal("3"));
+            case ALL -> false;
+            case ANY -> true;
+            case REDUCE -> new BigDecimal("6");
+          };
+      assertThat(eval(call)).as(function.name()).isEqualTo(expected);
+    }
+    assertThat(eval("$ALL([], item, item > 1)")).isEqualTo(true);
+    assertThat(eval("$ANY([], item, item > 1)")).isEqualTo(false);
+    assertThatThrownBy(() -> eval("$REDUCE([1], item, item, 0, item)"))
+        .hasMessage("REDUCE needs distinct item and accumulator identifiers");
+  }
+
   @Test
   void aRangeIsConvertedOncePerEvaluationAndNeverAcrossEvaluations() {
     var compiled = Expressions.compile("$SUM($MAP(keys, k, $VLOOKUP(k, table, 2, FALSE)))");

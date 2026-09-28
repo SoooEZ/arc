@@ -64,6 +64,11 @@ pre,
     "liga" 0,
     "calt" 0;
 }
+/* JSON default editors read the shared mono font and the workspace code size. */
+.json-field-input {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+}
 pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

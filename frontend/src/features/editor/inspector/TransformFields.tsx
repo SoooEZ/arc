@@ -2,10 +2,12 @@ import { memo, useCallback } from "react";
 import { Button, IconButton, TextField, Tooltip } from "@mui/material";
 import { Plus, Trash2 } from "lucide-react";
 import ExpressionField from "../../expressions/ExpressionField";
+import ExpressionDialogButton from "../../expressions/ExpressionDialogButton";
 import ValueBinding from "../../expressions/ValueBinding";
 import { quoteText } from "../../../domain/expressions";
 import { patchGraphNode } from "../../../domain/graph";
 import { uniqueName } from "../../../domain/ids";
+import { MAX_TRANSFORM_FIELDS } from "../../../domain/limits";
 import type { VariableOption } from "../../../domain/graph";
 import type { Definition, RuleNode } from "../../../types";
 import type { NodeFieldsProps } from "./types";
@@ -87,7 +89,7 @@ export default function TransformFields({
           ))}
           <Button
             startIcon={<Plus size={14} />}
-            disabled={readOnly || fields.length >= 50}
+            disabled={readOnly || fields.length >= MAX_TRANSFORM_FIELDS}
             onClick={() => {
               const name = uniqueName(
                 "field_",
@@ -103,21 +105,22 @@ export default function TransformFields({
             Fields read the same upstream scope. Use another node for
             calculations that depend on this result.
           </p>
-          <ExpressionField
-            label="Transform entire value"
-            hideInput
-            buttonLabel="Edit as one expression"
-            disabled={readOnly}
-            variables={variables}
-            scopeKnown={scopeKnown}
-            value={`$OBJECT(${fields.map((field) => `${quoteText(field.name)}, ${field.expression || "null"}`).join(", ")})`}
-            onChange={(expression) =>
-              patch({
-                fields: null,
-                expression,
-              })
-            }
-          />
+          <div className="expression-input">
+            <ExpressionDialogButton
+              label="Transform entire value"
+              buttonLabel="Edit as one expression"
+              disabled={readOnly}
+              variables={variables}
+              scopeKnown={scopeKnown}
+              value={`$OBJECT(${fields.map((field) => `${quoteText(field.name)}, ${field.expression || "null"}`).join(", ")})`}
+              onChange={(expression) =>
+                patch({
+                  fields: null,
+                  expression,
+                })
+              }
+            />
+          </div>
         </>
       ) : (
         <>

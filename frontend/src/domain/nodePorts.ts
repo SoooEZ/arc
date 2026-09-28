@@ -2,6 +2,22 @@ import type { BranchCase, RuleNode } from "../types";
 import { nodeKinds } from "./nodeKinds";
 export const branchHandleX = { true: 0.27, false: 0.73 } as const;
 
+/**
+ * The connection handles a node kind exposes (the server's `Handles`): one
+ * owner for the IDs that edges store in `sourceHandle`.
+ */
+export const handles = {
+  next: "next",
+  true: "true",
+  false: "false",
+  default: "default",
+} as const;
+
+/** The handle of a Switch case: its ID never depends on the case's position. */
+export function caseHandle(caseId: string): string {
+  return `case:${caseId}`;
+}
+
 export interface SourcePort {
   id: string;
   label: string;
@@ -17,11 +33,11 @@ const exitSpacing = 90;
 function casePorts(cases: BranchCase[]): SourcePort[] {
   const branches = [
     ...cases.map((option) => ({
-      id: `case:${option.id}`,
+      id: caseHandle(option.id),
       label: option.label,
       fallback: false,
     })),
-    { id: "default", label: "Default", fallback: true },
+    { id: handles.default, label: "Default", fallback: true },
   ];
   return branches.map((branch, index) => ({
     ...branch,
@@ -35,17 +51,17 @@ export function sourcePorts(node: RuleNode): SourcePort[] {
     case "none":
       return [];
     case "next":
-      return [{ id: "next", label: "", ratio: 0.5, fallback: false }];
+      return [{ id: handles.next, label: "", ratio: 0.5, fallback: false }];
     case "true-false":
       return [
         {
-          id: "true",
+          id: handles.true,
           label: "True",
           ratio: branchHandleX.true,
           fallback: false,
         },
         {
-          id: "false",
+          id: handles.false,
           label: "False",
           ratio: branchHandleX.false,
           fallback: true,
@@ -54,6 +70,14 @@ export function sourcePorts(node: RuleNode): SourcePort[] {
     case "cases":
       return casePorts(node.cases ?? []);
   }
+}
+
+/** The port `handleId` names on `node`, or undefined when the node has no such exit. */
+export function sourcePort(
+  node: RuleNode,
+  handleId: string,
+): SourcePort | undefined {
+  return sourcePorts(node).find((port) => port.id === handleId);
 }
 
 /** Whether the node has an incoming handle; the Input node starts every path. */

@@ -6,6 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule as createApiRule } from "./helpers/api";
 
 async function createRule(
   request: APIRequestContext,
@@ -378,4 +379,52 @@ test("an extra Input node can be deleted while the entry Input stays", async ({
   const saved: Rule = await (await request.get(`/api/rules/${id}`)).json();
   expect(saved.draft.nodes.map((node) => node.id)).toEqual(["input", "out"]);
   expect(saved.draft.edges.map((edge) => edge.id)).toEqual(["start"]);
+});
+
+test("deleting the selected node selects the default node, as a build or version load would", async ({
+  page,
+  request,
+}) => {
+  const id = `node-context-default-${Date.now()}`;
+  await createApiRule(request, {
+    id,
+    definition: {
+      schemaVersion: 1,
+      inputs: [],
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Inputs",
+          position: { x: 250, y: 0 },
+        },
+        {
+          id: "check",
+          type: "CONDITION",
+          label: "Check",
+          expression: "true",
+          position: { x: 250, y: 180 },
+        },
+        {
+          id: "out",
+          type: "OUTPUT",
+          label: "Result",
+          expression: "1",
+          position: { x: 250, y: 360 },
+        },
+      ],
+      edges: [
+        { id: "a", source: "input", sourceHandle: "next", target: "check" },
+        { id: "b", source: "check", sourceHandle: "true", target: "out" },
+      ],
+    },
+  });
+  await page.goto(`/#/rules/${id}?node=out`);
+  const nodeName = page.getByLabel("Node name", { exact: true });
+  await expect(nodeName).toHaveValue("Result");
+  const menu = await openMenu(page, "out");
+  await menu.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await expect(card(page, "out")).toHaveCount(0);
+  // The default node is the first Condition, not the Input.
+  await expect(nodeName).toHaveValue("Check");
 });

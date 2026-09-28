@@ -136,4 +136,15 @@ public final class Limits {
   public static String format(long limit) {
     return String.format(Locale.ROOT, "%,d", limit);
   }
+
+  /**
+   * Shows a byte size as messages state it: whole mebibytes as "1 MiB", whole kibibytes as "256
+   * KiB", any other count as grouped bytes ("1,500 bytes").
+   */
+  public static String formatBytes(long bytes) {
+    long kib = 1024, mib = kib * kib;
+    if (bytes % mib == 0) return format(bytes / mib) + " MiB";
+    if (bytes % kib == 0) return format(bytes / kib) + " KiB";
+    return format(bytes) + " bytes";
+  }
 }

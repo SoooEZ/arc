@@ -1,6 +1,7 @@
 package dev.arc.engine.execution;
 
 import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
 
@@ -8,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.SourceReader;
+import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.script.ArcScript;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
@@ -16,6 +18,7 @@ import dev.arc.model.Definition.*;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
 class FormulaCallExecutionTest {
@@ -49,6 +52,67 @@ class FormulaCallExecutionTest {
 
   private Engine.Result run(Definition graph, RuleResolver resolver) {
     return engine.execute("parent", 1, graph, Map.of(), resolver);
+  }
+
+  /**
+   * "A caller must supply this input" is one rule (Definition.Input.needsCallerValue): a Reference
+   * that binds nothing, an {@code @} call that omits the argument and the runtime resolution all
+   * accept or all reject the same declaration.
+   */
+  @Test
+  void staticBindingChecksAndRuntimeResolutionAgreeOnWhichInputsACallerMustSupply() {
+    var source = new SourceBinding("table", 1, Map.of(), "", "FAIL");
+    SourceReader reader = (binding, inputs, deadline) -> 1;
+    for (boolean required : new boolean[] {true, false})
+      for (Object defaultValue : Arrays.asList(null, 5))
+        for (SourceBinding binding : Arrays.asList(null, source)) {
+          var input = new Input("amount", "NUMBER", required, defaultValue, binding);
+          var callee = graph(List.of(input), "$COALESCE(amount, 0)");
+          var resolver = formulas(Map.of("callee:1", callee));
+          var reference =
+              new Definition(
+                  1,
+                  List.of(),
+                  List.of(
+                      inputNode("in", "Input"),
+                      nodeOf("ref", "REFERENCE", "Ref")
+                          .rule("callee", 1)
+                          .bindings(Map.of())
+                          .output("r")
+                          .build(),
+                      outputNode("out", "Output", "r")),
+                  List.of(new Edge("a", "in", "ref", "next"), new Edge("b", "ref", "out", "next")));
+          var call = graph(List.of(), "@callee:1()");
+          ThrowingCallable runtime =
+              () ->
+                  new Parameters(reader)
+                      .resolve(
+                          List.of(input),
+                          Map.of(),
+                          Expressions::compile,
+                          ExecutionDeadline.start(ExecutionDeadline.DEFAULT_TIMEOUT_MS),
+                          Expressions.FormulaCaller.unavailable());
+          String declaration = input.toString();
+          if (input.needsCallerValue()) {
+            assertThatThrownBy(() -> validator.validate(reference, resolver))
+                .as(declaration)
+                .hasMessageContaining("Ref: missing binding for amount");
+            assertThatThrownBy(() -> validator.validate(call, resolver))
+                .as(declaration)
+                .hasMessageContaining("@callee:1 needs argument 1 (amount)");
+            assertThatThrownBy(runtime)
+                .as(declaration)
+                .hasMessage("Missing required input: amount");
+          } else {
+            assertThatCode(() -> validator.validate(reference, resolver))
+                .as(declaration)
+                .doesNotThrowAnyException();
+            assertThatCode(() -> validator.validate(call, resolver))
+                .as(declaration)
+                .doesNotThrowAnyException();
+            assertThatCode(runtime).as(declaration).doesNotThrowAnyException();
+          }
+        }
   }
 
   @Test

@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react";
 import { TextField } from "@mui/material";
 import { parseJson, stringifyJson } from "../domain/json";
+import {
+  useParsedTextBuffer,
+  type ParsedText,
+} from "../hooks/useParsedTextBuffer";
 
 /** Indented JSON for a value; an undefined value (no default at all) is an empty buffer. */
 const jsonText = (value: unknown) => stringifyJson(value, 2) ?? "";
@@ -30,60 +33,39 @@ export default function JsonField({
   disabled?: boolean;
   rows?: number;
 }) {
-  const validity = useRef(onValidity);
-  validity.current = onValidity;
-  useEffect(() => () => validity.current(true), []);
-  const [text, setText] = useState(() => jsonText(value));
-  const [error, setError] = useState("");
-  // The value the text represents: the last one typed here or received from outside.
-  const acceptedValue = useRef(value);
-  useEffect(() => {
-    // Typing echoes its own value back through the draft; rewriting the text then
-    // would move the caret. Only a different value from outside replaces the buffer.
-    if (sameJson(value, acceptedValue.current)) return;
-    acceptedValue.current = value;
-    setText(jsonText(value));
-    setError("");
-    validity.current(true);
-  }, [value]);
+  // Empty text is no value; invalid JSON and a checked problem stay in the field.
+  const parse = (raw: string): ParsedText<unknown> => {
+    let parsed: unknown;
+    try {
+      parsed = raw.trim() ? parseJson(raw) : null;
+    } catch {
+      return { valid: false, error: "Enter valid JSON before saving" };
+    }
+    const problem = check?.(parsed) ?? null;
+    return problem
+      ? { valid: false, error: problem }
+      : { valid: true, value: parsed };
+  };
+  const buffer = useParsedTextBuffer<unknown, unknown>({
+    value,
+    format: jsonText,
+    parse,
+    same: sameJson,
+    onChange,
+    onValidity,
+  });
   return (
     <TextField
       label={label}
       multiline
       minRows={rows}
       maxRows={18}
-      value={text}
+      value={buffer.text}
       disabled={disabled}
-      error={!!error}
-      helperText={error || "JSON"}
-      onChange={(e) => {
-        const raw = e.target.value;
-        setText(raw);
-        let parsed: unknown;
-        try {
-          parsed = raw.trim() ? parseJson(raw) : null;
-        } catch {
-          setError("Enter valid JSON before saving");
-          onValidity(false);
-          return;
-        }
-        const problem = check?.(parsed) ?? null;
-        if (problem) {
-          setError(problem);
-          onValidity(false);
-          return;
-        }
-        acceptedValue.current = parsed;
-        onChange(parsed);
-        setError("");
-        onValidity(true);
-      }}
-      slotProps={{
-        input: {
-          className: "code-text",
-          style: { fontFamily: "JetBrains Mono, monospace", fontSize: 12 },
-        },
-      }}
+      error={!!buffer.error}
+      helperText={buffer.error || "JSON"}
+      onChange={(e) => buffer.change(e.target.value)}
+      slotProps={{ input: { className: "code-text json-field-input" } }}
     />
   );
 }

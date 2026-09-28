@@ -14,7 +14,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition.*;
 import dev.arc.model.Handles;
 import dev.arc.model.NodeKind;
-import dev.arc.model.NodeKind.Slot;
+import dev.arc.model.NodeKind.Property;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -84,6 +84,7 @@ final class ArcScriptNodeParser {
   private final Statement header;
   private final String id;
   private final NodeKind kind;
+  private final Set<String> keywords;
   private final String label;
   private final Position position;
   private final Map<String, String> bindings = new LinkedHashMap<>();
@@ -112,6 +113,7 @@ final class ArcScriptNodeParser {
     scanner.expect('{');
     id = syntax.unquote(match.group(1), header);
     kind = NodeKind.valueOf(match.group(2).toUpperCase(Locale.ROOT));
+    keywords = declarationKeywords(kind);
     label = syntax.unquote(match.group(3), header);
     position =
         match.group(4) == null
@@ -141,9 +143,9 @@ final class ArcScriptNodeParser {
             output,
             ruleId,
             version,
-            kind.owns(Slot.BINDINGS) ? bindings : null,
-            kind.owns(Slot.CASES) ? cases : null,
-            kind.owns(Slot.FIELDS) && !fields.isEmpty() ? fields : null,
+            kind.uses(Property.BINDINGS) ? bindings : null,
+            kind.uses(Property.CASES) ? cases : null,
+            kind.uses(Property.FIELDS) && !fields.isEmpty() ? fields : null,
             selector,
             outputName);
     locations.declared(node, header);
@@ -212,7 +214,7 @@ final class ArcScriptNodeParser {
   private void parseDeclaration(Statement statement, ScriptLocations locations) {
     String text = statement.text();
     String keyword = text.split("\\s", 2)[0];
-    if (!accepts(keyword))
+    if (!keywords.contains(keyword))
       throw error("Unsupported statement for " + kind + ": " + text, statement);
     String value = text.substring(keyword.length()).trim();
     switch (keyword) {
@@ -228,8 +230,11 @@ final class ArcScriptNodeParser {
       case "as" -> {
         unique("as", statement);
         String name = identifier(value, statement);
-        if (kind == NodeKind.OUTPUT) outputName = name;
-        else output = name;
+        switch (aliasTarget(kind)) {
+          case OUTPUT_NAME -> outputName = name;
+          case OUTPUT -> output = name;
+          default -> throw new IllegalStateException("as cannot declare " + aliasTarget(kind));
+        }
       }
       case "when", "return" -> {
         unique("expression", statement);
@@ -239,18 +244,32 @@ final class ArcScriptNodeParser {
     }
   }
 
-  /** The declarations each node kind owns; connections are parsed separately. */
-  private boolean accepts(String keyword) {
-    return switch (keyword) {
-      case "let" -> kind == NodeKind.FORMULA || kind == NodeKind.TRANSFORM;
-      case "case", "select" -> kind == NodeKind.SWITCH;
-      case "field" -> kind == NodeKind.TRANSFORM;
-      case "when" -> kind == NodeKind.CONDITION;
-      case "return" -> kind == NodeKind.OUTPUT;
-      case "use", "bind" -> kind == NodeKind.REFERENCE;
-      case "as" ->
-          kind == NodeKind.REFERENCE || kind == NodeKind.TRANSFORM || kind == NodeKind.OUTPUT;
-      default -> false;
+  /**
+   * The declaration statements each node kind owns; connections are parsed separately. A new kind
+   * does not compile until it decides which statements it accepts.
+   */
+  private static Set<String> declarationKeywords(NodeKind kind) {
+    return switch (kind) {
+      case INPUT -> Set.of();
+      case FORMULA -> Set.of("let");
+      case CONDITION -> Set.of("when");
+      case SWITCH -> Set.of("select", "case");
+      case TRANSFORM -> Set.of("let", "field", "as");
+      case REFERENCE -> Set.of("use", "bind", "as");
+      case OUTPUT -> Set.of("return", "as");
+    };
+  }
+
+  /**
+   * The property that {@code as name;} declares: an Output's field name, or the result variable of
+   * a Transform or Reference. The keyword table above rejects {@code as} for the other kinds first.
+   */
+  private static Property aliasTarget(NodeKind kind) {
+    return switch (kind) {
+      case OUTPUT -> Property.OUTPUT_NAME;
+      case TRANSFORM, REFERENCE -> Property.OUTPUT;
+      case INPUT, FORMULA, CONDITION, SWITCH ->
+          throw new IllegalStateException("as is not declared for " + kind);
     };
   }
 

@@ -7,6 +7,7 @@ import {
   sourceSample,
   type SourceBuffers,
 } from "./model";
+import { sourceProviders } from "./sourceProviders";
 
 export interface SourceDocument {
   selection: number;
@@ -29,6 +30,12 @@ export interface SourceDocument {
   error: string;
   saving: { request: number; snapshot: string } | null;
   testing: number | null;
+}
+
+/** The chip beside a source's name: its saved version, and whether it has unsaved edits. */
+export function sourceVersionLabel(version: number, dirty: boolean): string {
+  if (!version) return "Unsaved";
+  return dirty ? `v${version} · edited` : `v${version}`;
 }
 
 /** The server accepts whole milliseconds in this range (HttpSourceAdapter). */
@@ -149,12 +156,14 @@ export function httpUrlProblem(url: string): string | null {
 export function sourceSaveProblem(document: SourceDocument): string | null {
   if (!document.source.version && !isResourceId(document.source.id))
     return `Enter a valid source ID. ${resourceIdGuidance}`;
-  if (document.source.definition.kind === "HTTP") {
-    const urlProblem = httpUrlProblem(document.source.definition.url ?? "");
+  const { kind, url } = document.source.definition;
+  const provider = sourceProviders[kind];
+  if (provider.usesUrl) {
+    const urlProblem = httpUrlProblem(url ?? "");
     if (urlProblem) return `HTTP URL: ${urlProblem}`;
-    if (parseHttpTimeout(document.timeout) === null)
-      return `Timeout: ${httpTimeoutGuidance}`;
   }
+  if (provider.usesTimeout && parseHttpTimeout(document.timeout) === null)
+    return `Timeout: ${httpTimeoutGuidance}`;
   return null;
 }
 

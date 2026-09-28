@@ -10,9 +10,9 @@ import {
   Tooltip,
 } from "@mui/material";
 import { X } from "lucide-react";
-import type { Rule, RuleSummary } from "../../types";
+import type { Rule } from "../../types";
 import { patchGraphNode, type DefinitionChange } from "../../domain/graph";
-import Inspector from "./inspector/Inspector";
+import NodeForm from "./inspector/NodeForm";
 import NodeIdentity from "./inspector/NodeIdentity";
 import { applyNodeFormDraft } from "./nodeFormDraft";
 import type { ReferenceTarget } from "./types";
@@ -20,7 +20,6 @@ import type { ReferenceTarget } from "./types";
 export default function NodeEditDialog({
   rule,
   nodeId,
-  rules,
   readOnly,
   onApply,
   onClose,
@@ -28,7 +27,6 @@ export default function NodeEditDialog({
 }: {
   rule: Rule;
   nodeId: string;
-  rules: RuleSummary[];
   readOnly: boolean;
   /** Applies the change to the graph; false when the document refused it. */
   onApply: (change: DefinitionChange) => boolean;
@@ -105,20 +103,19 @@ export default function NodeEditDialog({
           Edit this node’s settings, then apply them to the draft.
         </p>
         {error && <Alert severity="error">{error}</Alert>}
-        <Inspector
-          rule={{ ...rule, draft }}
-          node={node}
-          rules={rules}
-          readOnly={readOnly}
-          presentation="dialog"
-          onNodeChange={(id, patch) =>
-            changeDraft((current) => patchGraphNode(current, id, patch))
-          }
-          onDefinitionChange={changeDraft}
-          onInvalidDefault={onInvalidDefault}
-          onOpenReference={onOpenReference}
-          errors={[]}
-        />
+        <aside className="inspector inspector-dialog">
+          <NodeForm
+            rule={{ ...rule, draft }}
+            node={node}
+            readOnly={readOnly}
+            onNodeChange={(id, patch) =>
+              changeDraft((current) => patchGraphNode(current, id, patch))
+            }
+            onDefinitionChange={changeDraft}
+            onInvalidDefault={onInvalidDefault}
+            onOpenReference={onOpenReference}
+          />
+        </aside>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>

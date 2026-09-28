@@ -2,9 +2,9 @@ package dev.arc.engine.expression;
 
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.Limits;
+import dev.arc.engine.ValueBounds;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.*;
 
@@ -74,11 +74,8 @@ public final class Expressions {
 
     public Object evaluate(
         Map<String, Object> scope, ExecutionDeadline deadline, FormulaCaller formulas) {
-      deadline.check();
-      Object result =
-          bounded(expression.eval(new ExpressionRuntime.Context(scope, deadline, formulas)));
-      deadline.check();
-      return result;
+      return deadline.within(
+          () -> bounded(expression.eval(new ExpressionRuntime.Context(scope, deadline, formulas))));
     }
   }
 
@@ -98,75 +95,20 @@ public final class Expressions {
     return compile(source).evaluate(scope);
   }
 
+  /** The bounded decimal value of a number ({@link ValueBounds#number}). */
   public static BigDecimal number(Object value) {
-    if (!(value instanceof Number n))
-      throw ArcException.invalid("Expected a number, got " + type(value));
-    return (BigDecimal) bounded(decimal(n));
-  }
-
-  /** The decimal value of any number ARC meets: JSON integers, POI doubles and decimals. */
-  private static BigDecimal decimal(Number value) {
-    if (value instanceof BigDecimal decimal) return decimal;
-    if (value instanceof BigInteger integer) return new BigDecimal(integer);
-    if (value instanceof Double || value instanceof Float) {
-      double d = value.doubleValue();
-      if (!Double.isFinite(d)) throw ArcException.invalid("Number must be finite");
-      return BigDecimal.valueOf(d);
-    }
-    return BigDecimal.valueOf(value.longValue());
+    return ValueBounds.number(value);
   }
 
   public static boolean bool(Object value) {
     if (!(value instanceof Boolean b))
-      throw ArcException.invalid("Expected a boolean, got " + type(value));
+      throw ArcException.invalid("Expected a boolean, got " + ValueBounds.typeOf(value));
     return b;
   }
 
+  /** The value once it is within every bound ({@link ValueBounds#bounded}). */
   public static Object bounded(Object value) {
-    bound(value, 0, new int[] {0});
-    return value;
-  }
-
-  private static void bound(Object value, int depth, int[] count) {
-    if (depth > Limits.MAX_VALUE_DEPTH || ++count[0] > Limits.MAX_VALUE_ELEMENTS)
-      throw ArcException.invalid("Value exceeds collection depth or size limit");
-    if (value instanceof Number n && exceedsDecimalLimits(decimal(n)))
-      throw ArcException.invalid("Number exceeds supported precision or magnitude");
-    if (value instanceof String s && s.length() > Limits.MAX_STRING_CHARACTERS)
-      throw ArcException.invalid(
-          "String exceeds " + Limits.format(Limits.MAX_STRING_CHARACTERS) + " characters");
-    if (value instanceof List<?> xs) {
-      if (xs.size() > Limits.MAX_COLLECTION_ITEMS)
-        throw ArcException.invalid(
-            "Array exceeds " + Limits.format(Limits.MAX_COLLECTION_ITEMS) + " items");
-      for (Object x : xs) bound(x, depth + 1, count);
-    }
-    if (value instanceof Map<?, ?> m) {
-      if (m.size() > Limits.MAX_COLLECTION_ITEMS)
-        throw ArcException.invalid(
-            "Object exceeds " + Limits.format(Limits.MAX_COLLECTION_ITEMS) + " fields");
-      for (var e : m.entrySet()) {
-        bound(e.getKey(), depth + 1, count);
-        bound(e.getValue(), depth + 1, count);
-      }
-    }
-  }
-
-  /**
-   * The limits apply to the number, not to how it is written: PostgreSQL JSONB stores 1E+100 as a
-   * 101-digit integer. Accepted decimals stay below 1E+201 and so are finite as doubles; that
-   * conversion is slow for 34-digit quotients, and every operand passes through here. A zero has no
-   * digits to strip, so its scale counts as written: 0E-2000000000 would otherwise pass and print
-   * as two billion characters.
-   */
-  private static boolean exceedsDecimalLimits(BigDecimal number) {
-    if (number.signum() == 0) return Math.abs((long) number.scale()) > Limits.MAX_NUMBER_SCALE;
-    return exceedsWrittenLimits(number) && exceedsWrittenLimits(number.stripTrailingZeros());
-  }
-
-  private static boolean exceedsWrittenLimits(BigDecimal number) {
-    return number.precision() > Limits.MAX_NUMBER_PRECISION
-        || Math.abs((long) number.scale()) > Limits.MAX_NUMBER_SCALE;
+    return ValueBounds.bounded(value);
   }
 
   /**
@@ -198,20 +140,5 @@ public final class Expressions {
       if (!equal(field.getValue(), right.get(field.getKey()))) return false;
     }
     return true;
-  }
-
-  /**
-   * The ARC type of a value, in the words of {@code InputTypes.NAMES} (this package may not import
-   * it): a message named JDK classes before, such as UnmodifiableMap, LinkedHashMap or ListN,
-   * depending on where the same value came from.
-   */
-  private static String type(Object o) {
-    if (o == null) return "null";
-    if (o instanceof Number) return "number";
-    if (o instanceof String) return "string";
-    if (o instanceof Boolean) return "boolean";
-    if (o instanceof List<?>) return "array";
-    if (o instanceof Map<?, ?>) return "object";
-    return o.getClass().getSimpleName();
   }
 }

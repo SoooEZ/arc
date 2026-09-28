@@ -9,6 +9,13 @@ interface PagedOptions {
   keepPrevious?: boolean;
 }
 
+/** Reads one page; null while the list has no owner yet (nothing selected). */
+export type PageLoader<T> = (
+  offset: number,
+  limit: number,
+  signal: AbortSignal,
+) => Promise<Page<T>>;
+
 /** Offset of the last page that holds any of `total` items. */
 export function lastPageOffset(total: number, limit: number): number {
   return total > 0 ? Math.floor((total - 1) / limit) * limit : 0;
@@ -17,12 +24,7 @@ export function lastPageOffset(total: number, limit: number): number {
 /** One bounded page; changing a search or owner immediately resets the offset. */
 export function usePagedResource<T>(
   key: string,
-  load: (
-    offset: number,
-    limit: number,
-    signal: AbortSignal,
-  ) => Promise<Page<T>>,
-  enabled = true,
+  load: PageLoader<T> | null,
   { refresh = 0, keepPrevious = false }: PagedOptions = {},
 ) {
   const [position, setPosition] = useState({ key, offset: 0 });
@@ -34,10 +36,8 @@ export function usePagedResource<T>(
   const emptyPage: Page<T> = { items: [], total: 0, offset, limit };
   const resource = useAsyncResource(
     JSON.stringify([key, offset, refresh]),
-    (signal) => load(offset, limit, signal),
+    load ? (signal) => load(offset, limit, signal) : null,
     emptyPage,
-    0,
-    enabled,
     { keepPrevious },
   );
   const settledTotal =
@@ -54,5 +54,18 @@ export function usePagedResource<T>(
     limit,
     setOffset: (next: number) =>
       setPosition({ key, offset: Math.max(0, next) }),
+  };
+}
+
+export type PagedResource<T> = ReturnType<typeof usePagedResource<T>>;
+
+/** The props a `CatalogPagination` control takes from a paged resource. */
+export function paginationProps<T>(page: PagedResource<T>) {
+  return {
+    offset: page.offset,
+    limit: page.limit,
+    total: page.data.total,
+    loading: page.loading,
+    onPage: page.setOffset,
   };
 }

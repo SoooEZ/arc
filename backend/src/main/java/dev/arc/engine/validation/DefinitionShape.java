@@ -175,14 +175,13 @@ final class DefinitionShape {
         node.expression() == null || node.expression().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
         declaration,
         "Expression exceeds " + EXPRESSION_LIMIT);
+    // Empty names are unset in an unfinished draft; a supplied name follows the identifier policy.
     require(
-        node.output() == null || node.output().isEmpty() || Identifiers.isValid(node.output()),
+        node.resultName() == null || Identifiers.isValid(node.resultName()),
         declaration,
         node.label() + ": provide a valid result variable");
     require(
-        node.outputName() == null
-            || node.outputName().isEmpty()
-            || Identifiers.isValid(node.outputName()),
+        node.outputFieldName() == null || Identifiers.isValid(node.outputFieldName()),
         declaration,
         node.label() + ": provide a valid output name");
     require(

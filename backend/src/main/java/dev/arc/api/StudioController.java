@@ -23,7 +23,7 @@ public class StudioController {
   public record ExpressionCode(String expression) {}
 
   @PostMapping("/studio/expression/check")
-  public ArcScript.ExpressionCheck checkExpression(@RequestBody ExpressionCode code) {
+  public RuleDefinitionService.ExpressionCheck checkExpression(@RequestBody ExpressionCode code) {
     return definitions.checkExpression(code.expression());
   }
 

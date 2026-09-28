@@ -10,6 +10,7 @@ import dev.arc.model.DataSource;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.SourceBinding;
+import dev.arc.model.RuleKind;
 import dev.arc.model.SourceDefinition;
 import dev.arc.rule.RuleSamples;
 import java.math.BigDecimal;
@@ -113,6 +114,11 @@ class SourceExecutionServiceTest {
           @Override
           public String kind() {
             return "TABLE";
+          }
+
+          @Override
+          public java.util.Set<SourceDefinition.Field> fields() {
+            return java.util.Set.of();
           }
 
           @Override
@@ -224,7 +230,7 @@ class SourceExecutionServiceTest {
             eq("memory"), eq(source.definition()), eq(Map.of("key", new BigDecimal("12"))), any()))
         .thenReturn(10, 20);
     var binding = new SourceBinding("memory", 1, Map.of(), "", "FAIL");
-    var blank = RuleSamples.blank("FORMULA");
+    var blank = RuleSamples.blank(RuleKind.FORMULA);
     var definition =
         new Definition(
             1,
@@ -235,7 +241,7 @@ class SourceExecutionServiceTest {
             blank.edges());
     var session = execution.openSession();
     new SourceBindingValidator(repository)
-        .validate(definition, (id, version) -> null, session::definition);
+        .validateForExecution(definition, (id, version) -> null, session::definition);
 
     assertThat(session.read(binding, Map.of(), ExecutionDeadline.start(1000))).isEqualTo(10);
     assertThat(session.read(binding, Map.of(), ExecutionDeadline.start(1000))).isEqualTo(20);

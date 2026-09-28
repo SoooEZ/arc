@@ -168,7 +168,8 @@ final class ExpressionParser {
           "Function calls require a $ prefix; use $" + token.toUpperCase(Locale.ROOT) + "(...)");
     expect("(");
     String name = token.substring(1).toUpperCase(Locale.ROOT);
-    if (BuiltinFunctionCatalog.isCollectionFunction(name)) return collectionCall(name);
+    CollectionFunction collection = CollectionFunction.named(name);
+    if (collection != null) return collectionCall(collection);
     List<Expr> arguments = arguments(")");
     Functions.arity(name, arguments.size());
     return context -> ExpressionRuntime.function(name, arguments, context);
@@ -197,7 +198,7 @@ final class ExpressionParser {
     return context -> ExpressionRuntime.formula(formula, arguments, context);
   }
 
-  private Expr collectionCall(String name) {
+  private Expr collectionCall(CollectionFunction function) {
     Expr collection = parse(0);
     expect(",");
     String local = take();
@@ -206,10 +207,11 @@ final class ExpressionParser {
     expect(",");
     String accumulator = null;
     Expr initial = null;
-    if (name.equals("REDUCE")) {
+    if (function.bindsAccumulator()) {
       accumulator = take();
       if (!Identifiers.isValid(accumulator) || local.equals(accumulator))
-        throw ArcException.invalid("REDUCE needs distinct item and accumulator identifiers");
+        throw ArcException.invalid(
+            function.name() + " needs distinct item and accumulator identifiers");
       expect(",");
       initial = parse(0);
       expect(",");
@@ -225,7 +227,7 @@ final class ExpressionParser {
     Expr initialValue = initial;
     return context ->
         ExpressionRuntime.collection(
-            name, collection, local, accumulatorName, initialValue, body, context);
+            function, collection, local, accumulatorName, initialValue, body, context);
   }
 
   private List<Expr> arguments(String closingToken) {

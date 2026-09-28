@@ -16,6 +16,7 @@ import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
 import dev.arc.model.Rule;
+import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
@@ -66,7 +67,7 @@ class RuleDeletionWebTest {
         "Rates",
         "",
         "FORMULA",
-        RuleSamples.blank("FORMULA"),
+        RuleSamples.blank(RuleKind.FORMULA),
         revision,
         null,
         Instant.EPOCH,

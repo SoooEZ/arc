@@ -5,18 +5,13 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule as createApiRule } from "./helpers/api";
 
-async function createRule(
+const createRule = (
   request: APIRequestContext,
   id: string,
   definition?: Definition,
-): Promise<Rule> {
-  const response = await request.post("/api/rules", {
-    data: { id, name: `Delete ${id}`, kind: "FORMULA", definition },
-  });
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()) as Rule;
-}
+) => createApiRule(request, { id, name: `Delete ${id}`, definition });
 
 async function openDeletion(page: Page) {
   await page

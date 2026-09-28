@@ -2,6 +2,7 @@ import { Autocomplete, Button, MenuItem, TextField } from "@mui/material";
 import { ChevronRight } from "lucide-react";
 import ValueBinding from "../../expressions/ValueBinding";
 import ExpressionField from "../../expressions/ExpressionField";
+import ExpressionDialogButton from "../../expressions/ExpressionDialogButton";
 import { useEditingPin } from "../../expressions/useEditingPin";
 import { comparisonText, simpleComparison } from "../../../domain/expressions";
 import { comparisonBindingType } from "../../../domain/valueBinding";
@@ -192,15 +193,16 @@ function ComparisonBuilder({
       <div className="expression-preview">
         <code>{expression}</code>
       </div>
-      <ExpressionField
-        label="Condition"
-        value={expression}
-        variables={variables}
-        scopeKnown={scopeKnown}
-        disabled={readOnly}
-        hideInput
-        onChange={onReplace}
-      />
+      <div className="expression-input">
+        <ExpressionDialogButton
+          label="Condition"
+          value={expression}
+          variables={variables}
+          scopeKnown={scopeKnown}
+          disabled={readOnly}
+          onChange={onReplace}
+        />
+      </div>
     </div>
   );
 }

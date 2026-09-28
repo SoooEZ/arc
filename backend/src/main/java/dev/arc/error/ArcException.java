@@ -116,8 +116,14 @@ public class ArcException extends RuntimeException {
             .toList());
   }
 
-  /** Adds the owning field/case description without losing a nested rule's locations or kind. */
+  /**
+   * Names the field, case, binding or mapping in which a value error happened, keeping the kind and
+   * a nested rule's locations. Only a {@link #recoverable()} error takes the context: a limit, the
+   * deadline and a definition failure belong to the whole execution and keep their plain message,
+   * so no caller needs its own gate.
+   */
   public ArcException withContext(String context) {
+    if (!recoverable()) return this;
     return new ArcException(
         status,
         kind,

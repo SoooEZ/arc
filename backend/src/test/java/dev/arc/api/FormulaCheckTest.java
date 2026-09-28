@@ -48,7 +48,14 @@ class FormulaCheckTest {
         .andExpect(jsonPath("$.variables[0]").value("amount"))
         .andExpect(jsonPath("$.formulaCalls[0].id").value("child"))
         .andExpect(jsonPath("$.formulaCalls[0].version").value(1))
-        .andExpect(jsonPath("$.formulaCalls[0].argumentCount").value(1));
+        .andExpect(jsonPath("$.formulaCalls[0].argumentCount").value(1))
+        // The record lives with its producer now; its JSON is byte for byte what it was.
+        .andExpect(
+            content()
+                .string(
+                    "{\"valid\":true,\"variables\":[\"amount\"],\"error\":null,"
+                        + "\"formulaCalls\":[{\"id\":\"child\",\"version\":1,\"argumentCount\":1},"
+                        + "{\"id\":\"child\",\"version\":1,\"argumentCount\":1}]}"));
     verify(rules, times(1)).resolveFormula("child", 1);
     for (String expression : List.of("@child:1()", "@child:1(1, 2)", "@child:2(1)", "@tree:1(1)")) {
       assertThatCode(() -> Expressions.compile(expression))

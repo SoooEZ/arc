@@ -95,3 +95,21 @@ export function createHttpClient(
 }
 export const http = createHttpClient();
 export const pathId = (id: string) => encodeURIComponent(id);
+
+/**
+ * The query string of a catalog request: fields left undefined are omitted,
+ * every other value is written as text (an empty string stays, as `kind=`).
+ */
+export function queryString(
+  query: Record<string, string | number | boolean | undefined>,
+): string {
+  const parameters = new URLSearchParams();
+  for (const [key, value] of Object.entries(query))
+    if (value !== undefined) parameters.set(key, String(value));
+  return parameters.toString();
+}
+
+/** The API base as an absolute URL, e.g. "https://arc.example/api", for the reference page. */
+export function apiBaseUrl(origin: string = window.location.origin): string {
+  return new URL(http.url(""), origin).href;
+}

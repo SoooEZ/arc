@@ -86,10 +86,9 @@ export function useGraphProblems({
 }: Options) {
   const { data: graphProblems, error } = useAsyncResource(
     graphKey,
-    (signal) => studioApi.diagnostics(rule.draft, { signal }),
+    loading ? null : (signal) => studioApi.diagnostics(rule.draft, { signal }),
     noProblems,
-    350,
-    !loading,
+    { delay: 350 },
   );
   useEffect(() => {
     if (!loading) clearCommandProblem();

@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule as createApiRule } from "./helpers/api";
 
 const basic: Definition = {
   schemaVersion: 1,
@@ -30,10 +31,7 @@ async function createRule(
   definition: Definition = basic,
 ) {
   const id = `${prefix}-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: `Resilience ${id}`, kind: "FORMULA", definition },
-  });
-  expect(created.ok()).toBeTruthy();
+  await createApiRule(request, { id, name: `Resilience ${id}`, definition });
   return id;
 }
 

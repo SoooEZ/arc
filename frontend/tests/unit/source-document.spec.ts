@@ -11,6 +11,7 @@ import {
   sourceSaveProblem,
   type SourceDocument,
   type SourceDocumentAction,
+  sourceVersionLabel,
 } from "../../src/features/sources/sourceDocument";
 
 function lookupSource(version = 3): DataSource {
@@ -218,4 +219,11 @@ test("an HTTP URL the server could not send as written blocks saving", () => {
     "https://api.example.com/customer",
   ])
     expect(withUrl(url), url).toBeNull();
+});
+
+test("the version chip names an unsaved draft, a saved version and one with edits", () => {
+  expect(sourceVersionLabel(0, false)).toBe("Unsaved");
+  expect(sourceVersionLabel(0, true)).toBe("Unsaved");
+  expect(sourceVersionLabel(3, false)).toBe("v3");
+  expect(sourceVersionLabel(3, true)).toBe("v3 · edited");
 });

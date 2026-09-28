@@ -1,0 +1,62 @@
+[
+  {
+    "method": "GET",
+    "path": "/rule-summaries",
+    "summary": "Search a bounded page of rule metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/rules",
+    "summary": "Legacy full rule list, including drafts"
+  },
+  {
+    "method": "POST",
+    "path": "/rules",
+    "summary": "Create a rule from a template or a graph definition"
+  },
+  {
+    "method": "GET",
+    "path": "/rules/{id}",
+    "summary": "Read a rule and its revision"
+  },
+  {
+    "method": "PUT",
+    "path": "/rules/{id}",
+    "summary": "Save a draft with optimistic concurrency protection"
+  },
+  {
+    "method": "DELETE",
+    "path": "/rules/{id}",
+    "summary": "Delete a rule that no other rule calls"
+  },
+  {
+    "method": "POST",
+    "path": "/rules/{id}/publish",
+    "summary": "Validate and publish an immutable version"
+  },
+  {
+    "method": "POST",
+    "path": "/rules/{id}/execute",
+    "summary": "Execute a published rule with typed inputs"
+  },
+  {
+    "method": "GET",
+    "path": "/rules/{id}/version-summaries",
+    "summary": "Search and page through published version metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/rules/{id}/versions/{version}",
+    "summary": "Read one immutable version"
+  },
+  {
+    "method": "POST",
+    "path": "/preview",
+    "summary": "Test a graph without saving or publishing it"
+  },
+  {
+    "method": "POST",
+    "path": "/validate",
+    "summary": "Check graph structure, expressions, and references"
+  }
+]

@@ -14,6 +14,7 @@ import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.Node;
 import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.Rule;
+import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleRepository.StoredDefinition;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,7 +36,7 @@ class RuleServiceTest {
           "Example",
           "",
           "FORMULA",
-          RuleSamples.blank("FORMULA"),
+          RuleSamples.blank(RuleKind.FORMULA),
           3,
           1,
           Instant.EPOCH,
@@ -55,6 +56,44 @@ class RuleServiceTest {
                   + " digits, and hyphens (max 80)");
     }
     verifyNoMoreInteractions(repository);
+  }
+
+  /** Payloads keep the kind as text; an unknown one is refused with the choice, never a 400. */
+  @Test
+  void unknownKindsAreRefusedByCreateAndByTheCatalogFilter() {
+    for (String kind : Arrays.asList(null, "", "formula", "Formula", "LOOP"))
+      assertThatThrownBy(
+              () -> service.create(new RuleService.Create("valid-id", "Name", "", kind, null)))
+          .as(String.valueOf(kind))
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(422);
+                assertThat(error.getMessage()).isEqualTo("Choose DECISION_TREE, FORMULA, or RULE");
+              });
+    var page = new dev.arc.model.PageRequest(0, 20, "");
+    for (String kind : List.of("formula", "LOOP"))
+      assertThatThrownBy(() -> service.catalog(page, kind, false))
+          .as(kind)
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(422);
+                assertThat(error.getMessage()).isEqualTo("Unknown rule kind");
+              });
+    verify(repository, never()).catalog(any(), anyString(), anyBoolean());
+    verify(repository, never()).create(anyString(), anyString(), anyString(), anyString(), any());
+    for (RuleKind kind : RuleKind.values()) service.catalog(page, kind.name(), false);
+    service.catalog(page, "", true);
+    verify(repository).catalog(page, "", true);
+    service.create(new RuleService.Create("tree", "Tree", "", "DECISION_TREE", null));
+    verify(repository)
+        .create(
+            eq("tree"),
+            eq("Tree"),
+            eq(""),
+            eq("DECISION_TREE"),
+            eq(RuleSamples.blank(RuleKind.DECISION_TREE)));
   }
 
   @Test
@@ -98,7 +137,11 @@ class RuleServiceTest {
     service.create(new RuleService.Create("valid-id", "  Example  ", null, "FORMULA", null));
     verify(repository)
         .create(
-            eq("valid-id"), eq("Example"), eq(""), eq("FORMULA"), eq(RuleSamples.blank("FORMULA")));
+            eq("valid-id"),
+            eq("Example"),
+            eq(""),
+            eq("FORMULA"),
+            eq(RuleSamples.blank(RuleKind.FORMULA)));
   }
 
   @Test

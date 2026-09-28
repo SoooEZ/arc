@@ -1,5 +1,5 @@
 import { ChevronRight, Radio } from "lucide-react";
-import type { WorkspacePage, WorkspaceRoute } from "./routing";
+import { pagePath, type WorkspacePage, type WorkspaceRoute } from "./routing";
 
 interface Crumb {
   label: string;
@@ -9,7 +9,7 @@ interface Crumb {
 
 const sectionCrumbs: Record<WorkspacePage, Crumb> = {
   library: { label: "Rule library", path: null },
-  rule: { label: "Rule library", path: "/library" },
+  rule: { label: "Rule library", path: pagePath("library") },
   sources: { label: "Data sources", path: null },
   playground: { label: "API playground", path: null },
   docs: { label: "API reference", path: null },

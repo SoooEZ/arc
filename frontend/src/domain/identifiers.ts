@@ -1,10 +1,12 @@
-const maxIdentifierLength = 64;
-const identifier = /^[A-Za-z_][A-Za-z_0-9]{0,63}$/;
+import { MAX_IDENTIFIER_CHARACTERS } from "./limits";
+
+const identifier = new RegExp(
+  `^[A-Za-z_][A-Za-z_0-9]{0,${MAX_IDENTIFIER_CHARACTERS - 1}}$`,
+);
 const identifierCharacters = /^[A-Za-z_0-9]*$/;
 const reserved = new Set(["true", "false", "null", "and", "or"]);
 
-export const identifierGuidance =
-  "Use letters, digits, or _; start with a letter or _. No spaces, $ or @. Maximum 64 characters.";
+export const identifierGuidance = `Use letters, digits, or _; start with a letter or _. No spaces, $ or @. Maximum ${MAX_IDENTIFIER_CHARACTERS} characters.`;
 
 export function identifierError(name: unknown): string | null {
   if (typeof name !== "string" || !identifier.test(name))
@@ -30,7 +32,7 @@ export function isIdentifier(name: unknown): name is string {
 export function acceptsIdentifierEdit(previous: string, next: string): boolean {
   if (next === "" || identifier.test(next)) return true;
   if (!identifierCharacters.test(insertedText(previous, next))) return false;
-  if (next.length > maxIdentifierLength && next.length > previous.length)
+  if (next.length > MAX_IDENTIFIER_CHARACTERS && next.length > previous.length)
     return false;
   return !startsWithDigit(next) || startsWithDigit(previous);
 }

@@ -184,6 +184,17 @@ def formula_graph(inputs, expression):
         {"id": "input-output", "source": "input", "target": "output", "sourceHandle": "next"}]}
 
 
+# An empty result name is unset, as the code view reads it: it names no variable downstream.
+unnamed = formula_graph([{"name": "amount", "type": "NUMBER", "required": True}], "amount")
+unnamed["nodes"].insert(1, {"id": "calc", "type": "FORMULA", "label": "Calc", "position": {"x": 0, "y": 80},
+                            "expression": "amount * 2", "output": ""})
+unnamed["edges"] = [{"id": "input-calc", "source": "input", "target": "calc", "sourceHandle": "next"},
+                    {"id": "calc-output", "source": "calc", "target": "output", "sourceHandle": "next"}]
+assert call("POST", "/variables", unnamed)["output"] == ["amount"]
+rebuilt = call("POST", "/studio/build", call("POST", "/studio/render", unnamed))["definition"]
+assert call("POST", "/variables", rebuilt) == call("POST", "/variables", unnamed)
+
+
 def publish_formula(suffix, graph, kind="FORMULA"):
     created = call("POST", "/rules", {"id": PREFIX + suffix, "name": "Formula call " + suffix,
                    "kind": kind, "definition": graph}, 201)

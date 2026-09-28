@@ -229,11 +229,6 @@ export function storesResult(type: NodeType): boolean {
   return nodeKinds[type].storesResult;
 }
 
-/** The one-line detail a canvas card shows under its label. */
-export function nodeSummary(node: RuleNode, inputCount: number): string {
-  return nodeKinds[node.type].summary(node, inputCount);
-}
-
 /** The RuleNode keys behind each property. */
 const propertyKeys: Record<
   NodeProperty,

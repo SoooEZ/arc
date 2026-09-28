@@ -25,8 +25,6 @@ public class RuleService {
 
   public record Publish(int revision) {}
 
-  private static final Set<String> KINDS = Set.of("DECISION_TREE", "FORMULA", "RULE");
-
   /** How many callers a refused deletion names in its message; `issues` lists them all. */
   private static final int NAMED_CALLERS = 5;
 
@@ -43,9 +41,10 @@ public class RuleService {
     this.engine = engine;
   }
 
-  /** An empty kind lists every kind. */
+  /** An empty kind lists every kind; the filter and the stored column spell {@link RuleKind}. */
   public CatalogPage<RuleSummary> catalog(PageRequest page, String kind, boolean publishedOnly) {
-    if (!kind.isEmpty() && !KINDS.contains(kind)) throw ArcException.invalid("Unknown rule kind");
+    if (!kind.isEmpty() && RuleKind.parse(kind).isEmpty())
+      throw ArcException.invalid("Unknown rule kind");
     return store.catalog(page, kind, publishedOnly);
   }
 
@@ -79,20 +78,20 @@ public class RuleService {
               + ")");
     String name = DisplayNames.normalize("Rule", request.name());
     description(request.description());
-    if (request.kind() == null || !KINDS.contains(request.kind()))
-      throw ArcException.invalid("Choose DECISION_TREE, FORMULA, or RULE");
+    // The payload keeps the kind as text; an unknown one is a 422 here, never a Jackson 400.
+    RuleKind kind =
+        RuleKind.parse(request.kind())
+            .orElseThrow(() -> ArcException.invalid("Choose " + RuleKind.choices()));
     Definition d =
         withNormalizedNotes(
-            request.definition() == null
-                ? RuleSamples.blank(request.kind())
-                : request.definition());
+            request.definition() == null ? RuleSamples.blank(kind) : request.definition());
     validator.shape(d);
     holdCallees(d);
     return store.create(
         request.id(),
         name,
         request.description() == null ? "" : request.description(),
-        request.kind(),
+        kind.name(),
         d);
   }
 

@@ -5,14 +5,14 @@ import type {
   SourceVersionSummary,
   Page,
 } from "../types";
-import { http, pathId, type RequestOptions } from "./http";
+import { http, pathId, queryString, type RequestOptions } from "./http";
 export const sourceApi = {
   catalog: (
     query: { offset?: number; limit?: number; search?: string } = {},
     options?: RequestOptions,
   ) =>
     http.get<Page<SourceSummary>>(
-      `/source-summaries?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`,
+      `/source-summaries?${queryString(query)}`,
       options,
     ),
   versionSummaries: (
@@ -21,7 +21,7 @@ export const sourceApi = {
     options?: RequestOptions,
   ) =>
     http.get<Page<SourceVersionSummary>>(
-      `/sources/${pathId(id)}/version-summaries?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`,
+      `/sources/${pathId(id)}/version-summaries?${queryString(query)}`,
       options,
     ),
   source: (id: string, version: number, options?: RequestOptions) =>

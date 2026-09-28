@@ -6,10 +6,13 @@ import {
   parseJson,
   parseJsonObject,
   decimalKey,
+  decimalTextParts,
   doubleKeepsDecimal,
   sameJsonNumber,
+  significantDigits,
   stringifyJson,
 } from "../../src/domain/json";
+import { decimalTexts } from "./decimal-texts";
 
 const inexactNumbers = [
   "9007199254740993",
@@ -379,4 +382,23 @@ test("a 1 MiB document parses in reasonable time", () => {
   const elapsed = performance.now() - started;
   expect(parsed).toEqual(JSON.parse(text));
   expect(elapsed).toBeLessThan(1_000);
+});
+
+test("the codec's decimal grammar accepts the same texts as numeric defaults", () => {
+  for (const [text, accepted] of decimalTexts)
+    expect(decimalTextParts(text) !== null, text).toBe(accepted);
+  expect(decimalTextParts("-012.50e1")).toEqual({
+    negative: true,
+    integer: "012",
+    fraction: "50",
+    exponent: 1n,
+  });
+  expect(significantDigits(decimalTextParts("-012.50e1")!)).toEqual({
+    digits: "1250",
+    trailingZeros: 1,
+  });
+  expect(significantDigits(decimalTextParts("0.000")!)).toEqual({
+    digits: "",
+    trailingZeros: 0,
+  });
 });

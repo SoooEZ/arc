@@ -386,3 +386,65 @@ test("dotted paths take no keyword, type or constant color while standalone word
     .poll(() => paintedColors(script, "null", 1))
     .not.toEqual(Array<string>("null".length).fill(plain));
 });
+
+test("the color key, the variables list and the editor paint each symbol role from one token", async ({
+  page,
+  request,
+}) => {
+  const id = await create(request);
+  await page.goto(`/#/rules/${id}?node=choose`);
+  const first = page.getByLabel("Case 1 condition", { exact: true });
+  const painted = async (fragment: string) =>
+    (await paintedColors(first, fragment))[0];
+  const computed = (locator: Locator) =>
+    locator.evaluate((element) => getComputedStyle(element).color);
+  // The roles are painted once the scope has loaded; compare only then.
+  await expectColor(first, "$ROUND", colors.function);
+  await expectColor(first, "amount", colors.input);
+  await expectColor(first, "price", colors.result);
+  await page
+    .getByRole("button", {
+      name: "Available variables · Case 1 condition",
+      exact: true,
+    })
+    .click();
+  const list = page.getByRole("dialog", {
+    name: "Available variables · Case 1 condition",
+    exact: true,
+  });
+  expect(await computed(list.locator('code[data-kind="input"]').first())).toBe(
+    await painted("amount"),
+  );
+  expect(await computed(list.locator('code[data-kind="result"]').first())).toBe(
+    await painted("price"),
+  );
+  await list
+    .getByRole("button", { name: "Close available variables", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Node expression", exact: true })
+    .click();
+  const key = page.locator(".expression-color-key");
+  await expect(key).toBeVisible();
+  expect(await computed(key.locator('[data-role="function"]'))).toBe(
+    await painted("$ROUND"),
+  );
+  expect(await computed(key.locator('[data-role="parameter"]'))).toBe(
+    await painted("amount"),
+  );
+  expect(await computed(key.locator('[data-role="result"]'))).toBe(
+    await painted("price"),
+  );
+  // The formula role has no painted symbol here: its key entry reads the token itself.
+  const formulaToken = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--color-symbol-formula)";
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  expect(await computed(key.locator('[data-role="formula"]'))).toBe(
+    formulaToken,
+  );
+});

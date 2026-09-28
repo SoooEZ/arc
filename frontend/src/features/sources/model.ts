@@ -2,6 +2,7 @@ import type { DataSource, Input, SourceConfig } from "../../types";
 import { identifierError } from "../../domain/identifiers";
 import { sampleValue } from "../../domain/executionInputs";
 import { parseJson, parseJsonObject, stringifyJson } from "../../domain/json";
+import { sourceProviders } from "./sourceProviders";
 
 /**
  * Raw JSON text for the editable parts of a source. Buffers keep every digit of
@@ -34,39 +35,18 @@ export function sourceCandidate(
     url,
     ...configuration
   } = source.definition;
+  // Only the active provider's fields are sent: the others' buffers stay as typed.
   return {
     ...source,
     definition: {
       ...configuration,
       parameters: parameters as Input[],
-      ...(configuration.kind === "HTTP"
-        ? { url, secretHeaders: secretHeaderAliases(buffers.secretHeaders) }
-        : {
-            entries: parseJsonObject(
-              buffers.entries,
-              "Lookup entries must be a JSON object.",
-            ),
-          }),
+      ...sourceProviders[configuration.kind].activeFields(
+        { ...configuration, url },
+        buffers,
+      ),
     },
   };
-}
-
-function secretHeaderAliases(text: string): Record<string, string> {
-  const aliases = parseJsonObject(
-    text,
-    "Secret header aliases must be a JSON object.",
-  );
-  if (!hasTextValues(aliases))
-    throw new Error(
-      'Secret header aliases must be text, for example {"Authorization":"CRM_TOKEN"}.',
-    );
-  return aliases;
-}
-
-function hasTextValues(
-  record: Record<string, unknown>,
-): record is Record<string, string> {
-  return Object.values(record).every((value) => typeof value === "string");
 }
 
 export function sourceParameterNamesError(parameters: unknown): string | null {
@@ -107,7 +87,7 @@ export function parseSourceTestInputs(text: string): Record<string, unknown> {
 export function providerParameterTemplate(kind: SourceConfig["kind"]): Input[] {
   return [
     {
-      name: kind === "LOOKUP" ? "key" : "customerId",
+      name: sourceProviders[kind].starterParameter,
       type: "STRING",
       required: true,
       defaultValue: null,

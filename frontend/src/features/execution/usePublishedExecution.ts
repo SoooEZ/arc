@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import type { Definition, RuleSummary, Version } from "../../types";
+import type { RuleSummary, Version } from "../../types";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { usePagedResource } from "../../hooks/usePagedResource";
 import { usePagedSearch } from "../../hooks/usePagedSearch";
 import { ruleApi } from "../../api/rules";
 import {
-  curlExample,
   parseExecutionInputs,
   sampleInputsJson,
   tryParseExecutionInputs,
 } from "../../domain/executionInputs";
+import { useExecutionOptions } from "./useExecutionOptions";
 import { useExecutionRequest } from "./useExecutionRequest";
 import { useInputBuffer } from "./useInputBuffer";
+import { publishedCurl } from "./publishedCurl";
 import {
   defaultRuleId,
   knownVersion,
@@ -20,17 +21,12 @@ import {
   selectionAfterCatalogPage,
 } from "./publishedSelection";
 
-function sampleText(definition: Definition | undefined): string {
-  return definition ? sampleInputsJson(definition) : "{}";
-}
-
 export function usePublishedExecution(notify: (message: string) => void) {
   const [search, setSearch] = useState("");
   const [retry, setRetry] = useState(0);
   const [selectedRule, setSelectedRule] = useState<RuleSummary | null>(null);
   const [pinnedVersion, setPinnedVersion] = useState<number | null>(null);
-  const [trace, setTrace] = useState(true);
-  const [timeoutMs, setTimeoutMs] = useState(30000);
+  const { trace, setTrace, timeoutMs, setTimeoutMs } = useExecutionOptions();
   // A new search starts at the first page; Retry reloads the page that is
   // shown. The hidden library page is not an input: keying on it read the
   // catalog twice on a direct visit, once more when that page arrived.
@@ -57,9 +53,10 @@ export function usePublishedExecution(notify: (message: string) => void) {
   const listedVersion = selectedRule?.publishedVersion ?? 0;
   const history = usePagedResource(
     id,
-    (offset, limit, signal) =>
-      ruleApi.versionSummaries(id, { offset, limit }, { signal }),
-    !!id,
+    id
+      ? (offset, limit, signal) =>
+          ruleApi.versionSummaries(id, { offset, limit }, { signal })
+      : null,
     { refresh: JSON.stringify([listedVersion, retry]) },
   );
   const newestOnPage =
@@ -79,22 +76,18 @@ export function usePublishedExecution(notify: (message: string) => void) {
     knownVersion(historyNewest, selectedRule),
   );
   const version = pinnedVersion ?? (newestVersion || null);
-  const loadVersion = (signal: AbortSignal) =>
-    version === null
-      ? Promise.resolve(null)
-      : ruleApi.version(id, version, { signal });
   const detail = useAsyncResource<Version | null>(
     JSON.stringify([id, version, retry]),
-    loadVersion,
+    id && version !== null
+      ? (signal) => ruleApi.version(id, version, { signal })
+      : null,
     null,
-    0,
-    !!id && version !== null,
   );
   const definition = detail.data?.definition;
   // Inputs typed for one rule version stay with it.
   const inputBuffer = useInputBuffer(
     JSON.stringify([id, version]),
-    sampleText(definition),
+    definition ? sampleInputsJson(definition) : "{}",
   );
   const inputs = inputBuffer.text;
   const execution = useExecutionRequest(
@@ -134,14 +127,13 @@ export function usePublishedExecution(notify: (message: string) => void) {
       }),
     );
   };
-  // Invalid JSON stays editable; the cURL example then sends empty inputs.
-  const curlInputs = tryParseExecutionInputs(inputs);
-  const curl = curlExample(
-    ruleApi.executeUrl(id || defaultRuleId),
-    curlInputs,
-    version,
-    { trace, timeoutMs },
-  );
+  // The endpoint line, the cURL example and the request name one rule: the
+  // sample rule stands in until one is selected.
+  const endpoint = ruleApi.executeUrl(id || defaultRuleId);
+  const curl = publishedCurl(id || defaultRuleId, inputs, version, {
+    trace,
+    timeoutMs,
+  });
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(curl);
@@ -165,13 +157,15 @@ export function usePublishedExecution(notify: (message: string) => void) {
     version,
     definition,
     inputs,
-    inputsAreObject: curlInputs !== null,
+    // Invalid JSON stays editable; the cURL example then sends empty inputs.
+    inputsAreObject: tryParseExecutionInputs(inputs) !== null,
     result,
     running,
     error,
     loadError,
     loading: detail.loading,
     requestDurationMs,
+    endpointPath: new URL(endpoint).pathname,
     curl,
     copy,
     selectRule,

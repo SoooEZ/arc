@@ -11,6 +11,7 @@ import {
 import type { Rule } from "../../types";
 import { kindLabel } from "../../types";
 import { KindIcon } from "../../components/Icons";
+import { rulePath } from "../../app/routing";
 import {
   viewToggleLabel,
   type EditorCapabilities,
@@ -138,7 +139,7 @@ export default function EditorHeader({
         {readOnly && !embedded && (
           <Button
             variant="contained"
-            onClick={() => navigate(`/rules/${rule.id}`)}
+            onClick={() => navigate(rulePath({ ruleId: rule.id }))}
           >
             Edit draft
           </Button>

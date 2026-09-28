@@ -11,7 +11,7 @@ import {
 import { Tooltip, useMediaQuery } from "@mui/material";
 import FocusTrap from "@mui/material/Unstable_TrapFocus";
 import { ArcMark } from "../components/Icons";
-import type { WorkspaceRoute } from "./routing";
+import { pagePath, type WorkspaceRoute } from "./routing";
 
 const preferenceKey = "arc.navigation.expanded";
 interface Props {
@@ -56,19 +56,19 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
       label: "Rule library",
       icon: Layers3,
       active: route.page === "library" || ruleMode === "graph",
-      action: () => open("/library"),
+      action: () => open(pagePath("library")),
     },
     {
       label: "API playground",
       icon: Terminal,
       active: route.page === "playground",
-      action: () => open("/playground"),
+      action: () => open(pagePath("playground")),
     },
     {
       label: "API reference",
       icon: BookOpen,
       active: route.page === "docs",
-      action: () => open("/docs"),
+      action: () => open(pagePath("docs")),
     },
     {
       label: "Code studio",
@@ -83,7 +83,7 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
       label: "Data sources",
       icon: Workflow,
       active: route.page === "sources",
-      action: () => open("/sources"),
+      action: () => open(pagePath("sources")),
     },
   ];
   return (
@@ -106,7 +106,7 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
           <button
             className="brand"
             aria-label="ARC home"
-            onClick={() => open("/library")}
+            onClick={() => open(pagePath("library"))}
           >
             <ArcMark />
             <span className="nav-label">
@@ -166,7 +166,7 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
               <button
                 className="help-link"
                 aria-label="Getting started"
-                onClick={() => open("/docs")}
+                onClick={() => open(pagePath("docs"))}
               >
                 <CircleHelp size={19} />
                 <span className="nav-label">Getting started</span>

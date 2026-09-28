@@ -1,0 +1,18 @@
+{
+  // The tests (Node 24 and Chromium) and the Playwright configuration, type-checked
+  // by `npm run typecheck:tests`. `src` stays on the base configuration (ES2022);
+  // the tests may use ES2024 (toReversed, isWellFormed).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"]
+  },
+  "include": ["tests", "playwright.config.ts", "src/vite-env.d.ts"],
+  // These read files through node:fs, node:path and node:zlib, whose typings
+  // (@types/node) are not a dependency; add it to type-check them too.
+  "exclude": [
+    "tests/style-cascade.spec.ts",
+    "tests/style-equivalence.spec.ts",
+    "tests/style-snapshot.ts"
+  ]
+}

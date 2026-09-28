@@ -1,13 +1,12 @@
 package dev.arc.engine;
 
-import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 
 /**
  * Canonical text of scalar values: null, strings, numbers and booleans. Numbers use plain decimal
  * notation, never scientific notation such as {@code 2E+1}, and must satisfy the value bounds of
- * {@link Expressions#number(Object)}. Arrays and objects have no text form here; callers that
+ * {@link ValueBounds#number(Object)}. Arrays and objects have no text form here; callers that
  * accept them decide how to reject or encode them first.
  */
 public final class ValueText {
@@ -27,7 +26,7 @@ public final class ValueText {
    */
   public static String text(Object scalar) {
     if (scalar == null || scalar instanceof String) return (String) scalar;
-    if (scalar instanceof Number) return Expressions.number(scalar).toPlainString();
+    if (scalar instanceof Number) return ValueBounds.number(scalar).toPlainString();
     if (scalar instanceof Boolean bool) return bool.toString();
     throw ArcException.invalid("Expected a scalar value");
   }
@@ -39,7 +38,7 @@ public final class ValueText {
    */
   public static String key(Object scalar) {
     if (!(scalar instanceof Number)) return text(scalar);
-    BigDecimal number = Expressions.number(scalar);
+    BigDecimal number = ValueBounds.number(scalar);
     if (number.signum() == 0) return "0";
     return number.stripTrailingZeros().toPlainString();
   }

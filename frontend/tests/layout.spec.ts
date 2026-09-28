@@ -5,10 +5,8 @@ import {
   type ElkLayout,
 } from "../src/features/editor/canvas/graphLayout";
 import type { Definition, RuleNode } from "../src/types";
-import {
-  branchHandleX,
-  defaultNodeSize,
-} from "../src/features/editor/canvas/graphGeometry";
+import { branchHandleX } from "../src/domain/nodePorts";
+import { cardSize } from "../src/features/editor/canvas/graphGeometry";
 
 // Node tests lay out in-thread; the browser runs ELK in a worker (graphLayoutWorker).
 const elk = new ELK();
@@ -122,14 +120,15 @@ test("nested splits, unequal measured sizes, and a shared descendant remain conn
     b: { width: 310, height: 180 },
     approved: { width: 290, height: 150 },
   };
-  const arranged = await arrangeGraph(d, new Map(Object.entries(sizes)));
+  const measured = new Map(Object.entries(sizes));
+  const arranged = await arrangeGraph(d, measured);
   expect(withoutPositions(arranged)).toEqual(withoutPositions(d));
   expect(x(arranged, "approved")).toBeLessThan(x(arranged, "declined"));
   for (const a of arranged.nodes)
     for (const b of arranged.nodes)
       if (a.id !== b.id) {
-        const sa = sizes[a.id as keyof typeof sizes] || defaultNodeSize;
-        const sb = sizes[b.id as keyof typeof sizes] || defaultNodeSize;
+        const sa = cardSize(a, measured);
+        const sb = cardSize(b, measured);
         const overlap =
           a.position.x < b.position.x + sb.width &&
           a.position.x + sa.width > b.position.x &&

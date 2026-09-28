@@ -8,6 +8,7 @@ import {
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { memo, useCallback } from "react";
 import { shortId } from "../../../domain/ids";
+import { MAX_SWITCH_CASES } from "../../../domain/limits";
 import { patchGraphNode, type VariableOption } from "../../../domain/graph";
 import type { Definition, RuleNode } from "../../../types";
 import ExpressionField from "../../expressions/ExpressionField";
@@ -119,7 +120,7 @@ export default function SwitchFields(props: NodeFieldsProps) {
         ))}
         <Button
           startIcon={<Plus size={14} />}
-          disabled={readOnly || cases.length >= 20}
+          disabled={readOnly || cases.length >= MAX_SWITCH_CASES}
           onClick={() =>
             patch({
               cases: [

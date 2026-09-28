@@ -1,6 +1,5 @@
 package dev.arc.engine;
 
-import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +26,6 @@ public final class InputTypes {
     // Locale.ROOT: the JVM default turns STRING into "strıng" under tr and az.
     if (!valid)
       throw ArcException.invalid("Input '" + name + "' must be " + type.toLowerCase(Locale.ROOT));
-    return value instanceof Number ? Expressions.number(value) : Expressions.bounded(value);
+    return value instanceof Number ? ValueBounds.number(value) : ValueBounds.bounded(value);
   }
 }

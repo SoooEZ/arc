@@ -45,25 +45,26 @@ export function useNodeExpressionDraft({
   }, [rendered.data]);
   const checked = useAsyncResource(
     JSON.stringify([definition, nodeId, source]),
-    async (signal) => {
-      const built = await studioApi.buildNode(definition, nodeId, source!, {
-        signal,
-      });
-      const issues = built.definition
-        ? await studioApi.diagnostics(built.definition, { signal })
-        : [];
-      const messages = issues
-        .filter((problem) =>
-          problem.locations.some(
-            (location) => !location.ruleId && location.nodeId === nodeId,
-          ),
-        )
-        .map((problem) => problem.message);
-      return { diagnostics: built.diagnostics, messages };
-    },
+    source !== null && !readOnly
+      ? async (signal) => {
+          const built = await studioApi.buildNode(definition, nodeId, source, {
+            signal,
+          });
+          const issues = built.definition
+            ? await studioApi.diagnostics(built.definition, { signal })
+            : [];
+          const messages = issues
+            .filter((problem) =>
+              problem.locations.some(
+                (location) => !location.ruleId && location.nodeId === nodeId,
+              ),
+            )
+            .map((problem) => problem.message);
+          return { diagnostics: built.diagnostics, messages };
+        }
+      : null,
     null,
-    350,
-    source !== null && !readOnly,
+    { delay: 350 },
   );
   const diagnostics = applyDiagnostics.length
     ? applyDiagnostics

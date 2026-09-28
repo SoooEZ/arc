@@ -7,8 +7,13 @@ import {
   Tooltip,
 } from "@mui/material";
 import { Trash2 } from "lucide-react";
-import type { Input, InputType } from "../../../types";
+import type { Input } from "../../../types";
 import type { VariableOption } from "../../../domain/graph";
+import {
+  inputTypeFacts,
+  inputTypeOf,
+  inputTypes,
+} from "../../../domain/inputTypes";
 import IdentifierField from "./IdentifierField";
 import SourceBindingEditor from "../../sources/SourceBindingEditor";
 import InputDefaultValue from "./InputDefaultValue";
@@ -70,20 +75,16 @@ export default function InputParameterCard({
         label="Type"
         value={input.type}
         disabled={readOnly}
-        onChange={(event) =>
-          onChange({
-            type: event.target.value as InputType,
-            defaultValue: null,
-          })
-        }
+        onChange={(event) => {
+          const type = inputTypeOf(event.target.value);
+          if (type) onChange({ type, defaultValue: null });
+        }}
       >
-        {(["NUMBER", "STRING", "BOOLEAN", "ARRAY", "OBJECT"] as const).map(
-          (type) => (
-            <MenuItem key={type} value={type}>
-              {type.toLowerCase()}
-            </MenuItem>
-          ),
-        )}
+        {inputTypes.map((type) => (
+          <MenuItem key={type} value={type}>
+            {inputTypeFacts[type].label}
+          </MenuItem>
+        ))}
       </TextField>
       <InputDefaultValue
         key={input.type}

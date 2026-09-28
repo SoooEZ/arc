@@ -8,17 +8,20 @@ final class BuiltinFunctionCatalog {
   record Spec(int minimumArguments, int maximumArguments, Entry entry) {}
 
   /**
-   * Aggregates that ARC computes with decimal arithmetic instead of POI's floating point. {@link
-   * Functions} evaluates them and the catalog documents them from this one list.
+   * The names of the {@link DecimalAggregate} constants, in their order: {@link Functions}
+   * evaluates them and the catalog documents them from the one enum.
    */
-  static final List<String> DECIMAL_AGGREGATES =
-      List.of("SUM", "MIN", "MAX", "AVG", "AVERAGE", "COUNT", "MUL");
+  static final List<String> DECIMAL_AGGREGATES = names(DecimalAggregate.values());
 
-  /** Collection functions that bind one local item identifier: {@code $MAP(items, item, body)}. */
-  static final List<String> ITEM_FUNCTIONS = List.of("MAP", "FILTER", "ALL", "ANY");
+  /** The {@link CollectionFunction}s that bind one local item identifier, in their order. */
+  static final List<String> ITEM_FUNCTIONS =
+      names(
+          Arrays.stream(CollectionFunction.values())
+              .filter(function -> !function.bindsAccumulator())
+              .toArray(CollectionFunction[]::new));
 
   /** Folds a collection with local item and accumulator identifiers. */
-  static final String REDUCE = "REDUCE";
+  static final String REDUCE = CollectionFunction.REDUCE.name();
 
   private static final Map<String, Spec> SPECS = create();
 
@@ -26,12 +29,8 @@ final class BuiltinFunctionCatalog {
     return SPECS;
   }
 
-  /**
-   * Whether the name introduces local identifiers, so the parser reads its arguments as bindings
-   * and {@link ExpressionRuntime} evaluates the body once per item.
-   */
-  static boolean isCollectionFunction(String name) {
-    return ITEM_FUNCTIONS.contains(name) || name.equals(REDUCE);
+  private static List<String> names(Enum<?>[] constants) {
+    return Arrays.stream(constants).map(Enum::name).toList();
   }
 
   private static Map<String, Spec> create() {
@@ -156,7 +155,11 @@ final class BuiltinFunctionCatalog {
           2,
           "Math",
           n + "(number, digits = 0)",
-          "Rounds to -12…12 decimal places. $ROUND uses half up; $ROUNDDOWN toward zero; $ROUNDUP away from"
+          "Rounds to -"
+              + Functions.MAX_ROUND_DIGITS
+              + "…"
+              + Functions.MAX_ROUND_DIGITS
+              + " decimal places. $ROUND uses half up; $ROUNDDOWN toward zero; $ROUNDUP away from"
               + " zero.",
           n + "(${1:amount}, ${2:2})");
     for (String n : ITEM_FUNCTIONS)

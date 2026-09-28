@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import {
   leavesRuleDocument,
   leaveWarning,
+  pagePath,
   parseRoute,
+  rulePath,
   sameRuleDocument,
   unsavedRuleWarning,
 } from "../../src/app/routing";
@@ -115,4 +117,28 @@ test("a guard scoped to the rule document ignores graph/code switches but not le
   releaseSources();
   release();
   expect(guards.messages()).toEqual([]);
+});
+
+test("rulePath writes today's paths and parseRoute reads every one of them back", () => {
+  expect(rulePath({ ruleId: "tax" })).toBe("/rules/tax");
+  expect(rulePath({ ruleId: "tax", version: 3 })).toBe("/rules/tax?version=3");
+  expect(rulePath({ ruleId: "tax", mode: "code" })).toBe("/studio/tax");
+  expect(
+    rulePath({ ruleId: "tax", mode: "code", version: 2, node: "out" }),
+  ).toBe("/studio/tax?version=2&node=out");
+  expect(pagePath("library")).toBe("/library");
+  expect(pagePath("docs")).toBe("/docs");
+  for (const mode of ["graph", "code"] as const)
+    for (const version of [null, 3])
+      for (const node of [null, "input", "a b/c"]) {
+        const route = { page: "rule", ruleId: "tax", mode, version, node };
+        expect(
+          parseRoute(rulePath({ ruleId: "tax", mode, version, node })),
+        ).toEqual(route);
+      }
+  // IDs are slugs, but the pair round-trips any ID; a malformed escape is an unknown path.
+  expect(parseRoute(rulePath({ ruleId: "a/b" }))).toMatchObject({
+    ruleId: "a/b",
+  });
+  expect(parseRoute("/rules/%E0%A4%A")).toEqual({ page: "library" });
 });

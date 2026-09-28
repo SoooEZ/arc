@@ -29,9 +29,7 @@ export function loadFunctionCatalog(): Promise<FunctionEntry[]> {
 export function useFunctionCatalog(enabled = true) {
   return useAsyncResource(
     "functions",
-    loadFunctionCatalog,
+    enabled ? loadFunctionCatalog : null,
     noFunctions,
-    0,
-    enabled,
   );
 }

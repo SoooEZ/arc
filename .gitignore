@@ -12,3 +12,6 @@ test-results/
 .local/
 *.log
 *.tsbuildinfo
+
+# Python bytecode from the architecture check and its test
+__pycache__/

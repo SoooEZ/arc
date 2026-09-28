@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import type { Build, Definition, Rule } from "../src/types";
+import type { Build, Definition } from "../src/types";
+import { createRule as createApiRule, publishRule } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -23,17 +24,8 @@ async function createRule(
   name: string,
   publish = false,
 ) {
-  const response = await request.post("/api/rules", {
-    data: { id, name, kind: "FORMULA", definition },
-  });
-  expect(response.ok()).toBeTruthy();
-  const rule: Rule = await response.json();
-  if (publish) {
-    const published = await request.post(`/api/rules/${id}/publish`, {
-      data: { revision: rule.revision },
-    });
-    expect(published.ok()).toBeTruthy();
-  }
+  const rule = await createApiRule(request, { id, name, definition });
+  if (publish) await publishRule(request, rule);
 }
 
 test("reusing a rule with an 80-character ID inserts a node ID that builds", async ({
@@ -92,10 +84,12 @@ test("the repeated click of a double click never inserts a second Reference node
   page.on("request", (outgoing) => {
     if (isVersionRead(outgoing.url())) started += 1;
   });
-  for (const event of ["requestfinished", "requestfailed"] as const)
-    page.on(event, (outgoing) => {
-      if (isVersionRead(outgoing.url())) settled += 1;
-    });
+  page.on("requestfinished", (outgoing) => {
+    if (isVersionRead(outgoing.url())) settled += 1;
+  });
+  page.on("requestfailed", (outgoing) => {
+    if (isVersionRead(outgoing.url())) settled += 1;
+  });
 
   await page.goto(`/#/studio/${parent}`);
   await expect(page.locator(".monaco-editor")).toBeVisible();

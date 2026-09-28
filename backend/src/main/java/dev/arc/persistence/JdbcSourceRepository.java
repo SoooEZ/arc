@@ -99,6 +99,9 @@ public class JdbcSourceRepository implements SourceRepository {
         id);
   }
 
+  /**
+   * An unknown source is the same 404 on every read path; only a known one has missing versions.
+   */
   @Override
   public DataSource get(String id, int version) {
     var rows =
@@ -112,8 +115,10 @@ public class JdbcSourceRepository implements SourceRepository {
             mapper,
             id,
             version);
-    if (rows.isEmpty())
+    if (rows.isEmpty()) {
+      requireSource(id);
       throw new ArcException(404, "Data source version not found: " + id + " v" + version);
+    }
     return rows.getFirst();
   }
 
@@ -167,15 +172,19 @@ public class JdbcSourceRepository implements SourceRepository {
   }
 
   @Override
-  public DataSource update(String id, String name, int revision, SourceDefinition definition) {
+  public int lock(String id) {
     var versions =
         db.queryForList(
             "SELECT version FROM data_sources WHERE id=? FOR UPDATE", Integer.class, id);
-    if (versions.isEmpty()) throw new ArcException(404, "Data source not found");
-    if (versions.getFirst() != revision)
-      throw new ArcException(409, "Source changed in another editor; reload before saving");
+    if (versions.isEmpty()) throw sourceNotFound();
+    return versions.getFirst();
+  }
+
+  @Override
+  public DataSource appendVersion(
+      String id, String name, int currentVersion, SourceDefinition definition) {
     StoredText.requireStorable(name);
-    int nextVersion = revision + 1;
+    int nextVersion = currentVersion + 1;
     db.update(
         "INSERT INTO data_source_versions(source_id,version,definition) VALUES (?,?,?::jsonb)",
         id,

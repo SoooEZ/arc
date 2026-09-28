@@ -8,6 +8,7 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Functions;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
+import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleSamples;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class NodeEditorTest {
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
-  private final RuleResolver noRefs = (id, v) -> RuleSamples.blank("FORMULA");
+  private final RuleResolver noRefs = (id, v) -> RuleSamples.blank(RuleKind.FORMULA);
 
   @Test
   void executableFunctionsHaveUsefulCategories() {

@@ -6,6 +6,7 @@ import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.Handles;
 import dev.arc.model.NodeKind;
+import dev.arc.model.RuleKind;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.ApplicationArguments;
@@ -69,20 +70,33 @@ public class RuleSamples implements ApplicationRunner {
     return new Edge(source + "-" + handle + "-" + target, source, target, handle);
   }
 
-  public static Definition blank(String kind) {
-    if (kind.equals("RULE"))
-      return new Definition(
-          1,
-          List.of(new Input("amount", "NUMBER", true, 100)),
-          List.of(
-              node("input", INPUT, "Inputs", 300, 0, null, null),
-              node("condition", CONDITION, "Check amount", 300, 160, "amount >= 100", null),
-              node("yes", OUTPUT, "Eligible", 100, 340, "true", null),
-              node("no", OUTPUT, "Not eligible", 500, 340, "false", null)),
-          List.of(
-              edge("input", "condition", Handles.NEXT),
-              edge("condition", "yes", Handles.TRUE),
-              edge("condition", "no", Handles.FALSE)));
+  /**
+   * The valid template a new rule of the kind starts from: a Condition with two Outputs for a RULE,
+   * and one calculation for a FORMULA or DECISION_TREE (a tree grows from the calculation by hand).
+   */
+  public static Definition blank(RuleKind kind) {
+    return switch (kind) {
+      case RULE -> conditionTemplate();
+      case FORMULA, DECISION_TREE -> calculationTemplate();
+    };
+  }
+
+  private static Definition conditionTemplate() {
+    return new Definition(
+        1,
+        List.of(new Input("amount", "NUMBER", true, 100)),
+        List.of(
+            node("input", INPUT, "Inputs", 300, 0, null, null),
+            node("condition", CONDITION, "Check amount", 300, 160, "amount >= 100", null),
+            node("yes", OUTPUT, "Eligible", 100, 340, "true", null),
+            node("no", OUTPUT, "Not eligible", 500, 340, "false", null)),
+        List.of(
+            edge("input", "condition", Handles.NEXT),
+            edge("condition", "yes", Handles.TRUE),
+            edge("condition", "no", Handles.FALSE)));
+  }
+
+  private static Definition calculationTemplate() {
     return new Definition(
         1,
         List.of(new Input("amount", "NUMBER", true, 100)),
@@ -125,7 +139,7 @@ public class RuleSamples implements ApplicationRunner {
             "apply-discount",
             "Apply discount",
             "A reusable formula for percentage discounts, rounded to two decimal places.",
-            "FORMULA",
+            RuleKind.FORMULA.name(),
             discount);
     service.publish(formula.id(), formula.revision());
     Definition pricing =
@@ -169,7 +183,7 @@ public class RuleSamples implements ApplicationRunner {
             "order-pricing",
             "Order pricing",
             "Reward premium customers and larger orders with the right discount.",
-            "DECISION_TREE",
+            RuleKind.DECISION_TREE.name(),
             pricing);
     service.publish(tree.id(), tree.revision());
     var eligibility =
@@ -177,8 +191,8 @@ public class RuleSamples implements ApplicationRunner {
             "free-shipping",
             "Free shipping",
             "Check whether an order qualifies for complimentary shipping.",
-            "RULE",
-            blank("RULE"));
+            RuleKind.RULE.name(),
+            blank(RuleKind.RULE));
     service.publish(eligibility.id(), eligibility.revision());
   }
 }

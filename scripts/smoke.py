@@ -164,6 +164,28 @@ try:
                                     '"timeoutMs":1000}}' % PREFIX)
     assert status == 422 and "do not use lookup entries" in text, (status, text[:200])
     request("GET", f"/api/sources/{PREFIX}-http-entries/versions", expected=404)
+    # A provider declares the fields it reads: a LOOKUP definition rejects a URL before its own checks.
+    lookup_with_url = request("POST", "/api/sources", {"id": f"{PREFIX}-lookup-url", "name": "Lookup URL", "definition": {
+        "kind": "LOOKUP", "url": "file:///etc/passwd", "parameters": [{"name": "key", "type": "STRING", "required": True}],
+        "entries": {"US": {"rate": 0.07}}, "timeoutMs": 3000}}, 422)
+    assert lookup_with_url["message"] == "Lookup tables do not use a URL", lookup_with_url
+    request("GET", f"/api/sources/{PREFIX}-lookup-url/versions", expected=404)
+    # A source save locks and checks the revision before validating: a stale and invalid save is a
+    # 409, an invalid save at the current revision a 422 that stores nothing, and an unknown source a 404.
+    table = request("POST", "/api/sources", {"id": f"{PREFIX}-table", "name": "Table", "definition": {
+        "kind": "LOOKUP", "parameters": [{"name": "key", "type": "STRING", "required": True}],
+        "entries": {"US": {"rate": 0.07}}, "timeoutMs": 3000}})
+    invalid_table = {"kind": "LOOKUP", "parameters": [{"name": "unit price", "type": "STRING", "required": True}],
+                     "entries": {}, "timeoutMs": 3000}
+    stale = request("PUT", f"/api/sources/{table['id']}", {"name": "Table", "revision": table["version"] + 1,
+                    "definition": invalid_table}, 409)
+    assert stale["message"] == "Source changed in another editor; reload before saving", stale
+    request("PUT", f"/api/sources/{table['id']}", {"name": "Table", "revision": table["version"],
+            "definition": invalid_table}, 422)
+    assert request("GET", f"/api/sources/{table['id']}/version-summaries")["total"] == 1
+    for path in [f"/api/sources/{PREFIX}-missing", f"/api/sources/{PREFIX}-missing/versions/1"]:
+        method, body = ("PUT", {"name": "Missing", "revision": 1, "definition": invalid_table}) if path.endswith("-missing") else ("GET", None)
+        assert request(method, path, body, expected=404)["message"] == "Source not found", path
 
     child = create("child")
     # Input problems are located on the Input node from a save too, as /validate reports them.

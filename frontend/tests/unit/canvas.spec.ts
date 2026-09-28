@@ -8,7 +8,8 @@ import {
   takenBranches,
   type FlowNodeInputs,
 } from "../../src/features/editor/canvas/flowElements";
-import { nodeSummary } from "../../src/domain/nodeKinds";
+import { nodeKinds } from "../../src/domain/nodeKinds";
+import { cardCenter } from "../../src/features/editor/canvas/graphGeometry";
 import {
   routeEdge,
   routeWithCache,
@@ -59,6 +60,7 @@ const inputs = (overrides: Partial<FlowNodeInputs> = {}): FlowNodeInputs => ({
   errors: new Map(),
   sizes: new Map(),
   onExpression,
+  canOpenCode: true,
   ...overrides,
 });
 const byId = <T extends { id: string }>(items: T[]) =>
@@ -181,6 +183,9 @@ test("every node kind has a card summary", () => {
     position: { x: 0, y: 0 },
     ...patch,
   });
+  // The path GraphNode takes: the descriptor's summary for the card's kind.
+  const nodeSummary = (card: RuleNode, inputCount: number) =>
+    nodeKinds[card.type].summary(card, inputCount);
   expect(nodeSummary(node({ type: "INPUT" }), 1)).toBe("1 input parameter");
   expect(nodeSummary(node({ type: "INPUT" }), 2)).toBe("2 input parameters");
   expect(nodeSummary(node({ type: "REFERENCE" }), 0)).toBe("Select a rule");
@@ -294,4 +299,75 @@ test("a drag routes again only the edges the moved card can affect, and the sett
       routeEdge(source, target, draggedCards),
     );
   }
+});
+
+test("Switch Default and Condition False edges take the fallback stroke and label style", () => {
+  const branching: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      { id: "input", type: "INPUT", label: "In", position: { x: 0, y: 0 } },
+      {
+        id: "check",
+        type: "CONDITION",
+        label: "Check",
+        expression: "true",
+        position: { x: 0, y: 100 },
+      },
+      {
+        id: "pick",
+        type: "SWITCH",
+        label: "Pick",
+        cases: [{ id: "high", label: "High", expression: "true" }],
+        position: { x: 0, y: 200 },
+      },
+      {
+        id: "out",
+        type: "OUTPUT",
+        label: "Out",
+        expression: "1",
+        position: { x: 0, y: 300 },
+      },
+    ],
+    edges: [
+      { id: "t", source: "check", target: "pick", sourceHandle: "true" },
+      { id: "f", source: "check", target: "out", sourceHandle: "false" },
+      { id: "c", source: "pick", target: "out", sourceHandle: "case:high" },
+      { id: "d", source: "pick", target: "out", sourceHandle: "default" },
+    ],
+  };
+  const edges = flowEdges(
+    branching,
+    { selectedEdge: null, taken: new Set() },
+    new Map(),
+  );
+  const byId = Object.fromEntries(edges.map((edge) => [edge.id, edge]));
+  expect(byId.d.label).toBe("Default");
+  expect(byId.c.label).toBe("High");
+  // Fallback exits share one stroke and label style, whatever the handle is called.
+  expect(byId.d.style?.stroke).toBe(byId.f.style?.stroke);
+  expect(byId.d.labelStyle).toBe(byId.f.labelStyle);
+  expect(byId.c.style?.stroke).toBe(byId.t.style?.stroke);
+  expect(byId.c.labelStyle).toBe(byId.t.labelStyle);
+  expect(byId.d.style?.stroke).not.toBe(byId.c.style?.stroke);
+  expect(byId.d.labelStyle).not.toBe(byId.c.labelStyle);
+});
+
+test("a card's centre comes from its measured size, else from its exit-driven width", () => {
+  const wide: RuleNode = {
+    id: "pick",
+    type: "SWITCH",
+    label: "Pick",
+    cases: Array.from({ length: 6 }, (_, index) => ({
+      id: `c${index}`,
+      label: `Case ${index}`,
+      expression: "true",
+    })),
+    position: { x: 100, y: 50 },
+  };
+  // Seven exits at 90 px each: a 630 px card, centred 315 px from its left edge.
+  expect(cardCenter(wide, new Map())).toEqual({ x: 415, y: 102.5 });
+  expect(
+    cardCenter(wide, new Map([["pick", { width: 700, height: 140 }]])),
+  ).toEqual({ x: 450, y: 120 });
 });

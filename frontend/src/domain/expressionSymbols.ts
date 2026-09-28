@@ -1,4 +1,5 @@
 import type { VariableOption } from "./graph";
+import { inputTypeOf } from "./inputTypes";
 import { isNodeType, storesResult } from "./nodeKinds";
 
 export type ExpressionSymbolKind =
@@ -23,7 +24,6 @@ interface LocalScope {
 const identifier =
   /^(?:@[a-z][a-z0-9-]*(?::[1-9]\d*)?|\$?[A-Za-z_][A-Za-z_0-9.]*)$/;
 const localIdentifier = /^[A-Za-z_][A-Za-z_0-9]*$/;
-const inputTypes = new Set(["NUMBER", "STRING", "BOOLEAN", "ARRAY", "OBJECT"]);
 const collections = new Set(["MAP", "FILTER", "ALL", "ANY", "REDUCE"]);
 
 /** This lexer only classifies visible names; execution and scope validation remain on the server. */
@@ -122,9 +122,10 @@ function scriptNames(
       declarations.set(at, kind);
       names.set(tokens[at].text, kind);
     };
+    // A declaration's type reads in any case, as the server's grammar does.
     if (
       tokens[index + 1]?.text === ":" &&
-      inputTypes.has(tokens[index + 2]?.text)
+      inputTypeOf(tokens[index + 2]?.text) !== null
     ) {
       declare(index, "parameter");
       continue;

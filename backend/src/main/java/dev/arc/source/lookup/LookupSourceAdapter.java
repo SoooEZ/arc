@@ -7,6 +7,7 @@ import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.SourceDefinition;
+import dev.arc.model.SourceDefinition.Field;
 import dev.arc.source.SourceAdapter;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -21,6 +22,17 @@ public final class LookupSourceAdapter implements SourceAdapter {
     return "LOOKUP";
   }
 
+  /** The table is the whole configuration; a URL or secret headers are refused before this. */
+  @Override
+  public Set<Field> fields() {
+    return Set.of(Field.ENTRIES);
+  }
+
+  @Override
+  public String noun() {
+    return "Lookup tables";
+  }
+
   @Override
   public void validate(SourceDefinition definition) {
     if (!definition.parameters().stream()
@@ -28,10 +40,6 @@ public final class LookupSourceAdapter implements SourceAdapter {
         .collect(Collectors.toSet())
         .equals(Set.of("key")))
       throw ArcException.invalid("Lookup tables require exactly one parameter named key");
-    if (definition.secretHeaders() != null && !definition.secretHeaders().isEmpty())
-      throw ArcException.invalid("Lookup tables do not use secret headers");
-    if (definition.url() != null && !definition.url().isBlank())
-      throw ArcException.invalid("Lookup tables do not use a URL");
     if (definition.entries() == null || definition.entries().size() > Limits.MAX_COLLECTION_ITEMS)
       throw ArcException.invalid(
           "Provide a JSON object with at most "

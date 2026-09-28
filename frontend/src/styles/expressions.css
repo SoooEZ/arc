@@ -115,10 +115,10 @@
   overflow-wrap: anywhere;
 }
 .expression-variable-list code[data-kind="input"] {
-  color: #205fa6;
+  color: var(--color-symbol-parameter);
 }
 .expression-variable-list code[data-kind="result"] {
-  color: #7b3f98;
+  color: var(--color-symbol-result);
 }
 .expression-variable-list.variable-list span {
   flex-shrink: 0;

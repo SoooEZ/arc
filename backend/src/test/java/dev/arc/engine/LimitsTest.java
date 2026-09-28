@@ -32,6 +32,15 @@ class LimitsTest {
     }
   }
 
+  /** Byte limits are stated from their constants too, in the units the messages always used. */
+  @Test
+  void byteSizesAreShownInWholeUnits() {
+    assertThat(Limits.formatBytes(1024 * 1024)).isEqualTo("1 MiB");
+    assertThat(Limits.formatBytes(16L * 1024 * 1024)).isEqualTo("16 MiB");
+    assertThat(Limits.formatBytes(256 * 1024)).isEqualTo("256 KiB");
+    assertThat(Limits.formatBytes(1_500)).isEqualTo("1,500 bytes");
+  }
+
   /** Every place that stores an expression accepts exactly what the compiler accepts. */
   @Test
   void draftShapeAndCompilerShareTheExpressionLimit() {

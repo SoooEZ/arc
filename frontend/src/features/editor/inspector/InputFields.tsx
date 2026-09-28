@@ -1,6 +1,7 @@
-import { Button } from "@mui/material";
+import { Button, Tooltip } from "@mui/material";
 import { Plus } from "lucide-react";
 import { inputVariables } from "../../../domain/graph";
+import { canAddInput, MAX_INPUTS } from "../../../domain/limits";
 import InputParameterCard from "./InputParameterCard";
 import { useInputParameterRows } from "./useInputParameterRows";
 import type { NodeFieldsProps } from "./types";
@@ -39,15 +40,26 @@ export default function InputFields({
         />
       ))}
       {!readOnly && (
-        <Button
-          size="small"
-          fullWidth
-          variant="outlined"
-          startIcon={<Plus size={14} />}
-          onClick={parameters.add}
+        <Tooltip
+          title={
+            canAddInput(rule.draft)
+              ? ""
+              : `A rule declares at most ${MAX_INPUTS} input parameters`
+          }
         >
-          Add parameter
-        </Button>
+          <span>
+            <Button
+              size="small"
+              fullWidth
+              variant="outlined"
+              startIcon={<Plus size={14} />}
+              disabled={!canAddInput(rule.draft)}
+              onClick={parameters.add}
+            >
+              Add parameter
+            </Button>
+          </span>
+        </Tooltip>
       )}
     </InspectorSection>
   );

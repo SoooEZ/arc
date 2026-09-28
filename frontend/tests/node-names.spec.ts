@@ -340,3 +340,42 @@ test("a stored invalid result name can be shortened and repaired while prohibite
     "ordertotal",
   );
 });
+
+test("a refused paste stops being reported once the name changes through the node dialog", async ({
+  page,
+  request,
+}) => {
+  const rule = await create(request);
+  await page.goto(`/#/rules/${rule.id}?node=calc`);
+  const field = page.getByLabel("Result variable", { exact: true });
+  await expect(field).toHaveValue("total");
+  await field.evaluate((element) => {
+    const clipboard = new DataTransfer();
+    clipboard.setData("text/plain", "bad name");
+    element.dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: clipboard,
+      }),
+    );
+  });
+  await expect(field).toHaveValue("total");
+  await expect(field).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText(/No spaces, \$ or @/).first()).toBeVisible();
+  await page
+    .locator('.react-flow__node[data-id="calc"] .graph-node')
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: /Edit node/ });
+  await dialog
+    .getByLabel("Result variable", { exact: true })
+    .fill("grand_total");
+  await dialog
+    .getByRole("button", { name: "Apply to graph", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  // The refusal belonged to "total"; the sidebar field shows the new valid name as valid.
+  await expect(field).toHaveValue("grand_total");
+  await expect(field).toHaveAttribute("aria-invalid", "false");
+});

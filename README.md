@@ -329,6 +329,9 @@ python3 scripts/check_architecture.py
 # Check native startup diagnostics (temporary sockets; no PostgreSQL or Foreman needed)
 node --test scripts/check_dev.test.mjs
 
+# Check the frontend's mirrors of backend limits, input types and the API reference rows
+node --test scripts/check_mirrors.test.mjs
+
 # Backend formatting check and tests for arithmetic, graphs, sources and references
 cd backend
 mvn clean verify
@@ -337,9 +340,10 @@ mvn clean verify
 cd ../frontend
 npm ci
 
-# Frontend formatting, pure unit tests (no browser/server), type check and build
+# Frontend formatting, pure unit tests (no browser/server), type checks and build
 npm run format:check
 npm run test:unit
+npm run typecheck:tests
 npm run build
 
 # End-to-end browser tests, with ARC running at localhost:3080
