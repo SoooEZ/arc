@@ -2,14 +2,15 @@ package dev.arc.engine.validation;
 
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.graph.GraphPlan;
-import dev.arc.engine.validation.Validator.Problem;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import java.util.*;
-import java.util.stream.Collectors;
 
-/** Collects navigable errors even when an incomplete graph has no executable scope plan. */
+/**
+ * Collects navigable problems in one pass, even when an incomplete graph has no scope plan. Each
+ * check runs once: every expression compiles once and the scope plan is built once.
+ */
 final class GraphDiagnostics {
   private final DefinitionShape documentShape;
   private final NodeValidation nodeValidation;
@@ -24,59 +25,88 @@ final class GraphDiagnostics {
     this.graphValidation = graphValidation;
   }
 
-  public List<Problem> diagnostics(Definition definition, RuleResolver resolver) {
-    var problems = new LinkedHashSet<Problem>();
-    try {
-      documentShape.validate(definition);
-    } catch (ArcException e) {
-      try {
-        graphValidation.plan(definition, resolver);
-      } catch (ArcException located) {
-        problems.add(Problem.from(located));
-      }
-      return new ArrayList<>(problems);
+  Validator.Diagnosis diagnose(Definition definition, RuleResolver resolver) {
+    var problems = new Problems(definition);
+    var violation = documentShape.firstViolation(definition);
+    if (violation.isPresent()) {
+      // Later checks assume a well-formed document.
+      problems.add(DefinitionShape.located(violation.get(), definition));
+      return new Validator.Diagnosis(problems.list(), false, List.of());
     }
-    Map<String, Set<String>> scope = null;
-    try {
-      scope = new GraphPlan(definition).available();
-    } catch (ArcException e) {
-      problems.add(Problem.from(e));
-    }
+    var pins = new RejectedPins(resolver);
+    var expressions = new ExpressionCache();
+    GraphPlan plan = scopePlan(definition, problems);
     for (Node node : definition.nodes()) {
       try {
-        if (scope != null)
+        if (plan == null) nodeValidation.syntax(node, pins, expressions);
+        else
           nodeValidation.validate(
-              definition, node, scope.getOrDefault(node.id(), Set.of()), resolver);
-        else nodeValidation.syntax(node, resolver);
-      } catch (ArcException e) {
-        problems.add(Problem.from(e.atNode(null, null, node.id(), node.label())));
+              definition, node, plan.available().get(node.id()), pins, expressions);
+      } catch (ArcException error) {
+        problems.add(error);
       }
     }
-    Node input =
-        definition.nodes().stream()
-            .filter(node -> node.type().equals("INPUT"))
-            .findFirst()
-            .orElse(null);
-    var names = definition.inputs().stream().map(Input::name).collect(Collectors.toSet());
-    for (Input parameter : definition.inputs())
-      if (parameter.source() != null) {
-        for (var binding : parameter.source().bindings().entrySet())
-          try {
-            NodeValidation.expression(
-                binding.getValue(),
-                names,
-                parameter.name() + " source / " + binding.getKey(),
-                resolver);
-          } catch (ArcException e) {
-            problems.add(
-                Problem.from(input == null ? e : e.atNode(null, null, input.id(), input.label())));
-          }
-      }
+    var inputReads =
+        graphValidation.checkSourceMappings(definition, expressions, pins, problems::add);
     try {
-      graphValidation.plan(definition, resolver);
-    } catch (ArcException e) {
-      problems.add(Problem.from(e));
+      graphValidation.checkStructure(definition, inputReads, plan);
+    } catch (ArcException error) {
+      problems.add(error);
     }
-    return new ArrayList<>(problems);
+    var dependencies =
+        NodeValidation.dependencies(definition, expressions::formulaCalls).stream()
+            .filter(dependency -> !pins.rejected(dependency))
+            .toList();
+    return new Validator.Diagnosis(problems.list(), true, dependencies);
+  }
+
+  /** A cyclic or too complex graph has no scope plan; its nodes still get syntax checks. */
+  private static GraphPlan scopePlan(Definition definition, Problems problems) {
+    try {
+      return new GraphPlan(definition);
+    } catch (ArcException error) {
+      problems.add(error);
+      return null;
+    }
+  }
+
+  /**
+   * Remembers the pins the graph checks could not resolve. Their problems are already reported, so
+   * a later source-contract check must not resolve and report them again.
+   */
+  private static final class RejectedPins implements RuleResolver {
+    private record Pin(String ruleId, int version, Validator.Dependency.Call call) {}
+
+    private final RuleResolver delegate;
+    private final Set<Pin> rejected = new HashSet<>();
+
+    RejectedPins(RuleResolver delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public Definition resolve(String id, int version) {
+      try {
+        return delegate.resolve(id, version);
+      } catch (ArcException error) {
+        rejected.add(new Pin(id, version, Validator.Dependency.Call.REFERENCE));
+        throw error;
+      }
+    }
+
+    @Override
+    public Definition resolveFormula(String id, int version) {
+      try {
+        return delegate.resolveFormula(id, version);
+      } catch (ArcException error) {
+        rejected.add(new Pin(id, version, Validator.Dependency.Call.FORMULA));
+        throw error;
+      }
+    }
+
+    boolean rejected(Validator.Dependency dependency) {
+      return rejected.contains(
+          new Pin(dependency.ruleId(), dependency.version(), dependency.call()));
+    }
   }
 }

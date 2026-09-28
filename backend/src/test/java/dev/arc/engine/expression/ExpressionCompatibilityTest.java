@@ -2,6 +2,7 @@ package dev.arc.engine.expression;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.arc.engine.ExecutionDeadline;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.util.*;
@@ -39,6 +40,55 @@ class ExpressionCompatibilityTest {
     assertThat(eval("$OR(true, 1 / 0)")).isEqualTo(true);
     assertThat(eval("$IF(false, 1 / 0, 3)")).isEqualTo(new BigDecimal("3"));
     assertThat(eval("$SWITCH(2, 1, 1 / 0, 2, 7, 1 / 0)")).isEqualTo(new BigDecimal("7"));
+  }
+
+  @Test
+  void collectionLocalsShadowTheScopeWithoutCopyingIt() {
+    var scope = new HashMap<String, Object>();
+    scope.put("items", Arrays.asList(1, null, 3));
+    scope.put("x", "outer");
+    scope.put("acc", "outer");
+    // A null item is still bound; it must not fall back to the outer x or be unknown.
+    assertThat(Expressions.evaluate("$MAP(items, x, x == null)", scope))
+        .isEqualTo(List.of(false, true, false));
+    assertThat(Expressions.evaluate("$MAP([1], y, x)", scope)).isEqualTo(List.of("outer"));
+    assertThat(Expressions.evaluate("$MAP([[1, 2]], x, $MAP(x, x, x * 10))", scope))
+        .isEqualTo(List.of(List.of(new BigDecimal("10"), new BigDecimal("20"))));
+    assertThat(
+            Expressions.evaluate(
+                "$REDUCE([1, 2], x, acc, null, $COALESCE(acc, 0) + x) + $LEN(acc)", scope))
+        .isEqualTo(new BigDecimal("8"));
+    assertThatThrownBy(() -> Expressions.evaluate("$MAP([1], y, missing)", scope))
+        .hasMessage("Unknown variable: missing");
+    assertThat(Expressions.evaluate("$FILTER(items, item, item != null)", scope))
+        .isEqualTo(List.of(1, 3));
+  }
+
+  @Test
+  void chooseEvaluatesOnlyTheSelectedValue() {
+    // Excel evaluates only the chosen value; every argument used to be evaluated first.
+    assertThat(eval("$CHOOSE(1, 5, 1 / 0)")).isEqualTo(new BigDecimal("5"));
+    assertThat(eval("$CHOOSE(2, 1 / 0, \"b\")")).isEqualTo("b");
+    assertThat(eval("$CHOOSE(1.9, \"a\", \"b\")")).isEqualTo("a");
+    assertThat(eval("$CHOOSE(\"2\", \"a\", \"b\")")).isEqualTo("b");
+    assertThat(eval("$CHOOSE(1, [5, 6])"))
+        .isEqualTo(List.of(new BigDecimal("5"), new BigDecimal("6")));
+    assertThat(eval("$CHOOSE(1, null, 1 / 0)")).isNull();
+    for (String outOfRange : List.of("$CHOOSE(0, 1, 2)", "$CHOOSE(3, 1, 2)", "$CHOOSE(\"x\", 1)"))
+      assertThatThrownBy(() -> eval(outOfRange)).as(outOfRange).hasMessage("CHOOSE: #VALUE!");
+    assertThatThrownBy(() -> eval("$CHOOSE([1], 1)"))
+        .hasMessage("CHOOSE: argument 1 must be a single value, not an array");
+    var calls = new ArrayList<Expressions.FormulaCall>();
+    Expressions.FormulaCaller caller =
+        (formula, arguments) -> {
+          calls.add(formula);
+          return BigDecimal.ONE;
+        };
+    assertThat(
+            Expressions.compile("$CHOOSE(2, @first:1(), @second:1())")
+                .evaluate(Map.of(), ExecutionDeadline.start(30_000), caller))
+        .isEqualTo(BigDecimal.ONE);
+    assertThat(calls).containsExactly(new Expressions.FormulaCall("second", 1, 0));
   }
 
   @Test

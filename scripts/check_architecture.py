@@ -21,12 +21,23 @@ ALLOWED_JAVA = {
     "api": {"api", "rule", "source", "engine", "model", "error"},
 }
 ENGINE_DEPENDENCIES = {
-    "expression": {"expression", "Identifiers", "ExecutionDeadline"},
+    "expression": {"expression", "Identifiers", "ExecutionDeadline", "Limits", "ValueText"},
     "graph": {"graph"},
-    "validation": {"validation", "graph", "expression", "Identifiers", "InputTypes", "RuleResolver"},
-    "script": {"script", "expression", "validation", "Identifiers"},
-    "execution": {"execution", "graph", "validation", "expression", "Identifiers", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline"},
+    "validation": {"validation", "graph", "expression", "Identifiers", "InputTypes", "RuleResolver", "Limits"},
+    "script": {"script", "expression", "validation", "Identifiers", "InputTypes", "Limits"},
+    "execution": {"execution", "graph", "validation", "expression", "Identifiers", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline", "Limits"},
 }
+# Node kinds and connection handles have one vocabulary: dev.arc.model.NodeKind and Handles.
+NODE_KINDS = "(?:INPUT|FORMULA|CONDITION|SWITCH|TRANSFORM|REFERENCE|OUTPUT)"
+HAND_WRITTEN_NODE_VOCABULARY = re.compile(
+    r'\.type\(\)\s*\.equals\(\s*"' + NODE_KINDS + '"'  # node.type().equals("INPUT")
+    + r'|"' + NODE_KINDS + r'"\s*\.equals\(\s*[\w.]*\.type\(\)'  # "INPUT".equals(node.type())
+    + r'|case\s+"' + NODE_KINDS + r'"\s*->'  # a string switch over node types
+    + r'|"' + NODE_KINDS + r'"\s*,\s*"' + NODE_KINDS + '"'  # a hand-written table of kinds
+    + r'|' + NODE_KINDS + r'\|' + NODE_KINDS  # a hand-written regex alternation of kinds
+    + r'|next\|true\|false'  # a hand-written regex alternation of handles
+    + r'|"case:"'  # a hand-built Switch case handle
+)
 PURE_FRONTEND = {
     "domain/": ("types", "domain/"),
     "features/editor/documentState.ts": ("types", "domain/"),
@@ -53,7 +64,11 @@ for path in sorted(JAVA.rglob("*.java")):
     module = parts[0]
     if module not in ALLOWED_JAVA:
         continue  # Spring application composition root.
-    imports = re.findall(r"^import\s+(?:static\s+)?([\w.*]+);", path.read_text(), re.M)
+    source = path.read_text()
+    if module != "model" and HAND_WRITTEN_NODE_VOCABULARY.search(source):
+        reject(path, HAND_WRITTEN_NODE_VOCABULARY.search(source).group(0),
+               "use NodeKind (Node.kind(), exhaustive switches) and Handles instead of node-type or handle strings")
+    imports = re.findall(r"^import\s+(?:static\s+)?([\w.*]+);", source, re.M)
     for dependency in imports:
         if dependency.startswith("dev.arc."):
             target = dependency.split(".")[2]

@@ -27,21 +27,21 @@ public class RuleController {
 
   @GetMapping("/rule-summaries")
   public CatalogPage<RuleSummary> catalog(
-      @RequestParam(defaultValue = "0") int offset,
-      @RequestParam(defaultValue = "20") int limit,
-      @RequestParam(defaultValue = "") String search,
+      @RequestParam(required = false) Integer offset,
+      @RequestParam(required = false) Integer limit,
+      @RequestParam(required = false) String search,
       @RequestParam(defaultValue = "") String kind,
       @RequestParam(defaultValue = "false") boolean publishedOnly) {
-    return rules.catalog(offset, limit, search, kind, publishedOnly);
+    return rules.catalog(PageParameters.page(offset, limit, search), kind, publishedOnly);
   }
 
   @GetMapping("/rules/{id}/version-summaries")
   public CatalogPage<RuleVersionSummary> versionSummaries(
       @PathVariable String id,
-      @RequestParam(defaultValue = "0") int offset,
-      @RequestParam(defaultValue = "20") int limit,
-      @RequestParam(defaultValue = "") String search) {
-    return rules.versionSummaries(id, offset, limit, search);
+      @RequestParam(required = false) Integer offset,
+      @RequestParam(required = false) Integer limit,
+      @RequestParam(required = false) String search) {
+    return rules.versionSummaries(id, PageParameters.page(offset, limit, search));
   }
 
   @PostMapping("/rules")

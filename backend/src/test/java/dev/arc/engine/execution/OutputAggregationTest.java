@@ -1,5 +1,6 @@
 package dev.arc.engine.execution;
 
+import static dev.arc.support.GraphFixtures.copyOf;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,22 +43,7 @@ class OutputAggregationTest {
         """);
     var nodes = new ArrayList<>(definition.nodes());
     var direct = nodes.get(1);
-    nodes.set(
-        1,
-        new Definition.Node(
-            direct.id(),
-            direct.type(),
-            direct.label(),
-            direct.position(),
-            "  amount\t",
-            direct.output(),
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            ""));
+    nodes.set(1, copyOf(direct).expression(" amount\t").outputName("").build());
     definition =
         new Definition(1, definition.inputs(), nodes, definition.edges(), definition.notes());
     var result = run(definition);

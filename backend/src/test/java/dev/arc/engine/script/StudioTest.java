@@ -105,7 +105,8 @@ node output OUTPUT "Return" { return final; }
     assertThatThrownBy(() -> eval("$REPT(\"x\", 1000000000)")).hasMessageContaining("string limit");
     assertThat(eval("2^3^2")).isEqualTo(new BigDecimal("512"));
     assertThat(eval("1 = 1.0 AND 2 <> 3")).isEqualTo(true);
-    assertThat(eval("$VLOOKUP(2, [[1, 10], [2, 20]], 2, false)")).isEqualTo(new BigDecimal("2E+1"));
+    assertThat((BigDecimal) eval("$VLOOKUP(2, [[1, 10], [2, 20]], 2, false)"))
+        .isEqualByComparingTo(new BigDecimal("20"));
     assertThat(Functions.catalog().stream().filter(Functions.Entry::supported).count())
         .isGreaterThan(150);
     assertThat(Functions.catalog()).anyMatch(f -> f.name().equals("$INDIRECT") && !f.supported());

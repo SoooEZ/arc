@@ -1,14 +1,16 @@
 package dev.arc.engine.script;
 
+import static dev.arc.support.GraphFixtures.nodeOf;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.Edge;
 import dev.arc.model.Definition.Node;
-import dev.arc.model.Definition.Position;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +69,133 @@ class ArcScriptContractTest {
   }
 
   @Test
+  void everyNodeKindRendersItsCanonicalStatementsAndConnections() {
+    String source =
+        """
+        // kinds
+        inputs {
+          amount: NUMBER required default 100;
+          rate: NUMBER optional default 0.1;
+          source rate = {"id":"country-tax","version":2,"bindings":{"key":"amount"},"pointer":"/rate","onError":"DEFAULT"};
+        }
+        node input INPUT "Inputs" at (0, 0) { next -> calc; }
+        node calc FORMULA "Calc" at (0, 100) { let discount = amount * rate; next -> check; }
+        node check CONDITION "Check" at (0, 200) { when discount > 5; true -> route; false -> pick; }
+        node route SWITCH "Route" at (0, 300) {
+          case big "Big" equals 100;
+          select amount;
+          CASE:big -> shape;
+          default -> whole;
+        }
+        node pick SWITCH "Pick" at (300, 300) { case yes "Yes" when amount > 1; case:yes -> whole; DEFAULT -> reuse; }
+        node shape TRANSFORM "Shape" at (0, 400) { field "value" = amount; as data; next -> reuse; }
+        node whole TRANSFORM "Whole" at (300, 400) { let items = [amount]; next -> reuse; }
+        node reuse REFERENCE "Reuse" at (0, 500) {
+          use "apply-discount" version 1;
+          bind rate = 0.2;
+          bind amount = amount;
+          as price;
+          next -> done;
+        }
+        node done OUTPUT "Done" at (0, 600) { return price; as total; }
+        """;
+    String canonical =
+        """
+        schema 1;
+
+        // kinds
+        inputs {
+          amount: NUMBER required default 100;
+          rate: NUMBER optional default 0.1;
+          source rate = {"id":"country-tax","version":2,"bindings":{"key":"amount"},"pointer":"/rate","onError":"DEFAULT"};
+        }
+
+        node "input" INPUT "Inputs" at (0.0, 0.0) {
+          next -> "calc" edge "input-next-calc";
+        }
+
+        node "calc" FORMULA "Calc" at (0.0, 100.0) {
+          let discount = amount * rate;
+          next -> "check" edge "calc-next-check";
+        }
+
+        node "check" CONDITION "Check" at (0.0, 200.0) {
+          when discount > 5;
+          true -> "route" edge "check-true-route";
+          false -> "pick" edge "check-false-pick";
+        }
+
+        node "route" SWITCH "Route" at (0.0, 300.0) {
+          select amount;
+          case "big" "Big" equals 100;
+          case:big -> "shape" edge "route-case:big-shape";
+          default -> "whole" edge "route-default-whole";
+        }
+
+        node "pick" SWITCH "Pick" at (300.0, 300.0) {
+          case "yes" "Yes" when amount > 1;
+          case:yes -> "whole" edge "pick-case:yes-whole";
+          default -> "reuse" edge "pick-default-reuse";
+        }
+
+        node "shape" TRANSFORM "Shape" at (0.0, 400.0) {
+          field "value" = amount;
+          as data;
+          next -> "reuse" edge "shape-next-reuse";
+        }
+
+        node "whole" TRANSFORM "Whole" at (300.0, 400.0) {
+          let items = [amount];
+          next -> "reuse" edge "whole-next-reuse";
+        }
+
+        node "reuse" REFERENCE "Reuse" at (0.0, 500.0) {
+          use "apply-discount" version 1;
+          bind amount = amount;
+          bind rate = 0.2;
+          as price;
+          next -> "done" edge "reuse-next-done";
+        }
+
+        node "done" OUTPUT "Done" at (0.0, 600.0) {
+          return price;
+          as total;
+        }
+        """;
+    var built = script.build(source);
+    assertThat(built.diagnostics()).isEmpty();
+    assertThat(built.source()).isEqualTo(canonical);
+    assertThat(script.render(built.definition())).isEqualTo(canonical);
+    assertThat(script.build(canonical).definition()).isEqualTo(built.definition());
+    assertThat(script.renderNode(built.definition(), "input"))
+        .isEqualTo(
+            canonical.substring(0, canonical.indexOf("\nnode \"calc\"")).replace("// kinds\n", ""));
+    assertThat(script.renderNode(built.definition(), "done"))
+        .isEqualTo("schema 1;\n\n" + canonical.substring(canonical.indexOf("\nnode \"done\"")));
+  }
+
+  @Test
+  void inputDeclarationsUseTheDeclaredTypeNamesInAnyCase() {
+    var built = script.build("inputs { items: array optional; }\nnode in INPUT \"In\" {}");
+    assertThat(built.diagnostics()).isEmpty();
+    assertThat(built.definition().inputs().getFirst().type()).isEqualTo("ARRAY");
+    assertThat(script.build("inputs { amount: DECIMAL required; }").diagnostics())
+        .containsExactly(
+            new ArcScript.Diagnostic(
+                "Use: parameter: NUMBER|STRING|BOOLEAN|ARRAY|OBJECT required|optional [default"
+                    + " JSON];",
+                1,
+                10));
+    var undeclared =
+        new Definition(
+            1,
+            List.of(new Definition.Input("amount", "DECIMAL", true, null)),
+            List.of(nodeOf("in", "INPUT", "In").build()),
+            List.of());
+    assertThatThrownBy(() -> new Validator().shape(undeclared)).hasMessage("Unknown input type");
+  }
+
+  @Test
   void scannerFailureRetainsItsExactLocationAndDoesNotLeakIntoTheNextBuild() {
     String incomplete =
         """
@@ -113,7 +242,7 @@ class ArcScriptContractTest {
                     built.definition(), "calc", script.renderNode(built.definition(), "calc"))
                 .definition())
         .isEqualTo(built.definition());
-    assertThat(script.checkExpression(built.definition().nodes().get(1).expression()).variables())
+    assertThat(Expressions.compile(built.definition().nodes().get(1).expression()).variables())
         .containsExactly("ROUND");
     new Validator()
         .validate(
@@ -132,36 +261,20 @@ class ArcScriptContractTest {
   void largeValidGraphsRemainEditableThroughTheirRenderedCode() throws Exception {
     var nodes = new ArrayList<Node>();
     var edges = new ArrayList<Edge>();
-    nodes.add(
-        new Node("input", "INPUT", "Input", new Position(0, 0), null, null, null, null, null));
+    nodes.add(nodeOf("input", "INPUT", "Input").at(0, 0).build());
     String previous = "input";
     for (int index = 0; index < 60; index++) {
       String id = "formula" + index;
       nodes.add(
-          new Node(
-              id,
-              "FORMULA",
-              "Formula " + index,
-              new Position(0, (index + 1) * 100),
-              "\"" + "x".repeat(1900) + "\"",
-              "value" + index,
-              null,
-              null,
-              null));
+          nodeOf(id, "FORMULA", "Formula " + index)
+              .at(0, (index + 1) * 100)
+              .expression("\"" + "x".repeat(1900) + "\"")
+              .output("value" + index)
+              .build());
       edges.add(new Edge(previous + "-" + id, previous, id, "next"));
       previous = id;
     }
-    nodes.add(
-        new Node(
-            "output",
-            "OUTPUT",
-            "Output",
-            new Position(0, 6100),
-            "value59",
-            null,
-            null,
-            null,
-            null));
+    nodes.add(nodeOf("output", "OUTPUT", "Output").at(0, 6100).expression("value59").build());
     edges.add(new Edge(previous + "-output", previous, "output", "next"));
     Definition graph = new Definition(1, List.of(), nodes, edges);
     RuleResolver noReferences =

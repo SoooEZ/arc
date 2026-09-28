@@ -1,6 +1,7 @@
 package dev.arc.source.http;
 
 import dev.arc.engine.ExecutionDeadline;
+import dev.arc.engine.Limits;
 import dev.arc.error.ArcException;
 import dev.arc.model.SourceDefinition;
 import dev.arc.source.SourceAdapter;
@@ -10,6 +11,9 @@ import org.springframework.stereotype.Component;
 /** Adapts bounded HTTP transport to the source extension point. */
 @Component
 public final class HttpSourceAdapter implements SourceAdapter {
+  private static final int MIN_TIMEOUT_MS = 100;
+  private static final int MAX_TIMEOUT_MS = 10_000;
+
   private final HttpSource http;
 
   public HttpSourceAdapter(HttpSource http) {
@@ -24,13 +28,9 @@ public final class HttpSourceAdapter implements SourceAdapter {
   @Override
   public void validate(SourceDefinition definition) {
     http.validate(definition);
-    if (definition.timeoutMs() < 100 || definition.timeoutMs() > 10000)
-      throw ArcException.invalid("HTTP timeout must be 100–10,000 ms");
-  }
-
-  @Override
-  public Object fetch(String id, SourceDefinition definition, Map<String, Object> inputs) {
-    return http.fetch(definition, inputs);
+    if (definition.timeoutMs() < MIN_TIMEOUT_MS || definition.timeoutMs() > MAX_TIMEOUT_MS)
+      throw ArcException.invalid(
+          "HTTP timeout must be " + MIN_TIMEOUT_MS + "–" + Limits.format(MAX_TIMEOUT_MS) + " ms");
   }
 
   @Override

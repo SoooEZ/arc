@@ -10,4 +10,5 @@ WORKDIR /app
 COPY --from=build /app/target/arc-api-*.jar app.jar
 USER arc
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+# Pin the JVM default locale so value formatting never depends on the host's settings.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-Duser.language=en", "-Duser.country=US", "-jar", "app.jar"]

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
 import dev.arc.engine.Identifiers;
+import dev.arc.engine.Limits;
 import dev.arc.engine.expression.Expressions.Expr;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
@@ -22,9 +23,18 @@ final class ExpressionParser {
           .enable(JsonReadFeature.ALLOW_BACKSLASH_ESCAPING_ANY_CHARACTER)
           .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
           .build();
+  // A quoted literal is plain runs separated by escapes. java.util.regex recurses once per
+  // repetition of an alternation or group, so a 2,000-character literal written as (a|b)* could
+  // exhaust a small thread stack. Possessive runs and escapes match the same text iteratively.
+  private static final String DOUBLE_QUOTED = "\"[^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+\"";
+  private static final String SINGLE_QUOTED = "'[^'\\\\]*+(?:\\\\.[^'\\\\]*+)*+'";
   private static final Pattern TOKEN =
       Pattern.compile(
-          "\\s*(?:(\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|\\.\\d+)|(\\$?[A-Za-z_][A-Za-z_0-9.]*|@[A-Za-z_][A-Za-z_0-9-]*(?::[0-9]+)?)|(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')|(&&|\\|\\||==|!=|<>|<=|>=|[=^\\[\\]+*/%<>()!,\\-]))");
+          "\\s*(?:(\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|\\.\\d+)|(\\$?[A-Za-z_][A-Za-z_0-9.]*|@[A-Za-z_][A-Za-z_0-9-]*(?::[0-9]+)?)|("
+              + DOUBLE_QUOTED
+              + "|"
+              + SINGLE_QUOTED
+              + ")|(&&|\\|\\||==|!=|<>|<=|>=|[=^\\[\\]+*/%<>()!,\\-]))");
 
   private static int priority(String op) {
     return switch (op) {
@@ -40,7 +50,7 @@ final class ExpressionParser {
   }
 
   private final List<String> tokens = new ArrayList<>();
-  private final Set<String> variables = new HashSet<>();
+  private final Set<String> variables = new LinkedHashSet<>();
   private final List<FormulaCall> formulaCalls = new ArrayList<>();
   private int index, depth;
   private final Set<String> locals = new HashSet<>();
@@ -54,7 +64,9 @@ final class ExpressionParser {
         throw ArcException.invalid("Invalid expression near character " + (position + 1));
       tokens.add(matcher.group().trim());
       position = matcher.end();
-      if (tokens.size() > 256) throw ArcException.invalid("Expression exceeds 256 tokens");
+      if (tokens.size() > Limits.MAX_EXPRESSION_TOKENS)
+        throw ArcException.invalid(
+            "Expression exceeds " + Limits.MAX_EXPRESSION_TOKENS + " tokens");
     }
     tokens.add("<end>");
   }
@@ -74,7 +86,9 @@ final class ExpressionParser {
   }
 
   Expr parse(int minimumPriority) {
-    if (++depth > 48) throw ArcException.invalid("Expression nesting exceeds 48 levels");
+    if (++depth > Limits.MAX_EXPRESSION_NESTING)
+      throw ArcException.invalid(
+          "Expression nesting exceeds " + Limits.MAX_EXPRESSION_NESTING + " levels");
     Expr left = atom();
     while (priority(peek()) >= minimumPriority) {
       String operator = take();
@@ -143,6 +157,9 @@ final class ExpressionParser {
   }
 
   private Expr variable(String path) {
+    // "customer." or "a..b" would otherwise read a field named "" and quietly return null.
+    if (path.endsWith(".") || path.contains(".."))
+      throw ArcException.invalid("Property path needs a name after every '.': " + path);
     String root = path.split("\\.")[0];
     if (!locals.contains(root)) variables.add(root);
     return context -> {
@@ -159,7 +176,7 @@ final class ExpressionParser {
           "Function calls require a $ prefix; use $" + token.toUpperCase(Locale.ROOT) + "(...)");
     expect("(");
     String name = token.substring(1).toUpperCase(Locale.ROOT);
-    if (Set.of("MAP", "FILTER", "ALL", "ANY", "REDUCE").contains(name)) return collectionCall(name);
+    if (BuiltinFunctionCatalog.isCollectionFunction(name)) return collectionCall(name);
     List<Expr> arguments = arguments(")");
     Functions.arity(name, arguments.size());
     return context -> ExpressionRuntime.function(name, arguments, context);
@@ -170,7 +187,7 @@ final class ExpressionParser {
     if (separator < 0)
       throw ArcException.invalid("Formula calls require a pinned version: @rule-id:1(...)");
     String id = token.substring(1, separator);
-    if (!id.matches("[a-z][a-z0-9-]{0,79}"))
+    if (!Identifiers.isResourceId(id))
       throw ArcException.invalid("Formula call needs a valid rule ID");
     int version;
     try {

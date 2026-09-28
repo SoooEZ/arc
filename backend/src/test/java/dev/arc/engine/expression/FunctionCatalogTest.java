@@ -6,8 +6,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.error.ArcException;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
 /** Full editor/arity contract, including the intentional dollar function namespace. */
@@ -60,6 +63,36 @@ class FunctionCatalogTest {
         .filteredOn(entry -> entry.name().equals("$YEAR"))
         .extracting(Functions.Entry::snippet)
         .containsExactly("\\$YEAR(${1:\\$DATE(2026, 9, 16)})");
+  }
+
+  @Test
+  void everyArcCatalogEntryIsEvaluatedByArcAndEveryArcFunctionIsCatalogued() {
+    List<String> arcEntries =
+        Functions.catalog().stream()
+            .filter(entry -> entry.origin().startsWith("ARC"))
+            .map(entry -> entry.name().substring(1))
+            .toList();
+    assertThat(arcEntries).hasSize(BuiltinFunctionCatalog.specs().size());
+    var evaluatedByArc = new TreeSet<String>(Functions.arcFunctionNames());
+    evaluatedByArc.addAll(ExpressionRuntime.lazyFunctionNames());
+    for (String name : arcEntries) {
+      if (BuiltinFunctionCatalog.isCollectionFunction(name)) evaluatedByArc.add(name);
+    }
+    // An ARC entry without ARC code would silently fall through to POI's floating point.
+    assertThat(evaluatedByArc).containsAll(arcEntries);
+    // Lazy Excel functions such as ISNA and CHOOSE keep their Excel catalog entries.
+    assertThat(Functions.catalog().stream().map(entry -> entry.name().substring(1)))
+        .containsAll(evaluatedByArc);
+    assertThat(arcEntries).containsAll(BuiltinFunctionCatalog.DECIMAL_AGGREGATES);
+    assertThat(Functions.arcFunctionNames()).containsAll(BuiltinFunctionCatalog.DECIMAL_AGGREGATES);
+  }
+
+  @Test
+  void decimalAggregatesStayDecimalWhilePoiAggregatesUseDoubles() {
+    assertThat(Expressions.evaluate("$MUL(0.1, 0.2, 3)", Map.of()))
+        .isEqualTo(new BigDecimal("0.06"));
+    assertThat(Expressions.evaluate("$PRODUCT(0.1, 0.2, 3)", Map.of()))
+        .isEqualTo(new BigDecimal("0.06000000000000001"));
   }
 
   @Test

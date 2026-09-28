@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -81,6 +84,96 @@ class ExpressionsTest {
         .isInstanceOf(ArcException.class)
         .hasMessageContaining("Decimal operation");
     assertThat(eval("$IFERROR(1e40 % 3, 7)")).isEqualTo(new BigDecimal("7"));
+  }
+
+  @Test
+  void isnaRecognizesExcelNotAvailableByKindRatherThanMessageText() {
+    assertThatThrownBy(() -> eval("$MATCH(\"zz\", [\"a\"], 0)"))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage()).isEqualTo("MATCH: #N/A");
+              assertThat(error.status()).isEqualTo(422);
+              assertThat(error.kind()).isEqualTo(ArcException.Kind.NOT_AVAILABLE);
+            });
+    assertThat(eval("$ISNA($MATCH(\"zz\", [\"a\"], 0))")).isEqualTo(true);
+    assertThat(eval("$ISERR($MATCH(\"zz\", [\"a\"], 0))")).isEqualTo(false);
+    assertThat(eval("$ISERROR($MATCH(\"zz\", [\"a\"], 0))")).isEqualTo(true);
+    // A duplicate-key error whose message merely contains the text "#N/A" is an ordinary error.
+    String duplicateKey = "$OBJECT(\"#N/A\", 1, \"#N/A\", 2)";
+    assertThatThrownBy(() -> eval(duplicateKey)).hasMessage("Duplicate OBJECT key: #N/A");
+    assertThat(eval("$ISNA(" + duplicateKey + ")")).isEqualTo(false);
+    assertThat(eval("$ISERR(" + duplicateKey + ")")).isEqualTo(true);
+    assertThat(eval("$ISERROR(" + duplicateKey + ")")).isEqualTo(true);
+  }
+
+  @Test
+  void errorFunctionsCannotHideTheOperationBudget() {
+    String heavy = "$SUM($MAP(items, x, $SUM($MAP(items, y, y))))";
+    var items = Map.<String, Object>of("items", Collections.nCopies(101, 1));
+    for (String expression :
+        new String[] {
+          "$IFERROR(" + heavy + ", 0)",
+          "$ISERROR(" + heavy + ")",
+          "$ISERR(" + heavy + ")",
+          "$ISNA(" + heavy + ")"
+        }) {
+      assertThatThrownBy(() -> Expressions.evaluate(expression, items))
+          .as(expression)
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.getMessage()).isEqualTo("Expression exceeds 10,000 operations");
+                assertThat(error.status()).isEqualTo(422);
+                assertThat(error.kind()).isEqualTo(ArcException.Kind.LIMIT);
+              });
+    }
+  }
+
+  @Test
+  void decimalBoundsNeverConvertTheDecimalToADouble() {
+    // Every operand and result is bounded; the double conversion of a 34-digit quotient is slow
+    // and cannot fail for a decimal within the precision and scale limits.
+    var third = new BigDecimal("0.3333333333333333333333333333333333");
+    var noDouble =
+        new BigDecimal(third.unscaledValue(), third.scale()) {
+          @Override
+          public double doubleValue() {
+            throw new AssertionError("bounded() converted a decimal to double");
+          }
+        };
+    assertThat(Expressions.bounded(noDouble)).isSameAs(noDouble);
+    assertThat(Expressions.bounded(List.of(noDouble, Map.of("x", noDouble)))).isNotNull();
+    for (Object nonFinite :
+        List.of(Double.NaN, Double.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+      assertThatThrownBy(() -> Expressions.bounded(nonFinite))
+          .isInstanceOf(ArcException.class)
+          .hasMessage("Number must be finite");
+    }
+    assertThatThrownBy(() -> Expressions.bounded(BigInteger.TEN.pow(400)))
+        .hasMessage("Number must be finite");
+  }
+
+  @Test
+  void decimalBoundsDependOnTheNumberNotOnHowItIsWritten() {
+    // PostgreSQL JSONB stores a default of 1E+100 as its 101-digit integer.
+    var written = new BigDecimal(new BigInteger("1" + "0".repeat(100)));
+    assertThat(written.precision()).isEqualTo(101);
+    assertThat(Expressions.bounded(written)).isSameAs(written);
+    assertThat(Expressions.bounded(new BigDecimal("1E+100"))).isNotNull();
+    assertThat(Expressions.bounded(new BigDecimal("1." + "0".repeat(150)))).isNotNull();
+    for (BigDecimal tooLarge :
+        List.of(
+            new BigDecimal("1E+101"),
+            new BigDecimal(new BigInteger("1" + "0".repeat(101))),
+            new BigDecimal(new BigInteger("1".repeat(102))),
+            new BigDecimal("1E-101"))) {
+      assertThatThrownBy(() -> Expressions.bounded(tooLarge))
+          .as(tooLarge.toString())
+          .hasMessage("Number exceeds supported precision or magnitude");
+    }
+    assertThat((BigDecimal) Expressions.evaluate("amount / 10", Map.of("amount", written)))
+        .isEqualByComparingTo(new BigDecimal("1E+99"));
   }
 
   @Test

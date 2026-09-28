@@ -8,19 +8,18 @@ import java.util.Map;
 public interface SourceAdapter {
   String kind();
 
+  /** Rejects an invalid configuration before it is stored, without performing IO. */
   void validate(SourceDefinition definition);
 
-  Object fetch(String sourceId, SourceDefinition definition, Map<String, Object> inputs);
-
-  /** Blocking providers override this method to cancel IO when the shared deadline expires. */
-  default Object fetch(
+  /**
+   * Reads the current value for inputs that are already typed and defaulted, in parameter order.
+   * The deadline belongs to the whole rule execution (a source Test uses the default one): a
+   * provider that blocks on IO must stop when it expires, as {@code HttpSource} does by cancelling
+   * its request. The caller checks the deadline before and after this call.
+   */
+  Object fetch(
       String sourceId,
       SourceDefinition definition,
       Map<String, Object> inputs,
-      ExecutionDeadline deadline) {
-    deadline.check();
-    Object value = fetch(sourceId, definition, inputs);
-    deadline.check();
-    return value;
-  }
+      ExecutionDeadline deadline);
 }

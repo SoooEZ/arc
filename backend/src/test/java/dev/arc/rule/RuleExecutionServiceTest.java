@@ -1,5 +1,8 @@
 package dev.arc.rule;
 
+import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.nodeOf;
+import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -27,7 +30,7 @@ class RuleExecutionServiceTest {
           new RuleDefinitionService(validator, rules, new SourceBindingValidator(sources)),
           new Engine(validator, json),
           new SourceExecutionService(
-              sources, new SourceAdapters(List.of()), new JsonPointerExtractor(json)));
+              sources, new SourceAdapters(List.of()), new JsonPointerExtractor()));
 
   private static class CountingValidator extends Validator {
     int compilations;
@@ -45,60 +48,75 @@ class RuleExecutionServiceTest {
     when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank("FORMULA"));
     var first = service.execute("rule", new Execution(Map.of("amount", 100), null));
     var second = service.execute("rule", new Execution(Map.of("amount", 200), 1, false, 30_000));
-    assertThat(first.result()).isEqualTo(new java.math.BigDecimal("90.0"));
-    assertThat(second.result()).isEqualTo(new java.math.BigDecimal("180.0"));
+    assertThat(first.execution().result()).isEqualTo(new java.math.BigDecimal("90.0"));
+    assertThat(second.execution().result()).isEqualTo(new java.math.BigDecimal("180.0"));
     assertThat(validator.compilations).isEqualTo(1);
     verify(rules, never()).get(anyString());
     verify(rules, times(1)).publishedVersion("rule");
-    assertThat(first.traceEnabled()).isTrue();
-    assertThat(first.traceBytes()).isEqualTo(json.writeValueAsBytes(first.trace()).length);
-    assertThat(second.trace()).isEmpty();
-    assertThat(second.executedSteps()).isEqualTo(3);
+    assertThat(first.execution().traceEnabled()).isTrue();
+    assertThat(first.execution().traceBytes())
+        .isEqualTo(json.writeValueAsBytes(first.execution().trace()).length);
+    assertThat(second.execution().trace()).isEmpty();
+    assertThat(second.execution().executedSteps()).isEqualTo(3);
     assertThat(second.timing().totalMicros())
         .isGreaterThanOrEqualTo(
             second.timing().preparationMicros() + second.timing().executionMicros());
-    assertThat(second.durationMicros()).isEqualTo(second.timing().executionMicros());
+    assertThat(second.execution().durationMicros()).isEqualTo(second.timing().executionMicros());
+  }
+
+  @Test
+  void aCachedPublishedPlanIsExecutedWithoutReadingItsVersionAgain() {
+    when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank("FORMULA"));
+    for (int amount : List.of(100, 200, 300))
+      assertThat(
+              service
+                  .execute("rule", new Execution(Map.of("amount", amount), 1))
+                  .execution()
+                  .result())
+          .isEqualTo(
+              new java.math.BigDecimal("0.9").multiply(java.math.BigDecimal.valueOf(amount)));
+    verify(rules, times(1)).resolve("rule", 1);
+    assertThat(validator.compilations).isEqualTo(1);
+
+    when(rules.resolve("rule", 9))
+        .thenThrow(new ArcException(404, "Published rule version not found: rule v9"));
+    for (int attempt = 0; attempt < 2; attempt++)
+      assertThatThrownBy(() -> service.execute("rule", new Execution(Map.of("amount", 1), 9)))
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(404);
+                assertThat(error.getMessage())
+                    .isEqualTo("Published rule version not found: rule v9");
+              });
+    verify(rules, times(2)).resolve("rule", 9);
   }
 
   @Test
   void changedDraftsNeverReusePublishedOrPreviousPreviewPlans() {
     var first = service.preview(new Preview(RuleSamples.blank("FORMULA"), Map.of("amount", 100)));
     var second = service.preview(new Preview(RuleSamples.blank("FORMULA"), Map.of("amount", 200)));
-    assertThat(first.result()).isNotEqualTo(second.result());
+    assertThat(first.execution().result()).isNotEqualTo(second.execution().result());
     assertThat(validator.compilations).isEqualTo(2);
     verifyNoInteractions(rules);
   }
 
   @Test
   void storedDraftsAndPublishedVersionsRequireExplicitFunctionPrefixesWithoutRewritingHistory() {
-    var input = new Node("input", "INPUT", "Inputs", null, null, null, null, null, null);
+    var input = inputNode("input", "Inputs");
     var edge = new Edge("next", "input", "output", "next");
     var parameters = List.of(new Input("ROUND", "NUMBER", true, null));
     var oldDefinition =
         new Definition(
             1,
             parameters,
-            List.of(
-                input,
-                new Node(
-                    "output", "OUTPUT", "Result", null, "ROUND(ROUND, 2)", null, null, null, null)),
+            List.of(input, outputNode("output", "Result", "ROUND(ROUND, 2)")),
             List.of(edge));
     var updatedDefinition =
         new Definition(
             1,
             parameters,
-            List.of(
-                input,
-                new Node(
-                    "output",
-                    "OUTPUT",
-                    "Result",
-                    null,
-                    "$ROUND(ROUND, 2)",
-                    null,
-                    null,
-                    null,
-                    null)),
+            List.of(input, outputNode("output", "Result", "$ROUND(ROUND, 2)")),
             List.of(edge));
     when(rules.publishedVersion("old-rule")).thenReturn(1);
     when(rules.resolve("old-rule", 1)).thenReturn(oldDefinition);
@@ -119,7 +137,7 @@ class RuleExecutionServiceTest {
                     .containsExactly(new ArcException.Location(null, null, "output", "Result"));
               });
     }
-    assertThat(service.execute("old-rule", new Execution(inputs, 2)).result())
+    assertThat(service.execute("old-rule", new Execution(inputs, 2)).execution().result())
         .isEqualTo(new java.math.BigDecimal("1.24"));
     assertThat(oldDefinition.nodes().getLast().expression()).isEqualTo("ROUND(ROUND, 2)");
     verify(rules).publishedVersion("old-rule");
@@ -142,12 +160,12 @@ class RuleExecutionServiceTest {
       var responses = executor.invokeAll(tasks);
       for (int index = 0; index < responses.size(); index++) {
         var response = responses.get(index).get();
-        assertThat(response.result())
+        assertThat(response.execution().result())
             .isEqualTo(
                 java.math.BigDecimal.valueOf(index + 1L).multiply(new java.math.BigDecimal("0.9")));
-        assertThat(response.executedSteps()).isEqualTo(3);
-        assertThat(response.trace()).isEmpty();
-        assertThat(response.sources()).isEmpty();
+        assertThat(response.execution().executedSteps()).isEqualTo(3);
+        assertThat(response.execution().trace()).isEmpty();
+        assertThat(response.execution().sources()).isEmpty();
       }
     }
     assertThat(validator.compilations).isEqualTo(1);
@@ -159,9 +177,7 @@ class RuleExecutionServiceTest {
         new Definition(
             1,
             List.of(),
-            List.of(
-                new Node("in", "INPUT", "Input", null, null, null, null, null, null),
-                new Node("out", "OUTPUT", "Output", null, "1", null, null, null, null)),
+            List.of(inputNode("in", "Input"), outputNode("out", "Output", "1")),
             List.of(new Edge("edge", "in", "out", "next")));
     when(rules.resolve("slow", 1))
         .thenAnswer(
@@ -176,8 +192,16 @@ class RuleExecutionServiceTest {
             List.of(),
             List.of(
                 child.nodes().getFirst(),
-                new Node("first", "REFERENCE", "First", null, null, "a", "slow", 1, Map.of()),
-                new Node("second", "REFERENCE", "Second", null, null, "b", "later", 1, Map.of()),
+                nodeOf("first", "REFERENCE", "First")
+                    .output("a")
+                    .rule("slow", 1)
+                    .bindings(Map.of())
+                    .build(),
+                nodeOf("second", "REFERENCE", "Second")
+                    .output("b")
+                    .rule("later", 1)
+                    .bindings(Map.of())
+                    .build(),
                 child.nodes().getLast()),
             List.of(
                 new Edge("one", "in", "first", "next"),

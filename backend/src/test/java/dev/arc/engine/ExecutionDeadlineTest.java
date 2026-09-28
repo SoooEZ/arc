@@ -13,7 +13,7 @@ class ExecutionDeadlineTest {
     for (long timeout : new long[] {Long.MIN_VALUE, 0, 99, 30_001, Long.MAX_VALUE})
       assertThatThrownBy(() -> ExecutionDeadline.start(timeout))
           .isInstanceOf(ArcException.class)
-          .hasMessageContaining("100–30,000");
+          .hasMessage("Execution timeout must be 100–30,000 ms");
   }
 
   @Test
@@ -22,7 +22,11 @@ class ExecutionDeadlineTest {
     Thread.sleep(150);
     assertThatThrownBy(deadline::check)
         .isInstanceOfSatisfying(
-            ArcException.class, error -> assertThat(error.status()).isEqualTo(504));
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(504);
+              assertThat(error.kind()).isEqualTo(ArcException.Kind.DEADLINE);
+            });
     assertThatThrownBy(deadline::remainingMillis).hasMessage("Rule execution deadline exceeded");
   }
 }

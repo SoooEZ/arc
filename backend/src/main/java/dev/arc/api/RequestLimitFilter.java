@@ -9,78 +9,95 @@ import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Enforce the same bound on the direct API port as on the Nginx proxy, including chunked bodies.
+ *
+ * <p>Every request is capped, whatever its method or path. Spring routes decoded paths such as
+ * {@code /api;x=1/...} and {@code /%61pi/...} to the API, so a check on the raw request URI could
+ * be bypassed. The filter runs first, before any other filter (such as form parsing) could read an
+ * unbounded body.
  */
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestLimitFilter extends OncePerRequestFilter {
-  private static final int MAX_BODY = 1024 * 1024;
-
-  @Override
-  protected boolean shouldNotFilter(HttpServletRequest request) {
-    return !request.getRequestURI().startsWith("/api/")
-        || !(request.getMethod().equals("POST") || request.getMethod().equals("PUT"));
-  }
+  static final int MAX_BODY_BYTES = 1024 * 1024;
 
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
-    byte[] body =
-        request.getContentLengthLong() > MAX_BODY
-            ? null
-            : request.getInputStream().readNBytes(MAX_BODY + 1);
-    if (body == null || body.length > MAX_BODY) {
-      response.setStatus(413);
-      response.setContentType("application/json");
-      response.setHeader("Access-Control-Allow-Origin", "*");
-      response
-          .getWriter()
-          .write("{\"status\":413,\"message\":\"Request body exceeds 1 MiB\",\"issues\":[]}");
+    byte[] body = boundedBody(request);
+    if (body == null) {
+      rejectOversized(response);
       return;
     }
-    chain.doFilter(
-        new HttpServletRequestWrapper(request) {
-          @Override
-          public ServletInputStream getInputStream() {
-            var input = new ByteArrayInputStream(body);
-            return new ServletInputStream() {
-              @Override
-              public int read() {
-                return input.read();
-              }
+    chain.doFilter(new BufferedBodyRequest(request, body), response);
+  }
 
-              @Override
-              public int read(byte[] b, int off, int len) {
-                return input.read(b, off, len);
-              }
+  /** The complete body, or null when it exceeds the limit. Reads at most one byte past it. */
+  private static byte[] boundedBody(HttpServletRequest request) throws IOException {
+    if (request.getContentLengthLong() > MAX_BODY_BYTES) return null;
+    byte[] body = request.getInputStream().readNBytes(MAX_BODY_BYTES + 1);
+    return body.length > MAX_BODY_BYTES ? null : body;
+  }
 
-              @Override
-              public boolean isFinished() {
-                return input.available() == 0;
-              }
+  private static void rejectOversized(HttpServletResponse response) throws IOException {
+    response.setStatus(413);
+    response.setContentType("application/json");
+    response.setHeader("Access-Control-Allow-Origin", "*");
+    response
+        .getWriter()
+        .write("{\"status\":413,\"message\":\"Request body exceeds 1 MiB\",\"issues\":[]}");
+  }
 
-              @Override
-              public boolean isReady() {
-                return true;
-              }
+  /** Replays the bounded body to later filters and controllers. */
+  private static final class BufferedBodyRequest extends HttpServletRequestWrapper {
+    private final byte[] body;
 
-              @Override
-              public void setReadListener(ReadListener listener) {
-                throw new UnsupportedOperationException("Synchronous API only");
-              }
-            };
-          }
+    BufferedBodyRequest(HttpServletRequest request, byte[] body) {
+      super(request);
+      this.body = body;
+    }
 
-          @Override
-          public BufferedReader getReader() {
-            return new BufferedReader(
-                new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
-          }
-        },
-        response);
+    @Override
+    public ServletInputStream getInputStream() {
+      var input = new ByteArrayInputStream(body);
+      return new ServletInputStream() {
+        @Override
+        public int read() {
+          return input.read();
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) {
+          return input.read(b, off, len);
+        }
+
+        @Override
+        public boolean isFinished() {
+          return input.available() == 0;
+        }
+
+        @Override
+        public boolean isReady() {
+          return true;
+        }
+
+        @Override
+        public void setReadListener(ReadListener listener) {
+          throw new UnsupportedOperationException("Synchronous API only");
+        }
+      };
+    }
+
+    @Override
+    public BufferedReader getReader() {
+      return new BufferedReader(new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
+    }
   }
 }

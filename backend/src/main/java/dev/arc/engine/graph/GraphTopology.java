@@ -10,7 +10,6 @@ import java.util.*;
 final class GraphTopology {
   private final Map<String, List<Edge>> incoming = new HashMap<>();
   private final Map<String, List<Edge>> outgoing = new HashMap<>();
-  private final Map<String, Set<String>> ancestors = new HashMap<>();
   private final List<Node> order;
 
   GraphTopology(Definition definition) {
@@ -34,26 +33,38 @@ final class GraphTopology {
     while (!ready.isEmpty()) {
       String id = ready.remove();
       sorted.add(nodes.get(id));
-      Set<String> predecessors = new HashSet<>();
-      for (Edge edge : incoming(id)) {
-        predecessors.add(edge.source());
-        predecessors.addAll(ancestors.get(edge.source()));
-      }
-      ancestors.put(id, Set.copyOf(predecessors));
       for (Edge edge : outgoing(id)) {
         if (unresolvedParents.merge(edge.target(), -1, Integer::sum) == 0) ready.add(edge.target());
       }
     }
-    if (sorted.size() != nodes.size()) {
-      Node blocked =
-          nodes.values().stream()
-              .filter(node -> unresolvedParents.get(node.id()) > 0)
-              .findFirst()
-              .orElseThrow();
-      throw ArcException.invalid("Decision graphs cannot contain cycles")
-          .atNode(null, null, blocked.id(), blocked.label());
-    }
+    if (sorted.size() != nodes.size()) throw cycleError(nodes, sorted);
     order = List.copyOf(sorted);
+  }
+
+  /**
+   * Locates the error on one cycle. Every node left unordered still waits for an unordered parent,
+   * so walking back through such parents must revisit a node on a cycle. Nodes that are merely
+   * downstream of the cycle are not reported.
+   */
+  private ArcException cycleError(Map<String, Node> nodes, List<Node> sorted) {
+    Set<String> unordered = new LinkedHashSet<>(nodes.keySet());
+    for (Node node : sorted) unordered.remove(node.id());
+    List<String> path = new ArrayList<>();
+    String current = unordered.iterator().next();
+    while (!path.contains(current)) {
+      path.add(current);
+      current = unorderedParent(current, unordered);
+    }
+    Set<String> cycle = Set.copyOf(path.subList(path.indexOf(current), path.size()));
+    var error = ArcException.invalid("Decision graphs cannot contain cycles");
+    for (Node node : nodes.values())
+      if (cycle.contains(node.id())) error = error.atNode(null, null, node.id(), node.label());
+    return error;
+  }
+
+  private String unorderedParent(String id, Set<String> unordered) {
+    for (Edge edge : incoming(id)) if (unordered.contains(edge.source())) return edge.source();
+    throw new IllegalStateException("Unordered node " + id + " has no unordered parent");
   }
 
   List<Node> order() {
@@ -66,9 +77,5 @@ final class GraphTopology {
 
   List<Edge> outgoing(String id) {
     return outgoing.getOrDefault(id, List.of());
-  }
-
-  boolean isAncestor(String earlier, String later) {
-    return ancestors.get(later).contains(earlier);
   }
 }

@@ -6,21 +6,25 @@ import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.NodeKind;
+import dev.arc.model.NodeKind.Slot;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
  * Node contracts and the expressions they own, shared by execution checks and editor diagnostics.
  */
 final class NodeValidation {
-  private record NodeExpression(String source, String label, String bindingName) {
-    NodeExpression(String source, String label) {
+  /**
+   * An expression and the label its problems carry, such as {@code "Route / Case Premium"}. The
+   * enumerations below are the only places that name an expression's position, so every check
+   * reports one fault with the same text.
+   */
+  record OwnedExpression(String source, String label, String bindingName) {
+    OwnedExpression(String source, String label) {
       this(source, label, null);
     }
-  }
-
-  void validate(Definition definition, Node node, Set<String> scope, RuleResolver resolver) {
-    validate(definition, node, scope, resolver, new HashMap<>());
   }
 
   void validate(
@@ -28,28 +32,27 @@ final class NodeValidation {
       Node node,
       Set<String> scope,
       RuleResolver resolver,
-      Map<String, Expressions.Compiled> compiled) {
+      ExpressionCache expressions) {
     try {
-      if (node.type().equals("SWITCH"))
+      NodeKind kind = node.kind();
+      if (kind == NodeKind.SWITCH)
         require(
             node.cases() != null && !node.cases().isEmpty(),
             node.label() + ": add at least one case");
 
       Set<String> referenceParameters = Set.of();
-      if (node.type().equals("REFERENCE"))
-        referenceParameters = referenceParameters(node, resolver);
+      if (kind == NodeKind.REFERENCE) referenceParameters = referenceParameters(node, resolver);
 
-      for (NodeExpression expression : expressions(node)) {
-        if (expression.bindingName() != null) {
-          if (!node.type().equals("REFERENCE")) continue;
+      for (OwnedExpression expression : expressions(node)) {
+        if (!owned(expression, kind)) continue;
+        if (expression.bindingName() != null)
           require(
               referenceParameters.contains(expression.bindingName()),
               node.label() + ": unknown parameter " + expression.bindingName());
-        }
-        expression(expression.source(), scope, expression.label(), compiled, resolver);
+        check(expression, scope, expressions, resolver);
       }
 
-      if (node.storesResult()) {
+      if (kind.storesResult()) {
         require(
             Identifiers.isValid(node.output()), node.label() + ": provide a valid result variable");
         require(
@@ -61,47 +64,42 @@ final class NodeValidation {
     }
   }
 
-  /** A cyclic/incomplete graph may have no scope plan; its expressions can still be parsed. */
-  void syntax(Node node, RuleResolver resolver) {
-    for (NodeExpression expression : expressions(node))
-      FormulaCallValidation.validate(Expressions.compile(expression.source()), resolver);
-  }
-
-  Set<String> handles(Node node) {
-    if (node.type().equals("OUTPUT")) return Set.of();
-    if (node.type().equals("CONDITION")) return Set.of("true", "false");
-    if (node.type().equals("SWITCH")) {
-      var handles = new LinkedHashSet<String>();
-      if (node.cases() != null)
-        for (BranchCase option : node.cases()) handles.add("case:" + option.id());
-      handles.add("default");
-      return handles;
+  /**
+   * A cyclic graph has no scope plan. Its expressions still receive syntax and Formula checks,
+   * labelled like executable validation labels them.
+   */
+  void syntax(Node node, RuleResolver resolver, ExpressionCache expressions) {
+    try {
+      for (OwnedExpression expression : expressions(node))
+        check(expression, null, expressions, resolver);
+    } catch (ArcException error) {
+      throw error.atNode(null, null, node.id(), node.label());
     }
-    return Set.of("next");
   }
 
-  static Expressions.Compiled expression(
-      String source, Set<String> scope, String label, RuleResolver resolver) {
-    return expression(source, scope, label, new HashMap<>(), resolver);
-  }
-
-  static Expressions.Compiled expression(
-      String source,
+  /**
+   * Checks an owned expression's syntax, variables and Formula calls, compiling it once per pass.
+   * Problems are prefixed with the expression's label. A null scope skips the variable check, for
+   * graphs without a scope plan.
+   */
+  static Expressions.Compiled check(
+      OwnedExpression expression,
       Set<String> scope,
-      String label,
-      Map<String, Expressions.Compiled> expressions,
+      ExpressionCache expressions,
       RuleResolver resolver) {
     try {
-      var compiled = expressions.computeIfAbsent(source, Expressions::compile);
-      var unknown = new TreeSet<>(compiled.variables());
-      unknown.removeAll(scope);
-      require(
-          unknown.isEmpty(),
-          "Variables unavailable on every incoming path: " + String.join(", ", unknown));
+      var compiled = expressions.compile(expression.source());
+      if (scope != null) {
+        var unknown = new TreeSet<>(compiled.variables());
+        unknown.removeAll(scope);
+        require(
+            unknown.isEmpty(),
+            "Variables unavailable on every incoming path: " + String.join(", ", unknown));
+      }
       FormulaCallValidation.validate(compiled, resolver);
       return compiled;
     } catch (ArcException error) {
-      throw error.withContext(label);
+      throw error.withContext(expression.label());
     }
   }
 
@@ -121,55 +119,119 @@ final class NodeValidation {
     return child.inputs().stream().map(Input::name).collect(Collectors.toSet());
   }
 
-  private static List<NodeExpression> expressions(Node node) {
-    var expressions = new ArrayList<NodeExpression>();
-    if (Set.of("FORMULA", "CONDITION", "OUTPUT").contains(node.type()))
-      expressions.add(new NodeExpression(node.expression(), node.label()));
-    if (node.type().equals("SWITCH") && node.selector() != null)
-      expressions.add(new NodeExpression(node.selector(), node.label() + " / Selector"));
-    // Draft shape permits unused bindings. Syntax diagnostics retain them, while
-    // executable validation uses bindings only for Reference nodes.
-    if (node.bindings() != null)
-      for (var binding : node.bindings().entrySet())
-        expressions.add(
-            new NodeExpression(
-                binding.getValue(), node.label() + " / " + binding.getKey(), binding.getKey()));
-    if (node.cases() != null)
-      for (BranchCase option : node.cases())
-        expressions.add(
-            new NodeExpression(option.expression(), node.label() + " / Case " + option.label()));
-    if (node.fields() != null)
-      for (Field field : node.fields())
-        expressions.add(
-            new NodeExpression(field.expression(), node.label() + " / Field " + field.name()));
-    if (node.type().equals("TRANSFORM") && (node.fields() == null || node.fields().isEmpty()))
-      expressions.add(new NodeExpression(node.expression(), node.label()));
-    return expressions;
+  /**
+   * The expressions a node holds, in the order checks visit them. Draft shape lets a node of any
+   * kind hold bindings, but only a Reference owns them: executable checks skip the others (see
+   * {@link #owned}), while the syntax check of a graph without a scope plan still parses them.
+   */
+  static List<OwnedExpression> expressions(Node node) {
+    return switch (node.kind()) {
+      case FORMULA, CONDITION, OUTPUT -> join(List.of(whole(node)), bindings(node));
+      case SWITCH -> join(selector(node), bindings(node), cases(node));
+      case TRANSFORM -> join(bindings(node), mapping(node));
+      case INPUT, REFERENCE -> bindings(node);
+    };
   }
 
-  static List<Validator.FormulaReference> formulaReferences(Definition definition) {
-    var calls = new ArrayList<Validator.FormulaReference>();
+  /** Whether the node's kind owns this expression; see {@link #expressions}. */
+  private static boolean owned(OwnedExpression expression, NodeKind kind) {
+    return expression.bindingName() == null || kind.owns(Slot.BINDINGS);
+  }
+
+  private static OwnedExpression whole(Node node) {
+    return new OwnedExpression(node.expression(), node.label());
+  }
+
+  private static List<OwnedExpression> selector(Node node) {
+    if (node.selector() == null) return List.of();
+    return List.of(new OwnedExpression(node.selector(), node.label() + " / Selector"));
+  }
+
+  private static List<OwnedExpression> bindings(Node node) {
+    var bindings = new ArrayList<OwnedExpression>();
+    if (node.bindings() != null)
+      for (var binding : node.bindings().entrySet())
+        bindings.add(
+            new OwnedExpression(
+                binding.getValue(), node.label() + " / " + binding.getKey(), binding.getKey()));
+    return bindings;
+  }
+
+  private static List<OwnedExpression> cases(Node node) {
+    var cases = new ArrayList<OwnedExpression>();
+    if (node.cases() != null)
+      for (BranchCase option : node.cases())
+        cases.add(
+            new OwnedExpression(option.expression(), node.label() + " / Case " + option.label()));
+    return cases;
+  }
+
+  /** A Transform's field expressions, or its whole-value expression when it maps no fields. */
+  private static List<OwnedExpression> mapping(Node node) {
+    if (node.fields() == null || node.fields().isEmpty()) return List.of(whole(node));
+    var fields = new ArrayList<OwnedExpression>();
+    for (Field field : node.fields())
+      fields.add(
+          new OwnedExpression(field.expression(), node.label() + " / Field " + field.name()));
+    return fields;
+  }
+
+  @SafeVarargs
+  private static List<OwnedExpression> join(List<OwnedExpression>... parts) {
+    var joined = new ArrayList<OwnedExpression>();
+    for (List<OwnedExpression> part : parts) joined.addAll(part);
+    return joined;
+  }
+
+  /**
+   * Source mappings by input, in declaration order. The Input node owns them; they read the
+   * declared inputs rather than a graph scope.
+   */
+  static Map<String, List<OwnedExpression>> sourceMappings(Definition definition) {
+    var mappings = new LinkedHashMap<String, List<OwnedExpression>>();
+    for (Input input : definition.inputs()) {
+      if (input.source() == null) continue;
+      var owned = new ArrayList<OwnedExpression>();
+      for (var mapping : input.source().bindings().entrySet())
+        owned.add(
+            new OwnedExpression(
+                mapping.getValue(), input.name() + " source / " + mapping.getKey()));
+      mappings.put(input.name(), owned);
+    }
+    return mappings;
+  }
+
+  /**
+   * Rules a graph calls: complete Reference pins in node order, then {@code @id:version} calls in
+   * node order, with Input source mappings at the Input node. {@code formulaCalls} lists the calls
+   * of one expression.
+   */
+  static List<Validator.Dependency> dependencies(
+      Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
+    var dependencies = new ArrayList<Validator.Dependency>();
+    for (Node node : definition.nodesOf(NodeKind.REFERENCE))
+      if (node.ruleId() != null && node.version() != null)
+        dependencies.add(Validator.Dependency.reference(node));
     for (Node node : definition.nodes()) {
+      NodeKind kind = node.kind();
+      var owned = new ArrayList<OwnedExpression>();
+      if (kind == NodeKind.INPUT)
+        for (var mappings : sourceMappings(definition).values()) owned.addAll(mappings);
+      for (OwnedExpression expression : expressions(node))
+        if (owned(expression, kind)) owned.add(expression);
       try {
-        if (node.type().equals("INPUT"))
-          for (Input input : definition.inputs())
-            if (input.source() != null)
-              for (String source : input.source().bindings().values())
-                for (var call : formulaCalls(source))
-                  calls.add(new Validator.FormulaReference(node.id(), node.label(), call));
-        for (var expression : expressions(node)) {
-          if (expression.bindingName() != null && !node.type().equals("REFERENCE")) continue;
-          for (var call : formulaCalls(expression.source()))
-            calls.add(new Validator.FormulaReference(node.id(), node.label(), call));
-        }
+        for (OwnedExpression expression : owned)
+          for (var call : formulaCalls.apply(expression.source()))
+            dependencies.add(Validator.Dependency.formula(node, call));
       } catch (ArcException error) {
         throw error.atNode(null, null, node.id(), node.label());
       }
     }
-    return List.copyOf(calls);
+    return List.copyOf(dependencies);
   }
 
-  private static List<Expressions.FormulaCall> formulaCalls(String source) {
+  /** Calls of one expression; a malformed expression fails, located at its node by the caller. */
+  static List<Expressions.FormulaCall> formulaCallsOf(String source) {
     return source == null || !source.contains("@")
         ? List.of()
         : Expressions.compile(source).formulaCalls();

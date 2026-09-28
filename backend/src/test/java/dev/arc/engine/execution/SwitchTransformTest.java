@@ -1,5 +1,6 @@
 package dev.arc.engine.execution;
 
+import static dev.arc.support.GraphFixtures.nodeOf;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -80,18 +81,10 @@ class SwitchTransformTest {
             .map(
                 n -> {
                   if (!n.type().equals("SWITCH")) return n;
-                  return new Node(
-                      n.id(),
-                      n.type(),
-                      n.label(),
-                      n.position(),
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      n.cases().reversed(),
-                      null);
+                  return nodeOf(n.id(), n.type(), n.label())
+                      .position(n.position())
+                      .cases(n.cases().reversed())
+                      .build();
                 })
             .toList();
     var reordered = new Definition(1, choice().inputs(), nodes, choice().edges());
@@ -224,10 +217,9 @@ class SwitchTransformTest {
                 .build("node transform TRANSFORM \"T\" { field \"x\" = 1; field \"x\" = 2; }")
                 .diagnostics())
         .isNotEmpty();
-    var bad = script.checkExpression("$MAP(items, item, item.price + factor)");
-    assertThat(bad.valid()).isTrue();
-    assertThat(bad.variables()).containsExactlyInAnyOrder("items", "factor");
-    assertThat(script.checkExpression("$SUM(1 +)").valid()).isFalse();
+    var mapped = Expressions.compile("$MAP(items, item, item.price + factor)");
+    assertThat(mapped.variables()).containsExactlyInAnyOrder("items", "factor");
+    assertThatThrownBy(() -> Expressions.compile("$SUM(1 +)")).isInstanceOf(ArcException.class);
   }
 
   @Test

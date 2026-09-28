@@ -32,8 +32,4 @@ public final class GraphPlan {
   public Map<String, Set<String>> available() {
     return available;
   }
-
-  public boolean isAncestor(String earlier, String later) {
-    return topology.isAncestor(earlier, later);
-  }
 }

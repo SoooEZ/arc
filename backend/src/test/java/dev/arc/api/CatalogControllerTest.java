@@ -29,7 +29,7 @@ class CatalogControllerTest {
     var summary =
         new RuleSummary(
             "example", "Example", "", "FORMULA", 2, 1, Instant.EPOCH, Instant.EPOCH, 3, 1, 0);
-    when(rules.catalog(20, 10, "Example", "FORMULA", true))
+    when(rules.catalog(new PageRequest(20, 10, "Example"), "FORMULA", true))
         .thenReturn(new CatalogPage<>(List.of(summary), 21, 20, 10));
     mvc.perform(
             get("/api/rule-summaries")
@@ -43,7 +43,7 @@ class CatalogControllerTest {
         .andExpect(jsonPath("$.items[0].id").value("example"))
         .andExpect(jsonPath("$.items[0].nodeCount").value(3))
         .andExpect(jsonPath("$.items[0].draft").doesNotExist());
-    verify(rules).catalog(20, 10, "Example", "FORMULA", true);
+    verify(rules).catalog(new PageRequest(20, 10, "Example"), "FORMULA", true);
     verifyNoMoreInteractions(rules);
   }
 
@@ -81,7 +81,7 @@ class CatalogControllerTest {
         .thenReturn(
             new CatalogPage<>(
                 List.of(new SourceVersionSummary("table", 3, Instant.EPOCH)), 3, 0, 20));
-    when(rules.versionSummaries("example", 0, 20, ""))
+    when(rules.versionSummaries("example", new PageRequest(0, 20, "")))
         .thenReturn(
             new CatalogPage<>(
                 List.of(new RuleVersionSummary("example", 2, Instant.EPOCH)), 2, 0, 20));
@@ -97,7 +97,7 @@ class CatalogControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].version").value(2))
         .andExpect(jsonPath("$.items[0].definition").doesNotExist());
-    verify(rules).versionSummaries("example", 0, 20, "");
+    verify(rules).versionSummaries("example", new PageRequest(0, 20, ""));
     when(rules.list()).thenReturn(List.of());
     when(sources.list()).thenReturn(List.of());
     mvc.perform(get("/api/rules")).andExpect(status().isOk()).andExpect(content().json("[]"));
@@ -110,7 +110,7 @@ class CatalogControllerTest {
   void versionSummarySearchTrimsTextAndRetainsFilteredPagingAndPublicationMetadata()
       throws Exception {
     var published = Instant.parse("2026-09-26T12:00:00Z");
-    when(rules.versionSummaries("example", 1, 1, "2"))
+    when(rules.versionSummaries("example", new PageRequest(1, 1, "2")))
         .thenReturn(
             new CatalogPage<>(List.of(new RuleVersionSummary("example", 12, published)), 3, 1, 1));
     mvc.perform(
@@ -125,14 +125,32 @@ class CatalogControllerTest {
         .andExpect(jsonPath("$.items[0].version").value(12))
         .andExpect(jsonPath("$.items[0].publishedAt").value(published.getEpochSecond()))
         .andExpect(jsonPath("$.items[0].definition").doesNotExist());
-    verify(rules).versionSummaries("example", 1, 1, "2");
+    verify(rules).versionSummaries("example", new PageRequest(1, 1, "2"));
     verifyNoMoreInteractions(rules);
+  }
+
+  @Test
+  void catalogSearchesIgnoreSurroundingWhitespaceLikeVersionSearch() throws Exception {
+    when(rules.catalog(any(), any(), anyBoolean()))
+        .thenReturn(new CatalogPage<>(List.of(), 0, 0, 20));
+    when(sources.catalog(anyInt(), anyInt(), any()))
+        .thenReturn(new CatalogPage<>(List.of(), 0, 0, 20));
+    String longest = "a".repeat(200);
+    for (String search : List.of("  tax  ", "   ", " " + longest + "  ")) {
+      mvc.perform(get("/api/rule-summaries").param("search", search)).andExpect(status().isOk());
+      mvc.perform(get("/api/source-summaries").param("search", search)).andExpect(status().isOk());
+    }
+    for (String trimmed : List.of("tax", "", longest)) {
+      verify(rules).catalog(new PageRequest(0, 20, trimmed), "", false);
+      verify(sources).catalog(0, 20, trimmed);
+    }
+    verifyNoMoreInteractions(rules, sources);
   }
 
   @Test
   void blankVersionSearchRetainsDefaultHistoryAndMaximumSearchLengthIsAccepted() throws Exception {
     for (String search : List.of("", "2".repeat(200))) {
-      when(rules.versionSummaries("example", 0, 20, search))
+      when(rules.versionSummaries("example", new PageRequest(0, 20, search)))
           .thenReturn(new CatalogPage<>(List.of(), 0, 0, 20));
       mvc.perform(
               get("/api/rules/example/version-summaries")
@@ -140,7 +158,7 @@ class CatalogControllerTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.items").isEmpty())
           .andExpect(jsonPath("$.total").value(0));
-      verify(rules).versionSummaries("example", 0, 20, search);
+      verify(rules).versionSummaries("example", new PageRequest(0, 20, search));
     }
     verifyNoMoreInteractions(rules);
   }

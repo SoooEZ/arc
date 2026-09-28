@@ -23,8 +23,7 @@ class OutputNameTest {
       };
 
   private Node output(String id, String expression, String name) {
-    return new Node(
-        id, "OUTPUT", id, null, expression, null, null, null, null, null, null, null, name);
+    return nodeOf(id, "OUTPUT", id).expression(expression).outputName(name).build();
   }
 
   private Definition graph(Node output) {
@@ -57,7 +56,7 @@ class OutputNameTest {
     for (String name : Arrays.asList(null, ""))
       assertThat(run(graph(output("out", "value", name))).result()).isEqualTo(new BigDecimal("42"));
     var legacy =
-        new Node("out", "OUTPUT", "out", null, "value", "previously_ignored", null, null, null);
+        nodeOf("out", "OUTPUT", "out").expression("value").output("previously_ignored").build();
     assertThat(run(graph(legacy)).result()).isEqualTo(new BigDecimal("42"));
   }
 
@@ -121,9 +120,11 @@ class OutputNameTest {
     for (String name : List.of("ROUND", "_total2", "a".repeat(64)))
       validator.validate(graph(output("out", "value", name)), noReferences);
     var misplaced =
-        new Node(
-            "calc", "FORMULA", "Calc", null, "1", "value", null, null, null, null, null, null,
-            "total");
+        nodeOf("calc", "FORMULA", "Calc")
+            .expression("1")
+            .output("value")
+            .outputName("total")
+            .build();
     assertThatThrownBy(() -> validator.shape(graph(misplaced)))
         .hasMessage("Output names belong to Output nodes");
   }

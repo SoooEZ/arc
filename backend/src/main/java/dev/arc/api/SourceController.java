@@ -26,18 +26,18 @@ public class SourceController {
 
   @GetMapping("/source-summaries")
   public CatalogPage<SourceSummary> catalog(
-      @RequestParam(defaultValue = "0") int offset,
-      @RequestParam(defaultValue = "20") int limit,
-      @RequestParam(defaultValue = "") String search) {
-    return sources.catalog(offset, limit, search);
+      @RequestParam(required = false) Integer offset,
+      @RequestParam(required = false) Integer limit,
+      @RequestParam(required = false) String search) {
+    return sources.catalog(PageParameters.page(offset, limit, search));
   }
 
   @GetMapping("/sources/{id}/version-summaries")
   public CatalogPage<SourceVersionSummary> versionSummaries(
       @PathVariable String id,
-      @RequestParam(defaultValue = "0") int offset,
-      @RequestParam(defaultValue = "20") int limit) {
-    return sources.versionSummaries(id, offset, limit);
+      @RequestParam(required = false) Integer offset,
+      @RequestParam(required = false) Integer limit) {
+    return sources.versionSummaries(id, PageParameters.page(offset, limit, null));
   }
 
   @PostMapping("/sources")

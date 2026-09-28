@@ -8,11 +8,14 @@ import java.util.List;
 public interface RuleRepository extends RuleResolver {
   List<Rule> list();
 
-  CatalogPage<RuleSummary> catalog(
-      int offset, int limit, String search, String kind, boolean publishedOnly);
+  /** Whether any rule is stored, without reading rule rows. */
+  boolean hasRules();
+
+  /** Newest edits first; the search matches ID, name and description, and an empty kind all. */
+  CatalogPage<RuleSummary> catalog(PageRequest page, String kind, boolean publishedOnly);
 
   /** Version-descending metadata, filtered by a literal substring of the decimal version. */
-  CatalogPage<RuleVersionSummary> versionSummaries(String id, int offset, int limit, String search);
+  CatalogPage<RuleVersionSummary> versionSummaries(String id, PageRequest page);
 
   Rule get(String id);
 
@@ -21,12 +24,14 @@ public interface RuleRepository extends RuleResolver {
 
   Rule lock(String id);
 
+  /** An ID that is already stored, including by a concurrent create, is a 409 conflict. */
   Rule create(String id, String name, String description, String kind, Definition definition);
 
   Rule update(String id, String name, String description, Definition definition);
 
   Rule publish(Rule rule);
 
+  /** Newest first; missing rules return 404. */
   List<RuleVersion> versions(String id);
 
   RuleVersion version(String id, int version);

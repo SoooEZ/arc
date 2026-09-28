@@ -1,15 +1,19 @@
 package dev.arc.engine.validation;
 
 import dev.arc.engine.RuleResolver;
-import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.NodeKind;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-/** Executable graph validation: input dependencies, connections, reachability and node scopes. */
+/**
+ * Executable graph validation: input dependencies, connections, reachability and node scopes.
+ * Diagnostics reuse the same steps to collect problems instead of stopping at the first.
+ */
 final class GraphValidation {
   private final DefinitionShape documentShape;
   private final NodeValidation nodeValidation;
@@ -19,29 +23,23 @@ final class GraphValidation {
     this.nodeValidation = nodeValidation;
   }
 
-  /** Produces the same checked topology used by execution; callers need not plan twice. */
-  public GraphPlan plan(Definition definition, RuleResolver resolver) {
-    return compile(definition, resolver).graph();
-  }
-
+  /**
+   * Produces the checked topology and expressions that execution reuses; fails at the first
+   * problem.
+   */
   CompiledGraph compile(Definition definition, RuleResolver resolver) {
     try {
       return validateGraph(definition, resolver);
-    } catch (ArcException e) {
-      if (!e.locations().isEmpty() || definition == null || definition.nodes() == null) throw e;
-      Node input =
-          definition.nodes().stream()
-              .filter(node -> node != null && "INPUT".equals(node.type()))
-              .findFirst()
-              .orElse(null);
-      throw input == null ? e : e.atNode(null, null, input.id(), input.label());
+    } catch (ArcException error) {
+      throw Problems.onInputNode(error, definition);
     }
   }
 
   private CompiledGraph validateGraph(Definition definition, RuleResolver resolver) {
-    var expressions = new HashMap<String, Expressions.Compiled>();
     documentShape.validate(definition);
-    checkInputDependencies(definition, expressions, resolver);
+    var expressions = new ExpressionCache();
+    var inputReads = checkSourceMappings(definition, expressions, resolver, GraphValidation::fail);
+    checkInputCycles(definition, inputReads);
     checkConnections(definition);
     var plan = new GraphPlan(definition);
     checkReachability(definition, plan);
@@ -49,46 +47,87 @@ final class GraphValidation {
       Set<String> scope = plan.available().get(node.id());
       nodeValidation.validate(definition, node, scope, resolver, expressions);
     }
-    return new CompiledGraph(definition, plan, expressions);
+    return new CompiledGraph(definition, plan, expressions.compiled());
   }
 
-  private void checkInputDependencies(
-      Definition definition, Map<String, Expressions.Compiled> expressions, RuleResolver resolver) {
+  /**
+   * Checks every source mapping against the declared inputs and reports each problem at the Input
+   * node. Returns, per input, the inputs its valid mappings read.
+   */
+  Map<String, Set<String>> checkSourceMappings(
+      Definition definition,
+      ExpressionCache expressions,
+      RuleResolver resolver,
+      Consumer<ArcException> problems) {
     var inputNames = definition.inputs().stream().map(Input::name).collect(Collectors.toSet());
-    Map<String, Set<String>> dependencies = new HashMap<>();
-    for (Input parameter : definition.inputs()) {
-      var parameterDependencies = new HashSet<String>();
-      if (parameter.source() != null)
-        for (String expr : parameter.source().bindings().values()) {
-          var compiled =
-              NodeValidation.expression(
-                  expr, inputNames, parameter.name() + " source", expressions, resolver);
-          parameterDependencies.addAll(compiled.variables());
+    Map<String, Set<String>> inputReads = new HashMap<>();
+    for (var input : NodeValidation.sourceMappings(definition).entrySet()) {
+      var reads = new HashSet<String>();
+      for (var mapping : input.getValue()) {
+        try {
+          reads.addAll(
+              NodeValidation.check(mapping, inputNames, expressions, resolver).variables());
+        } catch (ArcException error) {
+          problems.accept(Problems.onInputNode(error, definition));
         }
-      dependencies.put(parameter.name(), parameterDependencies);
+      }
+      inputReads.put(input.getKey(), reads);
     }
-    for (String name : inputNames)
-      inputCycles(name, dependencies, new HashSet<>(), new HashSet<>());
+    return inputReads;
+  }
+
+  /**
+   * The first input-cycle, connection or reachability problem, in the order validation finds it.
+   */
+  void checkStructure(Definition definition, Map<String, Set<String>> inputReads, GraphPlan plan) {
+    checkInputCycles(definition, inputReads);
+    checkConnections(definition);
+    if (plan != null) checkReachability(definition, plan);
+  }
+
+  private void checkInputCycles(Definition definition, Map<String, Set<String>> inputReads) {
+    var finished = new HashSet<String>();
+    for (Input input : definition.inputs())
+      visitInputReads(input.name(), definition, inputReads, finished, new HashSet<>());
+  }
+
+  /** Depth-first over declared inputs in declaration order, so the reported input is stable. */
+  private void visitInputReads(
+      String name,
+      Definition definition,
+      Map<String, Set<String>> inputReads,
+      Set<String> finished,
+      Set<String> active) {
+    require(!active.contains(name), "Circular source parameter dependency: " + name);
+    if (finished.contains(name)) return;
+    active.add(name);
+    var reads = inputReads.getOrDefault(name, Set.of());
+    for (Input input : definition.inputs())
+      if (reads.contains(input.name()))
+        visitInputReads(input.name(), definition, inputReads, finished, active);
+    active.remove(name);
+    finished.add(name);
   }
 
   private void checkConnections(Definition definition) {
     var nodeIndex = definition.nodes().stream().collect(Collectors.toMap(Node::id, node -> node));
-    var starts = definition.nodes().stream().filter(node -> node.type().equals("INPUT")).toList();
-    require(starts.size() == 1, "A rule must have exactly one Input node");
+    List<Node> inputs = definition.nodesOf(NodeKind.INPUT);
+    require(inputs.size() == 1, "A rule must have exactly one Input node");
+    Node input = inputs.getFirst();
     Map<String, List<Edge>> outgoing = new HashMap<>(), incoming = new HashMap<>();
     for (Edge e : definition.edges()) {
       outgoing.computeIfAbsent(e.source(), k -> new ArrayList<>()).add(e);
       incoming.computeIfAbsent(e.target(), k -> new ArrayList<>()).add(e);
     }
     require(
-        incoming.getOrDefault(starts.getFirst().id(), List.of()).isEmpty(),
+        incoming.getOrDefault(input.id(), List.of()).isEmpty(),
         "Input node cannot have incoming connections");
     for (Node node : definition.nodes()) {
       List<Edge> edges = outgoing.getOrDefault(node.id(), List.of());
       Set<String> handles = edges.stream().map(Edge::sourceHandle).collect(Collectors.toSet());
-      Set<String> expected = nodeValidation.handles(node);
+      List<String> expected = node.handles();
       require(
-          handles.equals(expected),
+          handles.equals(Set.copyOf(expected)),
           node.label() + ": connect " + (expected.isEmpty() ? "no outgoing branches" : expected),
           node);
     }
@@ -100,40 +139,30 @@ final class GraphValidation {
           nodeIndex.get(e.source()));
   }
 
+  /**
+   * The scope plan already rejects cycles, so only nodes Input cannot reach remain to find. The
+   * connection check has made sure that the graph has exactly one Input node.
+   */
   private void checkReachability(Definition definition, GraphPlan plan) {
-    Node input =
-        definition.nodes().stream()
-            .filter(node -> node.type().equals("INPUT"))
-            .findFirst()
-            .orElseThrow();
-    Set<String> visited = new HashSet<>(), active = new HashSet<>();
-    walk(input.id(), plan, visited, active);
+    Node input = definition.inputNode().orElseThrow();
+    Set<String> reached = new HashSet<>(Set.of(input.id()));
+    Deque<String> pending = new ArrayDeque<>(reached);
+    while (!pending.isEmpty())
+      for (Edge edge : plan.outgoing(pending.pop()))
+        if (reached.add(edge.target())) pending.push(edge.target());
     for (Node node : definition.nodes())
       require(
-          visited.contains(node.id()),
+          reached.contains(node.id()),
           "Every node must be reachable from Input; connect or remove unused nodes",
           node);
   }
 
+  private static void fail(ArcException error) {
+    throw error;
+  }
+
   private void require(boolean condition, String message, Node node) {
     if (!condition) throw ArcException.invalid(message).atNode(null, null, node.id(), node.label());
-  }
-
-  private void inputCycles(
-      String name, Map<String, Set<String>> deps, Set<String> seen, Set<String> active) {
-    require(!active.contains(name), "Circular source parameter dependency: " + name);
-    if (!seen.add(name)) return;
-    active.add(name);
-    for (String child : deps.getOrDefault(name, Set.of())) inputCycles(child, deps, seen, active);
-    active.remove(name);
-  }
-
-  private void walk(String id, GraphPlan plan, Set<String> visited, Set<String> active) {
-    require(!active.contains(id), "Decision trees cannot contain cycles");
-    if (!visited.add(id)) return;
-    active.add(id);
-    for (Edge e : plan.outgoing(id)) walk(e.target(), plan, visited, active);
-    active.remove(id);
   }
 
   private static void require(boolean condition, String message) {

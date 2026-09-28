@@ -1,5 +1,6 @@
 package dev.arc.engine.script;
 
+import static dev.arc.support.GraphFixtures.nodeOf;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -130,47 +131,38 @@ node out OUTPUT "Output" { return rate; }
   }
 
   @Test
-  void emptyTransformsGeneratePrefixedFunctionsAndOldSyntaxCannotBuild() {
+  void emptyTransformsStayIncompleteAndOldSyntaxCannotBuild() {
     var draft =
         new Definition(
             1,
             List.of(),
             List.of(
-                new Definition.Node(
-                    "input",
-                    "INPUT",
-                    "Input",
-                    new Definition.Position(0, 0),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null),
+                nodeOf("input", "INPUT", "Input").at(0, 0).build(),
                 node("transform", "TRANSFORM", null, "data"),
-                new Definition.Node(
-                    "out",
-                    "OUTPUT",
-                    "Output",
-                    new Definition.Position(600, 0),
-                    "data",
-                    null,
-                    null,
-                    null,
-                    null)),
+                nodeOf("out", "OUTPUT", "Output").at(600, 0).expression("data").build()),
             List.of(
                 new Definition.Edge("start", "input", "transform", "next"),
                 new Definition.Edge("done", "transform", "out", "next")));
+    // The renderer used to write `let data = $OBJECT();`, which made the unfinished node valid.
     String fragment = script.renderNode(draft, "transform");
-    assertThat(fragment).contains("let data = $OBJECT();");
+    assertThat(fragment).contains("  as data;\n").doesNotContain("let ", "$OBJECT");
     var built = script.buildNode(draft, "transform", fragment);
     assertThat(built.diagnostics()).isEmpty();
-    assertThat(built.definition().nodes().get(1).expression()).isEqualTo("$OBJECT()");
+    var transform = built.definition().nodes().get(1);
+    assertThat(transform.expression()).isNull();
+    assertThat(transform.fields()).isNull();
+    assertThat(transform.output()).isEqualTo("data");
     String canonical = script.render(built.definition());
     assertThat(script.build(canonical).definition()).isEqualTo(built.definition());
     assertThat(script.render(script.build(canonical).definition())).isEqualTo(canonical);
-    validator.validate(built.definition(), noRefs);
+    assertThatThrownBy(() -> validator.validate(built.definition(), noRefs))
+        .hasMessage("transform: Expression is required");
 
-    var legacy = script.buildNode(draft, "transform", fragment.replace("$OBJECT()", "OBJECT()"));
+    String emptyObject = fragment.replace("  as data;", "  let data = $OBJECT();");
+    var written = script.buildNode(draft, "transform", emptyObject);
+    assertThat(written.definition().nodes().get(1).expression()).isEqualTo("$OBJECT()");
+    validator.validate(written.definition(), noRefs);
+    var legacy = script.buildNode(draft, "transform", emptyObject.replace("$OBJECT()", "OBJECT()"));
     assertThat(legacy.definition()).isNull();
     assertThat(legacy.diagnostics())
         .extracting(ArcScript.Diagnostic::message)
@@ -178,7 +170,7 @@ node out OUTPUT "Output" { return rate; }
   }
 
   private Definition.Node node(String id, String type, String expression, String output) {
-    return new Definition.Node(id, type, id, null, expression, output, null, null, null);
+    return nodeOf(id, type, id).expression(expression).output(output).build();
   }
 
   @Test

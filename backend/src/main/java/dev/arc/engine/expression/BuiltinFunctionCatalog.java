@@ -7,10 +7,31 @@ import java.util.*;
 final class BuiltinFunctionCatalog {
   record Spec(int minimumArguments, int maximumArguments, Entry entry) {}
 
+  /**
+   * Aggregates that ARC computes with decimal arithmetic instead of POI's floating point. {@link
+   * Functions} evaluates them and the catalog documents them from this one list.
+   */
+  static final List<String> DECIMAL_AGGREGATES =
+      List.of("SUM", "MIN", "MAX", "AVG", "AVERAGE", "COUNT", "MUL");
+
+  /** Collection functions that bind one local item identifier: {@code $MAP(items, item, body)}. */
+  static final List<String> ITEM_FUNCTIONS = List.of("MAP", "FILTER", "ALL", "ANY");
+
+  /** Folds a collection with local item and accumulator identifiers. */
+  static final String REDUCE = "REDUCE";
+
   private static final Map<String, Spec> SPECS = create();
 
   static Map<String, Spec> specs() {
     return SPECS;
+  }
+
+  /**
+   * Whether the name introduces local identifiers, so the parser reads its arguments as bindings
+   * and {@link ExpressionRuntime} evaluates the body once per item.
+   */
+  static boolean isCollectionFunction(String name) {
+    return ITEM_FUNCTIONS.contains(name) || name.equals(REDUCE);
   }
 
   private static Map<String, Spec> create() {
@@ -107,7 +128,7 @@ final class BuiltinFunctionCatalog {
         "SWITCH(value, case, result, ..., default)",
         "Selects the first matching case; default is optional.",
         "SWITCH(${1:tier}, \"premium\", ${2:0.2}, ${3:0})");
-    for (String n : List.of("SUM", "MIN", "MAX", "AVG", "AVERAGE", "COUNT", "MUL"))
+    for (String n : DECIMAL_AGGREGATES)
       add(
           specs,
           n,
@@ -138,7 +159,7 @@ final class BuiltinFunctionCatalog {
           "Rounds to -12…12 decimal places. $ROUND uses half up; $ROUNDDOWN toward zero; $ROUNDUP away from"
               + " zero.",
           n + "(${1:amount}, ${2:2})");
-    for (String n : List.of("MAP", "FILTER", "ALL", "ANY"))
+    for (String n : ITEM_FUNCTIONS)
       add(
           specs,
           n,
@@ -150,7 +171,7 @@ final class BuiltinFunctionCatalog {
           n + "(${1:items}, item, ${2:item.price > 10})");
     add(
         specs,
-        "REDUCE",
+        REDUCE,
         5,
         5,
         "Collections",

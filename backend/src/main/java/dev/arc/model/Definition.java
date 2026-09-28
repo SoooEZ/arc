@@ -1,7 +1,9 @@
 package dev.arc.model;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Portable executable graph. Presentation coordinates never affect execution. */
 public record Definition(
@@ -10,13 +12,63 @@ public record Definition(
     this(schemaVersion, inputs, nodes, edges, List.of());
   }
 
+  /**
+   * The Input node, which receives the declared inputs: the first node of type {@code INPUT}.
+   * Validation requires exactly one in an executable graph. An unfinished draft may have none, or
+   * several; its whole-graph problems are then shown on the first.
+   */
+  public Optional<Node> inputNode() {
+    return nodesOf(NodeKind.INPUT).stream().findFirst();
+  }
+
+  /**
+   * The nodes of one kind, in document order. Unvalidated documents are accepted: a missing node
+   * list, null nodes and unknown types match no kind.
+   */
+  public List<Node> nodesOf(NodeKind kind) {
+    var matches = new ArrayList<Node>();
+    if (nodes != null)
+      for (Node node : nodes)
+        if (node != null && kind.name().equals(node.type())) matches.add(node);
+    return List.copyOf(matches);
+  }
+
+  /**
+   * A copy that shares no list or map with this definition; input defaults are frozen at every
+   * level. A compiled plan keeps this copy, so later changes to the caller's collections cannot
+   * reach it. A document without its input, node or edge list is returned as it is, for validation
+   * to report.
+   */
+  public Definition detached() {
+    if (inputs == null || nodes == null || edges == null) return this;
+    return new Definition(
+        schemaVersion,
+        Frozen.list(inputs, Input::detached),
+        Frozen.list(nodes, Node::detached),
+        Frozen.list(edges),
+        Frozen.list(notes));
+  }
+
   public record SourceBinding(
-      String id, int version, Map<String, String> bindings, String pointer, String onError) {}
+      String id, int version, Map<String, String> bindings, String pointer, String onError) {
+    SourceBinding detached() {
+      return new SourceBinding(id, version, Frozen.map(bindings), pointer, onError);
+    }
+  }
 
   public record Input(
       String name, String type, boolean required, Object defaultValue, SourceBinding source) {
     public Input(String name, String type, boolean required, Object defaultValue) {
       this(name, type, required, defaultValue, null);
+    }
+
+    Input detached() {
+      return new Input(
+          name,
+          type,
+          required,
+          Frozen.value(defaultValue),
+          source == null ? null : source.detached());
     }
   }
 
@@ -27,6 +79,10 @@ public record Definition(
 
   public record Field(String name, String expression) {}
 
+  /**
+   * One graph node. Its {@code type} selects the {@link NodeKind}; the kind decides which of the
+   * optional fields the node uses.
+   */
   public record Node(
       String id,
       String type,
@@ -41,77 +97,39 @@ public record Definition(
       List<Field> fields,
       String selector,
       String outputName) {
-    public Node(
-        String id,
-        String type,
-        String label,
-        Position position,
-        String expression,
-        String output,
-        String ruleId,
-        Integer version,
-        Map<String, String> bindings,
-        List<BranchCase> cases,
-        List<Field> fields,
-        String selector) {
-      this(
-          id,
-          type,
-          label,
-          position,
-          expression,
-          output,
-          ruleId,
-          version,
-          bindings,
-          cases,
-          fields,
-          selector,
-          null);
-    }
-
-    public Node(
-        String id,
-        String type,
-        String label,
-        Position position,
-        String expression,
-        String output,
-        String ruleId,
-        Integer version,
-        Map<String, String> bindings,
-        List<BranchCase> cases,
-        List<Field> fields) {
-      this(
-          id,
-          type,
-          label,
-          position,
-          expression,
-          output,
-          ruleId,
-          version,
-          bindings,
-          cases,
-          fields,
-          null);
-    }
-
-    public Node(
-        String id,
-        String type,
-        String label,
-        Position position,
-        String expression,
-        String output,
-        String ruleId,
-        Integer version,
-        Map<String, String> bindings) {
-      this(id, type, label, position, expression, output, ruleId, version, bindings, null, null);
+    /**
+     * The kind that {@code type} names. Draft-shape validation rejects unknown types, so use this
+     * on validated definitions only; {@link Definition#nodesOf} also reads unvalidated ones.
+     */
+    public NodeKind kind() {
+      return NodeKind.parse(type)
+          .orElseThrow(() -> new IllegalStateException("Unknown node type: " + type));
     }
 
     public boolean storesResult() {
-      return "FORMULA".equals(type) || "REFERENCE".equals(type) || "TRANSFORM".equals(type);
+      return kind().storesResult();
+    }
+
+    /** The handles this node connects, in canvas order (see {@link NodeKind#handles}). */
+    public List<String> handles() {
+      return kind().handles(cases);
+    }
+
+    Node detached() {
+      return new Node(
+          id,
+          type,
+          label,
+          position,
+          expression,
+          output,
+          ruleId,
+          version,
+          Frozen.map(bindings),
+          Frozen.list(cases),
+          Frozen.list(fields),
+          selector,
+          outputName);
     }
   }
 

@@ -29,6 +29,27 @@ class SourceServiceTest {
   }
 
   @Test
+  void sourceIdsFollowTheSharedResourceIdPolicy() {
+    var repository = mock(SourceRepository.class);
+    var adapter = mock(SourceAdapter.class);
+    when(adapter.kind()).thenReturn("MEMORY");
+    var service =
+        new SourceService(repository, new SourceValidator(new SourceAdapters(List.of(adapter))));
+    var definition =
+        new SourceDefinition(
+            "MEMORY", null, List.of(new Input("key", "NUMBER", true, 12)), null, null, 0);
+    String longest = "s" + "-1".repeat(39) + "z";
+    service.create(new SourceService.Create(longest, "Longest", definition));
+    verify(repository).create(longest, "Longest", definition);
+    for (String id : new String[] {longest + "z", "Source", "1source", "source_id", null}) {
+      assertThatThrownBy(() -> service.create(new SourceService.Create(id, "Name", definition)))
+          .as(String.valueOf(id))
+          .hasMessage("Invalid source ID");
+    }
+    verifyNoMoreInteractions(repository);
+  }
+
+  @Test
   void duplicateAdaptersFailFastInsteadOfSilentlyChangingBehavior() {
     var first = mock(SourceAdapter.class);
     var second = mock(SourceAdapter.class);

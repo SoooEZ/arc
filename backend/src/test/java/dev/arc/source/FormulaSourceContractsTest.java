@@ -1,5 +1,7 @@
 package dev.arc.source;
 
+import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -15,9 +17,7 @@ class FormulaSourceContractsTest {
     return new Definition(
         1,
         inputs,
-        List.of(
-            new Node("in", "INPUT", "Input", null, null, null, null, null, null),
-            new Node("out", "OUTPUT", "Output", null, expression, null, null, null, null)),
+        List.of(inputNode("in", "Input"), outputNode("out", "Output", expression)),
         List.of(new Edge("next", "in", "out", "next")));
   }
 

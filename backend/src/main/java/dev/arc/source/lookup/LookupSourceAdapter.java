@@ -1,10 +1,14 @@
 package dev.arc.source.lookup;
 
+import dev.arc.engine.ExecutionDeadline;
+import dev.arc.engine.Limits;
+import dev.arc.engine.ValueText;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.SourceDefinition;
 import dev.arc.source.SourceAdapter;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -24,16 +28,50 @@ public final class LookupSourceAdapter implements SourceAdapter {
         .collect(Collectors.toSet())
         .equals(Set.of("key")))
       throw ArcException.invalid("Lookup tables require exactly one parameter named key");
-    if (definition.entries() == null || definition.entries().size() > 1000)
-      throw ArcException.invalid("Provide a JSON object with at most 1,000 lookup entries");
+    if (definition.secretHeaders() != null && !definition.secretHeaders().isEmpty())
+      throw ArcException.invalid("Lookup tables do not use secret headers");
+    if (definition.entries() == null || definition.entries().size() > Limits.MAX_COLLECTION_ITEMS)
+      throw ArcException.invalid(
+          "Provide a JSON object with at most "
+              + Limits.format(Limits.MAX_COLLECTION_ITEMS)
+              + " lookup entries");
     Expressions.bounded(definition.entries());
   }
 
+  /** The table is in memory, so the caller's deadline checks around this call suffice. */
   @Override
-  public Object fetch(String sourceId, SourceDefinition definition, Map<String, Object> inputs) {
-    String key = String.valueOf(inputs.get("key"));
-    if (!definition.entries().containsKey(key))
-      throw ArcException.invalid("Lookup key was not found in " + sourceId);
-    return definition.entries().get(key);
+  public Object fetch(
+      String sourceId,
+      SourceDefinition definition,
+      Map<String, Object> inputs,
+      ExecutionDeadline deadline) {
+    Object key = inputs.get("key");
+    if (key == null) throw ArcException.invalid("Lookup key must not be null");
+    String entry = matchingEntry(definition.entries(), key);
+    if (entry == null) throw ArcException.invalid("Lookup key was not found in " + sourceId);
+    return definition.entries().get(entry);
+  }
+
+  /**
+   * Text and boolean keys match their exact text. Numbers match by value: {@code 20}, {@code 20.0}
+   * and {@code 2E+1} find the entry {@code "20"}. When no entry uses that plain form, the first
+   * entry that spells the same number differently, such as {@code "20.0"}, matches.
+   */
+  private static String matchingEntry(Map<String, Object> entries, Object key) {
+    String text = ValueText.key(key);
+    if (entries.containsKey(text)) return text;
+    if (key instanceof Number) {
+      BigDecimal number = Expressions.number(key);
+      for (String entry : entries.keySet()) if (isSameNumber(entry, number)) return entry;
+    }
+    return null;
+  }
+
+  private static boolean isSameNumber(String text, BigDecimal number) {
+    try {
+      return new BigDecimal(text).compareTo(number) == 0;
+    } catch (NumberFormatException notANumber) {
+      return false;
+    }
   }
 }

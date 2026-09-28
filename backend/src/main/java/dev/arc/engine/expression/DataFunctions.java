@@ -1,5 +1,7 @@
 package dev.arc.engine.expression;
 
+import dev.arc.engine.Limits;
+import dev.arc.engine.ValueText;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -11,8 +13,11 @@ final class DataFunctions {
   static Map<String, Object> object(List<Object> args) {
     var result = new LinkedHashMap<String, Object>();
     for (int i = 0; i < args.size(); i += 2) {
-      if (!(args.get(i) instanceof String key) || key.isBlank() || key.length() > 160)
-        throw ArcException.invalid("OBJECT keys must be text of 1 to 160 characters");
+      if (!(args.get(i) instanceof String key)
+          || key.isBlank()
+          || key.length() > Limits.MAX_FIELD_NAME_CHARACTERS)
+        throw ArcException.invalid(
+            "OBJECT keys must be text of 1 to " + Limits.MAX_FIELD_NAME_CHARACTERS + " characters");
       if (result.containsKey(key)) throw ArcException.invalid("Duplicate OBJECT key: " + key);
       result.put(key, args.get(i + 1));
     }
@@ -46,10 +51,8 @@ final class DataFunctions {
   }
 
   static Object text(Object value) {
-    if (value == null || value instanceof String) return value;
-    if (value instanceof Number) return Expressions.number(value).toPlainString();
-    if (value instanceof Boolean) return value.toString();
-    throw ArcException.invalid("TO_STRING expects a scalar value");
+    if (!ValueText.isScalar(value)) throw ArcException.invalid("TO_STRING expects a scalar value");
+    return ValueText.text(value);
   }
 
   static Object bool(Object value) {

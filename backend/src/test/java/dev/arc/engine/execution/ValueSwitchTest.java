@@ -1,5 +1,6 @@
 package dev.arc.engine.execution;
 
+import static dev.arc.support.GraphFixtures.copyOf;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -169,14 +170,18 @@ class ValueSwitchTest {
     assertThat(rebuilt.definition().nodes()).isEqualTo(graph.nodes());
     assertThat(rebuilt.definition().edges()).containsExactlyInAnyOrderElementsOf(graph.edges());
     assertThat(rebuilt.definition().inputs()).isEqualTo(graph.inputs());
-    var plans = new ExecutionPlans(validator);
+    var plans = new ExecutionPlans(validator, json);
     var first =
-        plans.session(noRefs, ExecutionDeadline.start(30_000), true).prepare("test", 1, graph);
+        plans
+            .session(noRefs, ExecutionDeadline.start(30_000), true)
+            .prepare("test", 1, () -> graph);
     assertThat(first.definition().nodes().get(1).selector()).isEqualTo("data.value");
     assertThat(first.expression("data.value").evaluate(Map.of("data", Map.of("value", false))))
         .isEqualTo(false);
     assertThat(
-            plans.session(noRefs, ExecutionDeadline.start(30_000), true).prepare("test", 1, graph))
+            plans
+                .session(noRefs, ExecutionDeadline.start(30_000), true)
+                .prepare("test", 1, () -> graph))
         .isSameAs(first);
     String casesFirst =
         canonical
@@ -255,18 +260,6 @@ class ValueSwitchTest {
   }
 
   private Node withSelector(Node node, String selector) {
-    return new Node(
-        node.id(),
-        node.type(),
-        node.label(),
-        node.position(),
-        node.expression(),
-        node.output(),
-        node.ruleId(),
-        node.version(),
-        node.bindings(),
-        node.cases(),
-        node.fields(),
-        selector);
+    return copyOf(node).selector(selector).build();
   }
 }

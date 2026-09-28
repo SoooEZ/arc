@@ -8,17 +8,17 @@ import dev.arc.model.DataSource;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.SourceDefinition;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
-/** Resolves one source version, normalizes its inputs, and dispatches the provider read. */
+/**
+ * Resolves one source version, normalizes its inputs, and dispatches the provider read. Rule
+ * executions read through a request {@link Session}, which is the engine's {@link SourceReader}.
+ */
 @Service
-public class SourceExecutionService implements SourceReader {
+public class SourceExecutionService {
   public record Test(Map<String, Object> inputs, Integer version) {}
 
   private final SourceRepository repository;
@@ -32,21 +32,12 @@ public class SourceExecutionService implements SourceReader {
     this.extractor = extractor;
   }
 
+  /** Reads the whole provider value of the current or a pinned version, like one execution. */
   public Object test(String id, Test request) {
     DataSource source =
         request.version() == null ? repository.latest(id) : repository.get(id, request.version());
-    return fetch(source, request.inputs());
-  }
-
-  @Override
-  public Object read(SourceBinding binding, Map<String, Object> inputs) {
-    return openSession().read(binding, inputs);
-  }
-
-  @Override
-  public Object read(
-      SourceBinding binding, Map<String, Object> inputs, ExecutionDeadline deadline) {
-    return openSession().read(binding, inputs, deadline);
+    return fetch(
+        source, request.inputs(), ExecutionDeadline.start(ExecutionDeadline.DEFAULT_TIMEOUT_MS));
   }
 
   /** A request owns this cache; provider values remain live on every read. */
@@ -65,72 +56,35 @@ public class SourceExecutionService implements SourceReader {
       return source(id, version).definition();
     }
 
+    /** One stored configuration per request, shared by static validation and every read. */
     private DataSource source(String id, int version) {
-      return configurations.computeIfAbsent(
-          new Version(id, version), ignored -> snapshot(repository.get(id, version)));
+      return configurations.computeIfAbsent(new Version(id, version), ignored -> load(id, version));
     }
 
-    @Override
-    public Object read(SourceBinding binding, Map<String, Object> inputs) {
-      Object value = fetch(source(binding.id(), binding.version()), inputs);
-      return extractor.extract(value, binding.pointer());
+    /** Providers receive an unmodifiable copy, so no read can change what later reads see. */
+    private DataSource load(String id, int version) {
+      DataSource source = repository.get(id, version);
+      return new DataSource(
+          source.id(), source.name(), source.version(), source.definition().detached());
     }
 
     @Override
     public Object read(
         SourceBinding binding, Map<String, Object> inputs, ExecutionDeadline deadline) {
       deadline.check();
-      DataSource source = source(binding.id(), binding.version());
-      SourceDefinition definition = source.definition();
-      Map<String, Object> values = normalizeInputs(definition, inputs);
-      deadline.check();
-      Object value =
-          adapters.require(definition.kind()).fetch(source.id(), definition, values, deadline);
-      deadline.check();
+      Object value = fetch(source(binding.id(), binding.version()), inputs, deadline);
       return extractor.extract(value, binding.pointer());
     }
   }
 
-  private DataSource snapshot(DataSource source) {
-    SourceDefinition definition = source.definition();
-    Map<String, Object> entries = null;
-    if (definition.entries() != null) {
-      entries = new LinkedHashMap<>();
-      for (var entry : definition.entries().entrySet())
-        entries.put(entry.getKey(), immutableValue(entry.getValue()));
-      entries = Collections.unmodifiableMap(entries);
-    }
-    return new DataSource(
-        source.id(),
-        source.name(),
-        source.version(),
-        new SourceDefinition(
-            definition.kind(),
-            definition.url(),
-            List.copyOf(definition.parameters()),
-            entries,
-            definition.secretHeaders() == null ? null : Map.copyOf(definition.secretHeaders()),
-            definition.timeoutMs()));
-  }
-
-  private Object immutableValue(Object value) {
-    if (value instanceof Map<?, ?> map) {
-      var copy = new LinkedHashMap<Object, Object>();
-      for (var entry : map.entrySet()) copy.put(entry.getKey(), immutableValue(entry.getValue()));
-      return Collections.unmodifiableMap(copy);
-    }
-    if (value instanceof List<?> list) {
-      var copy = new ArrayList<>();
-      for (Object item : list) copy.add(immutableValue(item));
-      return Collections.unmodifiableList(copy);
-    }
-    return value;
-  }
-
-  private Object fetch(DataSource source, Map<String, Object> inputs) {
+  private Object fetch(DataSource source, Map<String, Object> inputs, ExecutionDeadline deadline) {
     SourceDefinition definition = source.definition();
     Map<String, Object> values = normalizeInputs(definition, inputs);
-    return adapters.require(definition.kind()).fetch(source.id(), definition, values);
+    deadline.check();
+    Object value =
+        adapters.require(definition.kind()).fetch(source.id(), definition, values, deadline);
+    deadline.check();
+    return value;
   }
 
   private Map<String, Object> normalizeInputs(

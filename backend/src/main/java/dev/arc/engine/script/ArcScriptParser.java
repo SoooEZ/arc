@@ -4,12 +4,14 @@ import static dev.arc.engine.script.ArcScriptSyntax.error;
 import static dev.arc.engine.script.ArcScriptSyntax.identifier;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.InputTypes;
+import dev.arc.engine.Limits;
 import dev.arc.engine.script.ArcScriptScanner.Statement;
 import dev.arc.engine.script.ArcScriptScanner.SyntaxException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,13 +20,20 @@ import java.util.regex.Pattern;
 
 /** Document declarations and input schemas; each node owns a separate grammar session. */
 final class ArcScriptParser {
-  private static final int MAX_SOURCE_CHARACTERS = 1_048_576;
+  private static final String TYPES = String.join("|", InputTypes.NAMES);
   private static final Pattern INPUT =
       Pattern.compile(
-          "([A-Za-z_][A-Za-z_0-9]*)\\s*:\\s*(NUMBER|STRING|BOOLEAN|ARRAY|OBJECT)\\s+(required|optional)(?:\\s+default\\s+(.+))?",
+          "([A-Za-z_][A-Za-z_0-9]*)\\s*:\\s*("
+              + TYPES
+              + ")\\s+(required|optional)(?:\\s+default\\s+(.+))?",
           Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
   private static final Pattern SOURCE =
       Pattern.compile("source\\s+(\\w+)\\s*=\\s*(.+)", Pattern.DOTALL);
+
+  /** A parsed document and the statements that declared its elements. */
+  record Parsed(Definition definition, ScriptLocations locations) {}
+
+  private record Declared<T>(T value, Statement statement) {}
 
   private final ArcScriptSyntax syntax;
 
@@ -32,16 +41,20 @@ final class ArcScriptParser {
     this.syntax = new ArcScriptSyntax(json);
   }
 
-  Definition parse(String source) {
+  Parsed parse(String source) {
     // HTTP also bounds the encoded request bytes. Keep a separate bound for embedded callers;
     // the former 100,000-character limit rejected otherwise valid graph/code round trips.
-    if (source == null || source.length() > MAX_SOURCE_CHARACTERS)
-      throw new SyntaxException("Source must be at most 1,048,576 characters", 1, 1);
+    if (source == null || source.length() > Limits.MAX_SCRIPT_CHARACTERS)
+      throw new SyntaxException(
+          "Source must be at most " + Limits.format(Limits.MAX_SCRIPT_CHARACTERS) + " characters",
+          1,
+          1);
     var scanner = new ArcScriptScanner(source);
-    var inputs = new ArrayList<Input>();
+    var locations = new ScriptLocations();
+    var inputs = new ArrayList<Declared<Input>>();
     var nodes = new ArrayList<Node>();
     var edges = new ArrayList<Edge>();
-    Map<String, SourceBinding> sources = new HashMap<>();
+    Map<String, Declared<SourceBinding>> sources = new LinkedHashMap<>();
     boolean inputBlock = false;
     while (scanner.more()) {
       Statement header = scanner.readHeader();
@@ -54,55 +67,67 @@ final class ArcScriptParser {
         parseInputs(scanner.body(), inputs, sources);
       } else {
         var nodeParser = new ArcScriptNodeParser(syntax, header, scanner, nodes.size());
-        nodes.add(nodeParser.parse(scanner, edges));
+        nodes.add(nodeParser.parse(scanner, edges, locations));
       }
     }
-    return new Definition(1, attachSources(inputs, sources), nodes, edges, scanner.notes);
+    locations.commented(scanner.comments);
+    var notes = scanner.comments.stream().map(Statement::text).toList();
+    var connectedInputs = attachSources(inputs, sources, locations);
+    return new Parsed(new Definition(1, connectedInputs, nodes, edges, notes), locations);
   }
 
-  private List<Input> attachSources(List<Input> inputs, Map<String, SourceBinding> sources) {
-    for (String name : sources.keySet())
-      if (inputs.stream().noneMatch(input -> input.name().equals(name)))
-        throw new SyntaxException("Source refers to unknown input: " + name, 1, 1);
+  private List<Input> attachSources(
+      List<Declared<Input>> inputs,
+      Map<String, Declared<SourceBinding>> sources,
+      ScriptLocations locations) {
+    for (var source : sources.entrySet())
+      if (inputs.stream().noneMatch(input -> input.value().name().equals(source.getKey())))
+        throw error(
+            "Source refers to unknown input: " + source.getKey(), source.getValue().statement());
     var connectedInputs = new ArrayList<Input>();
-    for (Input input : inputs) {
-      connectedInputs.add(
+    for (var declared : inputs) {
+      Input input = declared.value();
+      var source = sources.get(input.name());
+      var connected =
           new Input(
               input.name(),
               input.type(),
               input.required(),
               input.defaultValue(),
-              sources.get(input.name())));
+              source == null ? null : source.value());
+      locations.declared(connected, declared.statement());
+      if (source != null) locations.sourced(connected, source.statement());
+      connectedInputs.add(connected);
     }
     return connectedInputs;
   }
 
   private void parseInputs(
-      List<Statement> statements, List<Input> inputs, Map<String, SourceBinding> sources) {
+      List<Statement> statements,
+      List<Declared<Input>> inputs,
+      Map<String, Declared<SourceBinding>> sources) {
     for (Statement statement : statements) {
       if (statement.text().startsWith("source ")) {
         Matcher match = SOURCE.matcher(statement.text());
         if (!match.matches())
           throw error("Use: source parameter = { JSON source binding };", statement);
+        var binding = syntax.read(match.group(2), SourceBinding.class, statement);
         if (sources.putIfAbsent(
-                identifier(match.group(1), statement),
-                syntax.read(match.group(2), SourceBinding.class, statement))
+                identifier(match.group(1), statement), new Declared<>(binding, statement))
             != null) throw error("Duplicate input source", statement);
       } else {
         Matcher match = INPUT.matcher(statement.text());
         if (!match.matches())
-          throw error(
-              "Use: parameter: NUMBER|STRING|BOOLEAN|ARRAY|OBJECT required|optional [default"
-                  + " JSON];",
-              statement);
-        inputs.add(
+          throw error("Use: parameter: " + TYPES + " required|optional [default JSON];", statement);
+        var input =
             new Input(
                 identifier(match.group(1), statement),
                 match.group(2).toUpperCase(Locale.ROOT),
                 match.group(3).equalsIgnoreCase("required"),
                 match.group(4) == null
                     ? null
-                    : syntax.read(match.group(4), Object.class, statement)));
+                    : syntax.read(match.group(4), Object.class, statement));
+        inputs.add(new Declared<>(input, statement));
       }
     }
   }

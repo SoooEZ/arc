@@ -3,8 +3,8 @@ package dev.arc.source;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.ExecutionDeadline;
+import dev.arc.engine.SourceReader;
 import dev.arc.error.ArcException;
 import dev.arc.model.DataSource;
 import dev.arc.model.Definition;
@@ -16,7 +16,9 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class SourceExecutionServiceTest {
   private final SourceRepository repository = mock(SourceRepository.class);
@@ -27,16 +29,15 @@ class SourceExecutionServiceTest {
     when(adapter.kind()).thenReturn("MEMORY");
     execution =
         new SourceExecutionService(
-            repository,
-            new SourceAdapters(List.of(adapter)),
-            new JsonPointerExtractor(new ObjectMapper()));
+            repository, new SourceAdapters(List.of(adapter)), new JsonPointerExtractor());
   }
 
   @Test
   void omittedVersionUsesOneCurrentSnapshotWithoutLoadingHistory() {
     DataSource source = source(3, true);
     when(repository.latest("memory")).thenReturn(source);
-    when(adapter.fetch("memory", source.definition(), Map.of("key", new BigDecimal("12"))))
+    when(adapter.fetch(
+            eq("memory"), eq(source.definition()), eq(Map.of("key", new BigDecimal("12"))), any()))
         .thenReturn("current");
 
     assertThat(execution.test("memory", new SourceExecutionService.Test(Map.of(), null)))
@@ -49,7 +50,8 @@ class SourceExecutionServiceTest {
   void explicitVersionStaysPinnedEvenWhenTheCurrentVersionDiffers() {
     DataSource source = source(1, true);
     when(repository.get("memory", 1)).thenReturn(source);
-    when(adapter.fetch("memory", source.definition(), Map.of("key", new BigDecimal("4"))))
+    when(adapter.fetch(
+            eq("memory"), eq(source.definition()), eq(Map.of("key", new BigDecimal("4"))), any()))
         .thenReturn("pinned");
 
     assertThat(execution.test("memory", new SourceExecutionService.Test(Map.of("key", 4), 1)))
@@ -59,17 +61,39 @@ class SourceExecutionServiceTest {
   }
 
   @Test
+  void theTestEndpointReadsWithinTheDefaultExecutionDeadline() {
+    DataSource source = source(1, true);
+    when(repository.get("memory", 1)).thenReturn(source);
+    var deadline = ArgumentCaptor.forClass(ExecutionDeadline.class);
+    when(adapter.fetch(any(), any(), any(), deadline.capture())).thenReturn("value");
+
+    execution.test("memory", new SourceExecutionService.Test(Map.of(), 1));
+
+    assertThat(deadline.getValue().remainingMillis())
+        .isBetween(
+            ExecutionDeadline.DEFAULT_TIMEOUT_MS - 5_000, ExecutionDeadline.DEFAULT_TIMEOUT_MS);
+  }
+
+  @Test
   void bindingReadsUseTheSameTypedProviderDispatchAndThenExtractThePointer() {
     DataSource source = source(1, true);
     when(repository.get("memory", 1)).thenReturn(source);
-    when(adapter.fetch("memory", source.definition(), Map.of("key", new BigDecimal("12"))))
+    when(adapter.fetch(
+            eq("memory"), eq(source.definition()), eq(Map.of("key", new BigDecimal("12"))), any()))
         .thenReturn(Map.of("value", 12));
 
     Object value =
-        execution.read(new SourceBinding("memory", 1, Map.of(), "/value", "FAIL"), Map.of());
+        execution
+            .openSession()
+            .read(
+                new SourceBinding("memory", 1, Map.of(), "/value", "FAIL"),
+                Map.of(),
+                ExecutionDeadline.start(ExecutionDeadline.DEFAULT_TIMEOUT_MS));
 
     assertThat(value).isEqualTo(12);
-    verify(adapter).fetch("memory", source.definition(), Map.of("key", new BigDecimal("12")));
+    verify(adapter)
+        .fetch(
+            eq("memory"), eq(source.definition()), eq(Map.of("key", new BigDecimal("12"))), any());
     assertThatThrownBy(
             () ->
                 execution.test("memory", new SourceExecutionService.Test(Map.of("key", "bad"), 1)))
@@ -78,7 +102,81 @@ class SourceExecutionServiceTest {
             () ->
                 execution.test("memory", new SourceExecutionService.Test(Map.of("unknown", 3), 1)))
         .hasMessageContaining("Unknown source parameter");
-    verify(adapter, times(1)).fetch(any(), any(), any());
+    verify(adapter, times(1)).fetch(any(), any(), any(), any());
+  }
+
+  @Test
+  void aProviderImplementsOneFetchThatReceivesTheExecutionDeadline() {
+    var received = new AtomicReference<ExecutionDeadline>();
+    SourceAdapter table =
+        new SourceAdapter() {
+          @Override
+          public String kind() {
+            return "TABLE";
+          }
+
+          @Override
+          public void validate(SourceDefinition definition) {}
+
+          @Override
+          public Object fetch(
+              String sourceId,
+              SourceDefinition definition,
+              Map<String, Object> inputs,
+              ExecutionDeadline deadline) {
+            received.set(deadline);
+            return Map.of("value", inputs.get("key"));
+          }
+        };
+    var definition =
+        new SourceDefinition(
+            "TABLE", null, List.of(new Input("key", "NUMBER", true, null)), null, null, 0);
+    when(repository.get("table", 1)).thenReturn(new DataSource("table", "Table", 1, definition));
+    var service =
+        new SourceExecutionService(
+            repository, new SourceAdapters(List.of(table)), new JsonPointerExtractor());
+    var deadline = ExecutionDeadline.start(1000);
+
+    Object value =
+        service
+            .openSession()
+            .read(
+                new SourceBinding("table", 1, Map.of(), "/value", "FAIL"),
+                Map.of("key", 7),
+                deadline);
+
+    assertThat(value).isEqualTo(new BigDecimal("7"));
+    assertThat(received).hasValue(deadline);
+  }
+
+  @Test
+  void aValueReturnedAfterTheDeadlineIsNotUsed() throws Exception {
+    DataSource source = source(1, true);
+    when(repository.get("memory", 1)).thenReturn(source);
+    when(adapter.fetch(any(), any(), any(), any()))
+        .thenAnswer(
+            call -> {
+              Thread.sleep(150);
+              return "late";
+            });
+    var session = execution.openSession();
+    var binding = new SourceBinding("memory", 1, Map.of(), "", "FAIL");
+
+    assertThatThrownBy(() -> session.read(binding, Map.of(), ExecutionDeadline.start(100)))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> assertThat(error.kind()).isEqualTo(ArcException.Kind.DEADLINE));
+    var expired = ExecutionDeadline.start(100);
+    Thread.sleep(120);
+    assertThatThrownBy(() -> session.read(binding, Map.of(), expired))
+        .hasMessage("Rule execution deadline exceeded");
+    verify(adapter, times(1)).fetch(any(), any(), any(), any());
+  }
+
+  @Test
+  void onlyRequestSessionsAreSourceReaders() {
+    assertThat(SourceReader.class.isAssignableFrom(SourceExecutionService.class)).isFalse();
+    assertThat(execution.openSession()).isInstanceOf(SourceReader.class);
   }
 
   @Test
@@ -87,11 +185,12 @@ class SourceExecutionServiceTest {
     when(repository.get("memory", 1)).thenReturn(source);
     var inputs = new HashMap<String, Object>();
     inputs.put("key", null);
-    when(adapter.fetch("memory", source.definition(), inputs)).thenReturn("null received");
+    when(adapter.fetch(eq("memory"), eq(source.definition()), eq(inputs), any()))
+        .thenReturn("null received");
 
     assertThat(execution.test("memory", new SourceExecutionService.Test(inputs, 1)))
         .isEqualTo("null received");
-    verify(adapter).fetch("memory", source.definition(), inputs);
+    verify(adapter).fetch(eq("memory"), eq(source.definition()), eq(inputs), any());
   }
 
   @Test
@@ -103,7 +202,7 @@ class SourceExecutionServiceTest {
         .hasMessage("Missing source parameter: key");
     assertThatThrownBy(() -> execution.test("memory", new SourceExecutionService.Test(null, 1)))
         .hasMessage("Source inputs must be an object");
-    verify(adapter, never()).fetch(any(), any(), any());
+    verify(adapter, never()).fetch(any(), any(), any(), any());
   }
 
   @Test
@@ -114,16 +213,16 @@ class SourceExecutionServiceTest {
         .isInstanceOfSatisfying(
             ArcException.class, error -> assertThat(error.status()).isEqualTo(404))
         .hasMessage("Source not found");
-    verify(adapter, never()).fetch(any(), any(), any());
+    verify(adapter, never()).fetch(any(), any(), any(), any());
   }
 
   @Test
   void validationAndExecutionSharePinnedConfigurationsButNeverProviderValues() {
     DataSource source = source(1, true);
     when(repository.get("memory", 1)).thenReturn(source);
-    when(adapter.fetch("memory", source.definition(), Map.of("key", new BigDecimal("12"))))
+    when(adapter.fetch(
+            eq("memory"), eq(source.definition()), eq(Map.of("key", new BigDecimal("12"))), any()))
         .thenReturn(10, 20);
-    doCallRealMethod().when(adapter).fetch(any(), any(), any(), any());
     var binding = new SourceBinding("memory", 1, Map.of(), "", "FAIL");
     var blank = RuleSamples.blank("FORMULA");
     var definition =
@@ -142,7 +241,8 @@ class SourceExecutionServiceTest {
     assertThat(session.read(binding, Map.of(), ExecutionDeadline.start(1000))).isEqualTo(20);
     verify(repository).get("memory", 1);
     verify(adapter, times(2))
-        .fetch("memory", source.definition(), Map.of("key", new BigDecimal("12")));
+        .fetch(
+            eq("memory"), eq(source.definition()), eq(Map.of("key", new BigDecimal("12"))), any());
   }
 
   @Test
@@ -158,7 +258,7 @@ class SourceExecutionServiceTest {
 
     verify(repository, times(2)).get("memory", 1);
     verify(repository).get("memory", 2);
-    verify(adapter, never()).fetch(any(), any(), any());
+    verify(adapter, never()).fetch(any(), any(), any(), any());
   }
 
   @Test
@@ -168,17 +268,22 @@ class SourceExecutionServiceTest {
     values.add(1);
     var entries = new HashMap<String, Object>();
     entries.put("US", values);
-    var definition = new SourceDefinition("LOOKUP", null, List.of(), entries, Map.of(), 0);
+    var parameters = new java.util.ArrayList<Input>();
+    var definition = new SourceDefinition("LOOKUP", null, parameters, entries, Map.of(), 0);
     when(repository.get("lookup", 1)).thenReturn(new DataSource("lookup", "Lookup", 1, definition));
 
     var snapshot = execution.openSession().definition("lookup", 1);
     values.add(2);
     entries.clear();
+    parameters.add(new Input("key", "STRING", true, null));
 
     assertThat(snapshot.entries().get("US")).isEqualTo(java.util.Arrays.asList(null, 1));
+    assertThat(snapshot.parameters()).isEmpty();
     assertThatThrownBy(() -> snapshot.entries().clear())
         .isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> ((List<?>) snapshot.entries().get("US")).clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> snapshot.parameters().clear())
         .isInstanceOf(UnsupportedOperationException.class);
   }
 

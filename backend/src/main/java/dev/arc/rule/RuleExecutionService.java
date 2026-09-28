@@ -1,5 +1,6 @@
 package dev.arc.rule;
 
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.MemoizingRuleResolver;
 import dev.arc.engine.RuleResolver;
@@ -8,8 +9,8 @@ import dev.arc.engine.execution.Parameters;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.source.SourceExecutionService;
-import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 
 /** Coordinates preparation and execution with isolated inputs, source reads and deadlines. */
@@ -31,18 +32,12 @@ public class RuleExecutionService {
 
   public record Timing(long preparationMicros, long executionMicros, long totalMicros) {}
 
+  /**
+   * The execution endpoint's response. The engine result's fields are written inline between {@code
+   * version} and {@code timing}, so the JSON has no nested {@code execution} object.
+   */
   public record ExecutionResponse(
-      String ruleId,
-      Integer version,
-      Object result,
-      List<Engine.Step> trace,
-      long durationMicros,
-      List<Parameters.Read> sources,
-      boolean traceEnabled,
-      boolean traceTruncated,
-      int executedSteps,
-      int traceBytes,
-      Timing timing) {}
+      String ruleId, Integer version, @JsonUnwrapped Engine.Result execution, Timing timing) {}
 
   private final RuleRepository rules;
   private final RuleDefinitionService definitions;
@@ -68,18 +63,26 @@ public class RuleExecutionService {
       throw new ArcException(409, "Publish this rule before calling its execution endpoint");
     var resolver = resolver(deadline);
     deadline.check();
-    Definition definition = resolver.resolve(id, version);
+    // The pinned version is read and decoded only when no compiled plan of it is cached.
     return evaluate(
-        id, version, definition, request.inputs(), resolver, request.trace(), deadline, start);
+        id,
+        version,
+        () -> resolver.resolve(id, version),
+        request.inputs(),
+        resolver,
+        request.trace(),
+        deadline,
+        start);
   }
 
   public ExecutionResponse preview(Preview request) {
     long start = System.nanoTime();
     ExecutionDeadline deadline = deadline(request.timeoutMs());
+    Definition draft = request.definition();
     return evaluate(
         "preview",
         null,
-        request.definition(),
+        () -> draft,
         request.inputs(),
         resolver(deadline),
         request.trace(),
@@ -90,7 +93,7 @@ public class RuleExecutionService {
   private ExecutionResponse evaluate(
       String id,
       Integer version,
-      Definition definition,
+      Supplier<Definition> definition,
       Map<String, Object> inputs,
       RuleResolver resolver,
       Boolean requestedTrace,
@@ -120,17 +123,7 @@ public class RuleExecutionService {
             requestedTrace == null || requestedTrace);
     long totalMicros = (System.nanoTime() - start) / 1000;
     return new ExecutionResponse(
-        id,
-        version,
-        result.result(),
-        result.trace(),
-        result.durationMicros(),
-        result.sources(),
-        result.traceEnabled(),
-        result.traceTruncated(),
-        result.executedSteps(),
-        result.traceBytes(),
-        new Timing(preparationMicros, result.durationMicros(), totalMicros));
+        id, version, result, new Timing(preparationMicros, result.durationMicros(), totalMicros));
   }
 
   private RuleResolver resolver(ExecutionDeadline deadline) {
@@ -155,6 +148,7 @@ public class RuleExecutionService {
   }
 
   private static ExecutionDeadline deadline(Integer timeoutMs) {
-    return ExecutionDeadline.start(timeoutMs == null ? 30_000 : timeoutMs);
+    return ExecutionDeadline.start(
+        timeoutMs == null ? ExecutionDeadline.DEFAULT_TIMEOUT_MS : timeoutMs);
   }
 }

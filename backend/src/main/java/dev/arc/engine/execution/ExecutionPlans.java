@@ -1,12 +1,14 @@
 package dev.arc.engine.execution;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.validation.CompiledGraph;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
-import dev.arc.model.Definition.*;
 import java.util.*;
+import java.util.function.Supplier;
 
 /** Bounded reusable plans for immutable pins; each request owns its resolver and local plan map. */
 final class ExecutionPlans {
@@ -15,17 +17,19 @@ final class ExecutionPlans {
   private record Entry(CompiledGraph plan, long weight) {}
 
   private final Validator validator;
+  private final ObjectMapper json;
   private final int maximumEntries;
   private final long maximumWeight;
   private final Map<Pin, Entry> published = new LinkedHashMap<>(16, 0.75f, true);
   private long weight;
 
-  ExecutionPlans(Validator validator) {
-    this(validator, 128, 8 * 1024 * 1024);
+  ExecutionPlans(Validator validator, ObjectMapper json) {
+    this(validator, json, 128, 8 * 1024 * 1024);
   }
 
-  ExecutionPlans(Validator validator, int maximumEntries, long maximumWeight) {
+  ExecutionPlans(Validator validator, ObjectMapper json, int maximumEntries, long maximumWeight) {
     this.validator = validator;
+    this.json = json;
     this.maximumEntries = maximumEntries;
     this.maximumWeight = maximumWeight;
   }
@@ -39,8 +43,11 @@ final class ExecutionPlans {
     return entry == null ? null : entry.plan();
   }
 
-  private synchronized void remember(Pin pin, CompiledGraph plan) {
-    long planWeight = weight(plan.definition());
+  private void remember(Pin pin, CompiledGraph plan) {
+    store(pin, plan, weight(plan));
+  }
+
+  private synchronized void store(Pin pin, CompiledGraph plan, long planWeight) {
     if (maximumEntries <= 0 || planWeight > maximumWeight) return;
     Entry previous = published.put(pin, new Entry(plan, planWeight));
     weight += planWeight - (previous == null ? 0 : previous.weight());
@@ -65,150 +72,56 @@ final class ExecutionPlans {
       this.cachePublished = cachePublished;
     }
 
-    CompiledGraph prepare(String id, Integer version, Definition definition) {
+    /**
+     * The compiled plan of a draft (no version) or of a pinned version. A draft is compiled once
+     * per request. A pinned definition is read only when neither this request nor the published
+     * plan cache has compiled that version yet.
+     */
+    CompiledGraph prepare(String id, Integer version, Supplier<Definition> definition) {
       deadline.check();
-      Pin pin = version == null ? null : new Pin(id, version);
-      CompiledGraph plan = pin == null ? drafts.get(definition) : pins.get(pin);
-      if (plan == null && pin != null && cachePublished) plan = cached(pin);
+      if (version == null) return prepareDraft(definition.get());
+      Pin pin = new Pin(id, version);
+      CompiledGraph plan = pins.get(pin);
+      if (plan == null && cachePublished) plan = cached(pin);
       if (plan == null) {
-        // Detached immutable values prevent callers mutating a retained published definition.
-        Definition snapshot = snapshot(definition);
-        plan = validator.compile(snapshot, resolver);
-        deadline.check();
-        if (pin != null && cachePublished) remember(pin, plan);
+        plan = compile(definition.get());
+        if (cachePublished) remember(pin, plan);
       }
-      if (pin == null) drafts.put(definition, plan);
-      else pins.put(pin, plan);
+      pins.put(pin, plan);
+      return plan;
+    }
+
+    private CompiledGraph prepareDraft(Definition definition) {
+      CompiledGraph plan = drafts.get(definition);
+      if (plan == null) {
+        plan = compile(definition);
+        drafts.put(definition, plan);
+      }
+      return plan;
+    }
+
+    private CompiledGraph compile(Definition definition) {
+      // A detached copy keeps a retained plan safe from later changes to the caller's definition.
+      Definition detached = definition == null ? null : definition.detached();
+      CompiledGraph plan = validator.compile(detached, resolver);
+      deadline.check();
       return plan;
     }
   }
 
-  // Weight units estimate retained graph/AST/scope cost, not exact JVM heap bytes.
-  private static long weight(Definition definition) {
+  /**
+   * Weight units estimate the retained graph, AST and scope cost, not exact JVM heap bytes: a fixed
+   * cost per node and connection, each compiled expression by its source length, and one unit per
+   * byte of the definition's JSON, which covers every field without listing them here.
+   */
+  private long weight(CompiledGraph plan) {
+    Definition definition = plan.definition();
     long weight = 1024L + definition.nodes().size() * 2048L + definition.edges().size() * 128L;
-    for (Node node : definition.nodes()) {
-      weight += text(node.expression()) * 32 + text(node.label()) + text(node.id());
-      weight += text(node.selector()) * 32;
-      weight += text(node.outputName());
-      if (node.bindings() != null)
-        for (var entry : node.bindings().entrySet())
-          weight += text(entry.getKey()) + text(entry.getValue()) * 32;
-      if (node.cases() != null)
-        for (BranchCase option : node.cases())
-          weight += text(option.id()) + text(option.label()) + text(option.expression()) * 32;
-      if (node.fields() != null)
-        for (Field field : node.fields())
-          weight += text(field.name()) + text(field.expression()) * 32;
+    for (String source : plan.expressions().keySet()) weight += (40L + source.length() * 2L) * 32;
+    try {
+      return weight + json.writeValueAsBytes(definition).length;
+    } catch (JsonProcessingException failure) {
+      throw new IllegalStateException("Cannot measure a compiled definition", failure);
     }
-    for (Input input : definition.inputs()) {
-      weight += valueWeight(input.defaultValue()) + text(input.name());
-      if (input.source() != null)
-        for (var entry : input.source().bindings().entrySet())
-          weight += text(entry.getKey()) + text(entry.getValue()) * 32;
-    }
-    if (definition.notes() != null) for (String note : definition.notes()) weight += text(note);
-    return weight;
-  }
-
-  private static long text(String text) {
-    return text == null ? 0 : 40L + text.length() * 2L;
-  }
-
-  private static long valueWeight(Object value) {
-    if (value instanceof String string) return text(string);
-    if (value instanceof Map<?, ?> map) {
-      long weight = 64;
-      for (var entry : map.entrySet())
-        weight += 64 + valueWeight(entry.getKey()) + valueWeight(entry.getValue());
-      return weight;
-    }
-    if (value instanceof List<?> list) {
-      long weight = 32;
-      for (Object item : list) weight += 8 + valueWeight(item);
-      return weight;
-    }
-    return 32;
-  }
-
-  private static Definition snapshot(Definition definition) {
-    if (definition == null
-        || definition.inputs() == null
-        || definition.nodes() == null
-        || definition.edges() == null)
-      return definition; // Validator owns malformed-document diagnostics.
-    var inputs = new ArrayList<Input>();
-    for (Input input : definition.inputs()) {
-      if (input == null) {
-        inputs.add(null);
-        continue;
-      }
-      SourceBinding source = input.source();
-      if (source != null)
-        source =
-            new SourceBinding(
-                source.id(),
-                source.version(),
-                copy(source.bindings()),
-                source.pointer(),
-                source.onError());
-      inputs.add(
-          new Input(
-              input.name(), input.type(), input.required(), freeze(input.defaultValue()), source));
-    }
-    var nodes = new ArrayList<Node>();
-    for (Node node : definition.nodes()) {
-      if (node == null) {
-        nodes.add(null);
-        continue;
-      }
-      nodes.add(
-          new Node(
-              node.id(),
-              node.type(),
-              node.label(),
-              node.position(),
-              node.expression(),
-              node.output(),
-              node.ruleId(),
-              node.version(),
-              copy(node.bindings()),
-              list(node.cases()),
-              list(node.fields()),
-              node.selector(),
-              node.outputName()));
-    }
-    return new Definition(
-        definition.schemaVersion(),
-        list(inputs),
-        list(nodes),
-        list(definition.edges()),
-        list(definition.notes()));
-  }
-
-  private static <T> List<T> list(List<T> values) {
-    return values == null ? null : Collections.unmodifiableList(new ArrayList<>(values));
-  }
-
-  private static <K, V> Map<K, V> copy(Map<K, V> values) {
-    return values == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(values));
-  }
-
-  private static Object freeze(Object value) {
-    return freeze(value, 0);
-  }
-
-  private static Object freeze(Object value, int depth) {
-    if (depth > 8) return value; // The validator rejects this before a plan can be cached.
-    if (value instanceof Map<?, ?> map) {
-      var result = new LinkedHashMap<Object, Object>();
-      map.forEach((key, item) -> result.put(key, freeze(item, depth + 1)));
-      return Collections.unmodifiableMap(result);
-    }
-    if (value instanceof List<?> items) {
-      var result = new ArrayList<Object>();
-      for (Object item : items) result.add(freeze(item, depth + 1));
-      return Collections.unmodifiableList(result);
-    }
-    return value;
   }
 }

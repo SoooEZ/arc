@@ -1,5 +1,8 @@
 package dev.arc.engine.execution;
 
+import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.nodeOf;
+import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,7 +48,7 @@ class ExecutionTraceTest {
               .execute(
                   "preview",
                   null,
-                  graph,
+                  () -> graph,
                   Map.of(),
                   new Parameters(SourceReader.unavailable()),
                   enabled);
@@ -79,51 +82,30 @@ class ExecutionTraceTest {
       Node action =
           switch (type) {
             case "SWITCH" ->
-                new Node(
-                    "action",
-                    type,
-                    type,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    List.of(
-                        new BranchCase(
-                            "active",
-                            "Active",
-                            scenario.equals("SWITCH_SELECTOR") ? "true" : "payload.value")),
-                    null,
-                    switch (scenario) {
-                      case "SWITCH_SELECTOR" -> "payload.value";
-                      case "SWITCH_VALUE" -> "true";
-                      default -> null;
-                    });
+                nodeOf("action", type, type)
+                    .cases(
+                        List.of(
+                            new BranchCase(
+                                "active",
+                                "Active",
+                                scenario.equals("SWITCH_SELECTOR") ? "true" : "payload.value")))
+                    .selector(
+                        switch (scenario) {
+                          case "SWITCH_SELECTOR" -> "payload.value";
+                          case "SWITCH_VALUE" -> "true";
+                          default -> null;
+                        })
+                    .build();
             case "TRANSFORM" ->
-                new Node(
-                    "action",
-                    type,
-                    type,
-                    null,
-                    null,
-                    "result",
-                    null,
-                    null,
-                    null,
-                    null,
-                    List.of(new Field("value", "payload.value")));
+                nodeOf("action", type, type)
+                    .output("result")
+                    .fields(List.of(new Field("value", "payload.value")))
+                    .build();
             default ->
-                new Node(
-                    "action",
-                    type,
-                    type,
-                    null,
-                    "$IFERROR(payload.value, 9)",
-                    "result",
-                    null,
-                    null,
-                    null);
+                nodeOf("action", type, type)
+                    .expression("$IFERROR(payload.value, 9)")
+                    .output("result")
+                    .build();
           };
       var edges = new ArrayList<Edge>();
       edges.add(new Edge("start", "in", "action", "next"));
@@ -152,7 +134,7 @@ class ExecutionTraceTest {
                       .execute(
                           "preview",
                           null,
-                          graph,
+                          () -> graph,
                           Map.of("payload", payload),
                           new Parameters(SourceReader.unavailable()),
                           false))
@@ -165,15 +147,15 @@ class ExecutionTraceTest {
   void nestedExecutionStillEnforcesStepBudgetWithoutRetainedTrace() {
     var nodes = new ArrayList<Node>();
     var edges = new ArrayList<Edge>();
-    nodes.add(new Node("in", "INPUT", "Input", null, null, null, null, null, null));
+    nodes.add(inputNode("in", "Input"));
     String prior = "in";
     for (int i = 0; i < 98; i++) {
       String id = "n" + i;
-      nodes.add(new Node(id, "FORMULA", id, null, "1", "v" + i, null, null, null));
+      nodes.add(nodeOf(id, "FORMULA", id).expression("1").output("v" + i).build());
       edges.add(new Edge(id, prior, id, "next"));
       prior = id;
     }
-    nodes.add(new Node("out", "OUTPUT", "Output", null, "1", null, null, null, null));
+    nodes.add(outputNode("out", "Output", "1"));
     edges.add(new Edge("last", prior, "out", "next"));
     Definition child = new Definition(1, List.of(), nodes, edges);
     var parentNodes = new ArrayList<Node>();
@@ -182,7 +164,8 @@ class ExecutionTraceTest {
     prior = "in";
     for (int i = 0; i < 11; i++) {
       String id = "r" + i;
-      parentNodes.add(new Node(id, "REFERENCE", id, null, null, "v" + i, "child", 1, Map.of()));
+      parentNodes.add(
+          nodeOf(id, "REFERENCE", id).output("v" + i).rule("child", 1).bindings(Map.of()).build());
       parentEdges.add(new Edge(id, prior, id, "next"));
       prior = id;
     }
@@ -198,7 +181,7 @@ class ExecutionTraceTest {
                       .execute(
                           "preview",
                           null,
-                          parent,
+                          () -> parent,
                           Map.of(),
                           new Parameters(SourceReader.unavailable()),
                           enabled))

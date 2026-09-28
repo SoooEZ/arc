@@ -4,12 +4,46 @@ import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import dev.arc.source.SourceRepository;
 import java.util.List;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class JdbcSourceRepository implements SourceRepository {
+  private static final String CATALOG_FILTER =
+      " WHERE (? = '' OR strpos(lower(s.id || ' ' || s.name), lower(?)) > 0)";
+
+  /** Chooses the page first, so only the returned sources read their current configuration. */
+  private static final String CATALOG_PAGE =
+      """
+      WITH page AS (
+        SELECT s.id FROM data_sources s %s
+        ORDER BY s.updated_at DESC, s.id
+        LIMIT ? OFFSET ?)
+      SELECT s.id, s.name, s.version, v.definition->>'kind' AS kind
+      FROM page
+      JOIN data_sources s ON s.id = page.id
+      JOIN data_source_versions v ON v.source_id = s.id AND v.version = s.version
+      ORDER BY s.updated_at DESC, s.id
+      """
+          .formatted(CATALOG_FILTER);
+
+  private static final RowMapper<SourceSummary> SUMMARY_MAPPER =
+      (row, index) ->
+          new SourceSummary(
+              row.getString("id"),
+              row.getString("name"),
+              row.getInt("version"),
+              row.getString("kind"));
+
+  private static final RowMapper<SourceVersionSummary> VERSION_SUMMARY_MAPPER =
+      (row, index) ->
+          new SourceVersionSummary(
+              row.getString("source_id"),
+              row.getInt("version"),
+              row.getTimestamp("created_at").toInstant());
+
   private final JdbcTemplate db;
   private final JsonCodec json;
   private final RowMapper<DataSource> mapper;
@@ -40,51 +74,29 @@ public class JdbcSourceRepository implements SourceRepository {
 
   @Override
   public CatalogPage<SourceSummary> catalog(int offset, int limit, String search) {
-    String filter = " WHERE (? = '' OR strpos(lower(s.id || ' ' || s.name), lower(?)) > 0)";
-    Long total =
-        db.queryForObject(
-            "SELECT count(*) FROM data_sources s" + filter, Long.class, search, search);
-    var items =
-        db.query(
-            """
-        SELECT s.id, s.name, s.version, v.definition->>'kind' AS kind
-        FROM data_sources s JOIN data_source_versions v ON v.source_id = s.id AND v.version = s.version
-        """
-                + filter
-                + " ORDER BY s.updated_at DESC, s.id LIMIT ? OFFSET ?",
-            (rs, index) ->
-                new SourceSummary(
-                    rs.getString("id"),
-                    rs.getString("name"),
-                    rs.getInt("version"),
-                    rs.getString("kind")),
-            search,
-            search,
-            limit,
-            offset);
-    return new CatalogPage<>(items, total, offset, limit);
+    return CatalogPages.read(
+        db,
+        "SELECT count(*) FROM data_sources s" + CATALOG_FILTER,
+        CATALOG_PAGE,
+        SUMMARY_MAPPER,
+        offset,
+        limit,
+        search,
+        search);
   }
 
   @Override
   public CatalogPage<SourceVersionSummary> versionSummaries(String id, int offset, int limit) {
-    var exists =
-        db.queryForObject("SELECT count(*) FROM data_sources WHERE id = ?", Long.class, id);
-    if (exists == 0) throw new ArcException(404, "Source not found");
-    Long total =
-        db.queryForObject(
-            "SELECT count(*) FROM data_source_versions WHERE source_id = ?", Long.class, id);
-    var items =
-        db.query(
-            "SELECT source_id, version, created_at FROM data_source_versions WHERE source_id = ? ORDER BY version DESC LIMIT ? OFFSET ?",
-            (rs, index) ->
-                new SourceVersionSummary(
-                    rs.getString("source_id"),
-                    rs.getInt("version"),
-                    rs.getTimestamp("created_at").toInstant()),
-            id,
-            limit,
-            offset);
-    return new CatalogPage<>(items, total, offset, limit);
+    requireSource(id);
+    return CatalogPages.read(
+        db,
+        "SELECT count(*) FROM data_source_versions WHERE source_id = ?",
+        "SELECT source_id, version, created_at FROM data_source_versions WHERE source_id = ?"
+            + " ORDER BY version DESC LIMIT ? OFFSET ?",
+        VERSION_SUMMARY_MAPPER,
+        offset,
+        limit,
+        id);
   }
 
   @Override
@@ -117,12 +129,14 @@ public class JdbcSourceRepository implements SourceRepository {
         """,
             mapper,
             id);
-    if (rows.isEmpty()) throw new ArcException(404, "Source not found");
+    if (rows.isEmpty()) throw sourceNotFound();
     return rows.getFirst();
   }
 
+  /** Newest first; an unknown source is a 404 like its other version reads. */
   @Override
   public List<DataSource> versions(String id) {
+    requireSource(id);
     return db.query(
         """
         SELECT s.id, s.name, v.version, v.definition
@@ -135,13 +149,20 @@ public class JdbcSourceRepository implements SourceRepository {
         id);
   }
 
+  /** An ID that is already stored, including by a concurrent create, is a 409 conflict. */
   @Override
   public DataSource create(String id, String name, SourceDefinition definition) {
-    db.update("INSERT INTO data_sources(id,name) VALUES (?,?)", id, name);
+    StoredText.requireStorable(name);
+    String encoded = json.encode(definition);
+    try {
+      db.update("INSERT INTO data_sources(id,name) VALUES (?,?)", id, name);
+    } catch (DuplicateKeyException duplicate) {
+      throw new ArcException(409, "This source ID already exists");
+    }
     db.update(
         "INSERT INTO data_source_versions(source_id,version,definition) VALUES (?,1,?::jsonb)",
         id,
-        json.encode(definition));
+        encoded);
     return get(id, 1);
   }
 
@@ -153,6 +174,7 @@ public class JdbcSourceRepository implements SourceRepository {
     if (versions.isEmpty()) throw new ArcException(404, "Data source not found");
     if (versions.getFirst() != revision)
       throw new ArcException(409, "Source changed in another editor; reload before saving");
+    StoredText.requireStorable(name);
     int nextVersion = revision + 1;
     db.update(
         "INSERT INTO data_source_versions(source_id,version,definition) VALUES (?,?,?::jsonb)",
@@ -165,5 +187,17 @@ public class JdbcSourceRepository implements SourceRepository {
         nextVersion,
         id);
     return get(id, nextVersion);
+  }
+
+  private void requireSource(String id) {
+    boolean exists =
+        Boolean.TRUE.equals(
+            db.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM data_sources WHERE id = ?)", Boolean.class, id));
+    if (!exists) throw sourceNotFound();
+  }
+
+  private static ArcException sourceNotFound() {
+    return new ArcException(404, "Source not found");
   }
 }

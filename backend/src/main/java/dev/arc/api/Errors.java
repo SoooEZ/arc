@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.ErrorResponse;
@@ -30,11 +29,6 @@ public class Errors {
                 e.issues(),
                 "locations",
                 e.locations()));
-  }
-
-  @ExceptionHandler(DuplicateKeyException.class)
-  ResponseEntity<?> conflict() {
-    return response(409, "This rule ID already exists", List.of());
   }
 
   @ExceptionHandler({

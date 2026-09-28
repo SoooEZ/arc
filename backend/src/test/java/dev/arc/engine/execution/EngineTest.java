@@ -79,16 +79,12 @@ class EngineTest {
   @Test
   void referencesPinTheirVersionAndMapParameters() {
     var ref =
-        new Node(
-            "reuse",
-            "REFERENCE",
-            "reuse",
-            new Position(0, 0),
-            null,
-            "value",
-            "child",
-            7,
-            Map.of("amount", "amount * 2"));
+        nodeOf("reuse", "REFERENCE", "reuse")
+            .at(0, 0)
+            .output("value")
+            .rule("child", 7)
+            .bindings(Map.of("amount", "amount * 2"))
+            .build();
     var d =
         new Definition(
             1,
@@ -140,16 +136,12 @@ class EngineTest {
             List.of(),
             List.of(
                 node("input", "INPUT", null, null),
-                new Node(
-                    "reuse",
-                    "REFERENCE",
-                    "reuse",
-                    new Position(0, 0),
-                    null,
-                    "value",
-                    "test",
-                    1,
-                    Map.of()),
+                nodeOf("reuse", "REFERENCE", "reuse")
+                    .at(0, 0)
+                    .output("value")
+                    .rule("test", 1)
+                    .bindings(Map.of())
+                    .build(),
                 node("result", "OUTPUT", "value", null)),
             List.of(edge("input", "reuse", "next"), edge("reuse", "result", "next")));
     assertThatThrownBy(() -> engine.execute("test", 1, d, Map.of(), (id, v) -> d))

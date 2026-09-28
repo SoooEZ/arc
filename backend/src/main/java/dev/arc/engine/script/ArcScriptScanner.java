@@ -22,7 +22,9 @@ final class ArcScriptScanner {
   private int index;
   private int line = 1;
   private int column = 1;
-  final List<String> notes = new ArrayList<>();
+
+  /** Comment text in source order, located at its {@code //}; a graph keeps them as notes. */
+  final List<Statement> comments = new ArrayList<>();
 
   ArcScriptScanner(String source) {
     this.source = source;
@@ -43,8 +45,10 @@ final class ArcScriptScanner {
       }
       if (source.startsWith("//", index)) {
         int start = index + 2;
+        int startLine = line;
+        int startColumn = column;
         while (index < source.length() && source.charAt(index) != '\n') advance();
-        notes.add(source.substring(start, index).strip());
+        comments.add(new Statement(source.substring(start, index).strip(), startLine, startColumn));
         continue;
       }
       break;

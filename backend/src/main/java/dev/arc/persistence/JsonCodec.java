@@ -13,12 +13,16 @@ public final class JsonCodec {
     this.json = json;
   }
 
+  /** JSON for a JSONB column; a string containing U+0000 is rejected with 422. */
   public String encode(Object value) {
+    String encoded;
     try {
-      return json.writeValueAsString(value);
+      encoded = json.writeValueAsString(value);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("Could not encode stored ARC definition", e);
     }
+    StoredText.requireStorableJson(encoded);
+    return encoded;
   }
 
   public <T> T decode(String value, Class<T> type) {

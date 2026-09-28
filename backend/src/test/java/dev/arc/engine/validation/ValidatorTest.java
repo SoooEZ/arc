@@ -173,7 +173,11 @@ class ValidatorTest {
   void parameterMappingKeysUseTheSameIdentifierPolicy() {
     for (String name : List.of("unit price", "$value", "@value")) {
       var reference =
-          new Node("ref", "REFERENCE", "Ref", null, null, "result", "child", 1, Map.of(name, "1"));
+          nodeOf("ref", "REFERENCE", "Ref")
+              .output("result")
+              .rule("child", 1)
+              .bindings(Map.of(name, "1"))
+              .build();
       assertThatThrownBy(
               () -> validator.shape(new Definition(1, List.of(), List.of(reference), List.of())))
           .hasMessageContaining("Invalid parameter binding");
@@ -194,16 +198,12 @@ class ValidatorTest {
   @Test
   void referencesMustExistAndBindRequiredInputs() {
     var ref =
-        new Node(
-            "reuse",
-            "REFERENCE",
-            "reuse",
-            new Position(0, 0),
-            null,
-            "value",
-            "missing",
-            1,
-            Map.of());
+        nodeOf("reuse", "REFERENCE", "reuse")
+            .at(0, 0)
+            .output("value")
+            .rule("missing", 1)
+            .bindings(Map.of())
+            .build();
     var d =
         new Definition(
             1,
@@ -224,31 +224,14 @@ class ValidatorTest {
   @Test
   void cyclicGraphsStillDiagnoseSwitchAndTransformExpressions() {
     var decision =
-        new Node(
-            "decision",
-            "SWITCH",
-            "Decision",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            List.of(new BranchCase("yes", "Yes", "1 +")),
-            null);
+        nodeOf("decision", "SWITCH", "Decision")
+            .cases(List.of(new BranchCase("yes", "Yes", "1 +")))
+            .build();
     var transform =
-        new Node(
-            "transform",
-            "TRANSFORM",
-            "Transform",
-            null,
-            null,
-            "data",
-            null,
-            null,
-            null,
-            null,
-            List.of(new Field("name", "$UPPER(")));
+        nodeOf("transform", "TRANSFORM", "Transform")
+            .output("data")
+            .fields(List.of(new Field("name", "$UPPER(")))
+            .build();
     var definition =
         new Definition(
             1,

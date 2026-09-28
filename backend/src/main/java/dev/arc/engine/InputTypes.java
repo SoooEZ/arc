@@ -7,6 +7,10 @@ import java.util.Map;
 
 /** Strict declared value types; the caller owns required, missing and default semantics. */
 public final class InputTypes {
+  /** Every declared input type, in the order messages and ARC Script usage list them. */
+  public static final List<String> NAMES =
+      List.of("NUMBER", "STRING", "BOOLEAN", "ARRAY", "OBJECT");
+
   private InputTypes() {}
 
   public static Object check(String name, String type, Object value) {

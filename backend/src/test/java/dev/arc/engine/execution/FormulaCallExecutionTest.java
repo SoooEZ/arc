@@ -1,5 +1,7 @@
 package dev.arc.engine.execution;
 
+import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,9 +27,7 @@ class FormulaCallExecutionTest {
     return new Definition(
         1,
         inputs,
-        List.of(
-            new Node("in", "INPUT", "Input", null, null, null, null, null, null),
-            new Node("out", "OUTPUT", "Output", null, expression, null, null, null, null)),
+        List.of(inputNode("in", "Input"), outputNode("out", "Output", expression)),
         List.of(new Edge("next", "in", "out", "next")));
   }
 
@@ -146,7 +146,7 @@ class FormulaCallExecutionTest {
         formulas(Map.of("sourced:1", graph(List.of(sourced), "value"), "increment:1", increment));
     var fetches = new AtomicInteger();
     SourceReader reader =
-        (binding, inputs) -> {
+        (binding, inputs, deadline) -> {
           fetches.incrementAndGet();
           assertThat(inputs).containsEntry("key", new BigDecimal("3"));
           return 8;
@@ -186,7 +186,7 @@ class FormulaCallExecutionTest {
                         "$MAP(items, item, @read:1())"),
                     Map.of(),
                     resolver,
-                    new Parameters((binding, inputs) -> 1)))
+                    new Parameters((binding, inputs, deadline) -> 1)))
         .hasMessageContaining("50 source reads");
     assertThatThrownBy(
             () ->
@@ -324,7 +324,7 @@ class FormulaCallExecutionTest {
                     new SourceBinding("slow", 1, Map.of(), "", "FAIL"))),
             "value");
     SourceReader slow =
-        (binding, inputs) -> {
+        (binding, inputs, readDeadline) -> {
           java.util.concurrent.locks.LockSupport.parkNanos(120_000_000);
           return 1;
         };
@@ -333,7 +333,7 @@ class FormulaCallExecutionTest {
             () ->
                 engine
                     .session(formulas(Map.of("slow:1", child)), deadline)
-                    .execute("parent", 1, parent, Map.of(), new Parameters(slow), true))
+                    .execute("parent", 1, () -> parent, Map.of(), new Parameters(slow), true))
         .isInstanceOfSatisfying(
             ArcException.class, error -> assertThat(error.status()).isEqualTo(504));
   }

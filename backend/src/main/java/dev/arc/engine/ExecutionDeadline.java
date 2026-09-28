@@ -8,6 +8,12 @@ public final class ExecutionDeadline {
   public static final long DEFAULT_TIMEOUT_MS = 30_000;
   public static final long MIN_TIMEOUT_MS = 100;
   public static final long MAX_TIMEOUT_MS = 30_000;
+  private static final String TIMEOUT_RANGE =
+      "Execution timeout must be "
+          + Limits.format(MIN_TIMEOUT_MS)
+          + "–"
+          + Limits.format(MAX_TIMEOUT_MS)
+          + " ms";
 
   private final long expiresAtNanos;
 
@@ -17,7 +23,7 @@ public final class ExecutionDeadline {
 
   public static ExecutionDeadline start(long timeoutMs) {
     if (timeoutMs < MIN_TIMEOUT_MS || timeoutMs > MAX_TIMEOUT_MS)
-      throw ArcException.invalid("Execution timeout must be 100–30,000 ms");
+      throw ArcException.invalid(TIMEOUT_RANGE);
     return new ExecutionDeadline(timeoutMs);
   }
 
@@ -32,7 +38,7 @@ public final class ExecutionDeadline {
 
   private long remainingNanos() {
     long remaining = expiresAtNanos - System.nanoTime();
-    if (remaining <= 0) throw new ArcException(504, "Rule execution deadline exceeded");
+    if (remaining <= 0) throw ArcException.deadline("Rule execution deadline exceeded");
     return remaining;
   }
 }

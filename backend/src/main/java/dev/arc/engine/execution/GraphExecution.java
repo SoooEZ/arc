@@ -2,6 +2,7 @@ package dev.arc.engine.execution;
 
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.Identifiers;
+import dev.arc.engine.Limits;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
@@ -9,7 +10,10 @@ import dev.arc.engine.validation.CompiledGraph;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.Handles;
+import dev.arc.model.NodeKind;
 import java.util.*;
+import java.util.function.Supplier;
 
 /** One execution session; nested rules share its trace, recursion guard and source-read budget. */
 final class GraphExecution {
@@ -42,73 +46,218 @@ final class GraphExecution {
     return executedSteps;
   }
 
+  /**
+   * Runs one rule invocation. A pinned definition is read only when this session and the plan cache
+   * have not compiled that version yet.
+   */
   Object run(
       String ruleId,
       Integer version,
-      Definition definition,
+      Supplier<Definition> definition,
       Map<String, Object> inputs,
       int depth) {
-    if (depth > 16) throw ArcException.invalid("Rule nesting exceeds 16 levels");
+    if (depth > Limits.MAX_NESTING_DEPTH)
+      throw ArcException.limit("Rule nesting exceeds " + Limits.MAX_NESTING_DEPTH + " levels");
     String key = ruleId + "@" + version;
     if (!activeRules.add(key)) throw ArcException.invalid("Circular rule reference: " + key);
     try {
       CompiledGraph compiled = plans.prepare(ruleId, version, definition);
-      definition = compiled.definition();
-      GraphPlan plan = compiled.graph();
-      Node input =
-          plan.order().stream()
-              .filter(node -> node.type().equals("INPUT"))
-              .findFirst()
-              .orElseThrow();
-      Map<String, Object> provided;
-      Expressions.FormulaCaller formulas = (call, arguments) -> formula(call, arguments, depth);
-      try {
-        provided =
-            parameters.resolve(
-                definition.inputs(), inputs, compiled::expression, deadline, formulas);
-      } catch (ArcException error) {
-        throw error.atNode(ruleId, version, input.id(), input.label());
-      }
-      Map<String, ExecutionScope> scopes = new HashMap<>();
-      Map<String, String> branches = new HashMap<>();
-      Map<String, ReachedOutput> outputs = new LinkedHashMap<>();
+      return new RuleRun(ruleId, version, compiled, depth).execute(inputs);
+    } catch (ArcException error) {
+      throw error.inRule(ruleId, version);
+    } finally {
+      activeRules.remove(key);
+    }
+  }
+
+  /** One rule invocation: its compiled graph and depth, and the nodes executed so far. */
+  private final class RuleRun {
+    private final String ruleId;
+    private final Integer version;
+    private final CompiledGraph compiled;
+    private final GraphPlan plan;
+    private final int depth;
+    private final Expressions.FormulaCaller formulas = this::callFormula;
+    private final Map<String, ExecutionScope> scopes = new HashMap<>();
+    private final Map<String, String> branches = new HashMap<>();
+    private final Map<String, ReachedOutput> outputs = new LinkedHashMap<>();
+
+    RuleRun(String ruleId, Integer version, CompiledGraph compiled, int depth) {
+      this.ruleId = ruleId;
+      this.version = version;
+      this.compiled = compiled;
+      this.plan = compiled.graph();
+      this.depth = depth;
+    }
+
+    Object execute(Map<String, Object> callerInputs) {
+      ExecutionScope inputs = resolveInputs(callerInputs);
       // Topological order resolves skipped parents too. Every active join executes once.
       for (Node node : plan.order()) {
         try {
-          ExecutionScope values = incomingScope(node, plan, provided, scopes, branches);
-          if (values == null) continue;
-          checkStepBudget();
-          executedSteps++;
-          Outcome outcome = evaluate(node, values.variables(), depth, compiled, formulas);
-          Object traceValue = outcome.value();
-          if (node.type().equals("OUTPUT")) {
-            String field = outputField(node);
-            if (outputs.containsKey(field)) {
-              Node previous = outputs.get(field).node();
-              throw ArcException.invalid(
-                      "Duplicate output field '" + field + "'; set distinct Output names")
-                  .atNode(ruleId, version, previous.id(), previous.label());
-            }
-            outputs.put(field, new ReachedOutput(node, outcome.value()));
-            traceValue = namedOutput(node, outcome.value());
-          }
-          if (node.storesResult()) values.store(node.output(), outcome.value(), node.id());
-          scopes.put(node.id(), values);
-          branches.put(node.id(), outcome.branch());
-          trace.add(
-              new Engine.Step(
-                  ruleId,
-                  version,
-                  node.id(),
-                  node.label(),
-                  node.type(),
-                  traceValue,
-                  outcome.branch(),
-                  depth));
+          ExecutionScope scope = node.kind() == NodeKind.INPUT ? inputs : incomingScope(node);
+          if (scope != null) runNode(node, scope);
         } catch (ArcException error) {
           throw error.atNode(ruleId, version, node.id(), node.label());
         }
       }
+      return result();
+    }
+
+    private ExecutionScope resolveInputs(Map<String, Object> callerInputs) {
+      Node input = compiled.definition().inputNode().orElseThrow();
+      try {
+        var resolved =
+            parameters.resolve(
+                compiled.definition().inputs(),
+                callerInputs,
+                compiled::expression,
+                deadline,
+                formulas);
+        return ExecutionScope.inputs(resolved, input.id());
+      } catch (ArcException error) {
+        throw error.atNode(ruleId, version, input.id(), input.label());
+      }
+    }
+
+    /** Null means that every incoming path was skipped; it is distinct from a value of null. */
+    private ExecutionScope incomingScope(Node node) {
+      List<ExecutionScope> active = new ArrayList<>();
+      for (Edge edge : plan.incoming(node.id())) {
+        if (!edge.sourceHandle().equals(branches.get(edge.source()))) continue;
+        // A parent without a result passes its own parent's scope on, so scopes can repeat.
+        ExecutionScope parent = scopes.get(edge.source());
+        if (!active.contains(parent)) active.add(parent);
+      }
+      return active.isEmpty() ? null : ExecutionScope.join(active);
+    }
+
+    private void runNode(Node node, ExecutionScope scope) {
+      checkStepBudget();
+      executedSteps++;
+      Outcome outcome = evaluate(node, scope.variables());
+      Object traceValue = outcome.value();
+      if (node.kind() == NodeKind.OUTPUT) traceValue = reachOutput(node, outcome.value());
+      ExecutionScope outgoing =
+          node.storesResult() ? scope.withResult(node.output(), outcome.value(), node.id()) : scope;
+      scopes.put(node.id(), outgoing);
+      branches.put(node.id(), outcome.branch());
+      trace.add(
+          new Engine.Step(
+              ruleId,
+              version,
+              node.id(),
+              node.label(),
+              node.type(),
+              traceValue,
+              outcome.branch(),
+              depth));
+    }
+
+    private Outcome evaluate(Node node, Map<String, Object> scope) {
+      return switch (node.kind()) {
+        case INPUT -> new Outcome(new LinkedHashMap<>(scope), Handles.NEXT);
+        case FORMULA -> new Outcome(eval(node.expression(), scope), Handles.NEXT);
+        case CONDITION -> {
+          boolean value = Expressions.bool(eval(node.expression(), scope));
+          yield new Outcome(value, Handles.condition(value));
+        }
+        case SWITCH -> {
+          String branch = switchBranch(node, scope);
+          yield new Outcome(branch, branch);
+        }
+        case TRANSFORM -> new Outcome(transform(node, scope), Handles.NEXT);
+        case REFERENCE -> new Outcome(reference(node, scope), Handles.NEXT);
+        case OUTPUT -> new Outcome(eval(node.expression(), scope), null);
+      };
+    }
+
+    private Object eval(String expression, Map<String, Object> scope) {
+      return compiled.expression(expression).evaluate(scope, deadline, formulas);
+    }
+
+    /** Without a selector the first true case wins; otherwise the first case equal to it. */
+    private String switchBranch(Node node, Map<String, Object> scope) {
+      Object selector = node.selector() == null ? null : selector(node, scope);
+      for (BranchCase option : node.cases())
+        if (matches(option, selector, scope)) return Handles.forCase(option.id());
+      return Handles.DEFAULT;
+    }
+
+    private Object selector(Node node, Map<String, Object> scope) {
+      try {
+        return switchValue(eval(node.selector(), scope));
+      } catch (ArcException error) {
+        throw inContext(error, "Selector");
+      }
+    }
+
+    private boolean matches(BranchCase option, Object selector, Map<String, Object> scope) {
+      try {
+        Object value = eval(option.expression(), scope);
+        return selector == null
+            ? Expressions.bool(value)
+            : Expressions.equal(selector, switchValue(value));
+      } catch (ArcException error) {
+        throw inContext(error, "Case " + option.label());
+      }
+    }
+
+    private Object transform(Node node, Map<String, Object> scope) {
+      if (node.fields() == null || node.fields().isEmpty()) return eval(node.expression(), scope);
+      var transformed = new LinkedHashMap<String, Object>();
+      for (Field field : node.fields()) {
+        try {
+          transformed.put(field.name(), eval(field.expression(), scope));
+        } catch (ArcException error) {
+          throw inContext(error, "Field " + field.name());
+        }
+      }
+      return Expressions.bounded(transformed);
+    }
+
+    private Object reference(Node node, Map<String, Object> scope) {
+      var inputs = new LinkedHashMap<String, Object>();
+      if (node.bindings() != null) {
+        for (var binding : node.bindings().entrySet())
+          inputs.put(binding.getKey(), eval(binding.getValue(), scope));
+      }
+      Definition child = resolver.resolve(node.ruleId(), node.version());
+      return run(node.ruleId(), node.version(), () -> child, inputs, depth + 1);
+    }
+
+    private Object callFormula(Expressions.FormulaCall call, List<Object> arguments) {
+      try {
+        deadline.check();
+        Definition child = resolver.resolveFormula(call.id(), call.version());
+        if (arguments.size() > child.inputs().size())
+          throw ArcException.invalid("Too many arguments for @" + call.id() + ":" + call.version());
+        var inputs = new LinkedHashMap<String, Object>();
+        for (int index = 0; index < arguments.size(); index++)
+          inputs.put(child.inputs().get(index).name(), arguments.get(index));
+        return run(call.id(), call.version(), () -> child, inputs, depth + 1);
+      } catch (ArcException error) {
+        if (error.locations().isEmpty())
+          throw error.atNode(
+              call.id(), call.version(), null, "@" + call.id() + ":" + call.version());
+        throw error.inRule(call.id(), call.version());
+      }
+    }
+
+    /** Registers a reached Output under its result field and returns its trace value. */
+    private Object reachOutput(Node node, Object value) {
+      String field = outputField(node);
+      if (outputs.containsKey(field)) {
+        Node previous = outputs.get(field).node();
+        throw ArcException.invalid(
+                "Duplicate output field '" + field + "'; set distinct Output names")
+            .atNode(ruleId, version, previous.id(), previous.label());
+      }
+      outputs.put(field, new ReachedOutput(node, value));
+      return namedOutput(node, value);
+    }
+
+    private Object result() {
       if (outputs.isEmpty()) throw ArcException.invalid("Execution did not reach an Output node");
       if (outputs.size() == 1) {
         ReachedOutput output = outputs.values().iterator().next();
@@ -121,178 +270,37 @@ final class GraphExecution {
       var result = new LinkedHashMap<String, Object>();
       outputs.forEach((field, output) -> result.put(field, output.value()));
       return result;
-    } catch (ArcException error) {
-      throw error.inRule(ruleId, version);
-    } finally {
-      activeRules.remove(key);
     }
   }
 
-  private String outputField(Node node) {
+  private static String outputField(Node node) {
     if (node.outputName() != null && !node.outputName().isEmpty()) return node.outputName();
     String expression = node.expression().trim();
     return Identifiers.isValid(expression) ? expression : node.id();
   }
 
-  private Object namedOutput(Node node, Object value) {
+  private static Object namedOutput(Node node, Object value) {
     if (node.outputName() == null || node.outputName().isEmpty()) return value;
     var named = new LinkedHashMap<String, Object>();
     named.put(node.outputName(), value);
     return named;
   }
 
-  /** Null means that every incoming path was skipped; it is distinct from a value of null. */
-  private ExecutionScope incomingScope(
-      Node node,
-      GraphPlan plan,
-      Map<String, Object> inputs,
-      Map<String, ExecutionScope> scopes,
-      Map<String, String> branches) {
-    if (node.type().equals("INPUT")) return ExecutionScope.inputs(inputs, node.id());
-    List<ExecutionScope> activeParents = new ArrayList<>();
-    for (Edge edge : plan.incoming(node.id())) {
-      if (edge.sourceHandle().equals(branches.get(edge.source())))
-        activeParents.add(scopes.get(edge.source()));
-    }
-    return activeParents.isEmpty() ? null : ExecutionScope.merge(activeParents, plan);
-  }
-
-  private Outcome evaluate(
-      Node node,
-      Map<String, Object> scope,
-      int depth,
-      CompiledGraph compiled,
-      Expressions.FormulaCaller formulas) {
-    return switch (node.type()) {
-      case "INPUT" -> new Outcome(new LinkedHashMap<>(scope), "next");
-      case "FORMULA" ->
-          new Outcome(
-              compiled.expression(node.expression()).evaluate(scope, deadline, formulas), "next");
-      case "CONDITION" -> {
-        boolean value =
-            Expressions.bool(
-                compiled.expression(node.expression()).evaluate(scope, deadline, formulas));
-        yield new Outcome(value, Boolean.toString(value));
-      }
-      case "SWITCH" -> {
-        Object selector =
-            node.selector() == null ? null : selector(node, scope, compiled, formulas);
-        String branch = "default";
-        for (BranchCase option : node.cases()) {
-          if (matches(option, selector, scope, compiled, formulas)) {
-            branch = "case:" + option.id();
-            break;
-          }
-        }
-        yield new Outcome(branch, branch);
-      }
-      case "TRANSFORM" -> new Outcome(transform(node, scope, compiled, formulas), "next");
-      case "REFERENCE" -> new Outcome(reference(node, scope, depth, compiled, formulas), "next");
-      case "OUTPUT" ->
-          new Outcome(
-              compiled.expression(node.expression()).evaluate(scope, deadline, formulas), null);
-      default -> throw ArcException.invalid("Unknown node type");
-    };
-  }
-
-  private Object transform(
-      Node node,
-      Map<String, Object> scope,
-      CompiledGraph compiled,
-      Expressions.FormulaCaller formulas) {
-    if (node.fields() == null || node.fields().isEmpty())
-      return compiled.expression(node.expression()).evaluate(scope, deadline, formulas);
-    var transformed = new LinkedHashMap<String, Object>();
-    for (Field field : node.fields()) {
-      try {
-        transformed.put(
-            field.name(),
-            compiled.expression(field.expression()).evaluate(scope, deadline, formulas));
-      } catch (ArcException error) {
-        if (error.status() == 504) throw error;
-        throw error.withContext("Field " + field.name());
-      }
-    }
-    return Expressions.bounded(transformed);
-  }
-
-  private Object reference(
-      Node node,
-      Map<String, Object> scope,
-      int depth,
-      CompiledGraph compiled,
-      Expressions.FormulaCaller formulas) {
-    var inputs = new LinkedHashMap<String, Object>();
-    if (node.bindings() != null) {
-      for (var binding : node.bindings().entrySet()) {
-        inputs.put(
-            binding.getKey(),
-            compiled.expression(binding.getValue()).evaluate(scope, deadline, formulas));
-      }
-    }
-    return run(
-        node.ruleId(),
-        node.version(),
-        resolver.resolve(node.ruleId(), node.version()),
-        inputs,
-        depth + 1);
-  }
-
-  private Object formula(Expressions.FormulaCall call, List<Object> arguments, int depth) {
-    try {
-      deadline.check();
-      Definition child = resolver.resolveFormula(call.id(), call.version());
-      if (arguments.size() > child.inputs().size())
-        throw ArcException.invalid("Too many arguments for @" + call.id() + ":" + call.version());
-      var inputs = new LinkedHashMap<String, Object>();
-      for (int index = 0; index < arguments.size(); index++)
-        inputs.put(child.inputs().get(index).name(), arguments.get(index));
-      return run(call.id(), call.version(), child, inputs, depth + 1);
-    } catch (ArcException error) {
-      if (error.locations().isEmpty())
-        throw error.atNode(call.id(), call.version(), null, "@" + call.id() + ":" + call.version());
-      throw error.inRule(call.id(), call.version());
-    }
-  }
-
-  private Object selector(
-      Node node,
-      Map<String, Object> scope,
-      CompiledGraph compiled,
-      Expressions.FormulaCaller formulas) {
-    try {
-      return switchValue(compiled.expression(node.selector()).evaluate(scope, deadline, formulas));
-    } catch (ArcException error) {
-      if (error.status() == 504) throw error;
-      throw error.withContext("Selector");
-    }
-  }
-
-  private boolean matches(
-      BranchCase option,
-      Object selector,
-      Map<String, Object> scope,
-      CompiledGraph compiled,
-      Expressions.FormulaCaller formulas) {
-    try {
-      Object value = compiled.expression(option.expression()).evaluate(scope, deadline, formulas);
-      return selector == null
-          ? Expressions.bool(value)
-          : Expressions.equal(selector, switchValue(value));
-    } catch (ArcException error) {
-      if (error.status() == 504) throw error;
-      throw error.withContext("Case " + option.label());
-    }
-  }
-
-  private Object switchValue(Object value) {
+  private static Object switchValue(Object value) {
     if (!(value instanceof Boolean || value instanceof Number || value instanceof String))
       throw ArcException.invalid("Expected a boolean, number or string");
     return value;
   }
 
+  /** Names the failing field or case; exhausted budgets and the deadline keep their message. */
+  private static ArcException inContext(ArcException error, String context) {
+    return error.recoverable() ? error.withContext(context) : error;
+  }
+
   private void checkStepBudget() {
     deadline.check();
-    if (executedSteps >= 1000) throw ArcException.invalid("Execution exceeds 1,000 steps");
+    if (executedSteps >= Limits.MAX_EXECUTION_STEPS)
+      throw ArcException.limit(
+          "Execution exceeds " + Limits.format(Limits.MAX_EXECUTION_STEPS) + " steps");
   }
 }

@@ -8,6 +8,7 @@ import dev.arc.engine.validation.CompiledGraph;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
 import java.util.*;
+import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -31,12 +32,7 @@ public class Engine {
       boolean traceEnabled,
       boolean traceTruncated,
       int executedSteps,
-      int traceBytes) {
-    public Result(
-        Object result, List<Step> trace, long durationMicros, List<Parameters.Read> sources) {
-      this(result, trace, durationMicros, sources, true, false, trace.size(), 0);
-    }
-  }
+      int traceBytes) {}
 
   private final ExecutionPlans plans;
   private final ObjectMapper json;
@@ -52,7 +48,7 @@ public class Engine {
   }
 
   Engine(Validator validator, ObjectMapper json, int traceMaximumBytes) {
-    this.plans = new ExecutionPlans(validator);
+    this.plans = new ExecutionPlans(validator, json);
     this.json = json;
     this.traceMaximumBytes = traceMaximumBytes;
   }
@@ -72,14 +68,19 @@ public class Engine {
       this.prepared = plans.session(resolver, deadline, cachePublished);
     }
 
-    public CompiledGraph prepare(String id, Integer version, Definition definition) {
+    /**
+     * Compiles a draft (null version) or a pinned version once per session. A pinned definition is
+     * read only if the process plan cache does not hold that version already.
+     */
+    public CompiledGraph prepare(String id, Integer version, Supplier<Definition> definition) {
       return prepared.prepare(id, version, definition);
     }
 
+    /** Runs a rule with this session's plans, which its nested calls share. */
     public Result execute(
         String id,
         Integer version,
-        Definition definition,
+        Supplier<Definition> definition,
         Map<String, Object> inputs,
         Parameters parameters,
         boolean traceEnabled) {
@@ -118,7 +119,8 @@ public class Engine {
       RuleResolver resolver,
       Parameters parameters) {
     // Embedded callers may provide changing definitions under the same ID/version.
-    var session = new Session(resolver, ExecutionDeadline.start(30_000), false);
-    return session.execute(ruleId, version, definition, inputs, parameters, true);
+    var session =
+        new Session(resolver, ExecutionDeadline.start(ExecutionDeadline.DEFAULT_TIMEOUT_MS), false);
+    return session.execute(ruleId, version, () -> definition, inputs, parameters, true);
   }
 }

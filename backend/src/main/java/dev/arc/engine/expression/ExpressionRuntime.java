@@ -3,6 +3,7 @@ package dev.arc.engine.expression;
 import static dev.arc.engine.expression.Expressions.*;
 
 import dev.arc.engine.ExecutionDeadline;
+import dev.arc.engine.Limits;
 import dev.arc.engine.expression.Expressions.Expr;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
@@ -12,65 +13,105 @@ import java.util.*;
 final class ExpressionRuntime {
   private ExpressionRuntime() {}
 
-  /** Local bindings share their parent's budget, while separate evaluations never share state. */
+  /**
+   * One evaluation's variables, operation budget and deadline. A collection item binds its local
+   * identifiers in front of the enclosing context instead of copying the whole scope, so binding
+   * costs the same for 2 or 150 upstream variables. Inner locals shadow outer names.
+   */
   static final class Context {
-    private final Map<String, Object> variables;
+    private final Map<String, Object> scope;
+    private final Local locals;
     private final Budget budget;
     private final ExecutionDeadline deadline;
     private final FormulaCaller formulas;
 
-    Context(Map<String, Object> variables, ExecutionDeadline deadline, FormulaCaller formulas) {
-      this(variables, new Budget(), deadline, formulas);
+    Context(Map<String, Object> scope, ExecutionDeadline deadline, FormulaCaller formulas) {
+      this(scope, null, new Budget(), deadline, formulas);
     }
 
     private Context(
-        Map<String, Object> variables,
+        Map<String, Object> scope,
+        Local locals,
         Budget budget,
         ExecutionDeadline deadline,
         FormulaCaller formulas) {
-      this.deadline = deadline;
-      this.variables = variables;
+      this.scope = scope;
+      this.locals = locals;
       this.budget = budget;
+      this.deadline = deadline;
       this.formulas = formulas;
     }
 
     Object variable(String name) {
-      if (!variables.containsKey(name)) throw ArcException.invalid("Unknown variable: " + name);
-      return variables.get(name);
+      for (Local local = locals; local != null; local = local.enclosing()) {
+        if (local.name().equals(name)) return local.value();
+      }
+      if (!scope.containsKey(name)) throw ArcException.invalid("Unknown variable: " + name);
+      return scope.get(name);
     }
 
     Context bind(String itemName, Object item, String accumulatorName, Object total) {
-      var local = new HashMap<>(variables);
-      local.put(itemName, item);
-      if (accumulatorName != null) local.put(accumulatorName, total);
-      return new Context(local, budget, deadline, formulas);
+      Local bound = new Local(itemName, item, locals);
+      if (accumulatorName != null) bound = new Local(accumulatorName, total, bound);
+      return new Context(scope, bound, budget, deadline, formulas);
     }
 
     void tick() {
       deadline.check();
-      if (++budget.operations > 10_000)
-        throw ArcException.invalid("Expression exceeds 10,000 operations");
+      if (++budget.operations > Limits.MAX_EXPRESSION_OPERATIONS)
+        throw ArcException.limit(
+            "Expression exceeds "
+                + Limits.format(Limits.MAX_EXPRESSION_OPERATIONS)
+                + " operations");
     }
   }
 
-  static Object formula(FormulaCall formula, List<Expr> arguments, Context context) {
-    context.tick();
-    var values = arguments.stream().map(argument -> argument.eval(context)).toList();
-    Object result = context.formulas.call(formula, values);
-    context.deadline.check();
-    return bounded(result);
-  }
+  /** A collection-local binding; values may be null, which is distinct from an unknown name. */
+  private record Local(String name, Object value, Local enclosing) {}
 
   private static final class Budget {
     private int operations;
   }
 
+  /** Functions whose arguments are evaluated on demand rather than before the call. */
+  @FunctionalInterface
+  private interface LazyFunction {
+    Object evaluate(List<Expr> args, Context context);
+  }
+
+  private static final Map<String, LazyFunction> LAZY_FUNCTIONS =
+      Map.of(
+          "COALESCE", ExpressionRuntime::coalesce,
+          "IF", ExpressionRuntime::ifThenElse,
+          "IFERROR", ExpressionRuntime::ifError,
+          "ISERROR", (args, context) -> isError("ISERROR", args, context),
+          "ISERR", (args, context) -> isError("ISERR", args, context),
+          "ISNA", (args, context) -> isError("ISNA", args, context),
+          "AND", ExpressionRuntime::and,
+          "OR", ExpressionRuntime::or,
+          "SWITCH", ExpressionRuntime::switchCase,
+          "CHOOSE", ExpressionRuntime::choose);
+
+  /** Functions whose arguments the runtime evaluates on demand instead of before the call. */
+  static Set<String> lazyFunctionNames() {
+    return LAZY_FUNCTIONS.keySet();
+  }
+
+  /**
+   * The graph session bounds each returned Output value. A multi-Output aggregate is not bounded
+   * again as a whole, so a Formula call receives exactly the value a Reference node would store.
+   */
+  static Object formula(FormulaCall formula, List<Expr> arguments, Context context) {
+    context.tick();
+    var values = arguments.stream().map(argument -> argument.eval(context)).toList();
+    Object result = context.formulas.call(formula, values);
+    context.deadline.check();
+    return result;
+  }
+
   static Object binary(String op, Object a, Object b) {
     if (Set.of("==", "!=", "=", "<>").contains(op)) {
-      boolean same =
-          a instanceof Number && b instanceof Number
-              ? number(a).compareTo(number(b)) == 0
-              : Objects.equals(a, b);
+      boolean same = equal(a, b);
       return (op.equals("==") || op.equals("=")) == same;
     }
     if (Set.of("<", "<=", ">", ">=").contains(op)) {
@@ -121,47 +162,84 @@ final class ExpressionRuntime {
 
   static Object function(String name, List<Expr> args, Context context) {
     context.tick();
-    if (name.equals("COALESCE")) {
-      for (Expr argument : args) {
-        Object value = argument.eval(context);
-        if (value != null) return value;
-      }
-      return null;
-    }
-    if (name.equals("IF")) return args.get(bool(args.get(0).eval(context)) ? 1 : 2).eval(context);
-    if (Set.of("ISERROR", "ISERR", "ISNA").contains(name)) {
-      try {
-        args.getFirst().eval(context);
-        return false;
-      } catch (ArcException e) {
-        deadlineCheck(context, e);
-        boolean na = e.getMessage().contains("#N/A");
-        return name.equals("ISERROR") || name.equals("ISNA") && na || name.equals("ISERR") && !na;
-      }
-    }
-    if (name.equals("IFERROR")) {
-      try {
-        return args.get(0).eval(context);
-      } catch (ArcException e) {
-        deadlineCheck(context, e);
-        return args.get(1).eval(context);
-      }
-    }
-    if (name.equals("AND")) return args.stream().allMatch(a -> bool(a.eval(context)));
-    if (name.equals("OR")) return args.stream().anyMatch(a -> bool(a.eval(context)));
-    if (name.equals("SWITCH")) {
-      Object v = args.getFirst().eval(context);
-      for (int i = 1; i + 1 < args.size(); i += 2)
-        if (equal(v, args.get(i).eval(context))) return args.get(i + 1).eval(context);
-      if (args.size() % 2 == 0) return args.getLast().eval(context);
-      throw ArcException.invalid("SWITCH has no matching case or default");
-    }
-    return bounded(Functions.call(name, args.stream().map(a -> a.eval(context)).toList()));
+    LazyFunction lazy = LAZY_FUNCTIONS.get(name);
+    if (lazy != null) return lazy.evaluate(args, context);
+    Object result = Functions.call(name, args.stream().map(a -> a.eval(context)).toList());
+    // POI cannot be interrupted, so a slow Excel calculation is caught as soon as it returns.
+    context.deadline.check();
+    return bounded(result);
   }
 
-  private static void deadlineCheck(Context context, ArcException error) {
+  private static Object coalesce(List<Expr> args, Context context) {
+    for (Expr argument : args) {
+      Object value = argument.eval(context);
+      if (value != null) return value;
+    }
+    return null;
+  }
+
+  private static Object ifThenElse(List<Expr> args, Context context) {
+    return args.get(bool(args.get(0).eval(context)) ? 1 : 2).eval(context);
+  }
+
+  private static Object ifError(List<Expr> args, Context context) {
+    try {
+      return args.get(0).eval(context);
+    } catch (ArcException error) {
+      rethrowUnrecoverable(context, error);
+      return args.get(1).eval(context);
+    }
+  }
+
+  private static boolean isError(String name, List<Expr> args, Context context) {
+    try {
+      args.getFirst().eval(context);
+      return false;
+    } catch (ArcException error) {
+      rethrowUnrecoverable(context, error);
+      boolean notAvailable = error.kind() == ArcException.Kind.NOT_AVAILABLE;
+      return switch (name) {
+        case "ISNA" -> notAvailable;
+        case "ISERR" -> !notAvailable;
+        default -> true;
+      };
+    }
+  }
+
+  private static boolean and(List<Expr> args, Context context) {
+    for (Expr argument : args) {
+      if (!bool(argument.eval(context))) return false;
+    }
+    return true;
+  }
+
+  private static boolean or(List<Expr> args, Context context) {
+    for (Expr argument : args) {
+      if (bool(argument.eval(context))) return true;
+    }
+    return false;
+  }
+
+  private static Object switchCase(List<Expr> args, Context context) {
+    Object value = args.getFirst().eval(context);
+    for (int i = 1; i + 1 < args.size(); i += 2) {
+      if (equal(value, args.get(i).eval(context))) return args.get(i + 1).eval(context);
+    }
+    if (args.size() % 2 == 0) return args.getLast().eval(context);
+    throw ArcException.invalid("SWITCH has no matching case or default");
+  }
+
+  /** Like Excel, $CHOOSE evaluates only the selected value; the others may fail or be costly. */
+  private static Object choose(List<Expr> args, Context context) {
+    int index = ExcelFunctionAdapter.choiceIndex(args.getFirst().eval(context));
+    if (index < 1 || index >= args.size()) throw ArcException.invalid("CHOOSE: #VALUE!");
+    return args.get(index).eval(context);
+  }
+
+  /** Error functions test one value; exhausted budgets and the deadline always propagate. */
+  private static void rethrowUnrecoverable(Context context, ArcException error) {
     context.deadline.check();
-    if (error.status() == 504) throw error;
+    if (!error.recoverable()) throw error;
   }
 
   static Object collection(

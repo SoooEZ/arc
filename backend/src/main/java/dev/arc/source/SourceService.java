@@ -1,5 +1,6 @@
 package dev.arc.source;
 
+import dev.arc.engine.Identifiers;
 import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import java.util.List;
@@ -21,20 +22,13 @@ public class SourceService {
     this.validator = validator;
   }
 
-  public CatalogPage<SourceSummary> catalog(int offset, int limit, String search) {
-    pageBounds(offset, limit);
-    if (search.length() > 200) throw ArcException.invalid("Search is limited to 200 characters");
-    return repository.catalog(offset, limit, search);
+  public CatalogPage<SourceSummary> catalog(PageRequest page) {
+    return repository.catalog(page.offset(), page.limit(), page.search());
   }
 
-  public CatalogPage<SourceVersionSummary> versionSummaries(String id, int offset, int limit) {
-    pageBounds(offset, limit);
-    return repository.versionSummaries(id, offset, limit);
-  }
-
-  private void pageBounds(int offset, int limit) {
-    if (offset < 0 || limit < 1 || limit > 100)
-      throw ArcException.invalid("Use offset >= 0 and limit from 1 to 100");
+  /** Version histories are not searchable; the page's search is ignored. */
+  public CatalogPage<SourceVersionSummary> versionSummaries(String id, PageRequest page) {
+    return repository.versionSummaries(id, page.offset(), page.limit());
   }
 
   public List<DataSource> list() {
@@ -51,8 +45,7 @@ public class SourceService {
 
   @Transactional
   public DataSource create(Create request) {
-    if (request.id() == null || !request.id().matches("[a-z][a-z0-9-]{0,79}"))
-      throw ArcException.invalid("Invalid source ID");
+    if (!Identifiers.isResourceId(request.id())) throw ArcException.invalid("Invalid source ID");
     validator.validate(request.name(), request.definition());
     return repository.create(request.id(), request.name(), request.definition());
   }

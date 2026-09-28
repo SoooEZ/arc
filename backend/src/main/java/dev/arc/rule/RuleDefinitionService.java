@@ -8,8 +8,10 @@ import dev.arc.engine.script.ArcScript;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
+import dev.arc.model.NodeKind;
 import dev.arc.model.SourceDefinition;
 import dev.arc.source.SourceBindingValidator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,19 +64,26 @@ public class RuleDefinitionService {
     return new GraphPlan(definition).available();
   }
 
+  /**
+   * Graph problems, then the first source-contract problem. Pin and syntax problems belong to the
+   * graph checks, so the source-contract check skips the pins they rejected.
+   */
   public List<Validator.Problem> diagnostics(Definition definition) {
     var resolver = new MemoizingRuleResolver(rules);
-    var problems = validator.diagnostics(definition, resolver);
-    try {
-      validator.shape(definition);
-      if (definition.nodes().stream().filter(n -> n.type().equals("INPUT")).count() == 1)
-        sources.validate(definition, resolver);
-    } catch (ArcException e) {
-      if (!e.locations().isEmpty()) {
-        var problem = Validator.Problem.from(e);
-        if (!problems.contains(problem)) problems.add(problem);
+    var diagnosis = validator.diagnose(definition, resolver);
+    var problems = new ArrayList<>(diagnosis.problems());
+    if (diagnosis.shaped() && hasOneInputNode(definition)) {
+      try {
+        sources.validate(definition, resolver, diagnosis.dependencies());
+      } catch (ArcException error) {
+        problems.add(Validator.Problem.from(error));
       }
     }
     return problems;
+  }
+
+  /** Source problems are shown on the Input node, so they need exactly one. */
+  private static boolean hasOneInputNode(Definition definition) {
+    return definition.nodesOf(NodeKind.INPUT).size() == 1;
   }
 }

@@ -8,6 +8,14 @@ spring:
   jackson:
     deserialization:
       use-big-decimal-for-floats: true
+    # 20, never 2E+1: strict JSON clients reject or retype exponent notation.
+    generator:
+      write-bigdecimal-as-plain: true
+  mvc:
+    # No endpoint accepts form bodies, so never parse PUT/PATCH/DELETE form content into memory.
+    formcontent:
+      filter:
+        enabled: false
 server:
   port: 8080
   error:

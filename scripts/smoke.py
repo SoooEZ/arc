@@ -4,6 +4,7 @@ import concurrent.futures
 import copy
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 import uuid
@@ -29,6 +30,19 @@ def request(method, path, body=None, expected=200, headers=None):
         assert response.headers.get("Access-Control-Allow-Origin") == "*"
     checks += 1
     return json.loads(content) if content else None
+
+
+def raw_request(method, path, body):
+    """Status and body text, for checks that the parsed JSON would hide (such as 1E+2 == 100)."""
+    global checks
+    req = urllib.request.Request(BASE + path, data=json.dumps(body).encode(), method=method,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        response = urllib.request.urlopen(req, timeout=20)
+    except urllib.error.HTTPError as error:
+        response = error
+    checks += 1
+    return response.status, response.read().decode()
 
 
 def create(suffix, kind="FORMULA", definition=None):
@@ -79,6 +93,26 @@ try:
     request("OPTIONS", "/api/rules/order-pricing/execute", headers={"Origin": "https://example.com",
             "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "Content-Type"})
 
+    # Boundaries answer with client errors, never 500 or a silently different value.
+    request("POST", "/api;x=1/preview", {"definition": None, "pad": "x" * (1024 * 1024)}, 413)
+    duplicate_rule = request("POST", "/api/rules", {"id": "order-pricing", "name": "Duplicate",
+                             "description": "", "kind": "RULE", "definition": None}, 409)
+    assert duplicate_rule["message"] == "This rule ID already exists", duplicate_rule
+    duplicate_source = request("POST", "/api/sources", {"id": "country-tax", "name": "Duplicate", "definition": {
+        "kind": "LOOKUP", "parameters": [{"name": "key", "type": "STRING", "required": True}],
+        "entries": {"US": {"rate": 0.07}}, "timeoutMs": 3000}}, 409)
+    assert duplicate_source["message"] == "This source ID already exists", duplicate_source
+    request("GET", f"/api/sources/{PREFIX}-missing/versions", expected=404)
+    power = {"schemaVersion": 1, "inputs": [],
+             "nodes": [{"id": "input", "type": "INPUT", "label": "Inputs"},
+                       {"id": "out", "type": "OUTPUT", "label": "Result", "expression": "$POWER(10, 2)"}],
+             "edges": [{"id": "next", "source": "input", "target": "out", "sourceHandle": "next"}]}
+    status, text = raw_request("POST", "/api/preview", {"definition": power, "inputs": {}})
+    assert status == 200 and re.search(r'"result":100[,}]', text), (status, text[:200])
+    nul = request("POST", "/api/rules", {"id": PREFIX + "-nul", "name": "Bad\u0000name",
+                  "description": "", "kind": "RULE", "definition": None}, 422)
+    assert nul["message"] == "Text cannot contain the NUL character (U+0000)", nul
+
     child = create("child")
     execute(child["id"], {"amount": 100}, expected=409)
     child = publish(child)
@@ -112,6 +146,7 @@ try:
     assert first["items"][0]["id"] != second["items"][0]["id"]
     assert "draft" not in first["items"][0] and "nodeCount" in first["items"][0]
     assert request("GET", f"/api/rule-summaries?search={PREFIX}&limit=1&offset=99")["items"] == []
+    assert request("GET", f"/api/rule-summaries?search=%20{PREFIX}%20&limit=1")["total"] == first["total"]
     request("GET", "/api/rule-summaries?limit=101", expected=422)
     request("GET", "/api/rule-summaries?offset=-1", expected=422)
 
@@ -217,6 +252,17 @@ try:
     child = save(child)  # Incomplete drafts are allowed.
     publish(child, expected=422)
     assert execute(child["id"], {"amount": 100})["result"] == 50
+
+    # PostgreSQL stores a 1e100 default written out (101 digits); limits apply by value, so it saves again.
+    big_graph = {"schemaVersion": 1,
+                 "inputs": [{"name": "amount", "type": "NUMBER", "required": False, "defaultValue": 1e100}],
+                 "nodes": [{"id": "input", "type": "INPUT", "label": "Inputs"},
+                           {"id": "out", "type": "OUTPUT", "label": "Result", "expression": "amount"}],
+                 "edges": [{"id": "next", "source": "input", "target": "out", "sourceHandle": "next"}]}
+    big_default = create("big-default", definition=big_graph)
+    assert big_default["draft"]["inputs"][0]["defaultValue"] == 10 ** 100
+    big_default = save(big_default)
+    assert request("POST", "/api/preview", {"definition": big_default["draft"], "inputs": {}})["result"] == 10 ** 100
 
     # Row locks + revision checks allow exactly one competing update.
     race = create("concurrent")

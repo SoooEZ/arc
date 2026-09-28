@@ -1,5 +1,7 @@
 package dev.arc.rule;
 
+import dev.arc.engine.Identifiers;
+import dev.arc.engine.Limits;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.*;
@@ -18,6 +20,8 @@ public class RuleService {
 
   public record Publish(int revision) {}
 
+  private static final Set<String> KINDS = Set.of("DECISION_TREE", "FORMULA", "RULE");
+
   private final RuleRepository store;
   private final Validator validator;
   private final RuleDefinitionService definitions;
@@ -28,25 +32,14 @@ public class RuleService {
     this.definitions = definitions;
   }
 
-  public CatalogPage<RuleSummary> catalog(
-      int offset, int limit, String search, String kind, boolean publishedOnly) {
-    pageBounds(offset, limit);
-    if (search.length() > 200) throw ArcException.invalid("Search is limited to 200 characters");
-    if (!Set.of("", "DECISION_TREE", "FORMULA", "RULE").contains(kind))
-      throw ArcException.invalid("Unknown rule kind");
-    return store.catalog(offset, limit, search, kind, publishedOnly);
+  /** An empty kind lists every kind. */
+  public CatalogPage<RuleSummary> catalog(PageRequest page, String kind, boolean publishedOnly) {
+    if (!kind.isEmpty() && !KINDS.contains(kind)) throw ArcException.invalid("Unknown rule kind");
+    return store.catalog(page, kind, publishedOnly);
   }
 
-  public CatalogPage<RuleVersionSummary> versionSummaries(
-      String id, int offset, int limit, String search) {
-    pageBounds(offset, limit);
-    if (search.length() > 200) throw ArcException.invalid("Search is limited to 200 characters");
-    return store.versionSummaries(id, offset, limit, search.trim());
-  }
-
-  private void pageBounds(int offset, int limit) {
-    if (offset < 0 || limit < 1 || limit > 100)
-      throw ArcException.invalid("Use offset >= 0 and limit from 1 to 100");
+  public CatalogPage<RuleVersionSummary> versionSummaries(String id, PageRequest page) {
+    return store.versionSummaries(id, page);
   }
 
   public List<Rule> list() {
@@ -67,13 +60,14 @@ public class RuleService {
 
   @Transactional
   public Rule create(Create request) {
-    if (request.id() == null || !request.id().matches("[a-z][a-z0-9-]{0,79}"))
+    if (!Identifiers.isResourceId(request.id()))
       throw ArcException.invalid(
           "Rule ID must start with a lowercase letter and contain only lowercase letters, digits,"
-              + " and hyphens (max 80)");
+              + " and hyphens (max "
+              + Limits.MAX_RESOURCE_ID_CHARACTERS
+              + ")");
     metadata(request.name(), request.description());
-    if (!Set.of("DECISION_TREE", "FORMULA", "RULE")
-        .contains(request.kind() == null ? "" : request.kind()))
+    if (request.kind() == null || !KINDS.contains(request.kind()))
       throw ArcException.invalid("Choose DECISION_TREE, FORMULA, or RULE");
     Definition d =
         request.definition() == null ? RuleSamples.blank(request.kind()) : request.definition();
@@ -114,9 +108,13 @@ public class RuleService {
   }
 
   private void metadata(String name, String description) {
-    if (name == null || name.isBlank() || name.length() > 160)
-      throw ArcException.invalid("Name must contain 1 to 160 characters");
-    if (description != null && description.length() > 2000)
-      throw ArcException.invalid("Description exceeds 2,000 characters");
+    if (name == null || name.isBlank() || name.length() > Limits.MAX_NAME_CHARACTERS)
+      throw ArcException.invalid(
+          "Name must contain 1 to " + Limits.MAX_NAME_CHARACTERS + " characters");
+    if (description != null && description.length() > Limits.MAX_DESCRIPTION_CHARACTERS)
+      throw ArcException.invalid(
+          "Description exceeds "
+              + Limits.format(Limits.MAX_DESCRIPTION_CHARACTERS)
+              + " characters");
   }
 }

@@ -28,7 +28,39 @@ class FanOutTest {
   }
 
   Engine.Result run(Definition d) {
-    return engine.execute("test", 1, d, Map.of(), noRefs);
+    return run(d, Map.of());
+  }
+
+  Engine.Result run(Definition d, Map<String, Object> inputs) {
+    return engine.execute("test", 1, d, inputs, noRefs);
+  }
+
+  static Node namedOutput(String id, String expression, String name) {
+    return nodeOf(id, "OUTPUT", id).expression(expression).outputName(name).build();
+  }
+
+  /** Members pay listPrice * rate; the rate comes from a node that runs for everyone. */
+  Definition memberPricing() {
+    return new Definition(
+        1,
+        List.of(
+            new Input("listPrice", "NUMBER", true, null),
+            new Input("isMember", "BOOLEAN", true, null)),
+        List.of(
+            input,
+            node("base", "FORMULA", "listPrice", "price"),
+            node("rateNode", "FORMULA", "0.8", "rate"),
+            node("memberCheck", "CONDITION", "isMember", null),
+            node("member", "FORMULA", "listPrice * rate", "price"),
+            node("out", "OUTPUT", "price", null)),
+        List.of(
+            edge("input", "base", "next"),
+            edge("input", "rateNode", "next"),
+            edge("base", "memberCheck", "next"),
+            edge("memberCheck", "member", "true"),
+            edge("memberCheck", "out", "false"),
+            edge("rateNode", "member", "next"),
+            edge("member", "out", "next")));
   }
 
   Definition diamond() {
@@ -157,6 +189,94 @@ class FanOutTest {
   }
 
   @Test
+  void aWriteLinkedToAnEarlierOneOnlyThroughASkippedBranchIsIndependent() {
+    var pricing = memberPricing();
+    validator.validate(pricing, noRefs); // Valid: whether writes conflict depends on the inputs.
+    var member = run(pricing, Map.of("listPrice", new BigDecimal("100"), "isMember", true));
+    assertThat((BigDecimal) member.result()).isEqualByComparingTo("80");
+    // Without the true branch, 'member' still runs from rateNode alone and never saw base's price.
+    assertThatThrownBy(
+            () -> run(pricing, Map.of("listPrice", new BigDecimal("100"), "isMember", false)))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage()).startsWith("Conflicting upstream values for 'price'");
+              assertThat(error.locations())
+                  .containsExactly(new ArcException.Location("test", 1, "out", "out"));
+            });
+
+    var gated =
+        new Definition(
+            1,
+            List.of(new Input("flag", "BOOLEAN", true, null)),
+            List.of(
+                input,
+                node("b", "FORMULA", "1", "x"),
+                node("k", "CONDITION", "flag", null),
+                node("d", "FORMULA", "0", "y"),
+                node("c", "FORMULA", "2", "x"),
+                node("j", "OUTPUT", "x", null)),
+            List.of(
+                edge("input", "b", "next"),
+                edge("input", "d", "next"),
+                edge("b", "k", "next"),
+                edge("b", "j", "next"),
+                edge("k", "c", "true"),
+                edge("k", "j", "false"),
+                edge("d", "c", "next"),
+                edge("c", "j", "next")));
+    assertThat(run(gated, Map.of("flag", true)).result()).isEqualTo(new BigDecimal("2"));
+    assertThatThrownBy(() -> run(gated, Map.of("flag", false)))
+        .hasMessageStartingWith("Conflicting upstream values for 'x'");
+  }
+
+  @Test
+  void anUpdateSeveralStepsDownstreamStillSupersedesTheOriginalWrite() {
+    var d =
+        graph(
+            List.of(
+                input,
+                node("a", "FORMULA", "1", "x"),
+                node("b", "FORMULA", "x + 1", "x"),
+                node("c", "FORMULA", "x + 1", "x"),
+                node("out", "OUTPUT", "x", null)),
+            edge("input", "a", "next"),
+            edge("a", "b", "next"),
+            edge("b", "c", "next"),
+            edge("a", "out", "next"),
+            edge("c", "out", "next"));
+    assertThat(run(d).result()).isEqualTo(new BigDecimal("3"));
+  }
+
+  @Test
+  void aNodeWithoutAResultSeesItsParentScopeUnchangedBySiblingResults() {
+    // 'a' updates x and runs before Condition 'c', which reads its parent p's scope.
+    var d =
+        graph(
+            List.of(
+                input,
+                node("p", "FORMULA", "1", "x"),
+                node("a", "FORMULA", "x + 1", "x"),
+                node("c", "CONDITION", "x == 1", null),
+                namedOutput("fromCondition", "x", "seenByCondition"),
+                namedOutput("fromUpdate", "x", "updated")),
+            edge("input", "p", "next"),
+            edge("p", "a", "next"),
+            edge("p", "c", "next"),
+            edge("c", "fromCondition", "true"),
+            edge("c", "fromCondition", "false"),
+            edge("a", "fromUpdate", "next"));
+    var result = run(d);
+    assertThat(result.trace()).extracting(Engine.Step::nodeId).containsSubsequence("a", "c");
+    assertThat(result.trace())
+        .filteredOn(step -> step.nodeId().equals("c"))
+        .extracting(Engine.Step::branch)
+        .containsExactly("true");
+    assertThat(result.result())
+        .isEqualTo(Map.of("seenByCondition", new BigDecimal("1"), "updated", new BigDecimal("2")));
+  }
+
+  @Test
   void nestedRuntimeErrorsKeepChildLocationAndCallerContext() {
     var child =
         graph(List.of(input, node("bad", "OUTPUT", "1 / 0", null)), edge("input", "bad", "next"));
@@ -164,7 +284,11 @@ class FanOutTest {
         graph(
             List.of(
                 input,
-                new Node("reuse", "REFERENCE", "Child rule", null, null, "x", "child", 7, Map.of()),
+                nodeOf("reuse", "REFERENCE", "Child rule")
+                    .output("x")
+                    .rule("child", 7)
+                    .bindings(Map.of())
+                    .build(),
                 node("out", "OUTPUT", "x", null)),
             edge("input", "reuse", "next"),
             edge("reuse", "out", "next"));

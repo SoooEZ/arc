@@ -2,6 +2,7 @@ package dev.arc.engine.graph;
 
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.NodeKind;
 import java.util.*;
 
 /** Infers variables present whenever a node runs, without evaluating predicates. */
@@ -14,25 +15,25 @@ final class BranchScopes {
     Map<String, Map<String, Integer>> scopes = new HashMap<>();
     int variableIndex = 0;
     for (Node node : topology.order()) {
-      if (node.type().equals("CONDITION")) {
+      if (!node.kind().choosesOneExit()) continue;
+      // Each exit but the last has an independent test and is taken only when every earlier test
+      // failed. The last exit, false or default, is taken when all of them fail.
+      Map<String, Integer> gates = new HashMap<>();
+      List<String> handles = node.handles();
+      int remaining = 1;
+      for (String handle : handles.subList(0, handles.size() - 1)) {
         int test = logic.variable(variableIndex++);
-        branchGates.put(node.id(), Map.of("true", test, "false", logic.not(test)));
-      } else if (node.type().equals("SWITCH")) {
-        Map<String, Integer> gates = new HashMap<>();
-        int remaining = 1;
-        for (BranchCase option : node.cases() == null ? List.<BranchCase>of() : node.cases()) {
-          int test = logic.variable(variableIndex++);
-          gates.put("case:" + option.id(), logic.and(remaining, test));
-          remaining = logic.and(remaining, logic.not(test));
-        }
-        gates.put("default", remaining);
-        branchGates.put(node.id(), gates);
+        gates.put(handle, logic.and(remaining, test));
+        remaining = logic.and(remaining, logic.not(test));
       }
+      gates.put(handles.getLast(), remaining);
+      branchGates.put(node.id(), gates);
     }
     for (Node node : topology.order()) {
-      int active = node.type().equals("INPUT") ? 1 : 0;
+      boolean input = node.kind() == NodeKind.INPUT;
+      int active = input ? 1 : 0;
       Map<String, Integer> scope = new HashMap<>();
-      if (node.type().equals("INPUT")) {
+      if (input) {
         for (Input parameter : definition.inputs()) scope.put(parameter.name(), 1);
       }
       for (Edge edge : topology.incoming(node.id())) {

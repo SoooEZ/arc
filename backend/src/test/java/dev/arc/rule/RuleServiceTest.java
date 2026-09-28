@@ -1,12 +1,12 @@
 package dev.arc.rule;
 
+import static dev.arc.support.GraphFixtures.nodeOf;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
-import dev.arc.model.Definition.Node;
 import dev.arc.model.Rule;
 import java.time.Instant;
 import java.util.List;
@@ -27,6 +27,22 @@ class RuleServiceTest {
           1,
           Instant.EPOCH,
           Instant.EPOCH);
+
+  @Test
+  void ruleIdsFollowTheSharedResourceIdPolicy() {
+    String longest = "r" + "-1".repeat(39) + "z";
+    service.create(new RuleService.Create(longest, "Longest", "", "FORMULA", null));
+    verify(repository).create(eq(longest), eq("Longest"), eq(""), eq("FORMULA"), any());
+    for (String id : new String[] {longest + "z", "Rule", "1rule", "rule_id", null}) {
+      assertThatThrownBy(
+              () -> service.create(new RuleService.Create(id, "Name", "", "FORMULA", null)))
+          .as(String.valueOf(id))
+          .hasMessage(
+              "Rule ID must start with a lowercase letter and contain only lowercase letters,"
+                  + " digits, and hyphens (max 80)");
+    }
+    verifyNoMoreInteractions(repository);
+  }
 
   @Test
   void staleEditsNeverWriteOrPublish() {
@@ -81,7 +97,7 @@ class RuleServiceTest {
             new Definition(
                 1,
                 List.of(),
-                List.of(new Node("result", type, "Result", null, null, name, null, null, null)),
+                List.of(nodeOf("result", type, "Result").output(name).build()),
                 List.of());
         assertThatThrownBy(
                 () ->

@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.apache.hc.client5.http.DnsResolver;
 
 /**
@@ -16,15 +17,37 @@ import org.apache.hc.client5.http.DnsResolver;
  * its connection. A host allowlist never implicitly grants access to private addresses.
  */
 final class HttpDestinationPolicy implements DnsResolver {
+  private static final int MAX_URL_CHARACTERS = 2_000;
+  private static final int MAX_SECRET_HEADERS = 10;
+
+  /** Longest secret header name, and longest environment alias after {@code ARC_SECRET_}. */
+  private static final int MAX_SECRET_NAME_CHARACTERS = 64;
+
+  private static final Pattern SECRET_HEADER_NAME =
+      Pattern.compile("[A-Za-z][A-Za-z0-9-]{0," + (MAX_SECRET_NAME_CHARACTERS - 1) + "}");
+  private static final Pattern SECRET_ALIAS =
+      Pattern.compile("[A-Z][A-Z0-9_]{0," + (MAX_SECRET_NAME_CHARACTERS - 1) + "}");
   private static final Set<String> FORBIDDEN_SECRET_HEADERS =
       Set.of("host", "content-length", "connection", "transfer-encoding");
 
+  /** Resolves every address of a host name; production uses the JVM resolver. */
+  @FunctionalInterface
+  interface HostLookup {
+    InetAddress[] addresses(String host) throws UnknownHostException;
+  }
+
   private final Set<String> allowedHosts;
   private final Set<String> privateHosts;
+  private final HostLookup lookup;
 
   HttpDestinationPolicy(String allowedHosts, String privateHosts) {
+    this(allowedHosts, privateHosts, InetAddress::getAllByName);
+  }
+
+  HttpDestinationPolicy(String allowedHosts, String privateHosts, HostLookup lookup) {
     this.allowedHosts = hosts(allowedHosts);
     this.privateHosts = hosts(privateHosts);
+    this.lookup = lookup;
   }
 
   URI validate(SourceDefinition definition) {
@@ -39,7 +62,7 @@ final class HttpDestinationPolicy implements DnsResolver {
         || host.isBlank()
         || uri.getUserInfo() != null
         || uri.getFragment() != null
-        || uri.toString().length() > 2000)
+        || uri.toString().length() > MAX_URL_CHARACTERS)
       throw ArcException.invalid("Use an HTTP(S) URL without credentials or fragment");
     if (!allowedHosts.isEmpty() && !allowedHosts.contains(host))
       throw ArcException.invalid("HTTP host is not in the configured allowlist");
@@ -49,12 +72,14 @@ final class HttpDestinationPolicy implements DnsResolver {
 
   private void validateSecretHeaders(String host, Map<String, String> headers) {
     if (headers == null) return;
-    if (headers.size() > 10) throw ArcException.invalid("At most 10 secret headers");
+    if (headers.size() > MAX_SECRET_HEADERS)
+      throw ArcException.invalid("At most " + MAX_SECRET_HEADERS + " secret headers");
     for (var header : headers.entrySet()) {
-      if (!header.getKey().matches("[A-Za-z][A-Za-z0-9-]{0,63}")
+      if (header.getKey() == null
+          || !SECRET_HEADER_NAME.matcher(header.getKey()).matches()
           || FORBIDDEN_SECRET_HEADERS.contains(header.getKey().toLowerCase(Locale.ROOT))
           || header.getValue() == null
-          || !header.getValue().matches("[A-Z][A-Z0-9_]{0,63}"))
+          || !SECRET_ALIAS.matcher(header.getValue()).matches())
         throw ArcException.invalid(
             "Secret headers map header names to uppercase environment aliases");
       if (!allowedHosts.contains(host))
@@ -62,12 +87,16 @@ final class HttpDestinationPolicy implements DnsResolver {
     }
   }
 
+  /**
+   * Blocks the whole host when any of its addresses is private or reserved (see {@link
+   * BlockedAddresses}), unless the exact host name is a configured private-host exception.
+   */
   @Override
   public InetAddress[] resolve(String host) throws UnknownHostException {
-    InetAddress[] addresses = InetAddress.getAllByName(host);
+    InetAddress[] addresses = lookup.addresses(host);
     if (!privateHosts.contains(host.toLowerCase(Locale.ROOT)))
       for (InetAddress address : addresses)
-        if (blocked(address))
+        if (BlockedAddresses.contains(address))
           throw new UnknownHostException("Private or reserved HTTP destination is blocked");
     return addresses;
   }
@@ -75,47 +104,6 @@ final class HttpDestinationPolicy implements DnsResolver {
   @Override
   public String resolveCanonicalHostname(String host) {
     return host;
-  }
-
-  private static boolean blocked(InetAddress address) {
-    if (address.isAnyLocalAddress()
-        || address.isLoopbackAddress()
-        || address.isLinkLocalAddress()
-        || address.isSiteLocalAddress()
-        || address.isMulticastAddress()) return true;
-    byte[] bytes = address.getAddress();
-    if (bytes.length == 16) return blockedIpv6(bytes);
-    return blockedIpv4(bytes);
-  }
-
-  private static boolean blockedIpv4(byte[] address) {
-    int first = address[0] & 255;
-    int second = address[1] & 255;
-    int third = address[2] & 255;
-    boolean sharedAddressSpace = first == 100 && second >= 64 && second <= 127;
-    boolean protocolAssignments = first == 192 && second == 0 && third == 0;
-    boolean benchmarking = first == 198 && (second == 18 || second == 19);
-    // These documentation blocks are /24, not the entire surrounding /16.
-    // https://www.iana.org/assignments/iana-ipv4-special-registry
-    boolean documentation =
-        first == 192 && second == 0 && third == 2
-            || first == 198 && second == 51 && third == 100
-            || first == 203 && second == 0 && third == 113;
-    return first == 0
-        || first >= 224
-        || sharedAddressSpace
-        || protocolAssignments
-        || benchmarking
-        || documentation;
-  }
-
-  private static boolean blockedIpv6(byte[] address) {
-    int first = address[0] & 255;
-    int second = address[1] & 255;
-    boolean uniqueLocal = (first & 254) == 252;
-    boolean documentation =
-        first == 32 && second == 1 && (address[2] & 255) == 13 && (address[3] & 255) == 184;
-    return uniqueLocal || documentation;
   }
 
   private static Set<String> hosts(String csv) {
