@@ -5,7 +5,11 @@ import { editorLines, setEditorText } from "./helpers/editor";
 const ruleId = "catalog-pricing";
 const publishedAt = "2026-09-25T12:00:00Z";
 
-function summary(id: string, version: number): RuleSummary {
+function summary(
+  id: string,
+  version: number,
+  createdAt = publishedAt,
+): RuleSummary {
   return {
     id,
     name: id === ruleId ? "Catalog pricing" : `Other rule ${id}`,
@@ -13,7 +17,7 @@ function summary(id: string, version: number): RuleSummary {
     kind: "FORMULA",
     revision: version,
     publishedVersion: version,
-    createdAt: publishedAt,
+    createdAt,
     updatedAt: publishedAt,
     nodeCount: 2,
     inputCount: 1,
@@ -54,6 +58,10 @@ async function mockCatalog(
     : otherRules;
   const state = {
     version: initialVersion,
+    /** When the rule was created; another value means it was deleted and created again. */
+    createdAt: publishedAt,
+    /** The rule is gone: it leaves the catalog and its versions answer 404. */
+    deleted: false,
     historyVersion: null as number | null,
     failCatalogOnce: false,
     executionError: false,
@@ -85,10 +93,13 @@ async function mockCatalog(
         });
         return;
       }
+      const published = state.deleted
+        ? []
+        : [summary(ruleId, state.version, state.createdAt)];
       await route.fulfill({
         json: {
-          items: publishedOnly ? [summary(ruleId, state.version)] : parentRules,
-          total: publishedOnly ? 1 : 40,
+          items: publishedOnly ? published : parentRules,
+          total: publishedOnly ? published.length : 40,
           offset,
           limit,
         },
@@ -117,6 +128,13 @@ async function mockCatalog(
       new RegExp(`^/api/rules/${ruleId}/versions/(\\d+)$`),
     );
     if (selectedVersion) {
+      if (state.deleted) {
+        await route.fulfill({
+          status: 404,
+          json: { message: `Rule not found: ${ruleId}` },
+        });
+        return;
+      }
       await route.fulfill({
         contentType: "application/json",
         body: `{"ruleId":"${ruleId}","version":${Number(selectedVersion[1])},"publishedAt":"${publishedAt}","definition":${state.rawDefinition ?? JSON.stringify(definition)}}`,
@@ -133,7 +151,12 @@ async function mockCatalog(
       };
       state.executions.push(execution);
       state.executionBodies.push(request.postData() ?? "");
-      if (state.executionError) {
+      if (state.deleted) {
+        await route.fulfill({
+          status: 404,
+          json: { message: `Rule not found: ${ruleId}` },
+        });
+      } else if (state.executionError) {
         await route.fulfill({
           status: 422,
           json: { message: "Amount is invalid for this rule" },
@@ -178,6 +201,51 @@ test("fresh published catalog wins over a stale version in the parent library pa
 
   expect(state.executions).toHaveLength(1);
   expect(state.executions[0].version).toBe(2);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("a rule created again under the same ID replaces the selection and its remembered releases", async ({
+  page,
+}) => {
+  const state = await mockCatalog(page, true, 2);
+  await page.goto("/#/playground");
+  await executeVersion(page, 2);
+
+  // Deleted and created again elsewhere: the new rule has one version, and the
+  // parent library page still lists the old one at v2.
+  state.version = 1;
+  state.createdAt = "2026-09-28T09:00:00Z";
+  await page
+    .getByLabel("Find published rules", { exact: true })
+    .fill("Catalog pricing");
+  await executeVersion(page, 1);
+
+  expect(state.executions.map((execution) => execution.version)).toEqual([
+    2, 1,
+  ]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("a deleted rule leaves the playground instead of a version that can never load", async ({
+  page,
+}) => {
+  const state = await mockCatalog(page, true, 2);
+  await page.goto("/#/playground");
+  await executeVersion(page, 2);
+
+  state.deleted = true;
+  await page.getByRole("button", { name: "Execute rule", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Publish a rule in the library to make your first API call.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Execute rule", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("alert").filter({ hasText: /not found/ }),
+  ).toHaveCount(0);
   expect(state.unexpected).toEqual([]);
 });
 

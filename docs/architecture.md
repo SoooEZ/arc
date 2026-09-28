@@ -4,11 +4,11 @@ For package boundaries, frontend state ownership, design patterns, and extension
 
 ## Storage and versioning
 
-`rules` stores identity, metadata, a mutable draft graph, edit revision, and latest published version. `rule_versions` stores immutable snapshots, keyed by `(rule_id, version)`. Flyway owns relational schema migrations; JSON graph documents carry `schemaVersion` for future graph migrations.
+`rules` stores identity, metadata, a mutable draft graph, edit revision, and latest published version. Revisions come from one sequence shared by all rules (`V3`), so a rule created again under a deleted ID never repeats a revision an open editor may hold. `rule_versions` stores immutable snapshots, keyed by `(rule_id, version)`. Flyway owns relational schema migrations; JSON graph documents carry `schemaVersion` for future graph migrations.
 
 PostgreSQL JSONB fits this graph because node shapes vary, graph structure is bounded, and a complete version is loaded for execution. Relational keys provide stable identities and atomic release creation. Graph coordinates and labels live in the document, allowing exact editor reconstruction, but do not affect execution semantics.
 
-Publishing acquires a row lock, checks the submitted edit revision, validates the graph, inserts a new version, and advances the latest-version pointer in one transaction. Save also locks and checks revisions. Competing edits return `409` rather than silently overwriting one another.
+Publishing acquires a row lock, checks the submitted edit revision, holds the rules the draft calls against deletion, validates the graph, inserts a new version, and advances the latest-version pointer in one transaction. Save also locks and checks revisions, and deletion checks the optional revision the client read. Competing edits return `409` rather than silently overwriting one another, and a deletion and the publication of a new caller never both succeed.
 
 References always contain a rule ID and positive integer version. Publishing never resolves a floating “latest” dependency. Updating or republishing a child cannot alter an already published parent. A parent must explicitly change its pinned reference and publish a new version to adopt the change.
 
@@ -141,6 +141,7 @@ Identifiers use letters, digits, and underscores, start with a letter or undersc
 - Rule metadata and parameter bindings have explicit size limits.
 - Nginx caps encoded request bodies at 1 MiB (1,048,576 bytes). Java independently caps every request body at the same size (`413`), whatever the method or path spelling: Spring routes `/api;x=1/...` and `/%61pi/...` to the API, so the cap never inspects the path. The limit runs before every other servlet filter, and form-content parsing is disabled because no endpoint accepts form bodies. JSON escaping and UTF-8 encoding count toward this transport limit.
 - Text containing U+0000 is rejected with `422` before storage; PostgreSQL text and JSONB cannot hold it.
+- One API process serves a database. The compiled-plan cache is per process, and deleting a rule evicts its plans only there; running several API processes against one database is not a supported configuration.
 - API responses write decimal numbers in plain notation (`20`, never `2E+1`). The API container's JVM runs with the en-US locale.
 - The web proxy waits 40 s for the API, above the 30 s execution deadline, so the API's JSON `504` with error locations reaches the caller instead of an nginx HTML `504`. It resolves the `api` service through Docker's DNS per request, so recreating the api container does not require restarting web. `index.html` is served with `Cache-Control: no-cache`; hashed `/assets/*` files are cached for a year as immutable, and a missing asset is a `404`, never `index.html`. JS, CSS, JSON and SVG responses are gzip-compressed.
 

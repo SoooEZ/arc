@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createHttpClient, pathId } from "../../src/api/http";
-import { ApiError } from "../../src/api/errors";
+import { ApiError, errorDetails } from "../../src/api/errors";
 import { ruleApi } from "../../src/api/rules";
 
 /** A body that delivers part of a document and then fails, like a reset connection. */
@@ -87,6 +87,7 @@ test("API errors retain graph locations and status; non-JSON errors still explai
     status: 422,
     message: "Invalid expression",
     locations: [location],
+    issues: [],
   });
   const offline = createHttpClient(
     "/api",
@@ -95,7 +96,32 @@ test("API errors retain graph locations and status; non-JSON errors still explai
   await expect(offline.get("/rules")).rejects.toMatchObject({
     message: "Request failed (503)",
     status: 503,
+    issues: [],
   });
+});
+
+test("API errors keep the body's issues, and only issues beyond the message are details", async () => {
+  const refused = createHttpClient(
+    "/api",
+    async () =>
+      new Response(
+        JSON.stringify({
+          message: "Other rules call this rule: a (draft) and 2 more.",
+          issues: ["a (draft)", "b v1", "c v2", 7],
+          locations: [],
+        }),
+        { status: 409 },
+      ),
+  );
+  const error = await refused.delete("/rules/x").catch((error) => error);
+  expect(error).toBeInstanceOf(ApiError);
+  expect(error.issues).toEqual(["a (draft)", "b v1", "c v2"]);
+  expect(errorDetails(error)).toEqual(["a (draft)", "b v1", "c v2"]);
+  const stale = new ApiError("This rule changed", [], 409, [
+    "This rule changed",
+  ]);
+  expect(errorDetails(stale)).toEqual([]);
+  expect(errorDetails(new Error("offline"))).toEqual([]);
 });
 
 test("a successful response without a readable JSON document rejects instead of resolving null", async () => {

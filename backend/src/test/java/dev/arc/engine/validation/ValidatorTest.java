@@ -256,4 +256,46 @@ class ValidatorTest {
         .containsExactly("decision", "transform");
     assertThat(problems).anyMatch(problem -> problem.message().contains("cycles"));
   }
+
+  /**
+   * The rules a stored definition names, for deletion checks: unlike dependencies, an unpinned
+   * Reference and the source mappings of a draft without an Input node count too.
+   */
+  @Test
+  void calledRuleIdsCoverUnfinishedDrafts() {
+    var sourced =
+        new Input(
+            "amount",
+            "NUMBER",
+            true,
+            null,
+            new SourceBinding("rates", 1, Map.of("key", "$TO_STRING(@lookup:2(1))"), "/x", "FAIL"));
+    Node unpinned = nodeOf("tax", "REFERENCE", "Tax").rule("tax-rule", null).output("tax").build();
+    Node pinned = nodeOf("fee", "REFERENCE", "Fee").rule("fee-rule", 3).output("fee").build();
+    Node calling = node("calc", "FORMULA", "@pricing:1(amount)", "x");
+    // A malformed expression calls nothing: the draft is unfinished, not a caller of "broken".
+    Node malformed = node("draft", "FORMULA", "@broken:1(", "y");
+    var withoutInput =
+        new Definition(1, List.of(sourced), List.of(unpinned, calling, malformed), List.of());
+    assertThat(Validator.calledRuleIds(withoutInput))
+        .containsExactly("tax-rule", "lookup", "pricing");
+    var withInput =
+        new Definition(
+            1,
+            List.of(sourced),
+            List.of(node("input", "INPUT", null, null), pinned, unpinned, calling, malformed),
+            List.of());
+    assertThat(Validator.calledRuleIds(withInput))
+        .containsExactly("fee-rule", "tax-rule", "lookup", "pricing");
+    var wellFormed =
+        new Definition(
+            1,
+            List.of(sourced),
+            List.of(node("input", "INPUT", null, null), pinned, unpinned, calling),
+            List.of());
+    assertThat(Validator.dependencies(wellFormed))
+        .as("dependencies keep only complete pins, for validation")
+        .extracting(Validator.Dependency::ruleId)
+        .containsExactly("fee-rule", "lookup", "pricing");
+  }
 }

@@ -15,6 +15,8 @@ import { useCodeStudioTarget } from "./app/useCodeStudioTarget";
 import { useChunkLoadFailed } from "./app/chunkLoadFailures";
 import { useAsyncResource } from "./hooks/useAsyncResource";
 import { ruleApi } from "./api/rules";
+import { sameRule } from "./domain/ruleIdentity";
+import { formulaMetadata } from "./features/studio/formulaMetadata";
 import type { Rule } from "./types";
 
 // The rule editor and React Flow download only when a rule opens.
@@ -73,9 +75,13 @@ export default function App() {
     0,
     !!ruleId,
   );
+  // The saved copy stands in for the fresh read only for the same rule, not
+  // for a rule created again under a deleted ID, whatever its revision.
   const selected =
     detail.data &&
-    (savedRule?.id === ruleId && savedRule.revision >= detail.data.revision
+    (savedRule &&
+    sameRule(savedRule, detail.data) &&
+    savedRule.revision >= detail.data.revision
       ? savedRule
       : detail.data);
   /** A save or create acknowledgement; the hidden library reloads when shown. */
@@ -91,11 +97,16 @@ export default function App() {
     createRule: newRule,
     notify: setNotice,
   });
-  /** Nothing keeps offering a deleted rule: saved copy, library page or Code studio target. */
+  /**
+   * Nothing keeps offering a deleted rule: saved copy, library page, Code studio
+   * target or Formula metadata. A deletion outlives its editor, so this may run
+   * after another rule was saved.
+   */
   const forgetDeletedRule = (id: string) => {
-    if (savedRule?.id === id) setSavedRule(null);
+    setSavedRule((saved) => (saved?.id === id ? null : saved));
     library.markChanged();
     codeStudio.forget(id);
+    formulaMetadata.forget(id);
   };
 
   const ruleContent = (rule: RuleRoute): ReactNode => {
@@ -121,7 +132,14 @@ export default function App() {
           />
         </LazyBoundary>
       );
-    if (detail.loading) return <LoadingRule />;
+    // A deleted or unknown rule cannot be retried into existence.
+    if (detail.status === 404)
+      return (
+        <div className="center-state">
+          <h2>Rule not found</h2>
+          <Button onClick={() => navigate("/library")}>Back to library</Button>
+        </div>
+      );
     if (detail.error)
       return (
         <div className="center-state">
@@ -131,12 +149,7 @@ export default function App() {
           </Button>
         </div>
       );
-    return (
-      <div className="center-state">
-        <h2>Rule not found</h2>
-        <Button onClick={() => navigate("/library")}>Back to library</Button>
-      </div>
-    );
+    return <LoadingRule />;
   };
 
   const workspaceContent = (): ReactNode => {

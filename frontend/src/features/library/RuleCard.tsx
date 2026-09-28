@@ -20,7 +20,7 @@ export default function RuleCard({
   const cached = cachedPreview(rule);
   // Only mounted cards on the current catalog page fetch; unmount aborts old previews.
   const detail = useAsyncResource<Rule | null>(
-    `${rule.id}:${rule.revision}:${attempt}`,
+    `${rule.id}:${rule.createdAt}:${rule.revision}:${attempt}`,
     async (signal) => {
       const loaded = await ruleApi.get(rule.id, { signal });
       rememberPreview(rule, loaded);

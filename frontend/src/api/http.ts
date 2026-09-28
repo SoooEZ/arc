@@ -48,10 +48,12 @@ async function failureBody(response: Response): Promise<unknown> {
 
 function requestFailure(payload: unknown, status: number): ApiError {
   const body: Record<string, unknown> = isJsonObject(payload) ? payload : {};
+  const issues = Array.isArray(body.issues) ? body.issues : [];
   return new ApiError(
     body.message ? String(body.message) : `Request failed (${status})`,
     Array.isArray(body.locations) ? body.locations : [],
     status,
+    issues.filter((issue): issue is string => typeof issue === "string"),
   );
 }
 

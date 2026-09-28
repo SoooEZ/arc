@@ -156,9 +156,10 @@ Maven downloads Java dependencies, compiles the backend, and starts Spring Boot.
 | `rule_versions` | Immutable published rule versions | [V1__rules.sql](backend/src/main/resources/db/migration/V1__rules.sql) |
 | `data_sources` | Data-source metadata | [V2__data_sources.sql](backend/src/main/resources/db/migration/V2__data_sources.sql) |
 | `data_source_versions` | Versioned HTTP or lookup-table configurations | [V2__data_sources.sql](backend/src/main/resources/db/migration/V2__data_sources.sql) |
+| `workspace_seeds` | Which one-time seeds ran (the sample rules) | [V4__workspace_seeds.sql](backend/src/main/resources/db/migration/V4__workspace_seeds.sql) |
 | `flyway_schema_history` | Applied migration versions and checksums | Managed by Flyway |
 
-`V2` also inserts the `country-tax` lookup example. After migrations, [RuleSamples.java](backend/src/main/java/dev/arc/rule/RuleSamples.java) creates and publishes `apply-discount`, `order-pricing`, and `free-shipping` **only if the `rules` table is empty**. Restarting an initialized workspace preserves existing rules. Later application updates apply new migration versions once; already applied migration files should not be edited or executed manually.
+`V2` also inserts the `country-tax` lookup example. After migrations, [RuleSamples.java](backend/src/main/java/dev/arc/rule/RuleSamples.java) creates and publishes `apply-discount`, `order-pricing`, and `free-shipping` **once per workspace**, recording the seeding in `workspace_seeds` (`V4`). Restarting an initialized workspace preserves existing rules, and deleting every rule does not bring the samples back. Later application updates apply new migration versions once; already applied migration files should not be edited or executed manually.
 
 ### 4. Verify tables and initial data
 

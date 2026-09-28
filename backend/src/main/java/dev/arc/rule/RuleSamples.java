@@ -94,11 +94,14 @@ public class RuleSamples implements ApplicationRunner {
             edge("input", "calculate", Handles.NEXT), edge("calculate", "result", Handles.NEXT)));
   }
 
-  /** Seeds the examples into an empty database only. */
+  /**
+   * Seeds the examples once per workspace. The claim is a row in the same transaction, so a failed
+   * seed rolls it back, and a workspace whose rules were all deleted is not seeded again.
+   */
   @Override
   @Transactional
   public void run(ApplicationArguments args) {
-    if (store.hasRules()) return;
+    if (!store.claimSampleSeeding()) return;
     Definition discount =
         new Definition(
             1,

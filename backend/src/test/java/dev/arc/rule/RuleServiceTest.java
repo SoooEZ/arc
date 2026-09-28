@@ -10,12 +10,16 @@ import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
+import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.Node;
+import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.Rule;
 import dev.arc.rule.RuleRepository.StoredDefinition;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class RuleServiceTest {
@@ -137,30 +141,30 @@ class RuleServiceTest {
    */
   @Test
   void aRuleThatOnlyMentionsTheDeletedOneDoesNotKeepIt() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForDeletion("example")).thenReturn(draft);
     when(repository.definitionsMentioning("example"))
         .thenReturn(
             List.of(
                 new StoredDefinition("labels", 1, returning("\"example\"")),
                 new StoredDefinition("other", 2, returning("@example-two:1()")),
                 new StoredDefinition("unfinished", null, returning("@example:1("))));
-    service.delete("example");
+    service.delete("example", null);
     var order = inOrder(repository, engine);
-    order.verify(repository).lock("example");
+    order.verify(repository).lockForDeletion("example");
     order.verify(repository).delete("example");
     order.verify(engine).forget("example");
   }
 
   @Test
   void aRuleThatOtherRulesCallIsKeptAndEveryCallerIsNamed() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForDeletion("example")).thenReturn(draft);
     Node reference = nodeOf("tax", "REFERENCE", "Tax").rule("example", 1).output("tax").build();
     when(repository.definitionsMentioning("example"))
         .thenReturn(
             List.of(
                 new StoredDefinition("checkout", null, graphWith(reference)),
                 new StoredDefinition("checkout", 3, returning("@example:1() * 2"))));
-    assertThatThrownBy(() -> service.delete("example"))
+    assertThatThrownBy(() -> service.delete("example", null))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -177,12 +181,12 @@ class RuleServiceTest {
 
   @Test
   void aLongCallerListNamesTheFirstFiveAndCountsTheRest() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForDeletion("example")).thenReturn(draft);
     var callers = new ArrayList<StoredDefinition>();
     for (String id : List.of("a", "b", "c", "d", "e", "f", "g"))
       callers.add(new StoredDefinition(id, 1, returning("@example:1()")));
     when(repository.definitionsMentioning("example")).thenReturn(callers);
-    assertThatThrownBy(() -> service.delete("example"))
+    assertThatThrownBy(() -> service.delete("example", null))
         .hasMessage(
             "Other rules call this rule: a v1, b v1, c v1, d v1, e v1 and 2 more. Remove those"
                 + " calls before deleting it.")
@@ -191,9 +195,92 @@ class RuleServiceTest {
 
   @Test
   void deletingAMissingRuleIsNotFoundAndChangesNothing() {
-    when(repository.lock("missing")).thenThrow(new ArcException(404, "Rule not found: missing"));
-    assertThatThrownBy(() -> service.delete("missing")).hasMessage("Rule not found: missing");
+    when(repository.lockForDeletion("missing"))
+        .thenThrow(new ArcException(404, "Rule not found: missing"));
+    assertThatThrownBy(() -> service.delete("missing", null)).hasMessage("Rule not found: missing");
     verify(repository, never()).delete(anyString());
     verifyNoInteractions(engine);
+  }
+
+  /** A rule published or replaced since the client read it is kept, as a stale save would be. */
+  @Test
+  void aDeletionWithAStaleRevisionIsRefusedBeforeAnythingIsRead() {
+    when(repository.lockForDeletion("example")).thenReturn(draft);
+    assertThatThrownBy(() -> service.delete("example", 2))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(409);
+              assertThat(error.getMessage())
+                  .isEqualTo(
+                      "This rule changed in another editor. Reload it before saving, publishing or"
+                          + " deleting.");
+            });
+    verify(repository, never()).definitionsMentioning(anyString());
+    verify(repository, never()).delete(anyString());
+    service.delete("example", 3);
+    verify(repository).delete("example");
+  }
+
+  /**
+   * The caller check counts every rule a stored draft names, not only the complete pins that
+   * validation resolves: a Reference that has chosen its rule but not its version, and source
+   * mappings of a draft without an Input node.
+   */
+  @Test
+  void unfinishedDraftsKeepTheRulesTheyName() {
+    when(repository.lockForDeletion("example")).thenReturn(draft);
+    Node unpinned = nodeOf("tax", "REFERENCE", "Tax").rule("example", null).output("tax").build();
+    var sourced =
+        new Definition(
+            1,
+            List.of(
+                new Input(
+                    "amount",
+                    "NUMBER",
+                    true,
+                    null,
+                    new SourceBinding(
+                        "rates", 1, Map.of("key", "$TO_STRING(@example:1(1))"), "/rate", "FAIL"))),
+            List.of(outputNode("out", "Output", "amount")),
+            List.of());
+    when(repository.definitionsMentioning("example"))
+        .thenReturn(
+            List.of(
+                new StoredDefinition("checkout", null, graphWith(unpinned)),
+                new StoredDefinition("pricing", null, sourced)));
+    assertThatThrownBy(() -> service.delete("example", null))
+        .hasMessage(
+            "Other rules call this rule: checkout (draft), pricing (draft). Remove those calls"
+                + " before deleting it.");
+    verify(repository, never()).delete(anyString());
+  }
+
+  /** The rules a draft calls are held against deletion before the write and until the commit. */
+  @Test
+  void savesAndPublicationsHoldTheRulesTheyCallAgainstDeletion() {
+    Node reference = nodeOf("tax", "REFERENCE", "Tax").rule("callee", 1).output("tax").build();
+    var calling = graphWith(reference);
+    var callingDraft =
+        new Rule("example", "Example", "", "RULE", calling, 3, null, Instant.EPOCH, Instant.EPOCH);
+    when(repository.lock("example")).thenReturn(callingDraft);
+    when(repository.publish(callingDraft)).thenReturn(callingDraft);
+
+    service.publish("example", 3);
+    var publication = inOrder(repository, definitions);
+    publication.verify(repository).lock("example");
+    publication.verify(repository).lockCallees(Set.of("callee"));
+    publication.verify(definitions).validate(calling);
+    publication.verify(repository).publish(callingDraft);
+
+    service.update("example", new RuleService.Update("Example", "", 3, calling));
+    var save = inOrder(repository);
+    save.verify(repository).lockCallees(Set.of("callee"));
+    save.verify(repository).update("example", "Example", "", calling);
+
+    service.create(new RuleService.Create("caller", "Caller", "", "RULE", calling));
+    var creation = inOrder(repository);
+    creation.verify(repository).lockCallees(Set.of("callee"));
+    creation.verify(repository).create("caller", "Caller", "", "RULE", calling);
   }
 }

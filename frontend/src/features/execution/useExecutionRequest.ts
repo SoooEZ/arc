@@ -7,6 +7,8 @@ interface ExecutionState {
   running: boolean;
   result: Execution | null;
   error: string;
+  /** The HTTP status behind `error`, when the failure was an API response. */
+  status: number | null;
   problem: GraphProblem | null;
   requestDurationMs: number | null;
 }
@@ -15,6 +17,7 @@ const idle = (key: string): ExecutionState => ({
   running: false,
   result: null,
   error: "",
+  status: null,
   problem: null,
   requestDurationMs: null,
 });
@@ -61,6 +64,7 @@ export function useExecutionRequest(key: string) {
         setState({
           ...idle(key),
           error: errorMessage(failure),
+          status: failure instanceof ApiError ? (failure.status ?? null) : null,
           requestDurationMs: performance.now() - started,
           problem:
             failure instanceof ApiError

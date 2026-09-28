@@ -5,7 +5,14 @@ import {
 } from "../../src/features/studio/formulaMetadata";
 import type { Definition, RuleSummary } from "../../src/types";
 
-function summary(id: string, version: number, name = id): RuleSummary {
+const created = "2026-09-27T00:00:00Z";
+
+function summary(
+  id: string,
+  version: number,
+  name = id,
+  createdAt = created,
+): RuleSummary {
   return {
     id,
     name,
@@ -13,7 +20,7 @@ function summary(id: string, version: number, name = id): RuleSummary {
     kind: "FORMULA",
     revision: version,
     publishedVersion: version,
-    createdAt: "",
+    createdAt,
     updatedAt: "",
     nodeCount: 2,
     inputCount: 1,
@@ -31,12 +38,13 @@ const definition: Definition = {
 };
 
 /** Reads that count version downloads per id:version pin. */
-function countingReads(catalog: RuleSummary[] = []) {
+function countingReads(catalog: RuleSummary[] = [], createdAt = created) {
   const versionReads: string[] = [];
   const reads: FormulaReads = {
     rule: async (id) => ({
       kind: id.startsWith("rule-") ? "RULE" : "FORMULA",
       name: `Rule ${id}`,
+      createdAt,
     }),
     version: async (id, version) => {
       versionReads.push(`${id}:${version}`);
@@ -105,5 +113,48 @@ test("a fresh catalog summary renames a cached pin", async () => {
     summary("tax", 1, "New name"),
   );
   expect(renamed.name).toBe("New name");
-  expect((await metadata.load("tax", 1, signal())).name).toBe("New name");
+  // Hover reads the rule to check its incarnation, so its name is the freshest.
+  expect((await metadata.load("tax", 1, signal())).name).toBe("Rule tax");
+});
+
+test("a rule created again under a deleted ID is read afresh, and a same-tab deletion forgets it at once", async () => {
+  const replaced = "2026-09-28T09:00:00Z";
+  const { reads, versionReads } = countingReads([summary("tax", 1)]);
+  const metadata = new FormulaMetadata(reads);
+  expect(
+    (await metadata.load("tax", 1, signal(), summary("tax", 1))).inputs,
+  ).toHaveLength(1);
+  // A search lists the new incarnation: its version is downloaded again.
+  await metadata.load(
+    "tax",
+    1,
+    signal(),
+    summary("tax", 1, "New tax", replaced),
+  );
+  expect(versionReads).toEqual(["tax:1", "tax:1"]);
+  // Hover reads the rule itself; the same incarnation reuses the cached inputs.
+  const recreated = new FormulaMetadata(countingReads([], replaced).reads);
+  await recreated.load(
+    "tax",
+    1,
+    signal(),
+    summary("tax", 1, "New tax", replaced),
+  );
+  expect((await recreated.load("tax", 1, signal())).name).toBe("Rule tax");
+  // Re-created as an ordinary rule, the pin is no longer callable.
+  const asRule = new FormulaMetadata(countingReads([], replaced).reads);
+  await asRule.load("rule-tax", 1, signal(), summary("rule-tax", 1));
+  await expect(asRule.load("rule-tax", 1, signal())).rejects.toThrow(
+    "Only published Formula rules can be called in an expression.",
+  );
+  // Deleting in this page drops every version before any later check.
+  const forgetting = new FormulaMetadata(reads);
+  await forgetting.load("tax", 1, signal(), summary("tax", 1));
+  await forgetting.load("tax", 2, signal(), summary("tax", 2));
+  await forgetting.load("taxes", 1, signal(), summary("taxes", 1));
+  forgetting.forget("tax");
+  versionReads.length = 0;
+  await forgetting.load("tax", 2, signal(), summary("tax", 2));
+  await forgetting.load("taxes", 1, signal(), summary("taxes", 1));
+  expect(versionReads).toEqual(["tax:2"]);
 });

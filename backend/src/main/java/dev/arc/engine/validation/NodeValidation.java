@@ -220,6 +220,20 @@ final class NodeValidation {
     return List.copyOf(dependencies);
   }
 
+  /** See {@link Validator#calledRuleIds}: every rule the definition names, in node order. */
+  static Set<String> calledRuleIds(
+      Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
+    var ids = new LinkedHashSet<String>();
+    for (Node node : definition.nodesOf(NodeKind.REFERENCE))
+      if (node.ruleId() != null) ids.add(node.ruleId());
+    var owned = new ArrayList<OwnedExpression>();
+    for (var mappings : sourceMappings(definition).values()) owned.addAll(mappings);
+    for (Node node : definition.nodes()) owned.addAll(expressions(node));
+    for (OwnedExpression expression : owned)
+      for (var call : formulaCalls.apply(expression.source())) ids.add(call.id());
+    return ids;
+  }
+
   /** Calls of one expression; a malformed expression fails, located at its node by the caller. */
   static List<Expressions.FormulaCall> formulaCallsOf(String source) {
     return source == null || !source.contains("@")

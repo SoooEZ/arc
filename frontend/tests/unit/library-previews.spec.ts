@@ -22,17 +22,21 @@ test("card previews are reused per rule revision and stay bounded", () => {
   const first = rule("preview-cache-first", 1);
   expect(cachedPreview(first)).toBeUndefined();
   rememberPreview(first, first);
-  expect(cachedPreview({ id: first.id, revision: 1 })).toBe(first);
+  expect(cachedPreview({ ...first, revision: 1 })).toBe(first);
   // A saved draft has a new revision, so its old preview is never shown.
-  expect(cachedPreview({ id: first.id, revision: 2 })).toBeUndefined();
+  expect(cachedPreview({ ...first, revision: 2 })).toBeUndefined();
+  // A rule created again under a deleted ID is another rule, whatever its revision.
+  expect(
+    cachedPreview({ ...first, createdAt: "2026-09-28T00:00:00Z" }),
+  ).toBeUndefined();
 
   for (let index = 0; index < 40; index++) {
     const other = rule(`preview-cache-${index}`, 1);
     rememberPreview(other, other);
   }
   expect(cachedPreview(first)).toBeUndefined();
-  expect(cachedPreview({ id: "preview-cache-39", revision: 1 })).toBeDefined();
-  expect(cachedPreview({ id: "preview-cache-0", revision: 1 })).toBeDefined();
+  expect(cachedPreview(rule("preview-cache-39", 1))).toBeDefined();
+  expect(cachedPreview(rule("preview-cache-0", 1))).toBeDefined();
 });
 
 test("a page offset past the end moves to the last page", () => {

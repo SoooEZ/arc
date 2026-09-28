@@ -62,8 +62,8 @@ public class RuleController {
 
   @DeleteMapping("/rules/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@PathVariable String id) {
-    rules.delete(id);
+  public void delete(@PathVariable String id, @RequestParam(required = false) Integer revision) {
+    rules.delete(id, revision);
   }
 
   @PostMapping("/rules/{id}/publish")

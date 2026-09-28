@@ -8,7 +8,12 @@ import {
 } from "react";
 import { ruleApi } from "../../api/rules";
 import { studioApi } from "../../api/studio";
-import { ApiError, errorMessage, type GraphProblem } from "../../api/errors";
+import {
+  ApiError,
+  errorDetails,
+  errorMessage,
+  type GraphProblem,
+} from "../../api/errors";
 import { useNavigationGuard } from "../../app/navigationGuards";
 import { leavesRuleDocument } from "../../app/routing";
 import type { Definition, Rule } from "../../types";
@@ -46,6 +51,12 @@ type VersionLoad =
 
 /** Computes positions for the draft it receives, e.g. with the ELK layout. */
 export type DraftLayout = (draft: Definition) => Promise<Definition>;
+
+/** Why the server kept a rule: its message and, for a refused deletion, every caller. */
+export interface DeletionRefusal {
+  message: string;
+  callers: string[];
+}
 
 /**
  * The open rule document and its command gate. Controls read `capabilities`;
@@ -399,24 +410,29 @@ export function useRuleDocument({
     });
   /**
    * Deletes the rule and leaves for the library. Unsaved changes go with the
-   * rule, so leaving does not ask about them. Resolves to the reason the server
-   * kept the rule, such as the rules that still call it, or null.
+   * rule, so leaving does not ask about them. Resolves to why the server kept
+   * the rule, or null. A deletion cannot be recalled once sent, so it outlives
+   * the editor session: the request carries no session signal, and its outcome
+   * is reported through the workspace even after the user has left.
    */
-  const deleteRule = async (): Promise<string | null> => {
-    let refusal: string | null = null;
+  const deleteRule = async (): Promise<DeletionRefusal | null> => {
+    let refusal: DeletionRefusal | null = null;
     await runTask("delete", async (signal) => {
       try {
-        await ruleApi.delete(rule.id, { signal });
+        await ruleApi.delete(rule.id, rule.revision);
       } catch (failure) {
-        if (!signal.aborted) refusal = errorMessage(failure);
+        refusal = {
+          message: errorMessage(failure),
+          callers: errorDetails(failure),
+        };
+        if (signal.aborted)
+          notify(`Rule ${rule.id} was not deleted: ${refusal.message}`);
         return;
       }
-      // The rule is gone even when the user has left the editor meanwhile;
-      // only an editor that is still open leaves for the library.
       onDeleted?.(rule.id);
+      notify(`Rule ${rule.id} deleted`);
       if (signal.aborted) return;
       onDirty(false);
-      notify(`Rule ${rule.id} deleted`);
       navigate("/library");
     });
     return refusal;

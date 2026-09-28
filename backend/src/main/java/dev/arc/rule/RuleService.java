@@ -82,6 +82,7 @@ public class RuleService {
     Definition d =
         request.definition() == null ? RuleSamples.blank(request.kind()) : request.definition();
     validator.shape(d);
+    holdCallees(d);
     return store.create(
         request.id(),
         request.name().trim(),
@@ -96,6 +97,7 @@ public class RuleService {
     revision(rule, request.revision());
     metadata(request.name(), request.description());
     validator.shape(request.definition());
+    holdCallees(request.definition());
     return store.update(
         id,
         request.name().trim(),
@@ -107,6 +109,7 @@ public class RuleService {
   public Rule publish(String id, int revision) {
     Rule rule = store.lock(id);
     revision(rule, revision);
+    holdCallees(rule.draft());
     definitions.validate(rule.draft());
     return store.publish(rule);
   }
@@ -114,12 +117,15 @@ public class RuleService {
   /**
    * Deletes the rule with its draft and every published version, so the execution API answers 404
    * for it afterwards. A rule that other rules still call stays, because deleting it would break
-   * them.
+   * them. A client that read the rule passes its {@code revision}, so a rule published or replaced
+   * since then is kept with a 409, as a stale save would be.
    */
   @Transactional
-  public void delete(String id) {
-    // A missing rule is a 404; a concurrent save or publish of this rule waits for the deletion.
-    store.lock(id);
+  public void delete(String id, Integer revision) {
+    // A missing rule is a 404. The lock waits for every writer of this rule and of the rules
+    // calling it, so the caller scan below sees each committed caller.
+    Rule rule = store.lockForDeletion(id);
+    if (revision != null) revision(rule, revision);
     List<String> callers = callersOf(id);
     if (!callers.isEmpty())
       throw new ArcException(
@@ -132,14 +138,20 @@ public class RuleService {
     afterCommit(() -> engine.forget(id));
   }
 
+  /**
+   * Holds the rules a definition calls until the commit, so deleting one of them either waits for
+   * this write or, having committed first, is already gone when the write validates.
+   */
+  private void holdCallees(Definition definition) {
+    Set<String> callees = Validator.calledRuleIds(definition);
+    if (!callees.isEmpty()) store.lockCallees(callees);
+  }
+
   /** Each draft ("checkout (draft)") or published version ("checkout v3") that calls the rule. */
   private List<String> callersOf(String id) {
     var callers = new ArrayList<String>();
     for (var stored : store.definitionsMentioning(id)) {
-      boolean calls =
-          Validator.draftDependencies(stored.definition()).stream()
-              .anyMatch(dependency -> dependency.ruleId().equals(id));
-      if (!calls) continue;
+      if (!Validator.calledRuleIds(stored.definition()).contains(id)) continue;
       callers.add(
           stored.version() == null
               ? stored.ruleId() + " (draft)"
@@ -177,7 +189,8 @@ public class RuleService {
   private void revision(Rule rule, int revision) {
     if (rule.revision() != revision)
       throw new ArcException(
-          409, "This rule changed in another editor. Reload it before saving or publishing.");
+          409,
+          "This rule changed in another editor. Reload it before saving, publishing or deleting.");
   }
 
   private void metadata(String name, String description) {

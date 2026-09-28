@@ -2,6 +2,7 @@ package dev.arc.rule;
 
 import dev.arc.engine.RuleResolver;
 import dev.arc.model.*;
+import java.util.Collection;
 import java.util.List;
 
 /** Storage port. lock/update/publish/delete are called inside the application transaction. */
@@ -11,8 +12,11 @@ public interface RuleRepository extends RuleResolver {
 
   List<Rule> list();
 
-  /** Whether any rule is stored, without reading rule rows. */
-  boolean hasRules();
+  /**
+   * Claims the one-time seeding of the sample rules: true for the first caller in the workspace's
+   * life, false afterwards, however many rules the workspace holds now.
+   */
+  boolean claimSampleSeeding();
 
   /** Newest edits first; the search matches ID, name and description, and an empty kind all. */
   CatalogPage<RuleSummary> catalog(PageRequest page, String kind, boolean publishedOnly);
@@ -25,7 +29,21 @@ public interface RuleRepository extends RuleResolver {
   /** Read only the current publication pointer; missing rules return 404. */
   Integer publishedVersion(String id);
 
+  /**
+   * Locks a rule for a save or publication. The lock excludes other writers of the rule but not the
+   * rules that call it, which only hold it against deletion ({@link #lockCallees}).
+   */
   Rule lock(String id);
+
+  /** Locks a rule for deletion, which waits for every writer of a rule that calls it. */
+  Rule lockForDeletion(String id);
+
+  /**
+   * Holds the rules a definition calls against deletion until the transaction ends, so a caller
+   * saved or published now is either seen by a later deletion or refused by an earlier one. IDs
+   * that name no rule are ignored.
+   */
+  void lockCallees(Collection<String> ruleIds);
 
   /** An ID that is already stored, including by a concurrent create, is a 409 conflict. */
   Rule create(String id, String name, String description, String kind, Definition definition);

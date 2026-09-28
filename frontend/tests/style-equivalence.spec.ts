@@ -357,7 +357,9 @@ const scenarios: Scenario[] = [
     viewports: ["desktop"],
     setup: async (page) => {
       await open(page, "/rules/no-such-rule");
-      await expect(page.getByText("Rule not found")).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Rule not found" }),
+      ).toBeVisible();
     },
   },
   {

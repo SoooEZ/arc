@@ -79,6 +79,7 @@ for (const step of ["validate", "save", "publish"] as const) {
     request,
   }) => {
     const id = await createRule(request, `leave-publish-${step}`);
+    const initialRevision = (await readRule(request, id)).revision;
     const target = {
       validate: { url: "/api/validate", method: "POST" },
       save: { url: `/api/rules/${id}`, method: "PUT" },
@@ -123,7 +124,10 @@ for (const step of ["validate", "save", "publish"] as const) {
       ).toBeVisible();
       const saved = await readRule(request, id);
       expect(saved.publishedVersion).toBeNull();
-      expect(saved.revision).toBe(step === "publish" ? 2 : 1);
+      // Publishing saves first; revisions come from a sequence shared by every rule.
+      if (step === "publish")
+        expect(saved.revision).toBeGreaterThan(initialRevision);
+      else expect(saved.revision).toBe(initialRevision);
       expect(writes).toEqual(issued);
       await expect(page.getByText(/published and ready to call/)).toHaveCount(
         0,

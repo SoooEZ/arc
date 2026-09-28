@@ -394,6 +394,7 @@ function EditorContent({
           onApply={editMetadata}
           onDelete={onDeleted && !readOnly ? deleteRule : undefined}
           canDelete={can.delete}
+          deleting={busy === "delete"}
         />
       )}
     </div>

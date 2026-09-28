@@ -116,7 +116,7 @@ test("reopening a saved rule waits for a fresh detail read and uses its latest r
     expect(response.ok()).toBeTruthy();
     const current: Rule = await response.json();
     expect(current.draft.inputs[0].defaultValue).toBe(10);
-    expect(current.revision).toBe(updated.revision + 1);
+    expect(current.revision).toBeGreaterThan(updated.revision);
   } finally {
     releaseFailure();
     releaseRead();
@@ -201,8 +201,57 @@ test("returning from a published version refreshes the draft while graph/code sw
     expect(response.ok()).toBeTruthy();
     const current: Rule = await response.json();
     expect(current.draft.inputs[0].defaultValue).toBe(10);
-    expect(current.revision).toBe(updated.revision + 1);
+    expect(current.revision).toBeGreaterThan(updated.revision);
   } finally {
     releaseRead();
   }
+});
+
+test("a saved copy never stands in for a rule created again under the same ID", async ({
+  page,
+  request,
+}) => {
+  const id = `rule-session-recreated-${Date.now()}`;
+  const created = await request.post("/api/rules", {
+    data: { id, name: "Mine", kind: "FORMULA", definition },
+  });
+  expect(created.ok()).toBeTruthy();
+  await page.goto(`/#/rules/${id}?node=input`);
+  await page.getByLabel("Default value (optional)").fill("2");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  const mine: Rule = await (await request.get(`/api/rules/${id}`)).json();
+  await page
+    .getByRole("navigation", { name: "Workspace", exact: true })
+    .getByRole("button", { name: "Rule library", exact: true })
+    .click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(0);
+
+  // Someone deleted the rule and created another under the same ID. Its
+  // revision is lower than the saved copy's, so only the identity can tell.
+  const theirs: Rule = {
+    ...mine,
+    name: "Someone else's rule",
+    revision: 1,
+    createdAt: "2030-01-01T00:00:00Z",
+    draft: {
+      ...definition,
+      nodes: definition.nodes.map((node) =>
+        node.id === "out" ? { ...node, label: "Their result" } : node,
+      ),
+    },
+  };
+  await page.route(`**/api/rules/${id}`, async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    await route.fulfill({ json: theirs });
+  });
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  await expect(
+    page.getByRole("heading", { name: "Someone else's rule", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="out"]')).toContainText(
+    "Their result",
+  );
 });

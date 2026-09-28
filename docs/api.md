@@ -96,7 +96,11 @@ The UI saves any changed draft before publishing. API clients should save explic
 
 `DELETE /rules/{id}` removes the rule with its draft and every published version and returns `204` without a body. Afterwards every request for the rule returns `404`, including execution of a pinned version, and the ID can name a new rule. Data sources cannot be deleted.
 
-A rule that another rule still calls, through a Reference node or an `@id:version` call in any draft or published version, is kept. The request returns `409` "Other rules call this rule: checkout (draft), checkout v3. Remove those calls before deleting it." The message names up to five callers; `issues` lists them all. Delete or change the callers first.
+Pass the `revision` you read (`DELETE /rules/{id}?revision=4`) to delete only the rule you looked at: a rule saved, published or re-created since then answers `409` "This rule changed in another editor. Reload it before saving, publishing or deleting.", as a stale save does. Without the parameter the current rule is deleted.
+
+A rule that another rule still calls is kept. That covers a Reference node that has chosen the rule, with or without a version, and an `@id:version` call in any node or input source mapping of any draft or published version, including unfinished drafts without an Input node. The request returns `409` "Other rules call this rule: checkout (draft), checkout v3. Remove those calls before deleting it." The message names up to five callers; `issues` lists them all. Delete or change the callers first. A caller saved or published while the deletion runs is either seen by it or refused: writes hold the rules they call until they commit.
+
+Revisions come from one sequence for all rules, so they advance but are not consecutive, and a rule created again under a deleted ID never repeats a revision an editor may still hold: that editor's next save, publish or delete answers `409`.
 
 ## Errors
 
@@ -125,6 +129,12 @@ See [the studio guide](studio.md) for ARC Script, the function catalog, source A
 ## Behavior changes from the second review
 
 These changes shipped with [the second full review](reviews/2026-09-27-second-review.md), after the ones listed in the next section. As there, graph JSON, ARC Script, stored versions and pins are unchanged; results changed because the earlier behavior was a defect.
+
+**Rule deletion and revisions**
+
+- `revision` values are drawn from one sequence shared by all rules: a save or publish still advances a rule's revision, but by more than one, and a rule created again under a deleted ID starts above every revision that ID ever had. Clients that treat the revision as an opaque token are unaffected; a stale editor of the deleted rule now receives `409` instead of overwriting the new rule.
+- `DELETE /rules/{id}` accepts an optional `revision` query parameter and answers `409` when the rule changed since that revision was read. The caller check now also counts a Reference without a version and `@id:version` calls in the source mappings of a draft without an Input node, and a caller saved or published concurrently can no longer slip past it.
+- The sample rules are seeded once per workspace (recorded in the `workspace_seeds` table); deleting every rule and restarting the API no longer re-creates them.
 
 **Errors and limits**
 

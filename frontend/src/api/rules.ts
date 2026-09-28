@@ -54,9 +54,12 @@ export const ruleApi = {
     ),
   publish: (id: string, revision: number, options?: RequestOptions) =>
     http.post<Rule>(`/rules/${pathId(id)}/publish`, { revision }, options),
-  /** Deletes the draft and every published version; a 409 names the rules that still call it. */
-  delete: (id: string, options?: RequestOptions) =>
-    http.delete<void>(`/rules/${pathId(id)}`, options),
+  /**
+   * Deletes the draft and every published version of the rule at `revision`. A 409
+   * names the rules that still call it, or reports that the rule changed since.
+   */
+  delete: (id: string, revision: number, options?: RequestOptions) =>
+    http.delete<void>(`/rules/${pathId(id)}?revision=${revision}`, options),
   execute: (
     id: string,
     inputs: Record<string, unknown>,

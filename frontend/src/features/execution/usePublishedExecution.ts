@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Definition, RuleSummary, Version } from "../../types";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { usePagedResource } from "../../hooks/usePagedResource";
@@ -13,31 +13,19 @@ import {
   sampleInputsJson,
   tryParseExecutionInputs,
 } from "../../domain/executionInputs";
+import { sameRule } from "../../domain/ruleIdentity";
 import { useExecutionRequest } from "./useExecutionRequest";
 import { useInputBuffer } from "./useInputBuffer";
-
-/** The sample rule the playground opens with when it is published. */
-const defaultRuleId = "order-pricing";
+import {
+  defaultRuleId,
+  knownVersion,
+  newestKnownRelease,
+  noRelease,
+  selectionAfterCatalogPage,
+} from "./publishedSelection";
 
 function sampleText(definition: Definition | undefined): string {
   return definition ? sampleInputsJson(definition) : "{}";
-}
-
-/**
- * The selection after a catalog page arrives: with nothing selected, the sample
- * rule or else the first published rule; otherwise the page's summary of the
- * selected rule when it shows a newer release.
- */
-function selectionAfterCatalogPage(
-  current: RuleSummary | null,
-  page: RuleSummary[],
-): RuleSummary | null {
-  if (!current)
-    return page.find((rule) => rule.id === defaultRuleId) ?? page[0] ?? null;
-  const listed = page.find((rule) => rule.id === current.id);
-  const newer =
-    (listed?.publishedVersion ?? 0) > (current.publishedVersion ?? 0);
-  return listed && newer ? listed : current;
 }
 
 export function usePublishedExecution(
@@ -77,9 +65,11 @@ export function usePublishedExecution(
     );
   }, [catalogRules]);
   const id = selectedRule?.id ?? "";
-  // The library list can lag behind the catalog, and the reverse.
+  // The library list can lag behind the catalog, and the reverse; a row of
+  // another incarnation of the ID says nothing about the selected rule.
   const listedVersion = Math.max(
-    rules.find((rule) => rule.id === id)?.publishedVersion ?? 0,
+    rules.find((rule) => selectedRule && sameRule(rule, selectedRule))
+      ?.publishedVersion ?? 0,
     selectedRule?.publishedVersion ?? 0,
   );
   const history = usePagedResource(
@@ -93,19 +83,17 @@ export function usePublishedExecution(
     history.offset === 0 ? (history.data.items[0]?.version ?? 0) : 0;
   // History can reveal a release the summaries do not show yet. It is kept
   // apart from the history key, so learning it does not read history again.
-  const [historyNewest, setHistoryNewest] = useState({ id: "", version: 0 });
+  const [historyNewest, setHistoryNewest] = useState(noRelease);
   useEffect(() => {
-    if (newestOnPage === 0) return;
+    if (newestOnPage === 0 || !selectedRule) return;
     setHistoryNewest((current) =>
-      current.id === id && current.version >= newestOnPage
-        ? current
-        : { id, version: newestOnPage },
+      newestKnownRelease(current, selectedRule, newestOnPage),
     );
-  }, [id, newestOnPage]);
+  }, [selectedRule, newestOnPage]);
   const newestVersion = Math.max(
     listedVersion,
     newestOnPage,
-    historyNewest.id === id ? historyNewest.version : 0,
+    knownVersion(historyNewest, selectedRule),
   );
   const version = pinnedVersion ?? (newestVersion || null);
   const loadVersion = (signal: AbortSignal) =>
@@ -130,6 +118,21 @@ export function usePublishedExecution(
     JSON.stringify([id, version, inputs, trace, timeoutMs]),
   );
   const { result, running, requestDurationMs } = execution;
+  // A version that no longer exists means the rule was deleted, or its history
+  // rewritten by a re-creation: forget it and choose again from a fresh page.
+  // A pin abandoned once keeps its error afterwards, so a stale library row
+  // cannot make the playground abandon and reselect it without end.
+  const gone = detail.status === 404 || execution.status === 404;
+  const abandoned = useRef<string | null>(null);
+  useEffect(() => {
+    const pin = `${id}:${version}`;
+    if (!gone || abandoned.current === pin) return;
+    abandoned.current = pin;
+    setSelectedRule(null);
+    setPinnedVersion(null);
+    setHistoryNewest(noRelease);
+    setRetry((value) => value + 1);
+  }, [gone, id, version]);
   const loadError = catalog.error || history.error || detail.error;
   const error = loadError || execution.error;
   const selectRule = (nextId: string) => {

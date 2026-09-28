@@ -6,6 +6,8 @@ import dev.arc.rule.RuleRepository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -110,10 +112,12 @@ public class JdbcRuleRepository implements RuleRepository {
     return jdbc.query("SELECT * FROM rules ORDER BY updated_at DESC, id", ruleMapper);
   }
 
+  /** The marker row is inserted once; a later claim changes no row and returns false. */
   @Override
-  public boolean hasRules() {
-    return Boolean.TRUE.equals(
-        jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM rules)", Boolean.class));
+  public boolean claimSampleSeeding() {
+    return jdbc.update(
+            "INSERT INTO workspace_seeds (name) VALUES ('rule-samples') ON CONFLICT DO NOTHING")
+        == 1;
   }
 
   @Override
@@ -153,7 +157,7 @@ public class JdbcRuleRepository implements RuleRepository {
 
   @Override
   public Rule get(String id) {
-    return find(id, false);
+    return find(id, "");
   }
 
   @Override
@@ -167,15 +171,35 @@ public class JdbcRuleRepository implements RuleRepository {
     return rows.getFirst();
   }
 
+  /**
+   * Compatible with the KEY SHARE locks that callers hold, so drafts pinning each other never
+   * deadlock.
+   */
   @Override
   public Rule lock(String id) {
-    return find(id, true);
+    return find(id, " FOR NO KEY UPDATE");
   }
 
-  private Rule find(String id, boolean lock) {
-    var rows =
-        jdbc.query(
-            "SELECT * FROM rules WHERE id = ?" + (lock ? " FOR UPDATE" : ""), ruleMapper, id);
+  /**
+   * Conflicts with every lock, including the KEY SHARE locks of a caller being saved or published.
+   */
+  @Override
+  public Rule lockForDeletion(String id) {
+    return find(id, " FOR UPDATE");
+  }
+
+  @Override
+  public void lockCallees(Collection<String> ruleIds) {
+    if (ruleIds.isEmpty()) return;
+    String placeholders = String.join(", ", Collections.nCopies(ruleIds.size(), "?"));
+    jdbc.query(
+        "SELECT id FROM rules WHERE id IN (" + placeholders + ") ORDER BY id FOR KEY SHARE",
+        (row, index) -> row.getString("id"),
+        ruleIds.toArray());
+  }
+
+  private Rule find(String id, String lock) {
+    var rows = jdbc.query("SELECT * FROM rules WHERE id = ?" + lock, ruleMapper, id);
     if (rows.isEmpty()) throw notFound(id);
     return rows.getFirst();
   }
@@ -214,7 +238,7 @@ public class JdbcRuleRepository implements RuleRepository {
   public Rule update(String id, String name, String description, Definition definition) {
     StoredText.requireStorable(name, description);
     jdbc.update(
-        "UPDATE rules SET name = ?, description = ?, draft = ?::jsonb, revision = revision + 1, updated_at = now() WHERE id = ?",
+        "UPDATE rules SET name = ?, description = ?, draft = ?::jsonb, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ?",
         name,
         description,
         encode(definition),
@@ -231,7 +255,7 @@ public class JdbcRuleRepository implements RuleRepository {
         version,
         encode(rule.draft()));
     jdbc.update(
-        "UPDATE rules SET published_version = ?, revision = revision + 1, updated_at = now() WHERE id = ?",
+        "UPDATE rules SET published_version = ?, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ?",
         version,
         rule.id());
     return get(rule.id());

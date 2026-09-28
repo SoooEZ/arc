@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import { kindLabel, kindDescription } from "../../types";
 import type { Rule } from "../../types";
+import type { DeletionRefusal } from "./useRuleDocument";
 export default function RuleSettings({
   rule,
   readOnly,
@@ -17,6 +18,7 @@ export default function RuleSettings({
   onClose,
   onDelete,
   canDelete = false,
+  deleting = false,
 }: {
   rule: Rule;
   readOnly: boolean;
@@ -24,16 +26,18 @@ export default function RuleSettings({
   onApply: (patch: Pick<Rule, "name" | "description">) => boolean;
   onClose: () => void;
   /** Offers deleting the rule; resolves to why the server kept it, or null. */
-  onDelete?: () => Promise<string | null>;
+  onDelete?: () => Promise<DeletionRefusal | null>;
   /** Whether a deletion may start now, e.g. no other command is running. */
   canDelete?: boolean;
+  /** A deletion is pending; the dialog stays open to show its outcome. */
+  deleting?: boolean;
 }) {
   const [name, setName] = useState(rule.name);
   const [description, setDescription] = useState(rule.description);
   return (
     <Dialog
       open
-      onClose={onClose}
+      onClose={deleting ? undefined : onClose}
       fullWidth
       maxWidth="sm"
       aria-labelledby="rule-settings-title"
@@ -80,11 +84,18 @@ export default function RuleSettings({
           </p>
         )}
         {onDelete && (
-          <DeleteRule rule={rule} onDelete={onDelete} allowed={canDelete} />
+          <DeleteRule
+            rule={rule}
+            onDelete={onDelete}
+            allowed={canDelete}
+            deleting={deleting}
+          />
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>{readOnly ? "Close" : "Cancel"}</Button>
+        <Button onClick={onClose} disabled={deleting}>
+          {readOnly && !deleting ? "Close" : "Cancel"}
+        </Button>
         {!readOnly && (
           <Button
             variant="contained"
@@ -110,21 +121,23 @@ function publishedVersions(latest: number): string {
 
 /**
  * Deleting cannot be undone, so it asks first. A published rule also asks for
- * its ID, because API clients call the rule by that ID.
+ * its ID, because API clients call the rule by that ID. While the deletion is
+ * pending nothing closes the dialog, so its outcome is always shown here.
  */
 function DeleteRule({
   rule,
   onDelete,
   allowed,
+  deleting,
 }: {
   rule: Rule;
-  onDelete: () => Promise<string | null>;
+  onDelete: () => Promise<DeletionRefusal | null>;
   allowed: boolean;
+  deleting: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [typedId, setTypedId] = useState("");
-  const [deleting, setDeleting] = useState(false);
-  const [refusal, setRefusal] = useState("");
+  const [refusal, setRefusal] = useState<DeletionRefusal | null>(null);
   const published = rule.publishedVersion;
   if (!confirming)
     return (
@@ -142,15 +155,12 @@ function DeleteRule({
   const cancel = () => {
     setConfirming(false);
     setTypedId("");
-    setRefusal("");
+    setRefusal(null);
   };
   const confirm = async () => {
-    setDeleting(true);
-    setRefusal("");
+    setRefusal(null);
     // On success the editor leaves for the library and this dialog closes.
-    const reason = await onDelete();
-    setDeleting(false);
-    if (reason) setRefusal(reason);
+    setRefusal(await onDelete());
   };
   return (
     <section className="rule-settings-danger" aria-label="Delete rule">
@@ -168,7 +178,21 @@ function DeleteRule({
           fullWidth
         />
       )}
-      {refusal && <Alert severity="error">{refusal}</Alert>}
+      {refusal && (
+        <Alert severity="error">
+          {refusal.message}
+          {refusal.callers.length > 0 && (
+            <ul
+              className="rule-settings-callers"
+              aria-label="Rules calling this rule"
+            >
+              {refusal.callers.map((caller) => (
+                <li key={caller}>{caller}</li>
+              ))}
+            </ul>
+          )}
+        </Alert>
+      )}
       <div className="rule-settings-danger-actions">
         <Button onClick={cancel} disabled={deleting}>
           Keep rule
@@ -176,7 +200,9 @@ function DeleteRule({
         <Button
           color="error"
           variant="contained"
-          disabled={!allowed || (!!published && typedId !== rule.id)}
+          disabled={
+            !allowed || deleting || (!!published && typedId !== rule.id)
+          }
           onClick={() => void confirm()}
         >
           {deleting ? "Deleting…" : "Delete rule"}

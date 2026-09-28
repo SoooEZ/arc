@@ -8,6 +8,7 @@ import dev.arc.model.Definition;
 import dev.arc.model.Definition.Node;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /** Coordinates draft shape, executable graph checks and editor diagnostics. */
@@ -62,11 +63,14 @@ public class Validator {
   }
 
   /**
-   * Rules a stored draft or version calls, like {@link #dependencies}, except that a malformed
-   * expression calls nothing instead of failing: a draft may be unfinished.
+   * The IDs of every rule a stored draft or version names: each well-formed {@code @id:version}
+   * call in any node or input source mapping, and each Reference's rule with or without a version.
+   * Unlike {@link #dependencies}, an unfinished draft counts in full: a Reference may have chosen
+   * its rule before its version, source mappings call rules even while the draft has no Input node,
+   * and a malformed expression calls nothing instead of failing.
    */
-  public static List<Dependency> draftDependencies(Definition definition) {
-    return NodeValidation.dependencies(definition, Validator::wellFormedFormulaCalls);
+  public static Set<String> calledRuleIds(Definition definition) {
+    return NodeValidation.calledRuleIds(definition, Validator::wellFormedFormulaCalls);
   }
 
   private static List<Expressions.FormulaCall> wellFormedFormulaCalls(String source) {

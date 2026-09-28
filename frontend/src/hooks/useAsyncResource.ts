@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { errorMessage } from "../api/errors";
+import { ApiError, errorMessage } from "../api/errors";
 interface Resource<T> {
   data: T;
   error: string;
+  /** The HTTP status behind `error`, when the failure was an API response. */
+  status: number | null;
   loading: boolean;
 }
 interface ResourceOptions {
@@ -25,7 +27,7 @@ export function useAsyncResource<T>(
   latest.current = load;
   const [state, setState] = useState<
     Resource<T> & { key: string; enabled: boolean }
-  >({ key, enabled, data: initial, error: "", loading: enabled });
+  >({ key, enabled, data: initial, error: "", status: null, loading: enabled });
   const keepData = keepPrevious && enabled;
   useEffect(() => {
     const controller = new AbortController();
@@ -34,6 +36,7 @@ export function useAsyncResource<T>(
       enabled,
       data: keepData ? previous.data : initial,
       error: "",
+      status: null,
       loading: enabled,
     }));
     if (!enabled) return;
@@ -42,7 +45,14 @@ export function useAsyncResource<T>(
         .current(controller.signal)
         .then((data) => {
           if (!controller.signal.aborted)
-            setState({ key, enabled, data, error: "", loading: false });
+            setState({
+              key,
+              enabled,
+              data,
+              error: "",
+              status: null,
+              loading: false,
+            });
         })
         .catch((error) => {
           if (!controller.signal.aborted)
@@ -51,6 +61,7 @@ export function useAsyncResource<T>(
               enabled,
               data: initial,
               error: errorMessage(error),
+              status: error instanceof ApiError ? (error.status ?? null) : null,
               loading: false,
             });
         });
@@ -65,6 +76,7 @@ export function useAsyncResource<T>(
   return {
     data: keepData ? state.data : initial,
     error: "",
+    status: null,
     loading: enabled,
   };
 }

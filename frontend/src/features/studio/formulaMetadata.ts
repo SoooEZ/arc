@@ -7,18 +7,27 @@ export interface FormulaReads {
   rule(
     id: string,
     signal: AbortSignal,
-  ): Promise<Pick<RuleSummary, "kind" | "name">>;
+  ): Promise<Pick<RuleSummary, "kind" | "name" | "createdAt">>;
   version(id: string, version: number, signal: AbortSignal): Promise<Version>;
   search(query: string, signal: AbortSignal): Promise<Page<RuleSummary>>;
 }
 
+/** A cached pin remembers which incarnation of the rule it was read from. */
+interface CachedFormula extends FormulaEntry {
+  createdAt: string;
+}
+
 /**
  * Input metadata of published Formula versions for `@` completion, hover and
- * insertion. An id:version pin is immutable, so one bounded cache serves every
- * editor on the page. Only completed reads are kept; an aborted read is dropped.
+ * insertion. An id:version pin is immutable while its rule lives, so one
+ * bounded cache serves every editor on the page. A deleted ID can be created
+ * again with other inputs, so an entry serves only the incarnation it was read
+ * from: every load checks the rule's creation time, from the catalog summary
+ * when the caller has one and from one rule read otherwise. Only completed
+ * reads are kept; an aborted read is dropped.
  */
 export class FormulaMetadata {
-  private readonly entries = new Map<string, FormulaEntry>();
+  private readonly entries = new Map<string, CachedFormula>();
 
   constructor(
     private readonly reads: FormulaReads,
@@ -33,23 +42,24 @@ export class FormulaMetadata {
   ): Promise<FormulaEntry> {
     const key = `${id}:${version}`;
     const cached = this.entries.get(key);
-    if (cached) {
+    const rule = summary ?? (await this.reads.rule(id, signal));
+    if (cached && cached.createdAt === rule.createdAt) {
       // A display name can change after publication; a fresh summary wins.
-      const current = summary ? { ...cached, name: summary.name } : cached;
+      const current = { ...cached, name: rule.name };
       this.remember(key, current);
       return current;
     }
-    const rule = summary ?? (await this.reads.rule(id, signal));
     if (rule.kind !== "FORMULA")
       throw new Error(
         "Only published Formula rules can be called in an expression.",
       );
     const published = await this.reads.version(id, version, signal);
-    const formula: FormulaEntry = {
+    const formula: CachedFormula = {
       id,
       name: rule.name,
       version,
       inputs: published.definition.inputs,
+      createdAt: rule.createdAt,
     };
     if (!signal.aborted) this.remember(key, formula);
     return formula;
@@ -70,8 +80,14 @@ export class FormulaMetadata {
     );
   }
 
+  /** Drops every version of a rule deleted in this page, ahead of any later check. */
+  forget(id: string): void {
+    for (const key of [...this.entries.keys()])
+      if (key.startsWith(`${id}:`)) this.entries.delete(key);
+  }
+
   /** Least recently used entries leave first. */
-  private remember(key: string, formula: FormulaEntry) {
+  private remember(key: string, formula: CachedFormula) {
     this.entries.delete(key);
     this.entries.set(key, formula);
     if (this.entries.size <= this.capacity) return;

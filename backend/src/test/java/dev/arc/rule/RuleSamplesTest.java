@@ -13,17 +13,19 @@ class RuleSamplesTest {
   private final RuleService service = mock(RuleService.class);
   private final RuleSamples samples = new RuleSamples(store, service);
 
+  /** A workspace seeded before, even one whose rules were all deleted since, is left alone. */
   @Test
-  void startupNeverLoadsStoredRulesToDecideWhetherToSeed() {
-    when(store.hasRules()).thenReturn(true);
+  void aRefusedClaimSeedsNothingAndNeverLoadsStoredRules() {
+    when(store.claimSampleSeeding()).thenReturn(false);
     samples.run(null);
-    verify(store).hasRules();
+    verify(store).claimSampleSeeding();
     verifyNoMoreInteractions(store);
     verifyNoInteractions(service);
   }
 
   @Test
-  void anEmptyDatabaseReceivesThePublishedExamples() {
+  void aNewWorkspaceReceivesThePublishedExamples() {
+    when(store.claimSampleSeeding()).thenReturn(true);
     when(store.create(anyString(), anyString(), anyString(), anyString(), any()))
         .thenAnswer(
             call ->

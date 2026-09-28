@@ -313,7 +313,30 @@ try:
     request("OPTIONS", "/api/rules/" + caller["id"], headers={"Origin": "https://example.com",
             "Access-Control-Request-Method": "DELETE"})
     delete(caller["id"], headers={"Origin": "https://example.com"})
-    delete(callee["id"])
+    # An unfinished draft keeps the rules it names: a Reference without a version, and a source
+    # mapping that calls the rule while the draft has no Input node.
+    unpinned = copy.deepcopy(calling)
+    unpinned["nodes"][1]["version"] = None
+    unpinned_caller = create("delete-unpinned", "DECISION_TREE", unpinned)
+    assert delete(callee["id"], 409)["issues"] == [unpinned_caller["id"] + " (draft)"]
+    delete(unpinned_caller["id"])
+    sourced = {"schemaVersion": 1,
+               "inputs": [{"name": "amount", "type": "NUMBER", "required": True, "defaultValue": None,
+                           "source": {"id": "country-tax", "version": 1, "onError": "FAIL", "pointer": "/rate",
+                                      "bindings": {"key": '$TO_STRING(@' + callee["id"] + ':1(1))'}}}],
+               "nodes": [{"id": "out", "type": "OUTPUT", "label": "Result", "expression": "amount"}],
+               "edges": []}
+    sourced_caller = create("delete-sourced", definition=sourced)
+    assert delete(callee["id"], 409)["issues"] == [sourced_caller["id"] + " (draft)"]
+    delete(sourced_caller["id"])
+    # The revision a client read is a precondition: a rule published since then is kept.
+    before_publish = request("GET", "/api/rules/" + callee["id"])
+    callee = save(before_publish)
+    callee = publish(callee)
+    assert "changed in another editor" in request("DELETE", "/api/rules/" + callee["id"] + "?revision=" + str(before_publish["revision"]), expected=409)["message"]
+    assert execute(callee["id"], {"amount": 100}, 1)["result"] == 90
+    request("DELETE", "/api/rules/" + callee["id"] + "?revision=" + str(callee["revision"]), expected=204)
+    created.remove(callee["id"])
     request("GET", "/api/rules/" + callee["id"], expected=404)
     execute(callee["id"], {"amount": 100}, 1, expected=404)
     delete(callee["id"], 404)
@@ -322,6 +345,36 @@ try:
     halving["nodes"][1]["expression"] = "amount * 0.5"
     recreated = publish(create("delete-callee", definition=halving))
     assert execute(recreated["id"], {"amount": 100}, 1)["result"] == 50
+    # Revisions come from one sequence, so an editor still holding the deleted rule cannot overwrite it.
+    assert recreated["revision"] > callee["revision"]
+    save(dict(callee, name="Stale editor"), expected=409)
+    assert request("GET", "/api/rules/" + recreated["id"])["name"] == recreated["name"]
+
+    # A deletion and the publication of a new caller never both succeed: the callee's lock is
+    # held by whichever write commits first, and the other sees its outcome.
+    for attempt in range(4):
+        racing_callee = publish(create(f"race-callee-{attempt}"))
+        racing_caller = create(f"race-caller-{attempt}")
+        call = copy.deepcopy(racing_caller["draft"])
+        call["nodes"][1]["expression"] = "@" + racing_callee["id"] + ":1(amount)"
+        def publish_caller():
+            saved = save(dict(racing_caller, draft=call))
+            return raw_request("POST", "/api/rules/" + saved["id"] + "/publish", {"revision": saved["revision"]})
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            deletion = executor.submit(raw_text_request, "DELETE", "/api/rules/" + racing_callee["id"], "")
+            publication = executor.submit(publish_caller)
+            delete_status, _ = deletion.result()
+            publish_status, publish_text = publication.result()
+        caller_published = publish_status == 200
+        assert not (delete_status == 204 and caller_published), (delete_status, publish_status, publish_text[:200])
+        if caller_published:
+            assert delete_status == 409
+            assert execute(racing_caller["id"], {"amount": 100}, 1)["result"] == 90
+        delete(racing_caller["id"])
+        if delete_status == 204:
+            created.remove(racing_callee["id"])
+        else:
+            delete(racing_callee["id"])
 
     # Row locks + revision checks allow exactly one competing update.
     race = create("concurrent")

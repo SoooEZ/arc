@@ -178,3 +178,46 @@ test("a variable scope that finishes loading leaves an open formula suggestion l
   await expect(suggestion(page, callee)).toBeVisible();
   expect(traffic.searches).toBe(searches);
 });
+
+test("a formula created again under a deleted ID offers its new parameters without a reload", async ({
+  page,
+  request,
+}) => {
+  const { callee, caller } = await fixtures(request);
+  await page.goto(`/#/rules/${caller}?node=calc`);
+  const expression = page.getByLabel("Expression", { exact: true });
+  await setEditorText(page, expression, "");
+  await page.keyboard.type(`@${callee}`);
+  await expect(suggestion(page, callee)).toContainText("amount: number");
+  await page.keyboard.press("Escape");
+
+  // Deleted and created again elsewhere with another contract, then published.
+  expect((await request.delete(`/api/rules/${callee}`)).status()).toBe(204);
+  const recreated = await request.post("/api/rules", {
+    data: {
+      id: callee,
+      name: "Recreated formula",
+      kind: "FORMULA",
+      definition: definition("amount", [
+        {
+          name: "country",
+          type: "STRING",
+          required: true,
+          defaultValue: "US",
+        },
+        { name: "amount", type: "NUMBER", required: true, defaultValue: 100 },
+      ]),
+    },
+  });
+  expect(recreated.status()).toBe(201);
+  const rule: Rule = await recreated.json();
+  const published = await request.post(`/api/rules/${callee}/publish`, {
+    data: { revision: rule.revision },
+  });
+  expect(published.ok()).toBeTruthy();
+
+  await setEditorText(page, expression, "");
+  await page.keyboard.type(`@${callee}`);
+  await expect(suggestion(page, callee)).toContainText("country: string");
+  await page.keyboard.press("Escape");
+});
