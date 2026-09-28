@@ -12,6 +12,8 @@ import dev.arc.model.SourceDefinition;
 import dev.arc.model.SourceSummary;
 import dev.arc.model.SourceVersionSummary;
 import dev.arc.source.lookup.LookupSourceAdapter;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,12 +74,36 @@ class SourceConfigurationConsistencyTest {
         .isInstanceOf(UnsupportedOperationException.class);
   }
 
+  @Test
+  void lookupEntriesOutsideTheNumberBoundsAreRejectedBeforeTheyCanBeStored() {
+    // Both passed the bound before: the zero because stripping its zeros leaves a plain 0, and
+    // the integer because only decimals were bounded. Executions then failed with 500 or 422.
+    for (Object rate : List.of(new BigDecimal("0E-1500"), new BigInteger("9".repeat(150))))
+      assertThatThrownBy(
+              () ->
+                  service.create(
+                      new SourceService.Create("tax", "Tax", tax(null, Map.of("rate", rate)))))
+          .as(rate.toString())
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.status()).isEqualTo(422);
+                assertThat(error.getMessage())
+                    .isEqualTo("Number exceeds supported precision or magnitude");
+              });
+    assertThat(repository.stored).isEmpty();
+  }
+
   private static SourceDefinition tax(Map<String, String> secretHeaders) {
+    return tax(secretHeaders, Map.of("rate", 0.07));
+  }
+
+  private static SourceDefinition tax(Map<String, String> secretHeaders, Map<String, Object> us) {
     return new SourceDefinition(
         "LOOKUP",
         null,
         List.of(new Input("key", "STRING", true, null)),
-        Map.of("US", Map.of("rate", 0.07)),
+        Map.of("US", us),
         secretHeaders,
         3000);
   }

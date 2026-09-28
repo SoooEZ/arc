@@ -30,7 +30,7 @@ final class ExcelFunctionAdapter {
         return emptyRangeResult(name, args);
       checkArgumentBounds(name, args);
       ValueEval[] values = args.stream().map(ExcelFunctionAdapter::value).toArray(ValueEval[]::new);
-      ExcelWildcards.checkMatchingWork(name, args);
+      ExcelMatchingWork.checkMatchingWork(name, args);
       return converted(inExcelLocale(() -> calculate(name, metadata, values)), name);
     } catch (ArcException e) {
       throw e;

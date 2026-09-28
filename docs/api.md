@@ -122,6 +122,15 @@ The current release has no batch endpoint, run-history storage, or authenticatio
 
 See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults. Entries appear in read order: an input's source dependencies are read first, in declaration order.
 
+## Behavior changes from the second review
+
+These changes shipped with [the second full review](reviews/2026-09-27-second-review.md), after the ones listed in the next section. As there, graph JSON, ARC Script, stored versions and pins are unchanged; results changed because the earlier behavior was a defect.
+
+**Errors and limits**
+
+- A zero written with more than 100 decimal places or an exponent beyond ±100 (`0e-101`, `0.00 ^ 100`) fails with `422` "Number exceeds supported precision or magnitude" like any other out-of-range number, wherever numbers are bounded: literals, `$TO_NUMBER`, operator results, inputs, defaults, lookup entries and HTTP responses. Such zeros passed every bound before; `$TO_STRING` of one could allocate gigabytes, and one with more than 9,999 decimal places answered `500`. Integers with more than 100 significant digits in ARRAY/OBJECT values, lookup entries and HTTP responses fail the same way at save, Test or read, as decimals already did; `1E+100` and its 101-digit stored spelling keep working. A stored draft or version holding such a value fails until it is fixed.
+- POI's number parsing is bounded like its wildcard matching: `$COUNTIF`/`$SUMIF` with a numeric criterion (`5`, `"5"`, `"=5"`), `$CORREL`, `$COVAR`, `$PEARSON` and `$FORECAST` over text cells that would need more than 10,000,000 character comparisons to parse fail with `422` "NAME: numeric text needs more than 10,000,000 character comparisons; use shorter text" before POI runs, instead of holding a request thread past the deadline.
+
 ## Behavior changes in this revision
 
 These changes shipped with [the 2026-09-27 full review](reviews/2026-09-27-full-review.md). Graph JSON, the ARC Script text of complete graphs, stored versions and pins are unchanged; results listed here changed because the earlier behavior was a defect. Changes that editors see are listed in [the studio guide](studio.md#behavior-changes-in-this-revision).

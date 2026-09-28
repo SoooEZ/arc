@@ -14,7 +14,9 @@ test("numeric defaults retain values across decimal and JSON notation", () => {
     [".50", 0.5],
     ["5.", 5],
     ["1.2500e+3", 1250],
+    // Every zero is the double 0, so the draft saves the token 0 whatever the exponent.
     ["-0.00e1000000", -0],
+    ["0e-101", 0],
     ["9007199254740992", 9007199254740992],
     ["100000000000000000000", 1e20],
     ["1e-7", 1e-7],

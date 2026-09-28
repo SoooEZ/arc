@@ -72,10 +72,11 @@ function withinServerLimits(token: string): boolean {
   const parts = decimalParts(token);
   if (!parts) return false;
   const digits = (parts.integer + parts.fraction).replace(/^0+/, "");
-  if (!digits) return true; // Zero
   // Precision counts the significant digits; scale counts decimal places.
   const precision = BigInt(digits.length);
   const scale = BigInt(parts.fraction.length) - parts.exponent;
+  // A zero has no digits to strip, so its scale counts as written.
+  if (!digits) return -maxScale <= scale && scale <= maxScale;
   const trailingZeros = BigInt(
     digits.length - digits.replace(/0+$/, "").length,
   );

@@ -5,6 +5,7 @@ import copy
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -34,8 +35,13 @@ def request(method, path, body=None, expected=200, headers=None):
 
 def raw_request(method, path, body):
     """Status and body text, for checks that the parsed JSON would hide (such as 1E+2 == 100)."""
+    return raw_text_request(method, path, json.dumps(body))
+
+
+def raw_text_request(method, path, text):
+    """Sends JSON text as written, for number tokens Python's json module would rewrite (0e-1500)."""
     global checks
-    req = urllib.request.Request(BASE + path, data=json.dumps(body).encode(), method=method,
+    req = urllib.request.Request(BASE + path, data=text.encode(), method=method,
                                  headers={"Content-Type": "application/json"})
     try:
         response = urllib.request.urlopen(req, timeout=20)
@@ -270,6 +276,27 @@ try:
     assert big_default["draft"]["inputs"][0]["defaultValue"] == 10 ** 100
     big_default = save(big_default)
     assert request("POST", "/api/preview", {"definition": big_default["draft"], "inputs": {}})["result"] == 10 ** 100
+    # A zero's scale counts as written: 0e-1500 has no digits to strip and would print as 1,500 characters.
+    zero_graph = copy.deepcopy(big_graph)
+    zero_graph["inputs"][0]["defaultValue"] = "ZERO_TOKEN"
+    zero_body = json.dumps({"id": PREFIX + "-zero-default", "name": "Smoke zero", "description": "",
+                            "kind": "FORMULA", "definition": zero_graph}).replace('"ZERO_TOKEN"', "0e-1500")
+    status, text = raw_text_request("POST", "/api/rules", zero_body)
+    assert status == 422 and "precision or magnitude" in text, (status, text[:200])
+    request("GET", "/api/rules/" + PREFIX + "-zero-default", expected=404)
+
+    # POI's number parser backtracks on long digit text; ARC rejects the call before POI runs.
+    digit_text = {"schemaVersion": 1,
+                  "inputs": [{"name": "items", "type": "ARRAY", "required": True}],
+                  "nodes": [{"id": "input", "type": "INPUT", "label": "Inputs"},
+                            {"id": "out", "type": "OUTPUT", "label": "Result",
+                             "expression": '$MAP([$CONCAT($REPT("1", 1999), "x")], s, $COUNTIF($MAP(items, i, s), 5))'}],
+                  "edges": [{"id": "next", "source": "input", "target": "out", "sourceHandle": "next"}]}
+    started = time.monotonic()
+    rejected = request("POST", "/api/preview", {"definition": digit_text, "inputs": {"items": list(range(20))},
+                                                "timeoutMs": 100}, 422)
+    assert "numeric text needs more than" in rejected["message"], rejected
+    assert time.monotonic() - started < 1.5, "the call must fail before POI parses the text"
 
     # A rule that other rules call is kept; once none does, it goes with every version.
     callee = publish(create("delete-callee"))

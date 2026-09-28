@@ -4,6 +4,7 @@ import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.Limits;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.*;
 
@@ -98,14 +99,21 @@ public final class Expressions {
   }
 
   public static BigDecimal number(Object value) {
-    if (!(value instanceof Number))
+    if (!(value instanceof Number n))
       throw ArcException.invalid("Expected a number, got " + type(value));
-    try {
-      return (BigDecimal)
-          bounded(value instanceof BigDecimal b ? b : new BigDecimal(value.toString()));
-    } catch (NumberFormatException e) {
-      throw ArcException.invalid("Invalid numeric value");
+    return (BigDecimal) bounded(decimal(n));
+  }
+
+  /** The decimal value of any number ARC meets: JSON integers, POI doubles and decimals. */
+  private static BigDecimal decimal(Number value) {
+    if (value instanceof BigDecimal decimal) return decimal;
+    if (value instanceof BigInteger integer) return new BigDecimal(integer);
+    if (value instanceof Double || value instanceof Float) {
+      double d = value.doubleValue();
+      if (!Double.isFinite(d)) throw ArcException.invalid("Number must be finite");
+      return BigDecimal.valueOf(d);
     }
+    return BigDecimal.valueOf(value.longValue());
   }
 
   public static boolean bool(Object value) {
@@ -122,15 +130,8 @@ public final class Expressions {
   private static void bound(Object value, int depth, int[] count) {
     if (depth > Limits.MAX_VALUE_DEPTH || ++count[0] > Limits.MAX_VALUE_ELEMENTS)
       throw ArcException.invalid("Value exceeds collection depth or size limit");
-    if (value instanceof BigDecimal n) {
-      // The limits apply to the number, not to how it is written: PostgreSQL JSONB stores 1E+100
-      // as a 101-digit integer. Accepted decimals stay below 1E+201 and so are finite as doubles;
-      // that conversion is slow for 34-digit quotients, and every operand passes through here.
-      if (exceedsDecimalLimits(n) && exceedsDecimalLimits(n.stripTrailingZeros()))
-        throw ArcException.invalid("Number exceeds supported precision or magnitude");
-    } else if (value instanceof Number n && !Double.isFinite(n.doubleValue())) {
-      throw ArcException.invalid("Number must be finite");
-    }
+    if (value instanceof Number n && exceedsDecimalLimits(decimal(n)))
+      throw ArcException.invalid("Number exceeds supported precision or magnitude");
     if (value instanceof String s && s.length() > Limits.MAX_STRING_CHARACTERS)
       throw ArcException.invalid(
           "String exceeds " + Limits.format(Limits.MAX_STRING_CHARACTERS) + " characters");
@@ -151,7 +152,19 @@ public final class Expressions {
     }
   }
 
+  /**
+   * The limits apply to the number, not to how it is written: PostgreSQL JSONB stores 1E+100 as a
+   * 101-digit integer. Accepted decimals stay below 1E+201 and so are finite as doubles; that
+   * conversion is slow for 34-digit quotients, and every operand passes through here. A zero has no
+   * digits to strip, so its scale counts as written: 0E-2000000000 would otherwise pass and print
+   * as two billion characters.
+   */
   private static boolean exceedsDecimalLimits(BigDecimal number) {
+    if (number.signum() == 0) return Math.abs((long) number.scale()) > Limits.MAX_NUMBER_SCALE;
+    return exceedsWrittenLimits(number) && exceedsWrittenLimits(number.stripTrailingZeros());
+  }
+
+  private static boolean exceedsWrittenLimits(BigDecimal number) {
     return number.precision() > Limits.MAX_NUMBER_PRECISION
         || Math.abs((long) number.scale()) > Limits.MAX_NUMBER_SCALE;
   }

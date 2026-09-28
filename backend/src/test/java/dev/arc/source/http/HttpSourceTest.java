@@ -3,7 +3,9 @@ package dev.arc.source.http;
 import static dev.arc.source.http.HttpDestinationPolicyTest.ipv6;
 import static org.assertj.core.api.Assertions.*;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dev.arc.engine.ExecutionDeadline;
@@ -198,6 +200,27 @@ class HttpSourceTest {
     try (var http = new HttpSource(new ObjectMapper(), "", "127.0.0.1")) {
       assertThat(query(fetch(http, config(base, 1000), inputs)))
           .isEqualTo("amount=1200&rounded=20&tiny=0.0000001&scaled=20.0&flag=true");
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void responseNumbersOutsideTheValueBoundsAreRejected() throws Exception {
+    var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/integer", exchange -> respond(exchange, 200, "{\"count\":" + "9".repeat(150) + "}"));
+    server.createContext("/zero", exchange -> respond(exchange, 200, "{\"count\":0e-1500}"));
+    server.start();
+    String base = "http://127.0.0.1:" + server.getAddress().getPort();
+    // The application's mapper reads JSON decimals as BigDecimal (application.yaml).
+    var responses =
+        JsonMapper.builder().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
+    try (var http = new HttpSource(responses, "", "127.0.0.1")) {
+      for (String path : List.of("/integer", "/zero"))
+        assertThatThrownBy(() -> fetch(http, config(base + path, 1000), Map.of()))
+            .as(path)
+            .hasMessage("Number exceeds supported precision or magnitude");
     } finally {
       server.stop(0);
     }

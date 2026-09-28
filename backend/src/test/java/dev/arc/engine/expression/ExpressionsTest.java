@@ -1,11 +1,14 @@
 package dev.arc.engine.expression;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.InputTypes;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -150,8 +153,56 @@ class ExpressionsTest {
           .isInstanceOf(ArcException.class)
           .hasMessage("Number must be finite");
     }
+    // A 401-digit integer is out of range like a 401-digit decimal, not "not finite".
     assertThatThrownBy(() -> Expressions.bounded(BigInteger.TEN.pow(400)))
-        .hasMessage("Number must be finite");
+        .hasMessage("Number exceeds supported precision or magnitude");
+  }
+
+  @Test
+  void zerosAreBoundedByTheirScaleAsWritten() {
+    // A zero has no digits to strip, so 0E-2000000000 passed every bound and printed as two
+    // billion characters.
+    for (String zero : List.of("0", "-0.0", "0.000", "0E-100", "0E+100"))
+      assertThat(Expressions.bounded(new BigDecimal(zero))).as(zero).isNotNull();
+    for (String zero : List.of("0E-101", "0E+101", "0E-2147483647"))
+      assertThatThrownBy(() -> Expressions.bounded(new BigDecimal(zero)))
+          .as(zero)
+          .hasMessage("Number exceeds supported precision or magnitude");
+    assertThatThrownBy(() -> InputTypes.check("x", "NUMBER", new BigDecimal("0E-10000")))
+        .hasMessage("Number exceeds supported precision or magnitude");
+    assertThatThrownBy(() -> Expressions.compile("0e-2147483647"))
+        .isInstanceOfSatisfying(
+            ArcException.class, error -> assertThat(error.status()).isEqualTo(422));
+    for (String expression :
+        List.of(
+            "$TO_STRING(((((0.0 ^ 100) ^ 100) ^ 100) ^ 100) ^ 10)",
+            "$CONCAT(\"\", 0e-2000000000)",
+            "$CONTAINS(\"x\", $TO_NUMBER(\"0e-2000000000\"))"))
+      assertTimeoutPreemptively(
+          Duration.ofSeconds(1),
+          () ->
+              assertThatThrownBy(() -> eval(expression))
+                  .as(expression)
+                  .isInstanceOfSatisfying(
+                      ArcException.class,
+                      error -> {
+                        assertThat(error.status()).isEqualTo(422);
+                        assertThat(error.getMessage())
+                            .contains("Number exceeds supported precision or magnitude");
+                      }));
+  }
+
+  @Test
+  void integersFollowTheDecimalBoundWhereverValuesAreBounded() {
+    // Jackson reads a JSON integer beyond a long as BigInteger; only decimals were bounded.
+    var beyondPrecision = new BigInteger("9".repeat(150));
+    assertThat(Expressions.bounded(BigInteger.TEN.pow(100))).isNotNull();
+    assertThat(Expressions.bounded(Map.of("a", BigInteger.TEN.pow(100)))).isNotNull();
+    assertThatThrownBy(() -> Expressions.bounded(Map.of("a", beyondPrecision)))
+        .hasMessage("Number exceeds supported precision or magnitude");
+    assertThatThrownBy(() -> InputTypes.check("v", "ARRAY", List.of(beyondPrecision)))
+        .hasMessage("Number exceeds supported precision or magnitude");
+    assertThat(Expressions.number(beyondPrecision.pow(0))).isEqualByComparingTo(BigDecimal.ONE);
   }
 
   @Test
