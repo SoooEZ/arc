@@ -42,6 +42,7 @@ import {
   type Capture,
 } from "./style-snapshot";
 import { setEditorText } from "./helpers/editor";
+import { createRule } from "./helpers/api";
 
 const directory = process.env.ARC_STYLE_SNAPSHOT_DIR ?? "";
 const recordHar = process.env.ARC_STYLE_HAR === "record";
@@ -270,8 +271,7 @@ async function ensureFixtures(request: APIRequestContext) {
   for (const rule of [nodeKinds, blockedRoutes, sourceReads, resultVariables]) {
     const existing = await request.get(`/api/rules/${rule.id}`);
     if (existing.ok()) continue;
-    const created = await request.post("/api/rules", { data: rule });
-    expect(created.ok(), await created.text()).toBeTruthy();
+    const created = await createRule(request, rule);
   }
 }
 
@@ -706,7 +706,7 @@ const scenarios: Scenario[] = [
         '{"amount": 50}',
       );
       await button(page, "Run test").click();
-      await expect(page.locator(".trace-branch.false")).toBeVisible();
+      await expect(page.locator(".trace-branch.fallback")).toBeVisible();
     },
   },
   {

@@ -11,9 +11,15 @@ type Layouter = InstanceType<typeof ELK>;
  * messages only, so a worker that fails to load, or throws, would leave a
  * layout pending forever and the document locked (lesson F8): the worker's
  * error events reject the pending layout, and the next Arrange starts a new
- * worker.
+ * worker. The worker holds ELK's heap, so it is released when it has been
+ * idle for a minute or when the editor closes, and the next Arrange starts
+ * another.
  */
 let current: { elk: Layouter; worker: Worker } | null = null;
+let idle: ReturnType<typeof setTimeout> | null = null;
+
+/** How long an idle worker is kept for the next Arrange. */
+const layoutWorkerIdleMs = 60_000;
 
 function start(): { elk: Layouter; worker: Worker } {
   let worker!: Worker;
@@ -27,7 +33,23 @@ function start(): { elk: Layouter; worker: Worker } {
   return { elk, worker };
 }
 
+/** Terminates the worker, if any; a layout in progress is not awaited by anyone. */
+export function releaseLayoutWorker(): void {
+  if (idle !== null) clearTimeout(idle);
+  idle = null;
+  if (!current) return;
+  void current.elk.terminateWorker();
+  current = null;
+}
+
+function releaseWhenIdle() {
+  if (idle !== null) clearTimeout(idle);
+  idle = setTimeout(releaseLayoutWorker, layoutWorkerIdleMs);
+}
+
 export const layoutInWorker: ElkLayout = (graph) => {
+  if (idle !== null) clearTimeout(idle);
+  idle = null;
   const instance = (current ??= start());
   return new Promise((resolve, reject) => {
     const fail = (message: string) => {
@@ -45,6 +67,7 @@ export const layoutInWorker: ElkLayout = (graph) => {
       (result) => {
         instance.worker.removeEventListener("error", onError);
         instance.worker.removeEventListener("messageerror", onError);
+        if (current === instance) releaseWhenIdle();
         resolve(result);
       },
       (failure) => {

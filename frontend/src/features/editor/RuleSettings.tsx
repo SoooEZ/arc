@@ -8,8 +8,8 @@ import {
   DialogTitle,
   TextField,
 } from "@mui/material";
-import { kindLabel, kindDescription } from "../../types";
 import { ruleMetadataProblem } from "../../domain/limits";
+import { ruleKinds } from "../../domain/ruleKinds";
 import type { Rule } from "../../types";
 import type { DeletionRefusal } from "./useRuleDocument";
 export default function RuleSettings({
@@ -35,6 +35,10 @@ export default function RuleSettings({
 }) {
   const [name, setName] = useState(rule.name);
   const [description, setDescription] = useState(rule.description);
+  // The server's own rule, shown under the field it refuses (lesson F28).
+  const problem = ruleMetadataProblem({ name, description });
+  const problemOf = (field: "name" | "description") =>
+    problem?.field === field ? problem.message : null;
   return (
     <Dialog
       open
@@ -51,6 +55,8 @@ export default function RuleSettings({
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={readOnly}
+          error={!readOnly && !!problemOf("name")}
+          helperText={readOnly ? undefined : problemOf("name")}
           fullWidth
         />
         <TextField
@@ -60,15 +66,17 @@ export default function RuleSettings({
           multiline
           rows={4}
           disabled={readOnly}
+          error={!readOnly && !!problemOf("description")}
+          helperText={readOnly ? undefined : problemOf("description")}
           fullWidth
         />
         <div className="read-only-field">
           <span>Rule type</span>
-          <strong>{kindLabel[rule.kind]}</strong>
+          <strong>{ruleKinds[rule.kind].label}</strong>
         </div>
         <p className="muted-copy">
-          {kindDescription[rule.kind]} All types support the same graph nodes
-          and execution engine.
+          {ruleKinds[rule.kind].description} All types support the same graph
+          nodes and execution engine.
         </p>
         <div className="read-only-field">
           <span>API identifier</span>
@@ -100,7 +108,7 @@ export default function RuleSettings({
         {!readOnly && (
           <Button
             variant="contained"
-            disabled={!!ruleMetadataProblem({ name, description })}
+            disabled={problem !== null}
             onClick={() => {
               if (onApply({ name, description })) onClose();
             }}

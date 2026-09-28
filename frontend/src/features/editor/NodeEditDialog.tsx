@@ -12,6 +12,10 @@ import {
 import { X } from "lucide-react";
 import type { Rule } from "../../types";
 import { patchGraphNode, type DefinitionChange } from "../../domain/graph";
+import {
+  unsavedDialogWarning,
+  useNavigationGuard,
+} from "../../app/navigationGuards";
 import NodeForm from "./inspector/NodeForm";
 import NodeIdentity from "./inspector/NodeIdentity";
 import { applyNodeFormDraft } from "./nodeFormDraft";
@@ -43,17 +47,23 @@ export default function NodeEditDialog({
   >({});
   const [error, setError] = useState("");
   const node = draft.nodes.find((candidate) => candidate.id === nodeId)!;
+  // Staged edits leave with the editor: a route change asks first (lesson F23).
+  useNavigationGuard(draft !== before ? unsavedDialogWarning : null);
   const hasInvalidDefaults = Object.values(invalidDefaults).some(Boolean);
   const onInvalidDefault = useCallback((key: string, invalid: boolean) => {
     setInvalidDefaults((current) =>
       current[key] === invalid ? current : { ...current, [key]: invalid },
     );
   }, []);
-  const changeDraft = (change: DefinitionChange) => {
-    if (readOnly) return;
-    setDraft(change);
-    setError("");
-  };
+  // Stable: the form's memoized fields receive it on every keystroke.
+  const changeDraft = useCallback(
+    (change: DefinitionChange) => {
+      if (readOnly) return;
+      setDraft(change);
+      setError("");
+    },
+    [readOnly],
+  );
   const apply = () => {
     if (readOnly || hasInvalidDefaults) return;
     if (!applyNodeFormDraft(rule.draft, before, draft, nodeId)) {

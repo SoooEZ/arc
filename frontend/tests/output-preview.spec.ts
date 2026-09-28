@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 function fanOutDefinition(): Definition {
   return {
@@ -67,11 +68,13 @@ function fanOutDefinition(): Definition {
 }
 
 async function create(request: APIRequestContext, definition: Definition) {
-  const id = `output-preview-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Output return preview", kind: "RULE", definition },
+  const id = uniqueId("output-preview");
+  await createRule(request, {
+    id,
+    name: "Output return preview",
+    kind: "RULE",
+    definition,
   });
-  expect(created.ok(), await created.text()).toBeTruthy();
   return id;
 }
 

@@ -11,6 +11,7 @@ import {
   renderCounts,
   resetRenderCounts,
 } from "./helpers/renderProbe";
+import { createRule, uniqueId } from "./helpers/api";
 
 /** A chain of `count` nodes: Input, Formulas, one Output. */
 function chain(count: number): Definition {
@@ -53,11 +54,13 @@ async function create(
   prefix: string,
   definition: Definition,
 ) {
-  const id = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId(`${prefix}`);
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok(), await created.text()).toBeTruthy();
   return id;
 }
 

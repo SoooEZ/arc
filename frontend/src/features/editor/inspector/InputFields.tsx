@@ -1,6 +1,6 @@
 import { Button, Tooltip } from "@mui/material";
 import { Plus } from "lucide-react";
-import { inputVariables } from "../../../domain/graph";
+import { inputVariables } from "../../../domain/variables";
 import { canAddInput, MAX_INPUTS } from "../../../domain/limits";
 import InputParameterCard from "./InputParameterCard";
 import { useInputParameterRows } from "./useInputParameterRows";

@@ -383,3 +383,9 @@ These editor changes shipped with [the 2026-09-27 full review](reviews/2026-09-2
 
 - Programming ligatures are off on every code surface: canvas previews, JSON fields, code blocks and studio chips. Library preview node colors now match the canvas node colors, with one color token per node kind.
 - Second review, Phase 6: a Switch's Default connection draws in the same fallback colours as a Condition's False connection, and a Switch step in the execution trace shows the case it took as a badge (its label, or *Default*). The four symbol-role colours, the canvas colour behind connection labels and the preview arrowhead read design tokens, so the Monaco theme, the colour key and the Available variables list cannot drift apart. Focusing a card centres it on its own size, so a wide Switch is no longer cut off at the right.
+
+**Frontend review (2026-09-28)**
+
+- A connection dropped on a draft that already holds 200 says so, and a drop the draft would refuse (a loop, a duplicate, the limit) is marked as refused while the handle is dragged. Rule settings show the server's name and description rules under the field they concern. A default value beyond the server's value bounds (2,000 characters, 1,000 items or fields, 10,000 elements, depth 8) is refused at the field in the server's words.
+- Trace badges name only real exits: True, False, Default and a case's label; a plain step shows no "next" pill. In code, `at (x, y)` keeps its keyword colour, and an identifier spelled like a type (`number`) stays plain outside a declaration.
+- A link to a node the rule does not have shows the whole graph. Back asks before dropping staged edits in the node, node-code and expression dialogs. A source renamed in the manager shows its new name on every card bound to it. The Reference picker and the API playground follow a rule created again under a deleted ID. Library search shows its loading state while you type.

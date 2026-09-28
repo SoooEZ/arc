@@ -68,7 +68,6 @@ export function useLibraryInsertion() {
   return {
     busy: state.busy,
     error: state.error,
-    run,
     onCardClick,
     cancel,
     dismissError,

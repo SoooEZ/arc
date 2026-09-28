@@ -5,7 +5,11 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import { createRule as createApiRule } from "./helpers/api";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueId,
+} from "./helpers/api";
 
 const basic: Definition = {
   schemaVersion: 1,
@@ -30,18 +34,14 @@ async function createRule(
   prefix: string,
   definition: Definition = basic,
 ) {
-  const id = `${prefix}-${Date.now()}`;
+  const id = uniqueId(prefix);
   await createApiRule(request, { id, name: `Resilience ${id}`, definition });
   return id;
 }
 
 async function publish(request: APIRequestContext, id: string) {
   const rule = (await (await request.get(`/api/rules/${id}`)).json()) as Rule;
-  const published = await request.post(`/api/rules/${id}/publish`, {
-    data: { revision: rule.revision },
-  });
-  expect(published.ok()).toBeTruthy();
-  return (await published.json()) as Rule;
+  return publishRule(request, rule);
 }
 
 const card = (page: Page, id: string) =>

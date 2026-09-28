@@ -17,7 +17,7 @@ import { ruleMetadataProblem } from "../domain/limits";
 import { isResourceId, suggestedRuleId } from "../domain/resourceIds";
 import ResourceIdField from "../components/ResourceIdField";
 import type { Kind, Rule } from "../types";
-import { kindDescription, kindLabel } from "../types";
+import { kinds, ruleKinds } from "../domain/ruleKinds";
 export default function CreateRuleDialog({
   onClose,
   onCreated,
@@ -35,12 +35,10 @@ export default function CreateRuleDialog({
   const [createError, setCreateError] = useState("");
   // The server's own rule, so a long name is refused here, not by a 422.
   const metadataProblem = ruleMetadataProblem({ name, description });
-  const nameProblem = metadataProblem?.startsWith("Rule name")
-    ? metadataProblem
-    : null;
-  const descriptionProblem = metadataProblem?.startsWith("Description")
-    ? metadataProblem
-    : null;
+  const nameProblem =
+    metadataProblem?.field === "name" ? metadataProblem.message : null;
+  const descriptionProblem =
+    metadataProblem?.field === "description" ? metadataProblem.message : null;
   const create = async () => {
     if (creating || metadataProblem || !isResourceId(id)) return;
     setCreating(true);
@@ -85,13 +83,13 @@ export default function CreateRuleDialog({
           <TextField
             select
             label="Rule type"
-            helperText={kindDescription[kind]}
+            helperText={ruleKinds[kind].description}
             value={kind}
             onChange={(e) => setKind(e.target.value as Kind)}
           >
-            {Object.entries(kindLabel).map(([value, label]) => (
+            {kinds.map((value) => (
               <MenuItem key={value} value={value}>
-                {label}
+                {ruleKinds[value].label}
               </MenuItem>
             ))}
           </TextField>

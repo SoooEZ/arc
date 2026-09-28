@@ -5,22 +5,25 @@ import {
   initialDocument,
 } from "../../src/features/editor/documentState";
 import {
-  applyNodeFragment,
-  availableVariables,
   connectGraphNodes,
-  declaredVariables,
-  groupVariablesByName,
-  inputVariables,
   isCurrentGraphLocation,
   isPreviewRoot,
   patchGraphNode,
   removeGraphNode,
   ruleSnapshot,
-  sameDefinition,
   semanticGraphKey,
-  variableOptionLabel,
-  withNodePositions,
 } from "../../src/domain/graph";
+import {
+  availableVariables,
+  declaredVariables,
+  inputVariables,
+  variableOptionLabel,
+} from "../../src/domain/variables";
+import {
+  applyNodeFragment,
+  sameDefinition,
+  withNodePositions,
+} from "../../src/domain/definitionEchoes";
 import { sampleInputsJson } from "../../src/domain/executionInputs";
 import { nodeWidth } from "../../src/domain/nodePorts";
 import { setSwitchDefaultReturn } from "../../src/domain/switchBranches";
@@ -618,13 +621,22 @@ test("declared variables list a name assigned by several nodes once, with every 
       label: "First calculation / Second calculation",
     },
   ]);
-  expect(
-    groupVariablesByName([
-      { name: "fee", type: "RESULT", label: "High fee" },
-      { name: "fee", type: "RESULT", label: "Low fee" },
-      { name: "fee", type: "RESULT", label: "High fee" },
-    ]),
-  ).toEqual([{ name: "fee", type: "RESULT", label: "High fee / Low fee" }]);
+  const fees: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    edges: [],
+    nodes: ["High fee", "Low fee", "High fee"].map((label, index) => ({
+      id: `fee${index}`,
+      type: "FORMULA",
+      label,
+      expression: "1",
+      output: "fee",
+      position: { x: 0, y: 0 },
+    })),
+  };
+  expect(declaredVariables(fees)).toEqual([
+    { name: "fee", type: "RESULT", label: "High fee / Low fee" },
+  ]);
 });
 
 test("the selected connection is derived from the current draft", () => {

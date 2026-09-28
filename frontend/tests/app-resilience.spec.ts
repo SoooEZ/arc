@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -41,11 +42,13 @@ test("a data source manager chunk that fails to load keeps the editor and its dr
     await servedByViteDevServer(page),
     "The dev server does not split chunks.",
   );
-  const id = `lazy-manager-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId("lazy-manager");
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   const chunkRequests: string[] = [];
   await page.route(/\/assets\/SourceManagerDialog-[^/]*\.js$/, (route) => {
     chunkRequests.push(route.request().url());
@@ -99,11 +102,13 @@ test("a rule editor chunk that fails to load leaves the workspace usable", async
     await servedByViteDevServer(page),
     "The dev server does not split chunks.",
   );
-  const id = `lazy-editor-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId("lazy-editor");
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.route(/\/assets\/EditorRoute-[^/]*\.js$/, (route) =>
     route.abort("internetdisconnected"),
   );

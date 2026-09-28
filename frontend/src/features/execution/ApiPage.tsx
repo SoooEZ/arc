@@ -174,10 +174,8 @@ export default function ApiPage({
               </div>
             )}
             <ExecutionOptionsFields
-              trace={request.trace}
-              timeoutMs={request.timeoutMs}
-              onTrace={request.setTrace}
-              onTimeout={request.setTimeoutMs}
+              value={request.options}
+              onChange={request.changeOptions}
             />
             <Button
               variant="contained"

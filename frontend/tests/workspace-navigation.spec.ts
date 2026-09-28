@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
+import { createRule as createApiRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -25,11 +26,13 @@ const definition: Definition = {
 };
 
 async function createRule(request: APIRequestContext, prefix: string) {
-  const id = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId(`${prefix}`);
+  await createApiRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   return id;
 }
 
@@ -396,4 +399,95 @@ test("a refused arrival is corrected in place and never adds a history entry", a
   page.once("dialog", (dialog) => void dialog.accept());
   await page.goBack();
   await expect(page).toHaveURL(/#\/library$/);
+});
+
+test("a pushed graph arrival with unbuildable code steps back once and shows why", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request, "pushed-arrival");
+  await page.goto("/#/library");
+  await expect(
+    page.getByRole("heading", { name: "Rule library" }),
+  ).toBeVisible();
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await code.focus();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("End");
+  await page.keyboard.type("\nnode broken");
+  const before = await sessionHistory(page);
+  // A link to the graph route pushes an entry. The refusing document renders
+  // again while its step back is pending, and used to step back twice: past
+  // the code entry, to the library.
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  await expect(code).toBeVisible();
+  await expect(
+    page.getByRole("alert").filter({ hasText: /expected/i }),
+  ).toBeVisible();
+  const bounced = await sessionHistory(page);
+  expect(bounced.index).toBe(before.index);
+  expect(bounced.entries[bounced.index]).toBe(`#/studio/${id}`);
+  expect(bounced.entries).toHaveLength(before.entries.length + 1);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("Back and Forward continue past an entry rewritten in place", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request, "rewritten-entry");
+  await page.goto("/#/library");
+  await expect(
+    page.getByRole("heading", { name: "Rule library" }),
+  ).toBeVisible();
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await code.focus();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("End");
+  await page.keyboard.type("\nnode broken");
+  // Back reaches the graph entry, which is rewritten to the code route in place.
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  await expect(code).toBeVisible();
+  const rewritten = await sessionHistory(page);
+  expect(rewritten.entries.slice(rewritten.index)).toEqual([
+    `#/studio/${id}`,
+    `#/studio/${id}`,
+  ]);
+  // Forward moves to the duplicate, which fires no hashchange.
+  await page.goForward();
+  await expect
+    .poll(async () => (await sessionHistory(page)).index)
+    .toBe(rewritten.index + 1);
+  // Back reaches the rewritten entry: the press used to show nothing. It now
+  // continues to the library, which asks about the unbuilt code.
+  const prompts: string[] = [];
+  page.on("dialog", (dialog) => {
+    prompts.push(dialog.message());
+    void dialog.dismiss();
+  });
+  await page.goBack();
+  await expect.poll(() => prompts.length).toBe(1);
+  expect(prompts[0]).toContain("Leave this rule");
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  await expect(code).toBeVisible();
 });

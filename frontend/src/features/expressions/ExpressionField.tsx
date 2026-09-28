@@ -1,6 +1,6 @@
 import { lazy } from "react";
 import { CircularProgress } from "@mui/material";
-import type { VariableOption } from "../../domain/graph";
+import type { VariableOption } from "../../domain/variables";
 import { LazyBoundary } from "../../components/LazyBoundary";
 import AvailableVariables from "./AvailableVariables";
 import ExpressionDialogButton from "./ExpressionDialogButton";

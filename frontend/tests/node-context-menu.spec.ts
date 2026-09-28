@@ -6,7 +6,11 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import { createRule as createApiRule } from "./helpers/api";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueId,
+} from "./helpers/api";
 
 async function createRule(
   request: APIRequestContext,
@@ -47,19 +51,13 @@ async function createRule(
       { id: "finish", source: "calc", sourceHandle: "next", target: "out" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const rule: Rule = await createApiRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
-  const rule: Rule = await response.json();
-  if (publish)
-    expect(
-      (
-        await request.post(`/api/rules/${id}/publish`, {
-          data: { revision: rule.revision },
-        })
-      ).ok(),
-    ).toBeTruthy();
+  if (publish) await publishRule(request, rule);
   return rule;
 }
 
@@ -74,7 +72,7 @@ test("node context menu edits in a roomy form, cancels safely, and deletes its t
   page,
   request,
 }) => {
-  const id = `node-context-${Date.now()}`;
+  const id = uniqueId("node-context");
   const original = await createRule(request, id);
   await page.goto(`/#/rules/${id}`);
   await card(page, "input").click();
@@ -142,7 +140,7 @@ test("input modal validates JSON locally and cancel clears only its own buffer",
   page,
   request,
 }) => {
-  const id = `node-context-input-${Date.now()}`;
+  const id = uniqueId("node-context-input");
   const original = await createRule(request, id);
   await page.goto(`/#/rules/${id}`);
   await card(page, "input").click();
@@ -196,7 +194,7 @@ test("historical versions and pending saves disable context mutations", async ({
   page,
   request,
 }) => {
-  const id = `node-context-guards-${Date.now()}`;
+  const id = uniqueId("node-context-guards");
   await createRule(request, id, true);
   await page.goto(`/#/rules/${id}?version=1`);
   let menu = await openMenu(page, "calc");
@@ -251,7 +249,7 @@ test("Rename focuses the inline name, targets the clicked node, and preserves un
   page,
   request,
 }) => {
-  const id = `node-context-rename-${Date.now()}`;
+  const id = uniqueId("node-context-rename");
   const original = await createRule(request, id);
   await page.goto(`/#/rules/${id}`);
   await card(page, "input").click();
@@ -301,7 +299,7 @@ test("deleting an unselected node from the context menu keeps the selection", as
   page,
   request,
 }) => {
-  const id = `node-context-keep-${Date.now()}`;
+  const id = uniqueId("node-context-keep");
   await createRule(request, id);
   await page.goto(`/#/rules/${id}?node=calc`);
   const nodeName = page.getByLabel("Node name", { exact: true });
@@ -321,7 +319,7 @@ test("an extra Input node can be deleted while the entry Input stays", async ({
   page,
   request,
 }) => {
-  const id = `node-context-inputs-${Date.now()}`;
+  const id = uniqueId("node-context-inputs");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -351,10 +349,12 @@ test("an extra Input node can be deleted while the entry Input stays", async ({
       { id: "stray", source: "input2", sourceHandle: "next", target: "out" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  await createApiRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}?node=input`);
   const nodeErrors = page.getByRole("button", { name: /^Node errors/ });
   await expect(nodeErrors).toBeVisible();
@@ -385,7 +385,7 @@ test("deleting the selected node selects the default node, as a build or version
   page,
   request,
 }) => {
-  const id = `node-context-default-${Date.now()}`;
+  const id = uniqueId("node-context-default");
   await createApiRule(request, {
     id,
     definition: {
@@ -427,4 +427,44 @@ test("deleting the selected node selects the default node, as a build or version
   await expect(card(page, "out")).toHaveCount(0);
   // The default node is the first Condition, not the Input.
   await expect(nodeName).toHaveValue("Check");
+});
+
+test("a node dialog with staged edits asks before the browser leaves the rule", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("node-context-staged");
+  await createRule(request, id);
+  await page.goto("/#/library");
+  await expect(
+    page.getByRole("heading", { name: "Rule library" }),
+  ).toBeVisible();
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  const menu = await openMenu(page, "calc");
+  await menu.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: /^Edit node/ });
+  await dialog.getByLabel("Node name", { exact: true }).fill("Staged name");
+  const prompts: string[] = [];
+  page.on("dialog", (prompt) => {
+    prompts.push(prompt.message());
+    void prompt.dismiss();
+  });
+  // Back used to leave for the library and drop the staged edits without a word.
+  await page.goBack();
+  await expect
+    .poll(() => prompts)
+    .toEqual([
+      "Discard the edits in this dialog? They are not applied to the draft yet.",
+    ]);
+  await expect(page).toHaveURL(new RegExp(`#/rules/${id}$`));
+  await expect(dialog.getByLabel("Node name", { exact: true })).toHaveValue(
+    "Staged name",
+  );
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/library$/);
+  expect(prompts).toHaveLength(1);
 });

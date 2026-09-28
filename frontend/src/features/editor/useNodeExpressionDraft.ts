@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { studioApi } from "../../api/studio";
 import { errorMessage } from "../../api/errors";
+import {
+  unsavedDialogWarning,
+  useNavigationGuard,
+} from "../../app/navigationGuards";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import type { Definition, Diagnostic } from "../../types";
 
@@ -43,6 +47,9 @@ export function useNodeExpressionDraft({
     if (renderedSource !== undefined)
       setSource((current) => (edited.current ? current : renderedSource));
   }, [rendered.data]);
+  // Code typed here is applied only on Apply: a route change asks first.
+  const dirty = source !== null && source !== rendered.data?.source;
+  useNavigationGuard(dirty ? unsavedDialogWarning : null);
   const checked = useAsyncResource(
     JSON.stringify([definition, nodeId, source]),
     source !== null && !readOnly

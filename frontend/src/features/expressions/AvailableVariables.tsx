@@ -1,7 +1,10 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Button, IconButton, Paper, Popper, Tooltip } from "@mui/material";
 import { X } from "lucide-react";
-import { variableOptionLabel, type VariableOption } from "../../domain/graph";
+import {
+  variableOptionLabel,
+  type VariableOption,
+} from "../../domain/variables";
 
 function VariableList({ variables }: { variables: VariableOption[] }) {
   if (!variables.length)

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Definition } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -27,11 +28,13 @@ test("preview results and trace values show every decimal digit without JSON.raw
   await page.addInitScript(() => {
     Reflect.deleteProperty(JSON, "rawJSON");
   });
-  const id = `result-display-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Exact result display", kind: "FORMULA", definition },
+  const id = uniqueId("result-display");
+  await createRule(request, {
+    id,
+    name: "Exact result display",
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   const exact = "3.333333333333333333333333333333333";
   const large = "12345678901234567890";
   await page.route("**/api/preview", (route) =>

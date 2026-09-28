@@ -6,6 +6,12 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { setEditorText } from "./helpers/editor";
+import {
+  createRule,
+  deleteRule,
+  publishRule,
+  uniqueStamp,
+} from "./helpers/api";
 
 function definition(
   expression: string,
@@ -40,7 +46,7 @@ function definition(
 }
 
 async function fixtures(request: APIRequestContext) {
-  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const suffix = uniqueStamp();
   const amount = {
     name: "amount",
     type: "NUMBER" as const,
@@ -48,30 +54,20 @@ async function fixtures(request: APIRequestContext) {
     defaultValue: 100,
   };
   const callee = `completion-price-${suffix}`;
-  const created = await request.post("/api/rules", {
-    data: {
-      id: callee,
-      name: `Completion formula ${suffix}`,
-      kind: "FORMULA",
-      definition: definition("amount * 2", [amount]),
-    },
+  const rule: Rule = await createRule(request, {
+    id: callee,
+    name: `Completion formula ${suffix}`,
+    kind: "FORMULA",
+    definition: definition("amount * 2", [amount]),
   });
-  expect(created.status()).toBe(201);
-  const rule: Rule = await created.json();
-  const published = await request.post(`/api/rules/${callee}/publish`, {
-    data: { revision: rule.revision },
-  });
-  expect(published.ok()).toBeTruthy();
+  await publishRule(request, rule);
   const caller = `completion-caller-${suffix}`;
-  const callerCreated = await request.post("/api/rules", {
-    data: {
-      id: caller,
-      name: caller,
-      kind: "FORMULA",
-      definition: definition("amount", [amount]),
-    },
+  await createRule(request, {
+    id: caller,
+    name: caller,
+    kind: "FORMULA",
+    definition: definition("amount", [amount]),
   });
-  expect(callerCreated.status()).toBe(201);
   return { callee, caller };
 }
 
@@ -194,29 +190,22 @@ test("a formula created again under a deleted ID offers its new parameters witho
   await page.keyboard.press("Escape");
 
   // Deleted and created again elsewhere with another contract, then published.
-  expect((await request.delete(`/api/rules/${callee}`)).status()).toBe(204);
-  const recreated = await request.post("/api/rules", {
-    data: {
-      id: callee,
-      name: "Recreated formula",
-      kind: "FORMULA",
-      definition: definition("amount", [
-        {
-          name: "country",
-          type: "STRING",
-          required: true,
-          defaultValue: "US",
-        },
-        { name: "amount", type: "NUMBER", required: true, defaultValue: 100 },
-      ]),
-    },
+  await deleteRule(request, callee);
+  const rule: Rule = await createRule(request, {
+    id: callee,
+    name: "Recreated formula",
+    kind: "FORMULA",
+    definition: definition("amount", [
+      {
+        name: "country",
+        type: "STRING",
+        required: true,
+        defaultValue: "US",
+      },
+      { name: "amount", type: "NUMBER", required: true, defaultValue: 100 },
+    ]),
   });
-  expect(recreated.status()).toBe(201);
-  const rule: Rule = await recreated.json();
-  const published = await request.post(`/api/rules/${callee}/publish`, {
-    data: { revision: rule.revision },
-  });
-  expect(published.ok()).toBeTruthy();
+  await publishRule(request, rule);
 
   await setEditorText(page, expression, "");
   await page.keyboard.type(`@${callee}`);

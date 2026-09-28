@@ -10,7 +10,7 @@ import { modules, referenceSnippet, reuseNodeId } from "./snippets";
 import { useLibraryInsertion } from "./useLibraryInsertion";
 import { formulaSuggestionProblem } from "./useFormulaSupport";
 import { uniqueName } from "../../domain/ids";
-import { variableNames } from "../../domain/graph";
+import { variableNames } from "../../domain/variables";
 import { scriptVariableNames } from "../../domain/expressionSymbols";
 
 type Pane = "functions" | "modules" | "reuse";

@@ -2,11 +2,11 @@ import { useRef } from "react";
 import type { Definition } from "../../../types";
 import { studioApi } from "../../../api/studio";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
+import { scopeGraphKey } from "../../../domain/graph";
 import {
   availableVariables,
-  scopeGraphKey,
   type VariableOption,
-} from "../../../domain/graph";
+} from "../../../domain/variables";
 import { ownValue } from "../../../domain/records";
 
 /** What the server reports in scope at a node, or nothing while that is unknown. */

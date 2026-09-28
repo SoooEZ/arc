@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { createRule, uniqueId, uniqueStamp } from "./helpers/api";
 
 /**
  * Renders the element as shown, with ligatures forced off and forced on. The
@@ -28,50 +29,47 @@ test("canvas expressions and JSON fields draw every operator character", async (
   page,
   request,
 }) => {
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const stamp = uniqueStamp();
   const ruleId = `ligatures-${stamp}`;
-  const created = await request.post("/api/rules", {
-    data: {
-      id: ruleId,
-      name: ruleId,
-      kind: "RULE",
-      definition: {
-        schemaVersion: 1,
-        inputs: [
-          {
-            name: "amount",
-            type: "NUMBER",
-            required: true,
-            defaultValue: null,
-          },
-        ],
-        nodes: [
-          {
-            id: "input",
-            type: "INPUT",
-            label: "Inputs",
-            position: { x: 200, y: 0 },
-          },
-          {
-            id: "check",
-            type: "CONDITION",
-            label: "Check",
-            expression: "amount == 100 != false",
-            position: { x: 200, y: 200 },
-          },
-        ],
-        edges: [
-          {
-            id: "next",
-            source: "input",
-            target: "check",
-            sourceHandle: "next",
-          },
-        ],
-      },
+  await createRule(request, {
+    id: ruleId,
+    name: ruleId,
+    kind: "RULE",
+    definition: {
+      schemaVersion: 1,
+      inputs: [
+        {
+          name: "amount",
+          type: "NUMBER",
+          required: true,
+          defaultValue: null,
+        },
+      ],
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Inputs",
+          position: { x: 200, y: 0 },
+        },
+        {
+          id: "check",
+          type: "CONDITION",
+          label: "Check",
+          expression: "amount == 100 != false",
+          position: { x: 200, y: 200 },
+        },
+      ],
+      edges: [
+        {
+          id: "next",
+          source: "input",
+          target: "check",
+          sourceHandle: "next",
+        },
+      ],
     },
   });
-  expect(created.ok(), await created.text()).toBeTruthy();
   await page.goto(`/#/rules/${ruleId}`);
   const preview = page.locator(
     '.react-flow__node[data-id="check"] .node-detail',
@@ -121,44 +119,41 @@ test("JSON default fields draw every operator character", async ({
   page,
   request,
 }) => {
-  const ruleId = `ligature-default-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const created = await request.post("/api/rules", {
-    data: {
-      id: ruleId,
-      name: ruleId,
-      kind: "FORMULA",
-      definition: {
-        schemaVersion: 1,
-        inputs: [
-          {
-            name: "routes",
-            type: "ARRAY",
-            required: false,
-            defaultValue: ["a == b -> c != d"],
-          },
-        ],
-        nodes: [
-          {
-            id: "input",
-            type: "INPUT",
-            label: "Inputs",
-            position: { x: 0, y: 0 },
-          },
-          {
-            id: "out",
-            type: "OUTPUT",
-            label: "Result",
-            expression: "routes",
-            position: { x: 0, y: 200 },
-          },
-        ],
-        edges: [
-          { id: "next", source: "input", target: "out", sourceHandle: "next" },
-        ],
-      },
+  const ruleId = uniqueId("ligature-default");
+  await createRule(request, {
+    id: ruleId,
+    name: ruleId,
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [
+        {
+          name: "routes",
+          type: "ARRAY",
+          required: false,
+          defaultValue: ["a == b -> c != d"],
+        },
+      ],
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Inputs",
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: "out",
+          type: "OUTPUT",
+          label: "Result",
+          expression: "routes",
+          position: { x: 0, y: 200 },
+        },
+      ],
+      edges: [
+        { id: "next", source: "input", target: "out", sourceHandle: "next" },
+      ],
     },
   });
-  expect(created.ok(), await created.text()).toBeTruthy();
   await page.goto(`/#/rules/${ruleId}?node=input`);
   const field = page
     .locator(".inspector-sidebar")

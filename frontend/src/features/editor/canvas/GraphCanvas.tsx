@@ -131,9 +131,16 @@ export default function GraphCanvas({
     fitRequest,
     onNodesChange,
     onEdgesChange,
+    isValidConnection,
     connect,
+    endDrag,
   } = canvas;
   const flow = useReactFlow<FlowNode>();
+  // A drag the previous canvas was reporting ended with it: the settled graph
+  // routes fully again instead of waiting for a drag end that never comes.
+  useEffect(() => {
+    endDrag();
+  }, [endDrag]);
   // The selection setters change identity with the selection; React Flow
   // hands these handlers to every memoized card, so they read the latest ones
   // through a ref and keep their own identity for the canvas's lifetime.
@@ -242,6 +249,7 @@ export default function GraphCanvas({
             onEdgeClick={handlers.onEdgeClick}
             onEdgeContextMenu={handlers.onEdgeContextMenu}
             onConnect={connect}
+            isValidConnection={isValidConnection}
             nodesDraggable={can.edit}
             nodesConnectable={can.edit}
             edgesReconnectable={false}

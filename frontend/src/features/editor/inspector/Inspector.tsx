@@ -12,6 +12,8 @@ interface Props extends NodeFormProps {
   nameInputRef: Ref<HTMLInputElement>;
   onDelete: (id: string) => void;
   onExpression: (id: string) => void;
+  /** Whether node code opens now; a running command disables it, as on the cards. */
+  canOpenCode: boolean;
 }
 
 /** The editor's sidebar: the node's identity and problems, its form, and the draft's save note. */
@@ -20,6 +22,7 @@ export default function Inspector({
   nameInputRef,
   onDelete,
   onExpression,
+  canOpenCode,
   ...form
 }: Props) {
   const { rule, node, readOnly, onNodeChange } = form;
@@ -42,6 +45,7 @@ export default function Inspector({
             <IconButton
               size="small"
               aria-label="Node expression"
+              disabled={!canOpenCode}
               onClick={() => onExpression(node.id)}
             >
               <Code2 size={17} />

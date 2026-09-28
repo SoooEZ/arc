@@ -1,9 +1,10 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 async function create(request: APIRequestContext, inputCount = 1) {
-  const id = `inspector-sections-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("inspector-sections");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -43,11 +44,13 @@ async function create(request: APIRequestContext, inputCount = 1) {
       { id: "finish", source: "calc", target: "out", sourceHandle: "next" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const response = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.status()).toBe(201);
-  return (await response.json()) as Rule;
+  return response;
 }
 
 test("inspector accordions start expanded and variable help opens above without blocking editing", async ({
@@ -314,13 +317,7 @@ test("published sections remain inspectable and variable overlays fit mobile wit
   request,
 }) => {
   const rule = await create(request);
-  expect(
-    (
-      await request.post(`/api/rules/${rule.id}/publish`, {
-        data: { revision: rule.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, rule);
   const published: Rule = await (
     await request.get(`/api/rules/${rule.id}`)
   ).json();

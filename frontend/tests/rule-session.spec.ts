@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -28,11 +29,13 @@ test("reopening a saved rule waits for a fresh detail read and uses its latest r
   page,
   request,
 }) => {
-  const id = `rule-session-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId("rule-session");
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}?node=input`);
   await page.getByLabel("Default value (optional)").fill("2");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
@@ -127,11 +130,13 @@ test("returning from a published version refreshes the draft while graph/code sw
   page,
   request,
 }) => {
-  const id = `rule-version-session-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId("rule-version-session");
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}?node=input`);
   await page.getByLabel("Default value (optional)").fill("2");
   await page.getByRole("button", { name: "Publish", exact: true }).click();
@@ -211,11 +216,13 @@ test("a saved copy never stands in for a rule created again under the same ID", 
   page,
   request,
 }) => {
-  const id = `rule-session-recreated-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Mine", kind: "FORMULA", definition },
+  const id = uniqueId("rule-session-recreated");
+  await createRule(request, {
+    id,
+    name: "Mine",
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}?node=input`);
   await page.getByLabel("Default value (optional)").fill("2");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();

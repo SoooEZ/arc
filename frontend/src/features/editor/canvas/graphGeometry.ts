@@ -9,7 +9,7 @@ export interface NodeSize {
 export type NodeSizes = ReadonlyMap<string, NodeSize>;
 
 /** The height of a card before it is measured; its width comes from its exits (nodePorts). */
-export const defaultCardHeight = 105;
+const defaultCardHeight = 105;
 
 /** A card's size: as measured, else its exit-driven width and the default height. */
 export function cardSize(node: RuleNode, sizes: NodeSizes): NodeSize {

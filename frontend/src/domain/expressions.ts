@@ -2,14 +2,10 @@
 // pattern would show text the server rejects as a valid typed constant.
 
 import { MAX_EXPRESSION_TOKENS } from "./limits";
+import { trimAsServer } from "./serverText";
 
 // JSON escapes are part of ARC's string contract.
 export const quoteText = (text: string) => JSON.stringify(text);
-
-/** The server trims UTF-16 code units up to U+0020 (Java String.trim) before tokenizing. */
-export function trimExpression(source: string): string {
-  return source.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "");
-}
 
 // A backslash escapes any character except a line terminator: the server's
 // `\\.` excludes \n, \r, U+0085, U+2028 and U+2029.
@@ -54,8 +50,8 @@ const expressionToken =
  * How many tokens the server reads from `text` before it stops, or Infinity
  * once the text holds something it cannot read.
  */
-export function expressionTokenCount(text: string): number {
-  const source = trimExpression(text);
+function expressionTokenCount(text: string): number {
+  const source = trimAsServer(text);
   let count = 0;
   expressionToken.lastIndex = 0;
   while (expressionToken.lastIndex < source.length) {
@@ -66,7 +62,7 @@ export function expressionTokenCount(text: string): number {
 }
 
 /** Whether the server's tokenizer refuses `text` for its length alone. */
-export function exceedsTokenLimit(text: string): boolean {
+function exceedsTokenLimit(text: string): boolean {
   return expressionTokenCount(text) > MAX_EXPRESSION_TOKENS;
 }
 
@@ -107,7 +103,7 @@ function containsObject(value: unknown): boolean {
  * out (each character becomes a space, so offsets are kept), leaving only the
  * operators that apply at the top level. Null while a quote is unterminated.
  */
-export function topLevelText(expression: string): string | null {
+function topLevelText(expression: string): string | null {
   let masked = "",
     quote = "",
     escaped = false,
@@ -132,9 +128,27 @@ export function topLevelText(expression: string): string | null {
   return quote ? null : masked;
 }
 
-// Server priorities: ||/or, then &&/and, then equality, then ordering. An operand
-// that carries any of them binds no tighter than the comparison it sits in.
-const logicalOrComparison = /&&|\|\||\b(?:and|or)\b|==|!=|<>|<=|>=|=|<|>/i;
+// Server priorities: ||/OR, then &&/AND, then equality, then ordering. An
+// operand that carries any of them binds no tighter than the comparison it
+// sits in.
+const comparisonOperator = /==|!=|<>|<=|>=|=|<|>/;
+// The keywords are upper-case only (BinaryOperator): `and` is an identifier,
+// `$AND` a function token and `x.AND` a path.
+const logicalKeyword = /(?<![\w$.])(?:AND|OR)(?![\w.])/g;
+
+/**
+ * Whether the top level of `expression` (masked to `masked`) holds a logical
+ * operator. A keyword after an operand is one; first in a term it names a call,
+ * `AND(a, b)`, which the parser reads as a function.
+ */
+function hasTopLevelLogic(expression: string, masked: string): boolean {
+  if (/&&|\|\|/.test(masked)) return true;
+  for (const match of masked.matchAll(logicalKeyword)) {
+    const before = expression.slice(0, match.index).trimEnd();
+    if (/[\w$)\]"']$/.test(before)) return true;
+  }
+  return false;
+}
 
 /**
  * A stored comparison from the builder's operands. An operand that contains a
@@ -151,16 +165,17 @@ export function comparisonText(
   const operand = (text: string) => {
     const trimmed = text.trim();
     const top = topLevelText(trimmed);
-    return top !== null && logicalOrComparison.test(top)
-      ? `(${trimmed})`
-      : trimmed;
+    const compound =
+      top !== null &&
+      (comparisonOperator.test(top) || hasTopLevelLogic(trimmed, top));
+    return compound ? `(${trimmed})` : trimmed;
   };
   return [operand(left), operator, operand(right)].join(" ");
 }
 
 export function simpleComparison(expression: string): string[] | null {
   const masked = topLevelText(expression);
-  if (masked === null || /&&|\|\||\b(?:and|or)\b/i.test(masked)) return null;
+  if (masked === null || hasTopLevelLogic(expression, masked)) return null;
   const operators = [...masked.matchAll(/==|!=|>=|<=|>|</g)];
   if (operators.length !== 1) return null;
   const operator = operators[0],

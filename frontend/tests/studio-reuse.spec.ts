@@ -1,6 +1,10 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Build, Definition } from "../src/types";
-import { createRule as createApiRule, publishRule } from "./helpers/api";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueStamp,
+} from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -32,7 +36,7 @@ test("reusing a rule with an 80-character ID inserts a node ID that builds", asy
   page,
   request,
 }) => {
-  const suffix = Date.now().toString(36);
+  const suffix = uniqueStamp();
   const child = `reuse-limit-child-${suffix}-`.padEnd(80, "x");
   const parent = `reuse-limit-parent-${suffix}`;
   const name = `Long reusable rule ${suffix}`;
@@ -71,7 +75,7 @@ test("the repeated click of a double click never inserts a second Reference node
   page,
   request,
 }) => {
-  const suffix = Date.now().toString(36);
+  const suffix = uniqueStamp();
   const child = `reuse-once-child-${suffix}`;
   const parent = `reuse-once-parent-${suffix}`;
   const name = `Reuse once ${suffix}`;
@@ -122,7 +126,7 @@ test("each inserted Reuse card gets its own result name", async ({
   page,
   request,
 }) => {
-  const suffix = Date.now().toString(36);
+  const suffix = uniqueStamp();
   const first = `reuse-names-a-${suffix}`;
   const second = `reuse-names-b-${suffix}`;
   const parent = `reuse-names-parent-${suffix}`;
@@ -160,7 +164,7 @@ test("the Reuse search waits for a pause in typing and keeps its cards until the
   page,
   request,
 }) => {
-  const suffix = Date.now().toString(36);
+  const suffix = uniqueStamp();
   const child = `reuse-search-child-${suffix}`;
   const parent = `reuse-search-parent-${suffix}`;
   await createRule(request, child, `Discount ${suffix}`, true);

@@ -1,4 +1,4 @@
-import type { VariableOption } from "./graph";
+import type { VariableOption } from "./variables";
 import { inputTypeOf } from "./inputTypes";
 import { isNodeType, storesResult } from "./nodeKinds";
 

@@ -1,22 +1,19 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 test("a failed published version cannot expose the draft and can be retried", async ({
   page,
   request,
 }) => {
-  const id = `version-failure-${Date.now()}`;
-  const createdResponse = await request.post("/api/rules", {
-    data: { id, name: "Version failure fixture", kind: "FORMULA" },
+  const id = uniqueId("version-failure");
+  const created: Rule = await createRule(request, {
+    id,
+    name: "Version failure fixture",
+    kind: "FORMULA",
   });
-  expect(createdResponse.ok()).toBeTruthy();
-  const created: Rule = await createdResponse.json();
-  const publishedResponse = await request.post(`/api/rules/${id}/publish`, {
-    data: { revision: created.revision },
-  });
-  expect(publishedResponse.ok()).toBeTruthy();
-  const published: Rule = await publishedResponse.json();
+  const published: Rule = await publishRule(request, created);
   expect(
     (
       await request.put(`/api/rules/${id}`, {
@@ -109,7 +106,7 @@ test("moving a node reuses semantic reads and late diagnostics cannot mark a new
   page,
   request,
 }) => {
-  const id = `resource-regression-${Date.now()}`;
+  const id = uniqueId("resource-regression");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -141,13 +138,12 @@ test("moving a node reuses semantic reads and late diagnostics cannot mark a new
       { id: "b", source: "calculate", target: "output", sourceHandle: "next" },
     ],
   };
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: { id, name: "Resource regression", kind: "FORMULA", definition },
-      })
-    ).status(),
-  ).toBe(201);
+  await createRule(request, {
+    id,
+    name: "Resource regression",
+    kind: "FORMULA",
+    definition,
+  });
   const reads = { variables: 0, diagnostics: 0 };
   page.on("request", (request) => {
     if (request.url().endsWith("/api/variables")) reads.variables++;

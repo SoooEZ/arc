@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import { Trash2 } from "lucide-react";
 import type { Input } from "../../../types";
-import type { VariableOption } from "../../../domain/graph";
+import type { VariableOption } from "../../../domain/variables";
 import {
   inputTypeFacts,
   inputTypeOf,

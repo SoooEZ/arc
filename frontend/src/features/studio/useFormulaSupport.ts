@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { monaco } from "./arcLanguage";
 import type { RuleSummary } from "../../types";
-import type { VariableOption } from "../../domain/graph";
+import type { VariableOption } from "../../domain/variables";
 import { expressionSymbols } from "../../domain/expressionSymbols";
 import { errorMessage } from "../../api/errors";
+import { typeaheadDelayMs } from "../../hooks/useDebouncedValue";
 import {
   formulaCallName,
   formulaParameterDescription,
@@ -23,9 +24,6 @@ import {
 export function formulaSuggestionProblem(formulaError: string): string {
   return `Formula suggestions unavailable: ${formulaError}`;
 }
-
-/** How long typing must pause before `@` completion searches the catalog. */
-const searchDelayMs = 150;
 
 /** Resolves true after `milliseconds`, or false as soon as Monaco cancels the request. */
 function afterPause(
@@ -47,7 +45,7 @@ function afterPause(
 /**
  * Monaco keeps a completion request open while the user types ordinary
  * characters instead of cancelling it. Waiting until the text has not changed
- * for `searchDelayMs` therefore sends one search for the settled prefix.
+ * for `typeaheadDelayMs` therefore sends one search for the settled prefix.
  */
 async function typingPaused(
   model: monaco.editor.ITextModel,
@@ -55,7 +53,7 @@ async function typingPaused(
 ): Promise<boolean> {
   let version = model.getVersionId();
   for (;;) {
-    if (!(await afterPause(token, searchDelayMs)) || model.isDisposed())
+    if (!(await afterPause(token, typeaheadDelayMs)) || model.isDisposed())
       return false;
     if (model.getVersionId() === version) return true;
     version = model.getVersionId();

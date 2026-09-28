@@ -7,6 +7,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, InputType } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 async function select(
   page: Page,
@@ -21,11 +22,13 @@ async function select(
 }
 
 async function create(request: APIRequestContext, definition: Definition) {
-  const id = `switch-values-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "DECISION_TREE", definition },
+  const id = uniqueId("switch-values");
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "DECISION_TREE",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
   return id;
 }
 

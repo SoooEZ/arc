@@ -3,12 +3,11 @@ import { Alert, Button, CircularProgress } from "@mui/material";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { GraphProblem } from "../../api/errors";
 import { LazyBoundary } from "../../components/LazyBoundary";
+import { isCurrentGraphLocation, semanticGraphKey } from "../../domain/graph";
 import {
   applyNodeFragment,
-  isCurrentGraphLocation,
-  semanticGraphKey,
   withNodePositions,
-} from "../../domain/graph";
+} from "../../domain/definitionEchoes";
 import Inspector from "./inspector/Inspector";
 import TestPanel from "../execution/TestPanel";
 import RuleSettings from "./RuleSettings";
@@ -160,6 +159,7 @@ function EditorContent({
     trace: preview.result,
     nodeErrors,
     edit,
+    onRefused: setError,
   });
   const { measurements, requestFit } = canvas;
   const { patchNode, addNode, removeNode, arrange } = useGraphCommands({
@@ -355,6 +355,7 @@ function EditorContent({
             onInvalidDefault={onInvalidDefault}
             errors={nodeErrors.get(selected) ?? noErrors}
             onExpression={openNodeCode}
+            canOpenCode={can.validate}
             onOpenReference={openReference}
           />
         </div>

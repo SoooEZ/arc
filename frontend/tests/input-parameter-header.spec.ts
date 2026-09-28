@@ -1,8 +1,13 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueId,
+} from "./helpers/api";
 
 async function createRule(request: APIRequestContext, name = "amount") {
-  const id = `input-parameter-header-${Date.now()}`;
+  const id = uniqueId("input-parameter-header");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [{ name, type: "NUMBER", required: true, defaultValue: 12 }],
@@ -25,11 +30,13 @@ async function createRule(request: APIRequestContext, name = "amount") {
       { id: "next", source: "input", sourceHandle: "next", target: "output" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const response = await createApiRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()) as Rule;
+  return response;
 }
 
 test("input headers edit Required/Optional and card counts follow added and removed parameters", async ({
@@ -88,13 +95,7 @@ test("parameter headers fit narrow layouts and preserve published read-only cont
 }) => {
   const name = "very_long_parameter_name_that_stays_inside_a_narrow_card";
   const rule = await createRule(request, name);
-  expect(
-    (
-      await request.post(`/api/rules/${rule.id}/publish`, {
-        data: { revision: rule.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, rule);
   await page.goto(`/#/rules/${rule.id}?version=1`);
   await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
   const header = page.locator(".inspector-sidebar .input-card-title");

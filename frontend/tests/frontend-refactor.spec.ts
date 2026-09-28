@@ -7,6 +7,7 @@ import {
   type Request,
 } from "@playwright/test";
 import type { Definition, Input, SourceConfig } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 async function openInputRule(
   page: Page,
@@ -38,10 +39,12 @@ async function openInputRule(
       { id: "next", source: "input", target: "output", sourceHandle: "next" },
     ],
   };
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Input editing fixture", kind: "FORMULA", definition },
+  await createRule(request, {
+    id,
+    name: "Input editing fixture",
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}`);
   await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
 }
@@ -86,7 +89,7 @@ for (const secondDefault of [[], [1]]) {
     page,
     request,
   }) => {
-    const id = `input-row-remove-${Date.now()}`;
+    const id = uniqueId("input-row-remove");
     await openInputRule(page, request, id, [
       { name: "first", type: "ARRAY", required: false, defaultValue: [] },
       {
@@ -128,7 +131,7 @@ for (const defaultValue of [null, []]) {
     page,
     request,
   }) => {
-    const id = `input-type-change-${Date.now()}`;
+    const id = uniqueId("input-type-change");
     await openInputRule(page, request, id, [
       { name: "payload", type: "ARRAY", required: false, defaultValue },
     ]);
@@ -160,7 +163,7 @@ test("input row identity preserves another row's invalid buffer through deletion
   page,
   request,
 }) => {
-  const id = `input-row-retain-${Date.now()}`;
+  const id = uniqueId("input-row-retain");
   await openInputRule(page, request, id, [
     { name: "first", type: "ARRAY", required: false, defaultValue: [] },
     { name: "second", type: "ARRAY", required: false, defaultValue: [] },
@@ -197,7 +200,7 @@ test("changing a pinned source version removes obsolete mappings and retains com
   page,
   request,
 }) => {
-  const sourceId = `source-contract-${Date.now()}`;
+  const sourceId = uniqueId("source-contract");
   const configuration: SourceConfig = {
     kind: "HTTP",
     timeoutMs: 3000,
@@ -235,7 +238,7 @@ test("changing a pinned source version removes obsolete mappings and retains com
     },
   });
   expect(revised.ok()).toBeTruthy();
-  const ruleId = `source-version-mapping-${Date.now()}`;
+  const ruleId = uniqueId("source-version-mapping");
   await openInputRule(page, request, ruleId, [
     {
       name: "amount",

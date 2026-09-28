@@ -26,7 +26,7 @@ Read the applicable [frontend failures](../docs/review-lessons.md#frontend-failu
 
 From the repository root, run `npm --prefix frontend run format:check`, `npm --prefix frontend run test:unit`, `npm --prefix frontend run build`, and `python3 scripts/check_architecture.py` for frontend logic changes. Use `npm --prefix frontend run format` for intentional formatting.
 
-Pure tests cover document transitions, graph helpers and the HTTP boundary. Browser workflows cover actual editor behavior; run affected cases against a disposable stack, following [README](../README.md#development-and-verification). For async changes include a late-response/selection-change case, not only the immediate success path.
+Pure tests cover document transitions, graph helpers and the HTTP boundary. Browser workflows cover actual editor behavior; run affected cases against a disposable stack, following [README](../README.md#development-and-verification). Browser specs create, publish and delete rules through `tests/helpers/api` (`createRule`, `publishRule`, `deleteRule`, the `…Response` variants for expected refusals) and make IDs and names unique with its `uniqueId`/`uniqueStamp`; a unit scan reports direct `request.post("/api/rules"…)` calls and `Date.now()` in specs. For async changes include a late-response/selection-change case, not only the immediate success path.
 
 ## Code Review Rules
 

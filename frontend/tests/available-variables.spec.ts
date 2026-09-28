@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 function definition(connected = false): Definition {
   return {
@@ -53,11 +54,13 @@ function definition(connected = false): Definition {
 }
 
 async function create(request: APIRequestContext, draft: Definition) {
-  const id = `variable-scope-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "DECISION_TREE", definition: draft },
+  const id = uniqueId("variable-scope");
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "DECISION_TREE",
+    definition: draft,
   });
-  expect(response.status()).toBe(201);
   return id;
 }
 

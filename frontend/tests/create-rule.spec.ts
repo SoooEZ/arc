@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { createRuleResponse, uniqueStamp } from "./helpers/api";
 
 test("Rule ID rejects forbidden typing and pasted whitespace while keeping the accepted value", async ({
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const name = `Rule ID ${stamp}`;
   const generatedId = `rule-id-${stamp}`;
   const submitted: { id: string; name: string }[] = [];
@@ -97,7 +98,7 @@ test("generated Rule IDs satisfy the server policy and invalid IDs are rejected 
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const name = `2026 Pricing $ @ ${stamp} ${"x".repeat(100)}`;
   const prefix = `rule-2026-pricing-${stamp}-`;
   const expectedId = prefix + "x".repeat(80 - prefix.length);
@@ -133,8 +134,10 @@ test("generated Rule IDs satisfy the server policy and invalid IDs are rejected 
     "bad_id",
     "a".repeat(81),
   ]) {
-    const rejected = await request.post("/api/rules", {
-      data: { id: invalid, name: "Invalid Rule ID", kind: "FORMULA" },
+    const rejected = await createRuleResponse(request, {
+      id: invalid,
+      name: "Invalid Rule ID",
+      kind: "FORMULA",
     });
     expect(rejected.status(), await rejected.text()).toBe(422);
     expect((await rejected.json()).message).toContain(
@@ -147,7 +150,7 @@ test("editing the name keeps a Rule ID the user chose", async ({
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const submitted: { id: string; name: string }[] = [];
   page.on("request", (sent) => {
     if (
@@ -202,7 +205,7 @@ test("a notice survives clicks elsewhere and clears on its own", async ({
   const dialog = page.getByRole("dialog");
   await dialog
     .getByLabel("Rule name", { exact: true })
-    .fill(`Notice ${Date.now()}`);
+    .fill(`Notice ${uniqueStamp()}`);
   await dialog
     .getByRole("button", { name: "Create rule", exact: true })
     .click();

@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -37,20 +38,14 @@ const definition: Definition = {
 };
 
 async function create(request: APIRequestContext, publish = false) {
-  const id = `editor-context-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId("editor-context");
+  const rule: Rule = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
-  const rule: Rule = await response.json();
-  if (publish)
-    expect(
-      (
-        await request.post(`/api/rules/${id}/publish`, {
-          data: { revision: rule.revision },
-        })
-      ).ok(),
-    ).toBeTruthy();
+  if (publish) await publishRule(request, rule);
   return id;
 }
 
@@ -174,7 +169,7 @@ test("Code studio lists a variable that several nodes assign once, naming every 
   page,
   request,
 }) => {
-  const id = `editor-context-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("editor-context");
   const [input, calc, out] = definition.nodes;
   const twoProducers: Definition = {
     ...definition,
@@ -197,10 +192,12 @@ test("Code studio lists a variable that several nodes assign once, naming every 
       { id: "d", source: "right", target: "out", sourceHandle: "next" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition: twoProducers },
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition: twoProducers,
   });
-  expect(response.ok()).toBeTruthy();
   await page.goto(`/#/studio/${id}`);
   const script = page.getByLabel("ARC code editor", { exact: true });
   await expect(editorLines(script)).toContainText("Right price");

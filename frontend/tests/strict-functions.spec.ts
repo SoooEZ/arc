@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import {
+  createRule,
+  publishRule,
+  publishRuleResponse,
+  uniqueId,
+} from "./helpers/api";
 
 test("an old unprefixed draft reports the required spelling and becomes executable after correction", async ({
   page,
@@ -22,15 +28,14 @@ test("an old unprefixed draft reports the required spelling and becomes executab
   const definition: Definition = (await built.json()).definition;
   definition.nodes.find((node) => node.id === "calc")!.expression =
     "ROUND(ROUND, 0)";
-  const id = `strict-functions-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId("strict-functions");
+  const rule: Rule = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.status()).toBe(201);
-  const rule: Rule = await created.json();
-  const rejected = await request.post(`/api/rules/${id}/publish`, {
-    data: { revision: rule.revision },
-  });
+  const rejected = await publishRuleResponse(request, rule);
   expect(rejected.status()).toBe(422);
   expect((await rejected.json()).message).toContain("use $ROUND(...)");
   const preview = await request.post("/api/preview", {
@@ -68,13 +73,7 @@ test("an old unprefixed draft reports the required spelling and becomes executab
   expect(saved.draft.nodes.find((node) => node.id === "calc")?.expression).toBe(
     "$ROUND(ROUND, 0)",
   );
-  expect(
-    (
-      await request.post(`/api/rules/${id}/publish`, {
-        data: { revision: saved.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, saved);
   const executed = await request.post(`/api/rules/${id}/execute`, {
     data: { inputs: {} },
   });

@@ -9,7 +9,7 @@ import {
   Upload,
 } from "lucide-react";
 import type { Rule } from "../../types";
-import { kindLabel } from "../../types";
+import { ruleKinds } from "../../domain/ruleKinds";
 import { KindIcon } from "../../components/Icons";
 import { rulePath } from "../../app/routing";
 import {
@@ -87,7 +87,7 @@ export default function EditorHeader({
             />
           </div>
           <span>
-            {kindLabel[rule.kind]}
+            {ruleKinds[rule.kind].label}
             <span className="tiny-divider" />
             {saveStatus(dirty, readOnly)}
           </span>

@@ -1,4 +1,4 @@
-import type { Edge } from "@xyflow/react";
+import type { Edge, NodeChange } from "@xyflow/react";
 import type { Definition, Execution, RuleNode } from "../../../types";
 import { nodeWidth, sourcePort } from "../../../domain/nodePorts";
 import type { FlowNode } from "./GraphNode";
@@ -25,6 +25,27 @@ export function cardBounds(nodes: RuleNode[], sizes: NodeSizes): CardBounds[] {
       height: size.height,
     };
   });
+}
+
+/**
+ * The cards' bounds when the drag reported by `changes` started, or null when
+ * no drag is in progress. The first position change of a drag arrives with
+ * `dragging: true` and the position already moved, so the bounds must be the
+ * ones from before that change is applied: the caller passes the bounds it
+ * rendered last.
+ */
+export function dragStartBounds(
+  current: ReadonlyMap<string, CardBounds> | null,
+  changes: NodeChange[],
+  bounds: CardBounds[],
+): ReadonlyMap<string, CardBounds> | null {
+  let dragging: boolean | null = null;
+  for (const change of changes)
+    if (change.type === "position" && typeof change.dragging === "boolean")
+      dragging = change.dragging;
+  if (dragging === null) return current;
+  if (!dragging) return null;
+  return current ?? new Map(bounds.map((card) => [card.id, card]));
 }
 
 /*

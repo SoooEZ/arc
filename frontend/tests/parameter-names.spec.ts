@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 test("parameter names reject whitespace and dollars without losing edits, row identity, or literal keys", async ({
   page,
   request,
 }, testInfo) => {
-  const id = `parameter-names-${Date.now()}`;
+  const id = uniqueId("parameter-names");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -36,13 +37,7 @@ test("parameter names reject whitespace and dollars without losing edits, row id
       { id: "next", source: "input", sourceHandle: "next", target: "output" },
     ],
   };
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: { id, name: id, kind: "FORMULA", definition },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await createRule(request, { id, name: id, kind: "FORMULA", definition });
   await page.goto(`/#/rules/${id}?node=input`);
   const names = page.getByLabel("Parameter name", { exact: true });
   const name = names.nth(1);
@@ -132,7 +127,7 @@ test("source parameter JSON retains invalid drafts, blocks invalid names before 
   page,
   request,
 }, testInfo) => {
-  const id = `source-parameter-names-${Date.now()}`;
+  const id = uniqueId("source-parameter-names");
   await page.goto("/#/sources");
   await page.getByRole("button", { name: "New source", exact: true }).click();
   await page.getByLabel("Source ID", { exact: true }).fill(id);

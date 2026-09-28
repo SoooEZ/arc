@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -23,11 +24,13 @@ for (const outcome of ["success", "failure"] as const) {
     page,
     request,
   }) => {
-    const id = `command-lifecycle-${outcome}-${Date.now()}`;
-    const created = await request.post("/api/rules", {
-      data: { id, name: id, kind: "FORMULA", definition },
+    const id = uniqueId(`command-lifecycle-${outcome}`);
+    await createRule(request, {
+      id,
+      name: id,
+      kind: "FORMULA",
+      definition,
     });
-    expect(created.ok()).toBeTruthy();
     const rendered = await request.post("/api/studio/render", {
       data: definition,
     });

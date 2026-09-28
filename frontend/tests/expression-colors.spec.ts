@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 const colors = {
   function: "rgb(139, 104, 47)",
@@ -98,12 +99,14 @@ function definition(connected = true): Definition {
 }
 
 async function create(request: APIRequestContext, connected = true) {
-  const id = `expression-colors-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("expression-colors");
   const draft = definition(connected);
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "DECISION_TREE", definition: draft },
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "DECISION_TREE",
+    definition: draft,
   });
-  expect(response.status()).toBe(201);
   const variables = await request.post("/api/variables", { data: draft });
   expect(variables.ok()).toBeTruthy();
   expect((await variables.json()).choose).toEqual(
@@ -324,9 +327,9 @@ test("dotted paths take no keyword, type or constant color while standalone word
   page,
   request,
 }) => {
-  const id = `expression-colors-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("expression-colors");
   const paths =
-    "customer.format + customer.lowercase + customer.reuse + customer.isnull + customer.ACCOUNT_NUMBER + customer.wallet + customer.plain == null";
+    "customer.format + customer.lowercase + customer.reuse + customer.isnull + customer.ACCOUNT_NUMBER + customer.wallet + customer.plain + number == null";
   // The inline editor renders only its visible lines, so it gets a short expression.
   const shortPaths = "customer.plain + customer.wallet + customer.isnull";
   const draft = definition(true);
@@ -341,10 +344,12 @@ test("dotted paths take no keyword, type or constant color while standalone word
         }
       : node,
   );
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "DECISION_TREE", definition: draft },
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "DECISION_TREE",
+    definition: draft,
   });
-  expect(created.status()).toBe(201);
   const properties = [
     "format",
     "lowercase",
@@ -381,6 +386,15 @@ test("dotted paths take no keyword, type or constant color while standalone word
   await expectColor(script, "let", colors.keyword);
   await expectColor(script, "case", colors.keyword);
   await expectColor(script, "NUMBER", colors.type);
+  // A keyword before a parenthesis was painted as a function call: `at (300, 0)`.
+  expect((await paintedColors(script, "at (")).slice(0, 2)).toEqual([
+    colors.keyword,
+    colors.keyword,
+  ]);
+  // A declared type follows a colon; an identifier spelled like one is plain.
+  await expect
+    .poll(() => paintedColors(script, "number"))
+    .toEqual(Array<string>("number".length).fill(plain));
   // The standalone null after "==" is the second "null" of the script (isnull holds the first).
   await expect
     .poll(() => paintedColors(script, "null", 1))

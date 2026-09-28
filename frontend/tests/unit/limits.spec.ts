@@ -11,7 +11,7 @@ import {
   ruleMetadataProblem,
 } from "../../src/domain/limits";
 import { canAddSwitchDefaultReturn } from "../../src/domain/switchBranches";
-import { connectGraphNodes } from "../../src/domain/graph";
+import { connectGraphNodes, connectionAllowed } from "../../src/domain/graph";
 import type { Definition, RuleEdge, RuleNode } from "../../src/types";
 
 const node = (id: string): RuleNode => ({
@@ -58,7 +58,16 @@ test("a full draft takes no new connection and no Default return", () => {
   };
   expect(connectGraphNodes(full, "n0", "out", "next", "new")).toBe(full);
   expect(canAddSwitchDefaultReturn(full, "choose")).toBe(false);
+  // The canvas asks while a handle is dragged: a full draft shows the drop as refused.
+  const drop = { source: "n0", target: "out", sourceHandle: "next" };
+  expect(connectionAllowed(full, drop)).toBe(false);
   const room = { ...full, edges: full.edges.slice(1) };
+  expect(connectionAllowed(room, drop)).toBe(true);
+  expect(connectionAllowed(room, { ...drop, target: "n0" })).toBe(false);
+  expect(connectionAllowed(room, { ...drop, source: null })).toBe(false);
+  expect(connectionAllowed(room, { ...drop, sourceHandle: "case:x" })).toBe(
+    false,
+  );
   expect(
     connectGraphNodes(room, "n0", "out", "next", "new").edges,
   ).toHaveLength(MAX_EDGES);
@@ -77,10 +86,28 @@ test("rule metadata problems repeat the server's messages at its boundaries", ()
       name: "a".repeat(MAX_NAME_CHARACTERS + 1),
       description: "",
     }),
-  ).toBe("Rule name must contain 1 to 160 characters");
-  expect(ruleMetadataProblem({ name: "   ", description: "" })).toBe(
-    "Rule name must contain 1 to 160 characters",
-  );
+  ).toEqual({
+    field: "name",
+    message: "Rule name must contain 1 to 160 characters",
+  });
+  expect(ruleMetadataProblem({ name: "   ", description: "" })).toEqual({
+    field: "name",
+    message: "Rule name must contain 1 to 160 characters",
+  });
+  // The server trims with Java's String.trim: a no-break space is a name.
+  expect(ruleMetadataProblem({ name: "\u00a0", description: "" })).toBeNull();
+  expect(
+    ruleMetadataProblem({ name: "\t\u0000Tax\r\n", description: "" }),
+  ).toBeNull();
+  expect(
+    ruleMetadataProblem({
+      name: ` ${"a".repeat(MAX_NAME_CHARACTERS)}\u00a0`,
+      description: "",
+    }),
+  ).toEqual({
+    field: "name",
+    message: "Rule name must contain 1 to 160 characters",
+  });
   expect(
     ruleMetadataProblem({
       name: "Tax",
@@ -92,5 +119,8 @@ test("rule metadata problems repeat the server's messages at its boundaries", ()
       name: "Tax",
       description: "d".repeat(MAX_DESCRIPTION_CHARACTERS + 1),
     }),
-  ).toBe("Description exceeds 2,000 characters");
+  ).toEqual({
+    field: "description",
+    message: "Description exceeds 2,000 characters",
+  });
 });

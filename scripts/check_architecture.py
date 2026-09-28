@@ -84,13 +84,13 @@ STATIC_IMPORT = re.compile(r'''(?:\bfrom\s+|\bimport\s+)["']([^"']+)["']''')
 # import("./x"), import(`./x`) or import(anything else); only the first two name a module.
 DYNAMIC_IMPORT = re.compile(r'''\bimport\s*\(\s*(?:(["'])([^"'`]+)\1|`([^`]*)`|([^)]*))\s*\)''')
 IMPORT_META_GLOB = re.compile(r"\bimport\.meta\.glob\b")
-# Connection handles have one frontend owner, domain/nodePorts.ts (`handles`, `caseHandle`,
+# Connection handles have one frontend owner, domain/nodePorts.ts (`handles`, `sourcePort`,
 # `sourcePort`): no other file compares or writes a handle literal, or builds a case handle.
 FRONTEND_HANDLE_OWNER = "domain/nodePorts.ts"
 FRONTEND_HANDLE_LITERAL = re.compile(
     r"""sourceHandle\s*(?:===|!==|:)\s*["'](?:%s)["']|["'`]case:(?:["']|\$\{)""" % "|".join(HANDLES)
 )
-FRONTEND_HANDLE_REASON = "use handles/caseHandle/sourcePort from domain/nodePorts instead of handle strings"
+FRONTEND_HANDLE_REASON = "use handles/sourcePort from domain/nodePorts instead of handle strings"
 
 
 def handle_contexts(handle):

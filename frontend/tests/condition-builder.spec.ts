@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 const number = (name: string, defaultValue: number) => ({
   name,
@@ -24,7 +25,7 @@ async function createCondition(
     number("android", 5),
   ],
 ) {
-  const id = `condition-builder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("condition-builder");
   const definition: Definition = {
     schemaVersion: 1,
     inputs,
@@ -63,11 +64,13 @@ async function createCondition(
       { id: "unmet", source: "check", target: "no", sourceHandle: "false" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "RULE", definition },
+  const response = await createRule(request, {
+    id,
+    name: id,
+    kind: "RULE",
+    definition,
   });
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()) as Rule;
+  return response;
 }
 
 async function savedCondition(request: APIRequestContext, id: string) {

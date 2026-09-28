@@ -17,7 +17,10 @@ import {
 import UndeclaredBindings from "../../expressions/UndeclaredBindings";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
-type RuleChoice = Pick<RuleSummary, "id" | "name" | "publishedVersion">;
+type RuleChoice = Pick<
+  RuleSummary,
+  "id" | "name" | "publishedVersion" | "createdAt"
+>;
 
 export default function ReferenceFields({
   node,
@@ -37,19 +40,22 @@ export default function ReferenceFields({
     ruleId && !knownRule ? (signal) => ruleApi.get(ruleId, { signal }) : null,
     null,
   );
+  // The rule as read now; a deleted ID created again is another incarnation.
+  const identity = knownRule ?? selectedRule.data;
   const ruleValue: RuleChoice | null = ruleId
-    ? knownRule ||
-      selectedRule.data || {
+    ? (identity ?? {
         id: ruleId,
         name: ruleId,
         publishedVersion: version ?? null,
-      }
+        createdAt: "",
+      })
     : null;
-  // The pinned version is immutable: the page-wide cache serves every selection.
+  // The pinned version is immutable for one incarnation: the page-wide cache
+  // serves every selection of it, keyed by the rule's creation time.
   const detail = useAsyncResource<Version | null>(
-    `${ruleId}:${version}`,
-    ruleId && version
-      ? (signal) => readRuleVersion(ruleId, version, signal)
+    `${ruleId}:${version}:${identity?.createdAt ?? ""}`,
+    ruleId && version && identity
+      ? (signal) => readRuleVersion(identity, version, signal)
       : null,
     null,
   );

@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -41,11 +42,13 @@ async function openRule(
   request: APIRequestContext,
   prefix: string,
 ) {
-  const id = `${prefix}-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: `Preview ${id}`, kind: "FORMULA", definition },
+  const id = uniqueId(`${prefix}`);
+  await createRule(request, {
+    id,
+    name: `Preview ${id}`,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}`);
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
   return id;

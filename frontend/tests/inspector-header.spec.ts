@@ -5,6 +5,11 @@ import {
   type Locator,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueId,
+} from "./helpers/api";
 
 async function expectHeaderActions(header: Locator) {
   const actions = header.locator(".inspector-heading-actions");
@@ -30,7 +35,7 @@ async function expectHeaderActions(header: Locator) {
 }
 
 async function createRule(request: APIRequestContext, label: string) {
-  const id = `inspector-header-${Date.now()}`;
+  const id = uniqueId("inspector-header");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -77,11 +82,13 @@ async function createRule(request: APIRequestContext, label: string) {
       },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "DECISION_TREE", definition },
+  const response = await createApiRule(request, {
+    id,
+    name: id,
+    kind: "DECISION_TREE",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as Rule;
+  return response;
 }
 
 test("the sidebar header follows node selection and name edits, retaining the expression action", async ({
@@ -184,13 +191,7 @@ test("long names fit the sidebar header on narrow screens and remain inspectable
 }) => {
   const label = "Eligibility".repeat(14);
   const rule = await createRule(request, label);
-  expect(
-    (
-      await request.post(`/api/rules/${rule.id}/publish`, {
-        data: { revision: rule.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, rule);
   await page.goto(`/#/rules/${rule.id}?version=1`);
   await page
     .locator('.react-flow__node[data-id="condition"] .graph-node')

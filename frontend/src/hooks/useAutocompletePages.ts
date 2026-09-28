@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "../api/errors";
 import type { Page } from "../types";
+import { typeaheadDelayMs } from "./useDebouncedValue";
 
 interface Pages<T> {
   key: string;
@@ -108,7 +109,7 @@ export function useAutocompletePages<T>(
       error: "",
     });
     if (!enabled) return;
-    const timer = setTimeout(() => void fetchPage(0, key), 180);
+    const timer = setTimeout(() => void fetchPage(0, key), typeaheadDelayMs);
     return () => {
       clearTimeout(timer);
       request.current?.abort();

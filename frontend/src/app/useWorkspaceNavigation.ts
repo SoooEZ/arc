@@ -18,10 +18,11 @@ function recordedPosition(): number | null {
   return typeof state.arcEntry === "number" ? state.arcEntry : null;
 }
 
-function recordPosition(position: number) {
+/** Records the entry's position, and rewrites its route when `url` is given. */
+function recordPosition(position: number, url?: string) {
   const state: unknown = window.history.state;
   const kept = typeof state === "object" && state !== null ? state : {};
-  window.history.replaceState({ ...kept, arcEntry: position }, "");
+  window.history.replaceState({ ...kept, arcEntry: position }, "", url);
 }
 
 export function useWorkspaceNavigation() {
@@ -34,6 +35,9 @@ export function useWorkspaceNavigation() {
   const shown = useRef({ route, position: 0, pushed: false });
   // navigate() has already confirmed this route; its hashchange must not ask again.
   const confirmed = useRef<string | null>(null);
+  // redirect() has stepped back and awaits the hashchange: the refusing
+  // document renders again in between, and a second step would leave the rule.
+  const correcting = useRef(false);
 
   const warningFor = useCallback(
     (to: string) =>
@@ -67,6 +71,7 @@ export function useWorkspaceNavigation() {
       window.history.go(delta);
     };
     const changed = () => {
+      correcting.current = false;
       const next = currentRoute();
       const recorded = recordedPosition();
       // An entry without a position was just pushed after the shown one.
@@ -91,6 +96,23 @@ export function useWorkspaceNavigation() {
     window.addEventListener("hashchange", changed);
     return () => window.removeEventListener("hashchange", changed);
   }, [warningFor]);
+
+  useEffect(() => {
+    // A traversal between two entries of the shown route fires no hashchange:
+    // a refused arrival rewrote one of them in place (lesson F24). The press
+    // would show nothing, so the position is re-read and the traversal goes
+    // on in its direction to the next entry that differs.
+    const traversed = () => {
+      const recorded = recordedPosition();
+      if (recorded === null || currentRoute() !== shown.current.route) return;
+      const previous = shown.current.position;
+      if (recorded === previous) return;
+      shown.current = { ...shown.current, position: recorded };
+      window.history.go(Math.sign(recorded - previous));
+    };
+    window.addEventListener("popstate", traversed);
+    return () => window.removeEventListener("popstate", traversed);
+  }, []);
 
   useEffect(() => {
     const leave = (event: BeforeUnloadEvent) => {
@@ -133,22 +155,18 @@ export function useWorkspaceNavigation() {
    * because the refusing state only exists inside that document's session. An
    * entry reached by Back or Forward is rewritten to `path` in place, so the
    * next Back continues past the rule instead of returning to the refused view.
+   * While the step back is pending, a repeated call changes nothing.
    */
   const redirect = useCallback((path: string) => {
     const { route, position, pushed } = shown.current;
-    if (route === path) return;
+    if (route === path || correcting.current) return;
     if (pushed && position > 0) {
+      correcting.current = true;
       confirmed.current = path;
       window.history.go(-1);
       return;
     }
-    const state: unknown = window.history.state;
-    const kept = typeof state === "object" && state !== null ? state : {};
-    window.history.replaceState(
-      { ...kept, arcEntry: position },
-      "",
-      `#${path}`,
-    );
+    recordPosition(position, `#${path}`);
     shown.current = { route: path, position, pushed };
     setRoute(path);
   }, []);

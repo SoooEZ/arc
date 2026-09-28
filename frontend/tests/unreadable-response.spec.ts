@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 // An intercepting proxy or captive portal can answer with 200 and an HTML page.
 const proxyPage = {
@@ -20,7 +21,7 @@ test("a save answered by an unreadable 200 response reports an error and keeps t
   page,
   request,
 }) => {
-  const id = `unreadable-save-${Date.now()}`;
+  const id = uniqueId("unreadable-save");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -38,10 +39,12 @@ test("a save answered by an unreadable 200 response reports an error and keeps t
       { id: "next", source: "input", target: "out", sourceHandle: "next" },
     ],
   };
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBe(true);
   const errors = pageErrors(page);
   await page.goto(`/#/rules/${id}?node=out`);
   const name = page.getByLabel("Node name", { exact: true });

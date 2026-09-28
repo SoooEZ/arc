@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { expressionSymbols } from "../../src/domain/expressionSymbols";
-import type { VariableOption } from "../../src/domain/graph";
+import type { VariableOption } from "../../src/domain/variables";
 
 const variables: VariableOption[] = [
   { name: "ROUND", type: "NUMBER", label: "Inputs" },

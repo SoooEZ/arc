@@ -14,8 +14,27 @@ export const handles = {
 } as const;
 
 /** The handle of a Switch case: its ID never depends on the case's position. */
-export function caseHandle(caseId: string): string {
+function caseHandle(caseId: string): string {
   return `case:${caseId}`;
+}
+
+/** The caption and fallback status of the fixed exits, which every graph shares. */
+const fixedExits: Record<
+  "true" | "false" | "default",
+  { label: string; fallback: boolean }
+> = {
+  true: { label: "True", fallback: false },
+  false: { label: "False", fallback: true },
+  default: { label: "Default", fallback: true },
+};
+
+/** The caption of a handle that needs no node to read: the fixed exits; null for `next` and case handles. */
+export function fixedExitCaption(
+  handleId: string,
+): { label: string; fallback: boolean } | null {
+  return Object.hasOwn(fixedExits, handleId)
+    ? fixedExits[handleId as keyof typeof fixedExits]
+    : null;
 }
 
 export interface SourcePort {
@@ -37,7 +56,7 @@ function casePorts(cases: BranchCase[]): SourcePort[] {
       label: option.label,
       fallback: false,
     })),
-    { id: handles.default, label: "Default", fallback: true },
+    { id: handles.default, ...fixedExits.default },
   ];
   return branches.map((branch, index) => ({
     ...branch,
@@ -54,18 +73,8 @@ export function sourcePorts(node: RuleNode): SourcePort[] {
       return [{ id: handles.next, label: "", ratio: 0.5, fallback: false }];
     case "true-false":
       return [
-        {
-          id: handles.true,
-          label: "True",
-          ratio: branchHandleX.true,
-          fallback: false,
-        },
-        {
-          id: handles.false,
-          label: "False",
-          ratio: branchHandleX.false,
-          fallback: true,
-        },
+        { id: handles.true, ratio: branchHandleX.true, ...fixedExits.true },
+        { id: handles.false, ratio: branchHandleX.false, ...fixedExits.false },
       ];
     case "cases":
       return casePorts(node.cases ?? []);

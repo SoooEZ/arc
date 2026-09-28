@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -38,12 +39,14 @@ const definition: Definition = {
 };
 
 async function create(request: APIRequestContext, draft = definition) {
-  const id = `node-names-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition: draft },
+  const id = uniqueId("node-names");
+  const response = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition: draft,
   });
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()) as Rule;
+  return response;
 }
 
 async function save(page: Page) {

@@ -7,9 +7,10 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, publishRule, uniqueStamp } from "./helpers/api";
 
 async function fixtures(request: APIRequestContext) {
-  const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const suffix = uniqueStamp();
   const callee = `fc-${suffix}`;
   const caller = `context-${suffix}`;
   const definition = (
@@ -52,52 +53,36 @@ async function fixtures(request: APIRequestContext) {
     required: true,
     defaultValue: 25,
   };
-  const created = await request.post("/api/rules", {
-    data: {
-      id: callee,
-      name: `Price formula ${suffix}`,
-      kind: "FORMULA",
-      definition: definition("amount * (1 + rate)", [
-        amount,
-        { name: "rate", type: "NUMBER", required: false, defaultValue: 0.1 },
-      ]),
-    },
+  const published: Rule = await createRule(request, {
+    id: callee,
+    name: `Price formula ${suffix}`,
+    kind: "FORMULA",
+    definition: definition("amount * (1 + rate)", [
+      amount,
+      { name: "rate", type: "NUMBER", required: false, defaultValue: 0.1 },
+    ]),
   });
-  expect(created.status()).toBe(201);
-  const published: Rule = await created.json();
-  expect(
-    (
-      await request.post(`/api/rules/${callee}/publish`, {
-        data: { revision: published.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: {
-          id: caller,
-          name: caller,
-          kind: "FORMULA",
-          definition: definition(`@${callee}:1(amount)`, [
-            amount,
-            {
-              name: "items",
-              type: "ARRAY",
-              required: true,
-              defaultValue: [1, 2],
-            },
-            {
-              name: "customer",
-              type: "OBJECT",
-              required: true,
-              defaultValue: { rows: [{ amount: 7 }] },
-            },
-          ]),
-        },
-      })
-    ).status(),
-  ).toBe(201);
+  await publishRule(request, published);
+  await createRule(request, {
+    id: caller,
+    name: caller,
+    kind: "FORMULA",
+    definition: definition(`@${callee}:1(amount)`, [
+      amount,
+      {
+        name: "items",
+        type: "ARRAY",
+        required: true,
+        defaultValue: [1, 2],
+      },
+      {
+        name: "customer",
+        type: "OBJECT",
+        required: true,
+        defaultValue: { rows: [{ amount: 7 }] },
+      },
+    ]),
+  });
   return { caller, callee, label: `Price formula ${suffix}` };
 }
 

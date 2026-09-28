@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -24,11 +25,13 @@ test("unfinished defaults survive canvas, outline, node-code and sidebar view ch
   page,
   request,
 }) => {
-  const id = `buffer-guards-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Buffer guards", kind: "FORMULA", definition },
+  const id = uniqueId("buffer-guards");
+  await createRule(request, {
+    id,
+    name: "Buffer guards",
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   const writes: string[] = [];
   page.on("request", (sent) => {
     if (sent.method() === "PUT") writes.push(sent.url());
@@ -117,21 +120,18 @@ test("a draft's last non-Input node cannot be deleted from either entry point", 
   page,
   request,
 }) => {
-  const id = `last-node-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: {
-      id,
-      name: "Last node",
-      kind: "FORMULA",
-      definition: {
-        ...definition,
-        inputs: [],
-        nodes: [definition.nodes[1]],
-        edges: [],
-      },
+  const id = uniqueId("last-node");
+  await createRule(request, {
+    id,
+    name: "Last node",
+    kind: "FORMULA",
+    definition: {
+      ...definition,
+      inputs: [],
+      nodes: [definition.nodes[1]],
+      edges: [],
     },
   });
-  expect(created.ok()).toBeTruthy();
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(`/#/rules/${id}`);
@@ -160,11 +160,13 @@ test("opening node code locks defaults while its editor module is loading", asyn
   page,
   request,
 }) => {
-  const id = `node-code-loading-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Node code loading", kind: "FORMULA", definition },
+  const id = uniqueId("node-code-loading");
+  await createRule(request, {
+    id,
+    name: "Node code loading",
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -224,11 +226,13 @@ test("adding a node is refused whole while a parameter default is invalid", asyn
   page,
   request,
 }) => {
-  const id = `buffer-guards-add-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Buffer guards add", kind: "FORMULA", definition },
+  const id = uniqueId("buffer-guards-add");
+  await createRule(request, {
+    id,
+    name: "Buffer guards add",
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}`);
   const field = page.getByLabel("Default JSON (optional)", { exact: true });
   await field.fill("[");

@@ -1,9 +1,10 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 async function create(request: APIRequestContext) {
-  const id = `function-namespace-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("function-namespace");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -42,11 +43,13 @@ async function create(request: APIRequestContext) {
       { id: "end", source: "calculate", target: "out", sourceHandle: "next" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const response = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as Rule;
+  return response;
 }
 
 test("function namespace separates same-named inputs and preserves snippet arguments through execution", async ({

@@ -5,18 +5,16 @@ import {
   Switch,
   TextField,
 } from "@mui/material";
+import type { ExecutionOptions } from "../../types";
 import { executionTimeoutChoicesMs } from "./executionOptions";
+import type { ExecutionRequestOptions } from "./useExecutionOptions";
 
 export default function ExecutionOptionsFields({
-  trace,
-  timeoutMs,
-  onTrace,
-  onTimeout,
+  value,
+  onChange,
 }: {
-  trace: boolean;
-  timeoutMs: number;
-  onTrace: (value: boolean) => void;
-  onTimeout: (value: number) => void;
+  value: ExecutionRequestOptions;
+  onChange: (patch: Partial<ExecutionOptions>) => void;
 }) {
   return (
     <Stack
@@ -29,8 +27,8 @@ export default function ExecutionOptionsFields({
         control={
           <Switch
             size="small"
-            checked={trace}
-            onChange={(_, checked) => onTrace(checked)}
+            checked={value.trace}
+            onChange={(_, trace) => onChange({ trace })}
           />
         }
         label="Include execution trace"
@@ -39,13 +37,15 @@ export default function ExecutionOptionsFields({
         select
         size="small"
         label="Execution timeout"
-        value={timeoutMs}
-        onChange={(event) => onTimeout(Number(event.target.value))}
+        value={value.timeoutMs}
+        onChange={(event) =>
+          onChange({ timeoutMs: Number(event.target.value) })
+        }
         sx={{ minWidth: 155 }}
       >
-        {executionTimeoutChoicesMs.map((value) => (
-          <MenuItem key={value} value={value}>
-            {value / 1000} seconds
+        {executionTimeoutChoicesMs.map((choice) => (
+          <MenuItem key={choice} value={choice}>
+            {choice / 1000} seconds
           </MenuItem>
         ))}
       </TextField>

@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 /** The stored draft as raw JSON text: parsing it into doubles would hide rounding. */
 async function storedDraft(request: APIRequestContext, id: string) {
@@ -12,7 +13,7 @@ async function storedDraft(request: APIRequestContext, id: string) {
 }
 
 async function openNumericRule(page: Page, request: APIRequestContext) {
-  const id = `numeric-default-${Date.now()}`;
+  const id = uniqueId("numeric-default");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -37,13 +38,15 @@ async function openNumericRule(page: Page, request: APIRequestContext) {
       { id: "next", source: "input", target: "out", sourceHandle: "next" },
     ],
   };
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const created = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}?node=input`);
   await expect(page.getByLabel("Default value (optional)")).toHaveValue("7");
-  return { id, original: (await created.json()) as Rule };
+  return { id, original: created };
 }
 
 function watchWrites(page: Page, id: string) {

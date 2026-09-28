@@ -5,7 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
-import { createRule as createApiRule, readRule } from "./helpers/api";
+import { createRule as createApiRule, readRule, uniqueId } from "./helpers/api";
 import { editorLines } from "./helpers/editor";
 
 const definition: Definition = {
@@ -38,7 +38,7 @@ const definition: Definition = {
 };
 
 async function createRule(request: APIRequestContext, prefix: string) {
-  const id = `${prefix}-${Date.now()}`;
+  const id = uniqueId(`${prefix}`);
   await createApiRule(request, { id, name: `Commands ${id}`, definition });
   return id;
 }
@@ -360,23 +360,20 @@ test("Arrange lays out a large graph off the main thread, and a failing worker r
       sourceHandle: "next",
     });
   }
-  const id = `arrange-worker-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: {
-      id,
-      name: `Arrange worker ${id}`,
-      kind: "FORMULA",
-      definition: {
-        schemaVersion: 1,
-        inputs: [
-          { name: "amount", type: "NUMBER", required: true, defaultValue: 1 },
-        ],
-        nodes,
-        edges,
-      },
+  const id = uniqueId("arrange-worker");
+  await createApiRule(request, {
+    id,
+    name: `Arrange worker ${id}`,
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [
+        { name: "amount", type: "NUMBER", required: true, defaultValue: 1 },
+      ],
+      nodes,
+      edges,
     },
   });
-  expect(created.ok(), await created.text()).toBeTruthy();
   const workerScripts: string[] = [];
   page.on("request", (outgoing) => {
     if (/elk-worker/.test(outgoing.url())) workerScripts.push(outgoing.url());
@@ -414,9 +411,22 @@ test("Arrange lays out a large graph off the main thread, and a failing worker r
   const after = (await (await request.get(`/api/rules/${id}`)).json()).draft
     .nodes[5].position;
   expect(after).not.toEqual(before);
+  // The worker holds ELK's heap: leaving the editor releases it.
+  const elkWorkers = () =>
+    page.workers().filter((worker) => /elk-worker/.test(worker.url()));
+  expect(elkWorkers()).toHaveLength(1);
+  await page
+    .getByRole("navigation", { name: "Workspace", exact: true })
+    .getByRole("button", { name: "Rule library", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Rule library" }),
+  ).toBeVisible();
+  await expect.poll(() => elkWorkers().length).toBe(0);
 
   // A worker that cannot load reports an error and releases the commands (lesson F8).
   await page.route(/elk-worker/, (route) => route.abort());
+  await page.goto(`/#/rules/${id}`);
   await page.reload();
   await expect(page.locator(".react-flow__node")).toHaveCount(100);
   await page

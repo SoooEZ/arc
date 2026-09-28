@@ -24,8 +24,15 @@ import {
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
 import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
+import {
+  unsavedDialogWarning,
+  useNavigationGuard,
+} from "../../app/navigationGuards";
 import { studioApi } from "../../api/studio";
-import { variableOptionLabel, type VariableOption } from "../../domain/graph";
+import {
+  variableOptionLabel,
+  type VariableOption,
+} from "../../domain/variables";
 
 export default function ExpressionDialog({
   label,
@@ -46,6 +53,8 @@ export default function ExpressionDialog({
   onApply: (value: string) => void;
 }) {
   const [source, setSource] = useState(value);
+  // The text is applied only on Apply: a route change asks first.
+  useNavigationGuard(source !== value ? unsavedDialogWarning : null);
   const { editor, model, onMount } = useArcEditor();
   const options = useEditorOptions(
     expressionDialogOptions,

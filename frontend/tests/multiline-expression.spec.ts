@@ -1,9 +1,14 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import type { Definition, Rule } from "../src/types";
+import type { Definition } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueId,
+} from "./helpers/api";
 
 async function createRule(request: APIRequestContext) {
-  const id = `multiline-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("multiline");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -42,18 +47,13 @@ async function createRule(request: APIRequestContext) {
       { id: "end", source: "calculate", target: "out", sourceHandle: "next" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const rule = await createApiRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
-  const rule = (await response.json()) as Rule;
-  expect(
-    (
-      await request.post(`/api/rules/${id}/publish`, {
-        data: { revision: rule.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, rule);
   return rule;
 }
 

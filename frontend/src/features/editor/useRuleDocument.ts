@@ -54,6 +54,9 @@ type VersionLoad =
 /** Computes positions for the draft it receives, e.g. with the ELK layout. */
 export type DraftLayout = (draft: Definition) => Promise<Definition>;
 
+/** The code's own diagnostics refused the build, as opposed to the build request failing. */
+class CodeBuildFailure extends Error {}
+
 /** Why the server kept a rule: its message and, for a refused deletion, every caller. */
 export interface DeletionRefusal {
   message: string;
@@ -256,7 +259,7 @@ export function useRuleDocument({
       diagnostics: result.diagnostics,
     });
     if (!result.definition)
-      throw new Error(
+      throw new CodeBuildFailure(
         result.diagnostics[0]?.message || "Code could not be built",
       );
     dispatch({
@@ -320,16 +323,20 @@ export function useRuleDocument({
     redirect,
     runTask,
   };
-  // The buffer whose arrival build failed: arriving again with the same text
-  // returns to the code without building it once more.
-  const failedArrival = useRef<string | null>(null);
+  // The buffer whose arrival build its diagnostics refused, with the message:
+  // arriving again with the same text returns to the code and shows why,
+  // without building it once more. A transient failure (the request failed,
+  // the code changed meanwhile) is not remembered, so the next arrival builds.
+  const failedArrival = useRef<{ source: string; message: string } | null>(
+    null,
+  );
   useEffect(() => {
     // Unbuilt code builds before the graph shows; a failure returns to the
     // code. The rule applies whenever it is due: a graph arrival during a
     // command waits for the lock and then builds, and never stays half-applied.
     if (mode !== "graph" || busy !== "" || !current.current.sourceDirty) return;
     const latest = current.current;
-    if (latest.source !== null && latest.source === failedArrival.current) {
+    const returnToCode = () =>
       latest.redirect(
         rulePath({
           ruleId: latest.ruleId,
@@ -337,6 +344,10 @@ export function useRuleDocument({
           version: latest.requestedVersion,
         }),
       );
+    const remembered = failedArrival.current;
+    if (latest.source !== null && remembered?.source === latest.source) {
+      setError(remembered.message);
+      returnToCode();
       return;
     }
     void latest.runTask("switch", async (signal) => {
@@ -344,14 +355,12 @@ export function useRuleDocument({
         await latest.buildCode();
       } catch (failure) {
         if (!signal.aborted) {
-          failedArrival.current = latest.source;
-          latest.redirect(
-            rulePath({
-              ruleId: latest.ruleId,
-              mode: "code",
-              version: latest.requestedVersion,
-            }),
-          );
+          if (failure instanceof CodeBuildFailure && latest.source !== null)
+            failedArrival.current = {
+              source: latest.source,
+              message: failure.message,
+            };
+          returnToCode();
         }
         throw failure;
       }

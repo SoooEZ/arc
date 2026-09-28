@@ -3,6 +3,7 @@ import type { Definition, Execution, RuleNode } from "../../src/types";
 import { patchGraphNode } from "../../src/domain/graph";
 import {
   cardBounds,
+  dragStartBounds,
   flowEdges,
   flowNodes,
   takenBranches,
@@ -299,6 +300,90 @@ test("a drag routes again only the edges the moved card can affect, and the sett
       routeEdge(source, target, draggedCards),
     );
   }
+});
+
+test("a blocked edge routes again whenever a card moves, since no route says what blocks it", () => {
+  const nodes: RoutingNode[] = [
+    { id: "a", x: 0, y: 0, width: 230, height: 94 },
+    { id: "b", x: 0, y: 300, width: 230, height: 94 },
+    { id: "c", x: 600, y: 150, width: 230, height: 94 },
+  ];
+  const source: Endpoint = { x: 115, y: 94, nodeId: "a", side: "bottom" };
+  const target: Endpoint = { x: 115, y: 300, nodeId: "b", side: "top" };
+  const blocked: CachedRoute = { source, target, route: null };
+  let calls = 0;
+  const counting: typeof routeEdge = (from, to, obstacles) => {
+    calls += 1;
+    return routeEdge(from, to, obstacles);
+  };
+  const moved: MovedCard = {
+    id: "c",
+    before: nodes[2],
+    after: { ...nodes[2], x: 700 },
+  };
+  // Card c sits far from the blocked edge: the cache used to keep the null route for the whole drag.
+  routeWithCache(blocked, source, target, nodes, [moved], counting);
+  expect(calls).toBe(1);
+  // Nothing moved yet in this drag: the cached decision stands.
+  expect(routeWithCache(blocked, source, target, nodes, [], counting)).toBe(
+    blocked,
+  );
+  expect(calls).toBe(1);
+});
+
+test("a drag's first change captures the bounds before it, and its end clears them", () => {
+  const bounds = cardBounds(definition.nodes, new Map());
+  const first = dragStartBounds(
+    null,
+    [
+      {
+        type: "position",
+        id: "check",
+        position: { x: 5, y: 150 },
+        dragging: true,
+      },
+    ],
+    bounds,
+  );
+  expect(first?.get("check")).toEqual(
+    expect.objectContaining({ x: 0, y: 150 }),
+  );
+  // Later changes keep the captured start; the moved bounds are never captured.
+  const moved = bounds.map((card) =>
+    card.id === "check" ? { ...card, x: 5 } : card,
+  );
+  expect(
+    dragStartBounds(
+      first,
+      [
+        {
+          type: "position",
+          id: "check",
+          position: { x: 9, y: 150 },
+          dragging: true,
+        },
+      ],
+      moved,
+    ),
+  ).toBe(first);
+  // A change without a drag flag (a measurement) changes nothing.
+  expect(
+    dragStartBounds(first, [{ type: "dimensions", id: "check" }], moved),
+  ).toBe(first);
+  expect(
+    dragStartBounds(
+      first,
+      [
+        {
+          type: "position",
+          id: "check",
+          position: { x: 9, y: 150 },
+          dragging: false,
+        },
+      ],
+      moved,
+    ),
+  ).toBeNull();
 });
 
 test("Switch Default and Condition False edges take the fallback stroke and label style", () => {

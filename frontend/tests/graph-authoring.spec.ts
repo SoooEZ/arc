@@ -7,17 +7,20 @@ import {
   type Locator,
 } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
+import { createRule, uniqueId, uniqueStamp } from "./helpers/api";
 
 async function create(request: APIRequestContext, source: string) {
   const built = await (
     await request.post("/api/studio/build", { data: { source } })
   ).json();
   expect(built.diagnostics).toEqual([]);
-  const id = `graph-authoring-${Date.now()}`;
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "DECISION_TREE", definition: built.definition },
+  const id = uniqueId("graph-authoring");
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "DECISION_TREE",
+    definition: built.definition,
   });
-  expect(response.ok()).toBeTruthy();
   return id;
 }
 async function replaceExpression(page: Page, dialog: Locator, source: string) {
@@ -382,7 +385,7 @@ test("a draft at the server's node or input limit disables Add node and Add para
   page,
   request,
 }) => {
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const stamp = uniqueStamp();
   const nodes: RuleNode[] = [
     { id: "input", type: "INPUT", label: "Inputs", position: { x: 0, y: 0 } },
   ];
@@ -419,10 +422,12 @@ test("a draft at the server's node or input limit disables Add node and Add para
     })),
   };
   const id = `graph-limits-${stamp}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition: full },
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition: full,
   });
-  expect(created.ok(), await created.text()).toBeTruthy();
   await page.goto(`/#/rules/${id}?node=input`);
   await expect(page.locator(".react-flow__node")).toHaveCount(100);
   const addNode = page.getByRole("button", { name: "Add node", exact: true });

@@ -68,3 +68,89 @@ test("a read aborted by every subscriber is not cached, and forget drops every v
   expect(started).toBe(5);
   expect(await reads.load("t:1", fresh("never"))).toBe("t1");
 });
+
+test("a read the last subscriber abandoned is not joined again: the next load starts afresh", async () => {
+  // Re-picking a version joined the read the card had just aborted and showed "This operation was aborted".
+  const reads = new PinnedReads<string>();
+  let started = 0;
+  const first = deferred<string>();
+  const second = deferred<string>();
+  const read = (signal: AbortSignal) => {
+    started += 1;
+    const own = started === 1 ? first : second;
+    signal.addEventListener("abort", () =>
+      own.reject(new DOMException("aborted by the transport", "AbortError")),
+    );
+    return own.promise;
+  };
+  const controller = new AbortController();
+  const abandoned = reads.load("s:1", read, controller.signal);
+  controller.abort();
+  await expect(abandoned).rejects.toThrow();
+  const fresh = reads.load("s:1", read);
+  expect(started).toBe(2);
+  second.resolve("v1");
+  expect(await fresh).toBe("v1");
+});
+
+test("forget lets live subscribers finish their read and only stops remembering it", async () => {
+  // Closing the source manager aborted a sibling card's read, which then showed a permanent error.
+  const reads = new PinnedReads<string>();
+  let started = 0;
+  const pending = deferred<string>();
+  let readSignal: AbortSignal | null = null;
+  const read = (signal: AbortSignal) => {
+    started += 1;
+    readSignal = signal;
+    return started === 1 ? pending.promise : Promise.resolve("v1 again");
+  };
+  const sibling = reads.load("s:1", read);
+  reads.forget("s");
+  expect(readSignal!.aborted).toBe(false);
+  pending.resolve("v1");
+  expect(await sibling).toBe("v1");
+  // Not cached: the next load reads again, and its result is kept.
+  expect(await reads.load("s:1", read)).toBe("v1 again");
+  expect(started).toBe(2);
+  expect(await reads.load("s:1", read)).toBe("v1 again");
+  expect(started).toBe(2);
+});
+
+test("a read that settles after forget does not remove the fresh read under its key", async () => {
+  const reads = new PinnedReads<string>();
+  let started = 0;
+  const old = deferred<string>();
+  const read = () => {
+    started += 1;
+    return started === 1 ? old.promise : Promise.resolve("new");
+  };
+  const stale = reads.load("s:1", read);
+  reads.forget("s");
+  const fresh = reads.load("s:1", read);
+  const joined = reads.load("s:1", read);
+  expect(started).toBe(2);
+  old.resolve("old");
+  expect(await stale).toBe("old");
+  // The stale read settled without deleting the fresh entry: a third load still joins it.
+  expect(await fresh).toBe("new");
+  expect(await joined).toBe("new");
+  expect(started).toBe(2);
+});
+
+test("a load with an already-aborted signal starts no read", async () => {
+  const reads = new PinnedReads<string>();
+  let started = 0;
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    reads.load(
+      "s:1",
+      async () => {
+        started += 1;
+        return "v1";
+      },
+      controller.signal,
+    ),
+  ).rejects.toThrow();
+  expect(started).toBe(0);
+});

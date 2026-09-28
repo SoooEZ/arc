@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { scopeGraphKey, patchGraphNode } from "../../src/domain/graph";
+import { nodeVariables } from "../../src/features/editor/inspector/useNodeVariables";
 import type { Definition } from "../../src/types";
 
 const definition: Definition = {
@@ -100,4 +101,24 @@ test("the scope key changes with inputs, node kinds, results, cases and connecti
     },
   ])
     expect(scopeGraphKey(edited)).not.toBe(key);
+});
+
+test("a node named like an Object.prototype member reads only its own scope (lesson F22)", () => {
+  // Before the scope read answers, `{}["constructor"]` reached available.includes and threw.
+  const named = {
+    ...definition,
+    nodes: definition.nodes.map((node) =>
+      node.id === "choose" ? { ...node, id: "constructor" } : node,
+    ),
+    edges: definition.edges.map((edge) =>
+      edge.target === "choose" ? { ...edge, target: "constructor" } : edge,
+    ),
+  };
+  for (const id of ["constructor", "__proto__", "toString"])
+    expect(nodeVariables(named, id, {})).toEqual([]);
+  expect(
+    nodeVariables(named, "constructor", {
+      constructor: ["amount", "price"],
+    }).map((option) => option.name),
+  ).toEqual(["amount", "price"]);
 });

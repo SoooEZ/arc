@@ -4,6 +4,7 @@ import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { usePagedResource } from "../../hooks/usePagedResource";
 import { usePagedSearch } from "../../hooks/usePagedSearch";
 import { ruleApi } from "../../api/rules";
+import { ruleIncarnation } from "../../domain/ruleIdentity";
 import {
   parseExecutionInputs,
   sampleInputsJson,
@@ -26,7 +27,7 @@ export function usePublishedExecution(notify: (message: string) => void) {
   const [retry, setRetry] = useState(0);
   const [selectedRule, setSelectedRule] = useState<RuleSummary | null>(null);
   const [pinnedVersion, setPinnedVersion] = useState<number | null>(null);
-  const { trace, setTrace, timeoutMs, setTimeoutMs } = useExecutionOptions();
+  const { options, change: changeOptions } = useExecutionOptions();
   // A new search starts at the first page; Retry reloads the page that is
   // shown. The hidden library page is not an input: keying on it read the
   // catalog twice on a direct visit, once more when that page arrived.
@@ -48,11 +49,14 @@ export function usePublishedExecution(notify: (message: string) => void) {
     );
   }, [catalogRules]);
   const id = selectedRule?.id ?? "";
+  // Reads and results belong to one incarnation of the rule: an ID deleted and
+  // created again has other versions and inputs, and its pins start over.
+  const identity = selectedRule ? ruleIncarnation(selectedRule) : "";
   // History page 0 holds the newest release; the selected catalog row is the
   // other place a release is learned.
   const listedVersion = selectedRule?.publishedVersion ?? 0;
   const history = usePagedResource(
-    id,
+    identity,
     id
       ? (offset, limit, signal) =>
           ruleApi.versionSummaries(id, { offset, limit }, { signal })
@@ -77,7 +81,7 @@ export function usePublishedExecution(notify: (message: string) => void) {
   );
   const version = pinnedVersion ?? (newestVersion || null);
   const detail = useAsyncResource<Version | null>(
-    JSON.stringify([id, version, retry]),
+    JSON.stringify([identity, version, retry]),
     id && version !== null
       ? (signal) => ruleApi.version(id, version, { signal })
       : null,
@@ -86,12 +90,12 @@ export function usePublishedExecution(notify: (message: string) => void) {
   const definition = detail.data?.definition;
   // Inputs typed for one rule version stay with it.
   const inputBuffer = useInputBuffer(
-    JSON.stringify([id, version]),
+    JSON.stringify([identity, version]),
     definition ? sampleInputsJson(definition) : "{}",
   );
   const inputs = inputBuffer.text;
   const execution = useExecutionRequest(
-    JSON.stringify([id, version, inputs, trace, timeoutMs]),
+    JSON.stringify([identity, version, inputs, options]),
   );
   const { result, running, requestDurationMs } = execution;
   // A version that no longer exists means the rule was deleted, or its history
@@ -101,14 +105,14 @@ export function usePublishedExecution(notify: (message: string) => void) {
   const gone = detail.status === 404 || execution.status === 404;
   const abandoned = useRef<string | null>(null);
   useEffect(() => {
-    const pin = `${id}:${version}`;
+    const pin = `${identity}:${version}`;
     if (!gone || abandoned.current === pin) return;
     abandoned.current = pin;
     setSelectedRule(null);
     setPinnedVersion(null);
     setHistoryNewest(noRelease);
     setRetry((value) => value + 1);
-  }, [gone, id, version]);
+  }, [gone, identity, version]);
   const loadError = catalog.error || history.error || detail.error;
   const error = loadError || execution.error;
   const selectRule = (nextId: string) => {
@@ -122,18 +126,14 @@ export function usePublishedExecution(notify: (message: string) => void) {
     return execution.run((signal) =>
       ruleApi.execute(id, parseExecutionInputs(inputs), version, {
         signal,
-        trace,
-        timeoutMs,
+        ...options,
       }),
     );
   };
   // The endpoint line, the cURL example and the request name one rule: the
   // sample rule stands in until one is selected.
   const endpoint = ruleApi.executeUrl(id || defaultRuleId);
-  const curl = publishedCurl(id || defaultRuleId, inputs, version, {
-    trace,
-    timeoutMs,
-  });
+  const curl = publishedCurl(id || defaultRuleId, inputs, version, options);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(curl);
@@ -173,10 +173,8 @@ export function usePublishedExecution(notify: (message: string) => void) {
     setInputs: inputBuffer.change,
     run,
     clear: execution.clear,
-    trace,
-    setTrace,
-    timeoutMs,
-    setTimeoutMs,
+    options,
+    changeOptions,
     retry: () => setRetry((value) => value + 1),
   };
 }

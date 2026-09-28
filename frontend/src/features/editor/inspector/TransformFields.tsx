@@ -8,7 +8,7 @@ import { quoteText } from "../../../domain/expressions";
 import { patchGraphNode } from "../../../domain/graph";
 import { uniqueName } from "../../../domain/ids";
 import { MAX_TRANSFORM_FIELDS } from "../../../domain/limits";
-import type { VariableOption } from "../../../domain/graph";
+import type { VariableOption } from "../../../domain/variables";
 import type { Definition, RuleNode } from "../../../types";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";

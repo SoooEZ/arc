@@ -267,9 +267,10 @@ export function routeWithCache(
         (card) =>
           card.id === source.nodeId ||
           card.id === target.nodeId ||
-          (cached.route !== null &&
-            (meets(cached.route, card.before) ||
-              meets(cached.route, card.after))),
+          // A blocked edge has no route to test: any moved card may free it.
+          cached.route === null ||
+          meets(cached.route, card.before) ||
+          meets(cached.route, card.after),
       );
     if (unchanged) return cached;
   }

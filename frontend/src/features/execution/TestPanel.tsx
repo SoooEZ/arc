@@ -73,10 +73,8 @@ export default function TestPanel({
       <div className="test-panel-content">
         <div className="test-input">
           <ExecutionOptionsFields
-            trace={preview.trace}
-            timeoutMs={preview.timeoutMs}
-            onTrace={preview.setTrace}
-            onTimeout={preview.setTimeoutMs}
+            value={preview.options}
+            onChange={preview.changeOptions}
           />
           <Tabs
             value={preview.inputView}
@@ -98,10 +96,12 @@ export default function TestPanel({
                 <span>Publish this rule to enable its endpoint.</span>
               )}
               <pre>
-                {publishedCurl(ruleId, preview.input, publishedVersion, {
-                  trace: preview.trace,
-                  timeoutMs: preview.timeoutMs,
-                })}
+                {publishedCurl(
+                  ruleId,
+                  preview.input,
+                  publishedVersion,
+                  preview.options,
+                )}
               </pre>
               <small>
                 cURL executes the published version. Preview uses the graph

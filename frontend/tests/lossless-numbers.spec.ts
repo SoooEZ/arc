@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRuleResponse, uniqueId, uniqueStamp } from "./helpers/api";
 
 // Numbers that a JavaScript double would round. Assertions read raw request and
 // response text, because parsing them in the test would round them as well.
@@ -22,10 +23,10 @@ async function createRule(
   id: string,
   definition: string,
 ) {
-  const created = await request.post("/api/rules", {
-    headers: { "Content-Type": "application/json" },
-    data: `{"id":"${id}","name":"${id}","kind":"FORMULA","definition":${definition}}`,
-  });
+  const created = await createRuleResponse(
+    request,
+    `{"id":"${id}","name":"${id}","kind":"FORMULA","definition":${definition}}`,
+  );
   expect(created.ok()).toBe(true);
 }
 
@@ -68,7 +69,7 @@ test("Code studio saves a default that a double would round with every digit", a
   page,
   request,
 }) => {
-  const id = `exact-studio-${Date.now()}`;
+  const id = uniqueId("exact-studio");
   await createRule(request, id, outputRule("1"));
   const puts = putBodies(page, `/api/rules/${id}`);
   await page.goto(`/#/studio/${id}`);
@@ -100,7 +101,7 @@ test("an API-created lookup source saves a new version without rounding its entr
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const id = `exact-lookup-${stamp}`;
   const name = `Exact lookup ${stamp}`;
   const entries = `{"US":{"accountId":${longInteger},"rate":${longDecimal},"limit":${beyondDouble},"price":${scaledPrice},"fee":${scaledRate}}}`;
@@ -153,7 +154,7 @@ test("preview sends exact inputs and shows every digit of defaults and results",
   page,
   request,
 }) => {
-  const id = `exact-preview-${Date.now()}`;
+  const id = uniqueId("exact-preview");
   const definition = outputRule(
     '$OBJECT("id", id, "limit", limit, "third", 10 / 3, "price", $CONCAT("Price ", price))',
     [

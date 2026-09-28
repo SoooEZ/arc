@@ -1,7 +1,8 @@
 import { ruleApi } from "../../api/rules";
+import type { RuleIdentity } from "../../domain/ruleIdentity";
 import type { Page, RuleSummary, Version } from "../../types";
 import type { FormulaEntry } from "./formulaCalls";
-import { pinnedRuleVersions, readRuleVersion } from "./pinnedVersions";
+import { readRuleVersion } from "./pinnedVersions";
 
 /** The reads behind the cache; tests supply their own. */
 export interface FormulaReads {
@@ -9,15 +10,61 @@ export interface FormulaReads {
     id: string,
     signal: AbortSignal,
   ): Promise<Pick<RuleSummary, "kind" | "name" | "createdAt">>;
-  version(id: string, version: number, signal: AbortSignal): Promise<Version>;
+  /** The pinned version of one incarnation of the rule (the page-wide cache keys by it). */
+  version(
+    rule: RuleIdentity,
+    version: number,
+    signal: AbortSignal,
+  ): Promise<Version>;
   search(query: string, signal: AbortSignal): Promise<Page<RuleSummary>>;
-  /** Drops cached versions of a rule created again under its ID, ahead of the next read. */
-  forgetVersions?(id: string): void;
 }
 
 /** A cached pin remembers which incarnation of the rule it was read from. */
 interface CachedFormula extends FormulaEntry {
   createdAt: string;
+}
+
+type RuleIdentitySummary = Awaited<ReturnType<FormulaReads["rule"]>>;
+
+/** A read several callers wait for; it is abandoned once none waits. */
+interface SharedRead<T> {
+  promise: Promise<T>;
+  controller: AbortController;
+  waiting: number;
+}
+
+const abandoned = () =>
+  new DOMException("The rule read was abandoned", "AbortError");
+
+/** Waits for `read` until `signal` aborts; the last waiter to leave aborts the read. */
+function joinRead<T>(read: SharedRead<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(abandoned());
+  read.waiting += 1;
+  return new Promise<T>((resolve, reject) => {
+    let waiting = true;
+    const leave = () => {
+      if (!waiting) return;
+      waiting = false;
+      signal.removeEventListener("abort", onAbort);
+      read.waiting -= 1;
+    };
+    const onAbort = () => {
+      leave();
+      if (read.waiting === 0) read.controller.abort();
+      reject(abandoned());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    read.promise.then(
+      (value) => {
+        leave();
+        resolve(value);
+      },
+      (failure: unknown) => {
+        leave();
+        reject(failure);
+      },
+    );
+  });
 }
 
 /**
@@ -31,6 +78,12 @@ interface CachedFormula extends FormulaEntry {
  */
 export class FormulaMetadata {
   private readonly entries = new Map<string, CachedFormula>();
+  // Hover, completion and insertion may ask about one rule together: they
+  // share its identity read instead of each sending one.
+  private readonly identityReads = new Map<
+    string,
+    SharedRead<RuleIdentitySummary>
+  >();
 
   constructor(
     private readonly reads: FormulaReads,
@@ -45,7 +98,7 @@ export class FormulaMetadata {
   ): Promise<FormulaEntry> {
     const key = `${id}:${version}`;
     const cached = this.entries.get(key);
-    const rule = summary ?? (await this.reads.rule(id, signal));
+    const rule = summary ?? (await this.readIdentity(id, signal));
     if (cached && cached.createdAt === rule.createdAt) {
       // A display name can change after publication; a fresh summary wins.
       const current = { ...cached, name: rule.name };
@@ -56,9 +109,12 @@ export class FormulaMetadata {
       throw new Error(
         "Only published Formula rules can be called in an expression.",
       );
-    // Another incarnation of the ID: the shared version cache is stale for it too.
-    if (cached) this.reads.forgetVersions?.(id);
-    const published = await this.reads.version(id, version, signal);
+    // The pin of this incarnation: another incarnation of the ID has its own.
+    const published = await this.reads.version(
+      { id, createdAt: rule.createdAt },
+      version,
+      signal,
+    );
     const formula: CachedFormula = {
       id,
       name: rule.name,
@@ -91,6 +147,27 @@ export class FormulaMetadata {
       if (key.startsWith(`${id}:`)) this.entries.delete(key);
   }
 
+  private readIdentity(
+    id: string,
+    signal: AbortSignal,
+  ): Promise<RuleIdentitySummary> {
+    let read = this.identityReads.get(id);
+    if (!read) {
+      const controller = new AbortController();
+      const shared: SharedRead<RuleIdentitySummary> = {
+        controller,
+        waiting: 0,
+        promise: this.reads.rule(id, controller.signal).finally(() => {
+          if (this.identityReads.get(id) === shared)
+            this.identityReads.delete(id);
+        }),
+      };
+      this.identityReads.set(id, shared);
+      read = shared;
+    }
+    return joinRead(read, signal);
+  }
+
   /** Least recently used entries leave first. */
   private remember(key: string, formula: CachedFormula) {
     this.entries.delete(key);
@@ -104,8 +181,7 @@ export class FormulaMetadata {
 /** Shared by every editor on the page; pinned versions come from the page-wide cache. */
 export const formulaMetadata = new FormulaMetadata({
   rule: (id, signal) => ruleApi.get(id, { signal }),
-  version: (id, version, signal) => readRuleVersion(id, version, signal),
-  forgetVersions: (id) => pinnedRuleVersions.forget(id),
+  version: (rule, version, signal) => readRuleVersion(rule, version, signal),
   search: (query, signal) =>
     ruleApi.catalog(
       {

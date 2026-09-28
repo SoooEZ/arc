@@ -39,7 +39,7 @@ export function sourceVersionLabel(version: number, dirty: boolean): string {
 }
 
 /** The server accepts whole milliseconds in this range (HttpSourceAdapter). */
-export const httpTimeoutLimits = { min: 100, max: 10_000 };
+const httpTimeoutLimits = { min: 100, max: 10_000 };
 export const httpTimeoutGuidance =
   "Enter whole milliseconds from 100 to 10,000.";
 
@@ -54,7 +54,7 @@ export function parseHttpTimeout(text: string): number | null {
     : null;
 }
 
-export function sourceSnapshot({
+function sourceSnapshot({
   source,
   buffers,
   timeout,

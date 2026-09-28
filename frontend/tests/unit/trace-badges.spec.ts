@@ -56,14 +56,21 @@ test("trace badges caption a branch with its exit, marking the fallback exits", 
     branchBadge(step({ nodeId: "input", branch: "next" }), definition),
   ).toBeNull();
   expect(branchBadge(step({}), definition)).toBeNull();
-  // Nested rules and unknown nodes show the handle as recorded.
+  // A nested rule's graph is not here: the server records `next` for every
+  // plain step (it showed a "next" pill), a case handle names nothing shown,
+  // and the fixed exits caption themselves with their fallback tint.
+  for (const branch of ["next", "case:high"])
+    expect(
+      branchBadge(step({ depth: 1, branch }), definition),
+      branch,
+    ).toBeNull();
   expect(
-    branchBadge(step({ depth: 1, branch: "case:high" }), definition),
-  ).toEqual({ text: "case:high", fallback: false });
+    branchBadge(step({ depth: 1, nodeId: "any", branch: "false" }), definition),
+  ).toEqual({ text: "False", fallback: true });
+  expect(
+    branchBadge(step({ depth: 2, branch: "default" }), definition),
+  ).toEqual({ text: "Default", fallback: true });
   expect(
     branchBadge(step({ nodeId: "gone", branch: "default" }), definition),
-  ).toEqual({
-    text: "default",
-    fallback: false,
-  });
+  ).toEqual({ text: "Default", fallback: true });
 });

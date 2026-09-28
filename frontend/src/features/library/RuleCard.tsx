@@ -4,7 +4,7 @@ import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { Button, Chip } from "@mui/material";
 import { ArrowUpRight, RotateCcw } from "lucide-react";
 import type { RuleSummary, Rule } from "../../types";
-import { kindLabel } from "../../types";
+import { ruleKinds } from "../../domain/ruleKinds";
 import { KindIcon } from "../../components/Icons";
 import RulePreview from "./RulePreview";
 import { cachedPreview, rememberPreview } from "./previewCache";
@@ -80,7 +80,7 @@ export default function RuleCard({
         </div>
       )}
       <div className="rule-card-footer">
-        <span>{kindLabel[rule.kind]}</span>
+        <span>{ruleKinds[rule.kind].label}</span>
         <span>
           {rule.nodeCount} {rule.nodeCount === 1 ? "node" : "nodes"}
           <span className="tiny-divider" />

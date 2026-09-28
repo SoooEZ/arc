@@ -1,9 +1,6 @@
 import { MenuItem, TextField } from "@mui/material";
-import {
-  literalText,
-  quoteText,
-  trimExpression,
-} from "../../domain/expressions";
+import { literalText, quoteText } from "../../domain/expressions";
+import { trimAsServer } from "../../domain/serverText";
 import {
   constantTextError,
   type ConstantType,
@@ -41,7 +38,7 @@ export default function ConstantValueField({
       <TextField
         select
         label={label}
-        value={trimExpression(stored).toLowerCase() || "false"}
+        value={trimAsServer(stored).toLowerCase() || "false"}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         helperText={helperText}
@@ -55,7 +52,7 @@ export default function ConstantValueField({
     return (
       <TextField
         label={label}
-        value={literalText(trimExpression(stored)) ?? stored}
+        value={literalText(trimAsServer(stored)) ?? stored}
         disabled={disabled}
         onChange={(event) => onChange(quoteText(event.target.value))}
         helperText="Text value · no quotation marks needed"
@@ -68,7 +65,7 @@ export default function ConstantValueField({
       <TextField
         label={label}
         // A number input shows nothing for padded text; the server trims it too.
-        value={trimExpression(stored)}
+        value={trimAsServer(stored)}
         disabled={disabled}
         type="number"
         error={!!error}

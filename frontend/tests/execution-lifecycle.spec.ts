@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition, Execution } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -36,14 +37,13 @@ const definition: Definition = {
   ],
 };
 async function openRule(page: Page, request: APIRequestContext) {
-  const id = `execution-lifecycle-${Date.now()}`;
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: { id, name: "Execution lifecycle", kind: "FORMULA", definition },
-      })
-    ).ok(),
-  ).toBe(true);
+  const id = uniqueId("execution-lifecycle");
+  await createRule(request, {
+    id,
+    name: "Execution lifecycle",
+    kind: "FORMULA",
+    definition,
+  });
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   return id;

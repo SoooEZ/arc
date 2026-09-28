@@ -1,7 +1,7 @@
 import { lazy, useState } from "react";
 import { Button, CircularProgress } from "@mui/material";
 import { ExternalLink } from "lucide-react";
-import type { VariableOption } from "../../domain/graph";
+import type { VariableOption } from "../../domain/variables";
 import { LazyBoundary } from "../../components/LazyBoundary";
 
 const ExpressionDialog = lazy(() => import("./ExpressionDialog"));

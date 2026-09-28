@@ -1,6 +1,9 @@
 import { MenuItem, TextField } from "@mui/material";
 
-import { variableOptionLabel, type VariableOption } from "../../domain/graph";
+import {
+  variableOptionLabel,
+  type VariableOption,
+} from "../../domain/variables";
 import {
   acceptsVariableType,
   bindingConstantTypes,

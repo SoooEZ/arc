@@ -32,7 +32,14 @@ export function useGraphFocus({
   navigate,
 }: Options) {
   const flow = useReactFlow<FlowNode>();
-  const [pendingFocus, setPendingFocus] = useState(requestedNode || null);
+  const [requestedFocus, setPendingFocus] = useState(requestedNode || null);
+  // A deep link or a trace step may name a node the draft no longer has: such
+  // a request is dropped, so it cannot hold every canvas mount unfitted.
+  const pendingFocus =
+    requestedFocus !== null &&
+    definition.nodes.some((node) => node.id === requestedFocus)
+      ? requestedFocus
+      : null;
   const focusNode = useCallback(
     (id: string) => {
       if (!selectNode(id)) return;
@@ -52,6 +59,10 @@ export function useGraphFocus({
     if (mode === "code")
       navigate(rulePath({ ruleId, version: requestedVersion }));
   };
+
+  useEffect(() => {
+    if (requestedFocus !== null && pendingFocus === null) setPendingFocus(null);
+  }, [requestedFocus, pendingFocus]);
 
   useEffect(() => {
     if (

@@ -1,4 +1,5 @@
 import type { Definition } from "../types";
+import { trimAsServer } from "./serverText";
 
 /**
  * Server limits restated for the browser (backend `engine.Limits`), so that
@@ -31,6 +32,14 @@ export const MAX_RESOURCE_ID_CHARACTERS = 80;
 export const MAX_NODE_ID_CHARACTERS = 80;
 /** ExpressionParser reads at most this many tokens from one expression. */
 export const MAX_EXPRESSION_TOKENS = 256;
+/** UTF-16 units of one text value (ValueBounds). */
+export const MAX_STRING_CHARACTERS = 2_000;
+/** Items of one array, or fields of one object (ValueBounds). */
+export const MAX_COLLECTION_ITEMS = 1_000;
+/** Values a whole default, input or result may hold, keys included (ValueBounds). */
+export const MAX_VALUE_ELEMENTS = 10_000;
+/** How deep a value may nest below its root (ValueBounds). */
+export const MAX_VALUE_DEPTH = 8;
 /** Significant digits a number may carry. */
 export const MAX_NUMBER_PRECISION = 100;
 /** Decimal places a number may carry, either way. */
@@ -56,9 +65,16 @@ export function formatLimit(limit: number): string {
   return limit.toLocaleString("en-US");
 }
 
+/** The server's refusal of a rule's name or description, and which field it belongs to. */
+export interface RuleMetadataProblem {
+  field: "name" | "description";
+  message: string;
+}
+
 /**
  * Why the server would refuse a rule's name and description, or null: the
- * messages are the server's, so a dialog can refuse before sending.
+ * messages are the server's, so a dialog can show them under the field and
+ * refuse before sending. The name is trimmed as the server trims it.
  */
 export function ruleMetadataProblem({
   name,
@@ -66,11 +82,17 @@ export function ruleMetadataProblem({
 }: {
   name: string;
   description: string;
-}): string | null {
-  const trimmed = name.trim();
+}): RuleMetadataProblem | null {
+  const trimmed = trimAsServer(name);
   if (!trimmed || trimmed.length > MAX_NAME_CHARACTERS)
-    return `Rule name must contain 1 to ${MAX_NAME_CHARACTERS} characters`;
+    return {
+      field: "name",
+      message: `Rule name must contain 1 to ${MAX_NAME_CHARACTERS} characters`,
+    };
   if (description.length > MAX_DESCRIPTION_CHARACTERS)
-    return `Description exceeds ${formatLimit(MAX_DESCRIPTION_CHARACTERS)} characters`;
+    return {
+      field: "description",
+      message: `Description exceeds ${formatLimit(MAX_DESCRIPTION_CHARACTERS)} characters`,
+    };
   return null;
 }

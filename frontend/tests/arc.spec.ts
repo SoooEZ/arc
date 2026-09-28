@@ -1,5 +1,6 @@
 import { setEditorText } from "./helpers/editor";
 import { expect, test } from "@playwright/test";
+import { uniqueStamp } from "./helpers/api";
 
 test("library, graph preview, reference navigation, and published API execution", async ({
   page,
@@ -80,7 +81,7 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
   page,
   request,
 }) => {
-  const name = `E2E formula ${Date.now()}`;
+  const name = `E2E formula ${uniqueStamp()}`;
   const id = name.toLowerCase().replaceAll(" ", "-");
   await page.goto("/");
   await page

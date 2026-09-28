@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 /*
  * Every editor control reads one capability set from the rule document. These
@@ -42,15 +43,13 @@ const definition: Definition = {
 };
 
 async function createPublishedRule(request: APIRequestContext, id: string) {
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Capability fixture", kind: "FORMULA", definition },
+  const rule: Rule = await createRule(request, {
+    id,
+    name: "Capability fixture",
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
-  const rule: Rule = await created.json();
-  const published = await request.post(`/api/rules/${id}/publish`, {
-    data: { revision: rule.revision },
-  });
-  expect(published.ok()).toBeTruthy();
+  await publishRule(request, rule);
 }
 
 type ControlState = "enabled" | "disabled" | "absent";
@@ -81,7 +80,7 @@ test("a draft allows editing and commands until a save holds the document", asyn
   page,
   request,
 }) => {
-  const id = `capabilities-draft-${Date.now()}`;
+  const id = uniqueId("capabilities-draft");
   await createPublishedRule(request, id);
   await page.goto(`/#/rules/${id}`);
   await node(page, "calc").locator(".graph-node").click();
@@ -149,7 +148,7 @@ test("a published version offers commands that keep it unchanged", async ({
   page,
   request,
 }) => {
-  const id = `capabilities-version-${Date.now()}`;
+  const id = uniqueId("capabilities-version");
   await createPublishedRule(request, id);
   const writes: string[] = [];
   page.on("request", (outgoing) => {

@@ -1,6 +1,10 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition } from "../src/types";
-import { createRule as createApiRule, publishRule } from "./helpers/api";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueStamp,
+} from "./helpers/api";
 import { editorLines } from "./helpers/editor";
 
 const definition: Definition = {
@@ -33,7 +37,7 @@ test("reused rule names remain literal while Monaco placeholders remain editable
   page,
   request,
 }) => {
-  const suffix = Date.now();
+  const suffix = uniqueStamp();
   const child = `snippet-literal-child-${suffix}`;
   const parent = `snippet-literal-parent-${suffix}`;
   const name = "Discount $100 \\ tier ${1:literal} " + suffix;
@@ -68,7 +72,7 @@ test("a late reuse response cannot insert into a newly mounted code editor", asy
   page,
   request,
 }) => {
-  const suffix = Date.now();
+  const suffix = uniqueStamp();
   const child = `snippet-late-child-${suffix}`;
   const parent = `snippet-late-parent-${suffix}`;
   const name = `Delayed reusable rule ${suffix}`;
@@ -112,7 +116,7 @@ test("a reuse insertion is refused when the code changed while the rule loaded",
   page,
   request,
 }) => {
-  const suffix = Date.now();
+  const suffix = uniqueStamp();
   const child = `snippet-stale-child-${suffix}`;
   const parent = `snippet-stale-parent-${suffix}`;
   const name = `Stale reusable rule ${suffix}`;

@@ -3,7 +3,7 @@ import {
   curlExample,
   tryParseExecutionInputs,
 } from "../../domain/executionInputs";
-import type { ExecutionOptions } from "../../types";
+import type { ExecutionRequestOptions } from "./useExecutionOptions";
 
 /**
  * The cURL example for the published endpoint of `ruleId`, from the input
@@ -13,7 +13,7 @@ export function publishedCurl(
   ruleId: string,
   inputText: string,
   version: number | null,
-  options: Required<ExecutionOptions>,
+  options: ExecutionRequestOptions,
 ): string {
   return curlExample(
     ruleApi.executeUrl(ruleId),

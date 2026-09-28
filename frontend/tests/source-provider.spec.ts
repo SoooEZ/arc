@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { DataSource, Rule } from "../src/types";
+import { createRule, uniqueStamp } from "./helpers/api";
 
 const providers: DataSource[] = Array.from({ length: 45 }, (_, index) => ({
   id: index === 0 ? "caller" : `provider-${index}`,
@@ -559,7 +560,7 @@ test("source manager creates, versions and tests providers without losing the pa
   page,
   request,
 }, testInfo) => {
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const stamp = uniqueStamp();
   const sourceId = `managed-${stamp}`;
   const sourceName = `Managed provider ${stamp}`;
   const createdSource = await request.post("/api/sources", {
@@ -578,53 +579,50 @@ test("source manager creates, versions and tests providers without losing the pa
   });
   expect(createdSource.ok()).toBeTruthy();
   const ruleId = `source-manager-${stamp}`;
-  const created = await request.post("/api/rules", {
-    data: {
-      id: ruleId,
-      name: ruleId,
-      kind: "FORMULA",
-      definition: {
-        schemaVersion: 1,
-        inputs: [
-          { name: "payload", type: "ARRAY", required: false, defaultValue: [] },
-          {
-            name: "amount",
-            type: "NUMBER",
-            required: true,
-            defaultValue: 1,
-            source: {
-              id: sourceId,
-              version: 1,
-              bindings: { key: '"US"' },
-              pointer: "",
-              onError: "FAIL",
-            },
+  const created = await createRule(request, {
+    id: ruleId,
+    name: ruleId,
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [
+        { name: "payload", type: "ARRAY", required: false, defaultValue: [] },
+        {
+          name: "amount",
+          type: "NUMBER",
+          required: true,
+          defaultValue: 1,
+          source: {
+            id: sourceId,
+            version: 1,
+            bindings: { key: '"US"' },
+            pointer: "",
+            onError: "FAIL",
           },
-        ],
-        nodes: [
-          {
-            id: "input",
-            type: "INPUT",
-            label: "Inputs",
-            position: { x: 200, y: 0 },
-          },
-          {
-            id: "out",
-            type: "OUTPUT",
-            label: "Result",
-            expression: "amount",
-            position: { x: 200, y: 200 },
-          },
-        ],
-        edges: [
-          { id: "next", source: "input", target: "out", sourceHandle: "next" },
-        ],
-      },
+        },
+      ],
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Inputs",
+          position: { x: 200, y: 0 },
+        },
+        {
+          id: "out",
+          type: "OUTPUT",
+          label: "Result",
+          expression: "amount",
+          position: { x: 200, y: 200 },
+        },
+      ],
+      edges: [
+        { id: "next", source: "input", target: "out", sourceHandle: "next" },
+      ],
     },
   });
-  expect(created.status()).toBe(201);
   // Revisions come from a sequence shared by every rule, so the created value is the baseline.
-  const createdRevision = ((await created.json()) as Rule).revision;
+  const createdRevision = created.revision;
   await page.goto(`/#/rules/${ruleId}?node=input`);
   await page
     .getByLabel("Default JSON (optional)", { exact: true })
@@ -798,4 +796,122 @@ test("five inputs bound to one source read its pinned version once and no versio
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect.poll(() => reads.lists).toBe(1);
+});
+
+test("a source renamed from another card's manager shows its new name on the card bound to it", async ({
+  page,
+  request,
+}) => {
+  const stamp = uniqueStamp();
+  const lookup = (entries: Record<string, number>) => ({
+    kind: "LOOKUP" as const,
+    parameters: [
+      {
+        name: "key",
+        type: "STRING" as const,
+        required: true,
+        defaultValue: null,
+      },
+    ],
+    entries,
+    timeoutMs: 3000,
+  });
+  const sources = [] as { id: string; name: string }[];
+  for (const which of ["first", "second"]) {
+    const id = `${which}-${stamp}`;
+    const name = `${which} source ${stamp}`;
+    const created = await request.post("/api/sources", {
+      data: { id, name, definition: lookup({ US: 1 }) },
+    });
+    expect(created.ok(), await created.text()).toBeTruthy();
+    sources.push({ id, name });
+  }
+  const bound = (name: string, source: { id: string }) => ({
+    name,
+    type: "NUMBER" as const,
+    required: true,
+    defaultValue: 1,
+    source: {
+      id: source.id,
+      version: 1,
+      bindings: { key: '"US"' },
+      pointer: "",
+      onError: "FAIL" as const,
+    },
+  });
+  const ruleId = `source-rename-${stamp}`;
+  await createRule(request, {
+    id: ruleId,
+    name: ruleId,
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [bound("a", sources[0]), bound("b", sources[1])],
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Inputs",
+          position: { x: 200, y: 0 },
+        },
+        {
+          id: "out",
+          type: "OUTPUT",
+          label: "Result",
+          expression: "a + b",
+          position: { x: 200, y: 200 },
+        },
+      ],
+      edges: [
+        { id: "next", source: "input", target: "out", sourceHandle: "next" },
+      ],
+    },
+  });
+  await page.goto(`/#/rules/${ruleId}?node=input`);
+  const pickers = page.getByRole("combobox", {
+    name: "Value provider",
+    exact: true,
+  });
+  await expect(pickers.nth(1)).toHaveValue(sources[1].name);
+  // The first card's manager renames the second card's source.
+  await page
+    .locator(".input-schema-card")
+    .nth(0)
+    .getByRole("button", { name: "Manage data sources", exact: true })
+    .click();
+  const manager = page.getByRole("dialog", {
+    name: "Manage data sources",
+    exact: true,
+  });
+  await manager
+    .getByLabel("Search data sources", { exact: true })
+    .fill(sources[1].name);
+  await manager
+    .locator(".source-list > button")
+    .filter({ hasText: sources[1].name })
+    .click();
+  await expect(manager.getByLabel("Source ID", { exact: true })).toHaveValue(
+    sources[1].id,
+  );
+  const renamed = `Renamed second ${stamp}`;
+  await manager.getByLabel("Name", { exact: true }).fill(renamed);
+  await manager
+    .getByLabel("Lookup entries · JSON object", { exact: true })
+    .fill('{"US":2}');
+  await manager
+    .getByRole("button", { name: "Save new version", exact: true })
+    .click();
+  await expect(
+    manager.getByRole("combobox", { name: "Inspect version", exact: true }),
+  ).toHaveText("v2 · latest");
+  await manager
+    .getByRole("button", { name: "Close data sources", exact: true })
+    .click();
+  await expect(manager).toHaveCount(0);
+  // Every version carries the source's current name. The second card is
+  // shown again from the page-wide cache, which used to keep the old name.
+  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
+  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
+  await expect(pickers.nth(1)).toHaveValue(renamed);
+  await expect(pickers.nth(0)).toHaveValue(sources[0].name);
 });

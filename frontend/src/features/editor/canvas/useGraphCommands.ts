@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useReactFlow } from "@xyflow/react";
 import type { Definition, NodeType, RuleNode } from "../../../types";
 import type { FlowNode } from "./GraphNode";
@@ -38,6 +39,11 @@ export function useGraphCommands({
   requestFit,
 }: Options) {
   const flow = useReactFlow<FlowNode>();
+  // The layout worker holds ELK's heap; it goes with the editor that loaded it.
+  const layoutWorker = useRef<typeof import("./graphLayoutWorker") | null>(
+    null,
+  );
+  useEffect(() => () => layoutWorker.current?.releaseLayoutWorker(), []);
 
   const patchNode = (id: string, patch: Partial<RuleNode>) =>
     edit((current) => patchGraphNode(current, id, patch));
@@ -70,11 +76,12 @@ export function useGraphCommands({
   // neither may keep the document locked (F8).
   const arrange = () =>
     arrangeDocument(async (draft) => {
-      const [{ arrangeGraph }, { layoutInWorker }] = await Promise.all([
+      const [{ arrangeGraph }, worker] = await Promise.all([
         import("./graphLayout"),
         import("./graphLayoutWorker"),
       ]);
-      return arrangeGraph(draft, measurements, layoutInWorker);
+      layoutWorker.current = worker;
+      return arrangeGraph(draft, measurements, worker.layoutInWorker);
     }, requestFit);
 
   return { patchNode, addNode, removeNode, arrange };

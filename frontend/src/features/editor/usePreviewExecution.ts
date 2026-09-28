@@ -28,17 +28,16 @@ export function usePreviewExecution(definition: Definition, graphKey: string) {
   const [inputView, setInputView] = useState<PreviewInputView>("json");
   // One target: once edited, the buffer stays for the whole editor session.
   const inputBuffer = useInputBuffer("preview", sampleInputsJson(definition));
-  const { trace, setTrace, timeoutMs, setTimeoutMs } = useExecutionOptions();
+  const { options, change: changeOptions } = useExecutionOptions();
   const input = inputBuffer.text;
   const execution = useExecutionRequest(
-    JSON.stringify([graphKey, input, trace, timeoutMs]),
+    JSON.stringify([graphKey, input, options]),
   );
   const run = () =>
     execution.run((signal) =>
       studioApi.preview(definition, parseExecutionInputs(input), {
         signal,
-        trace,
-        timeoutMs,
+        ...options,
       }),
     );
   const close = () => {
@@ -53,10 +52,8 @@ export function usePreviewExecution(definition: Definition, graphKey: string) {
     setInputView,
     input,
     changeInput: inputBuffer.change,
-    trace,
-    setTrace,
-    timeoutMs,
-    setTimeoutMs,
+    options,
+    changeOptions,
     run,
     running: execution.running,
     result: execution.result,

@@ -22,9 +22,10 @@ export default function SourceManagerDialog({
 }) {
   const [notice, setNotice] = useState("");
   const editor = useSourceEditor({ notify: setNotice });
+  const { pending, dirty } = editor.document;
   const close = () => {
-    if (editor.pending) return;
-    if (editor.dirty && !window.confirm(unsavedSourceWarning)) return;
+    if (pending) return;
+    if (dirty && !window.confirm(unsavedSourceWarning)) return;
     onClose();
   };
   return (
@@ -46,10 +47,10 @@ export default function SourceManagerDialog({
         <SourceWorkspace editor={editor} />
       </DialogContent>
       <DialogActions>
-        {editor.pending && (
+        {pending && (
           <span role="status">Wait for the source operation to finish.</span>
         )}
-        <Button onClick={close} disabled={editor.pending}>
+        <Button onClick={close} disabled={pending}>
           Close data sources
         </Button>
       </DialogActions>

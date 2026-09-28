@@ -11,13 +11,14 @@ import {
   renderCounts,
   resetRenderCounts,
 } from "./helpers/renderProbe";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 async function create(
   request: APIRequestContext,
   expression = "hello.a == 1",
   additionalInputs: Definition["inputs"] = [],
 ) {
-  const id = `inline-expression-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("inline-expression");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -89,16 +90,13 @@ async function create(
       },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: {
-      id,
-      name: `Editor ${id.slice(-5)}`,
-      kind: "DECISION_TREE",
-      definition,
-    },
+  const response = await createRule(request, {
+    id,
+    name: `Editor ${id.slice(-5)}`,
+    kind: "DECISION_TREE",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as Rule;
+  return response;
 }
 
 async function focusNode(page: Page, name: string) {
@@ -268,13 +266,7 @@ test("published inline expressions reject keyboard changes and keep both equalit
   request,
 }) => {
   const rule = await create(request);
-  expect(
-    (
-      await request.post(`/api/rules/${rule.id}/publish`, {
-        data: { revision: rule.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, rule);
   const published: Rule = await (
     await request.get(`/api/rules/${rule.id}`)
   ).json();
@@ -379,7 +371,7 @@ test("typing beside twenty inline editors hands Monaco no new options object", a
   request,
 }) => {
   await installRenderProbe(page);
-  const id = `inline-expression-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("inline-expression");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -408,10 +400,12 @@ test("typing beside twenty inline editors hands Monaco no new options object", a
       { id: "start", source: "input", sourceHandle: "next", target: "choose" },
     ],
   };
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "DECISION_TREE", definition },
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "DECISION_TREE",
+    definition,
   });
-  expect(created.ok(), await created.text()).toBeTruthy();
   await page.goto(`/#/rules/${id}?node=choose`);
   const label = page.getByLabel("Case 1 label", { exact: true });
   await expect(label).toHaveValue("Case 1");

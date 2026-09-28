@@ -16,19 +16,16 @@ import {
   Workflow,
 } from "lucide-react";
 import type { Kind, RuleSummary } from "../../types";
+import { kinds, ruleKinds } from "../../domain/ruleKinds";
 import type { useRuleLibrary } from "../../app/useRuleLibrary";
 import CatalogPagination from "../../components/CatalogPagination";
 import RuleCard from "./RuleCard";
 
 type KindFilter = Kind | "ALL";
-/** Plural forms of kindLabel; the Record type requires a tab for every rule kind. */
-const kindFilterLabels: Record<KindFilter, string> = {
-  ALL: "All rules",
-  DECISION_TREE: "Decision trees",
-  FORMULA: "Formulas",
-  RULE: "Condition rules",
-};
-const kindFilters = Object.keys(kindFilterLabels) as KindFilter[];
+/** One tab for every rule kind, in the order the create dialog offers them. */
+const kindFilters: KindFilter[] = ["ALL", ...kinds];
+const kindFilterLabel = (filter: KindFilter) =>
+  filter === "ALL" ? "All rules" : ruleKinds[filter].pluralLabel;
 
 function EmptyLibrary({
   filtered,
@@ -145,7 +142,7 @@ export default function Library({
               aria-pressed={filter === type}
               onClick={() => setFilter(type)}
             >
-              {kindFilterLabels[type]}
+              {kindFilterLabel(type)}
             </button>
           ))}
         </div>

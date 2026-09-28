@@ -6,6 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
+import { createRule, publishRule, uniqueId, uniqueStamp } from "./helpers/api";
 
 const node = (
   id: string,
@@ -33,19 +34,13 @@ async function create(
   definition: Definition,
   publish = false,
 ) {
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const rule = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
-  const rule = await response.json();
-  if (publish)
-    expect(
-      (
-        await request.post(`/api/rules/${id}/publish`, {
-          data: { revision: rule.revision },
-        })
-      ).ok(),
-    ).toBeTruthy();
+  if (publish) await publishRule(request, rule);
 }
 async function replaceCode(page: Page, code: string) {
   await page
@@ -92,7 +87,7 @@ test("node expressions edit one node, group functions, and flag all invalid expr
   page,
   request,
 }) => {
-  const id = `node-editor-${Date.now()}`;
+  const id = uniqueId("node-editor");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -190,7 +185,7 @@ test("references navigate within one modal with back and close all while preserv
   request,
   context,
 }) => {
-  const stamp = Date.now(),
+  const stamp = uniqueStamp(),
     child = `node-modal-child-${stamp}`,
     parent = `node-modal-parent-${stamp}`;
   const childDefinition: Definition = {

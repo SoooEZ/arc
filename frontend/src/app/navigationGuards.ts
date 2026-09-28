@@ -13,7 +13,7 @@ export interface RouteChange {
 export type GuardScope = (change: RouteChange) => boolean;
 
 /** The default scope: work that any route change would discard. */
-export const everyRouteChange: GuardScope = () => true;
+const everyRouteChange: GuardScope = () => true;
 
 interface Guard {
   message: string;
@@ -53,6 +53,10 @@ export function createNavigationGuards() {
 }
 
 const workspaceGuards = createNavigationGuards();
+
+/** Edits staged in a dialog (node form, node code, expression) that Apply has not taken yet. */
+export const unsavedDialogWarning =
+  "Discard the edits in this dialog? They are not applied to the draft yet.";
 
 /**
  * Guards workspace navigation with `message` while it is non-null. By default

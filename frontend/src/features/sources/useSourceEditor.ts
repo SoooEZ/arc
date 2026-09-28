@@ -4,6 +4,7 @@ import { errorMessage } from "../../api/errors";
 import { useNavigationGuard } from "../../app/navigationGuards";
 import { usePagedResource } from "../../hooks/usePagedResource";
 import { usePagedSearch } from "../../hooks/usePagedSearch";
+import { pinnedSourceVersions } from "../studio/pinnedVersions";
 import type { DataSource, SourceConfig, SourceSummary } from "../../types";
 import {
   parseSourceTestInputs,
@@ -67,7 +68,10 @@ export function useSourceEditor({
   const selectionRequest = useRef<AbortController | null>(null);
   const versionRequest = useRef<AbortController | null>(null);
   const requestSequence = useRef(0);
-  const [savingIds, setSavingIds] = useState<string[]>([]);
+  // Every save in flight, by request: two saves of one source finish one at a time.
+  const [pendingSaves, setPendingSaves] = useState<
+    { request: number; sourceId: string }[]
+  >([]);
   const mounted = useRef(true);
   const dirty = document !== null && sourceIsDirty(document);
   const historical = document !== null && isHistoricalVersion(document);
@@ -77,7 +81,7 @@ export function useSourceEditor({
   const saving =
     document !== null &&
     (document.source.version > 0
-      ? savingIds.includes(document.source.id)
+      ? pendingSaves.some((save) => save.sourceId === document.source.id)
       : document.saving !== null);
   const selected = document?.source;
   const versions = usePagedResource(
@@ -89,7 +93,7 @@ export function useSourceEditor({
   );
   const listed = catalogRows(catalog.data, savedSources, listedRevision);
   useNavigationGuard(dirty ? unsavedSourceWarning : null);
-  useNavigationGuard(savingIds.length > 0 ? pendingSaveWarning : null);
+  useNavigationGuard(pendingSaves.length > 0 ? pendingSaveWarning : null);
 
   useEffect(() => {
     if (catalog.loading || catalog.error) return;
@@ -201,7 +205,7 @@ export function useSourceEditor({
     }
     const sourceId = document.source.id;
     const request = ++requestSequence.current;
-    setSavingIds((ids) => [...ids, sourceId]);
+    setPendingSaves((saves) => [...saves, { request, sourceId }]);
     dispatch({ type: "save/start", request });
     try {
       const candidate = sourceCandidate(document.source, document.buffers);
@@ -213,6 +217,9 @@ export function useSourceEditor({
             candidate.definition,
           );
       if (!mounted.current) return;
+      // Every version of the source carries its current name: cards bound to
+      // it read the renamed source again instead of the cached name.
+      pinnedSourceVersions.forget(saved.id);
       // Refresh the library even when another source is being edited.
       if (loadingSourceId.current === saved.id)
         savedDuringSelection.current = saved;
@@ -246,7 +253,9 @@ export function useSourceEditor({
         });
     } finally {
       if (mounted.current)
-        setSavingIds((ids) => ids.filter((id) => id !== sourceId));
+        setPendingSaves((saves) =>
+          saves.filter((save) => save.request !== request),
+        );
     }
   };
   const canRun = canRunSourceTest(document, saving);
@@ -269,47 +278,58 @@ export function useSourceEditor({
   };
 
   return {
-    sources: listed.rows,
-    sourcesTotal: listed.total,
-    catalog,
-    search,
-    setSearch,
-    detailLoading,
-    versionLoading,
-    document,
-    loading: catalog.loading,
-    dirty,
-    historical,
-    saving,
-    saveProblem: document && sourceSaveProblem(document),
-    canRun,
-    pending: savingIds.length > 0 || document?.testing != null,
-    versions: versions.data.items,
-    versionsPage: versions,
-    versionsLoading: versions.loading,
-    // Document and command failures are dismissed; a failed catalog read is retried.
-    error: document?.error || listError,
-    catalogError: catalog.error,
-    retryCatalog: () => setCatalogAttempt((attempt) => attempt + 1),
-    versionsError: versions.error,
-    displayConfig: document && displayedConfiguration(document),
-    select,
-    inspectVersion,
-    save,
-    run,
-    changeMetadata: (patch: Pick<Partial<DataSource>, "id" | "name">) =>
-      dispatch({ type: "metadata", patch }),
-    changeConfig: (patch: Partial<SourceConfig>) =>
-      dispatch({ type: "configuration", patch }),
-    changeBuffer: (field: keyof SourceBuffers, value: string) =>
-      dispatch({ type: "buffer", field, value }),
-    changeTimeout: (value: string) => dispatch({ type: "timeout", value }),
-    changeProvider: (kind: SourceConfig["kind"]) =>
-      dispatch({ type: "provider", kind }),
-    changeTestInput: (value: string) => dispatch({ type: "test/input", value }),
-    dismissError: () => {
-      dispatch({ type: "error/clear" });
-      setListError("");
+    /** The list: rows, paging and search; a failed read is retried. */
+    catalog: {
+      rows: listed.rows,
+      total: listed.total,
+      page: catalog,
+      search,
+      setSearch,
+      loading: catalog.loading,
+      error: catalog.error,
+      retry: () => setCatalogAttempt((attempt) => attempt + 1),
+    },
+    /** The open source and what may happen to it; its failures are dismissed. */
+    document: {
+      open: document,
+      loading: detailLoading,
+      versionLoading,
+      dirty,
+      historical,
+      saving,
+      saveProblem: document && sourceSaveProblem(document),
+      canRun,
+      pending: pendingSaves.length > 0 || document?.testing != null,
+      error: document?.error || listError,
+      displayConfig: document && displayedConfiguration(document),
+    },
+    /** The open source's version history. */
+    versions: {
+      items: versions.data.items,
+      page: versions,
+      loading: versions.loading,
+      error: versions.error,
+    },
+    commands: {
+      select,
+      inspectVersion,
+      save,
+      run,
+      changeMetadata: (patch: Pick<Partial<DataSource>, "id" | "name">) =>
+        dispatch({ type: "metadata", patch }),
+      changeConfig: (patch: Partial<SourceConfig>) =>
+        dispatch({ type: "configuration", patch }),
+      changeBuffer: (field: keyof SourceBuffers, value: string) =>
+        dispatch({ type: "buffer", field, value }),
+      changeTimeout: (value: string) => dispatch({ type: "timeout", value }),
+      changeProvider: (kind: SourceConfig["kind"]) =>
+        dispatch({ type: "provider", kind }),
+      changeTestInput: (value: string) =>
+        dispatch({ type: "test/input", value }),
+      dismissError: () => {
+        dispatch({ type: "error/clear" });
+        setListError("");
+      },
     },
   };
 }

@@ -1,6 +1,7 @@
 import { editorLines, setEditorText } from "./helpers/editor";
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
+import { createRule, publishRule, uniqueId, uniqueStamp } from "./helpers/api";
 const node = (
   id: string,
   type: RuleNode["type"],
@@ -43,7 +44,7 @@ test("settings modal and runtime/validation errors jump to the failing node from
   page,
   request,
 }) => {
-  const id = `editor-error-${Date.now()}`;
+  const id = uniqueId("editor-error");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -54,13 +55,12 @@ test("settings modal and runtime/validation errors jump to the failing node from
     ],
     edges: [edge("input", "bad"), edge("bad", "output")],
   };
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: { id, name: "Error navigation", kind: "FORMULA", definition },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await createRule(request, {
+    id,
+    name: "Error navigation",
+    kind: "FORMULA",
+    definition,
+  });
   await page.goto(`/#/rules/${id}`);
   const gear = page.getByRole("button", { name: "Rule settings", exact: true });
   await gear.hover();
@@ -137,7 +137,7 @@ test("connected parameter dropdowns, unquoted string constants and reference mod
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const childId = `editor-child-${stamp}`,
     id = `editor-parent-${stamp}`;
   const child: Definition = {
@@ -152,23 +152,13 @@ test("connected parameter dropdowns, unquoted string constants and reference mod
     ],
     edges: [edge("input", "out")],
   };
-  const created = await (
-    await request.post("/api/rules", {
-      data: {
-        id: childId,
-        name: "String mapping child",
-        kind: "FORMULA",
-        definition: child,
-      },
-    })
-  ).json();
-  expect(
-    (
-      await request.post(`/api/rules/${childId}/publish`, {
-        data: { revision: created.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  const created = await createRule(request, {
+    id: childId,
+    name: "String mapping child",
+    kind: "FORMULA",
+    definition: child,
+  });
+  await publishRule(request, created);
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -194,13 +184,12 @@ test("connected parameter dropdowns, unquoted string constants and reference mod
       edge("future", "out"),
     ],
   };
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: { id, name: "Mapping parent", kind: "FORMULA", definition },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await createRule(request, {
+    id,
+    name: "Mapping parent",
+    kind: "FORMULA",
+    definition,
+  });
   await page.goto(`/#/rules/${id}`);
   await focus(page, "reuse");
   await expect(
@@ -259,7 +248,7 @@ test("condition string builder quotes text and graph connections retain multiple
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const conditionId = `editor-condition-${stamp}`,
     id = `editor-fanout-${stamp}`;
   const condition: Definition = {
@@ -279,13 +268,11 @@ test("condition string builder quotes text and graph connections retain multiple
       edge("check", "no", "false"),
     ],
   };
-  await request.post("/api/rules", {
-    data: {
-      id: conditionId,
-      name: "String condition",
-      kind: "RULE",
-      definition: condition,
-    },
+  await createRule(request, {
+    id: conditionId,
+    name: "String condition",
+    kind: "RULE",
+    definition: condition,
   });
   await page.goto(`/#/rules/${conditionId}`);
   await expect(
@@ -320,8 +307,11 @@ test("condition string builder quotes text and graph connections retain multiple
     ],
     edges: [edge("input", "base"), edge("base", "tax")],
   };
-  await request.post("/api/rules", {
-    data: { id, name: "Fanout canvas", kind: "FORMULA", definition },
+  await createRule(request, {
+    id,
+    name: "Fanout canvas",
+    kind: "FORMULA",
+    definition,
   });
   await page.goto(`/#/rules/${id}`);
   await page.reload(); // API-created fixture is newer than this tab's library snapshot.
@@ -365,7 +355,7 @@ test("errors inside reused rules open the failing published node in a modal", as
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const childId = `editor-bad-child-${stamp}`,
     id = `editor-bad-parent-${stamp}`;
   const child: Definition = {
@@ -377,19 +367,13 @@ test("errors inside reused rules open the failing published node in a modal", as
     ],
     edges: [edge("input", "broken")],
   };
-  const created = await (
-    await request.post("/api/rules", {
-      data: {
-        id: childId,
-        name: "Broken child",
-        kind: "FORMULA",
-        definition: child,
-      },
-    })
-  ).json();
-  await request.post(`/api/rules/${childId}/publish`, {
-    data: { revision: created.revision },
+  const created = await createRule(request, {
+    id: childId,
+    name: "Broken child",
+    kind: "FORMULA",
+    definition: child,
   });
+  await publishRule(request, created);
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -405,8 +389,11 @@ test("errors inside reused rules open the failing published node in a modal", as
     ],
     edges: [edge("input", "reuse"), edge("reuse", "out")],
   };
-  await request.post("/api/rules", {
-    data: { id, name: "Broken parent", kind: "FORMULA", definition },
+  await createRule(request, {
+    id,
+    name: "Broken parent",
+    kind: "FORMULA",
+    definition,
   });
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
@@ -435,7 +422,7 @@ test("a problem jump from the studio centers a far node however the canvas was m
   page,
   request,
 }) => {
-  const id = `editor-far-${Date.now()}`;
+  const id = uniqueId("editor-far");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -446,13 +433,12 @@ test("a problem jump from the studio centers a far node however the canvas was m
     ],
     edges: [edge("input", "near"), edge("near", "far")],
   };
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: { id, name: "Far focus", kind: "FORMULA", definition },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await createRule(request, {
+    id,
+    name: "Far focus",
+    kind: "FORMULA",
+    definition,
+  });
   // The graph mounts first, so its measurements outlive the canvas.
   await page.goto(`/#/rules/${id}`);
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
@@ -489,4 +475,77 @@ test("a problem jump from the studio centers a far node however the canvas was m
         .evaluate((viewport) => getComputedStyle(viewport).transform),
     )
     .toMatch(/^matrix\(1, 0, 0, 1, /);
+});
+
+test("a deep link to a node the rule does not have shows the whole graph", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("editor-missing-node");
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      node("input", "INPUT"),
+      node("near", "FORMULA", "1", "x", 300, 180),
+      node("far", "OUTPUT", "x", undefined, 3000, 2400),
+    ],
+    edges: [edge("input", "near"), edge("near", "far")],
+  };
+  await createRule(request, {
+    id,
+    name: "Missing focus",
+    kind: "FORMULA",
+    definition,
+  });
+  await page.goto(`/#/rules/${id}?node=missing`);
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
+  // A focus that could never apply used to hold off the initial fit, so the
+  // far card stayed outside the pane.
+  const inside = async (nodeId: string) => {
+    const flow = await page.locator(".react-flow").boundingBox();
+    const card = await page
+      .locator(`.react-flow__node[data-id="${nodeId}"]`)
+      .boundingBox();
+    if (!flow || !card) return false;
+    return (
+      card.x >= flow.x &&
+      card.y >= flow.y &&
+      card.x + card.width <= flow.x + flow.width &&
+      card.y + card.height <= flow.y + flow.height
+    );
+  };
+  await expect.poll(() => inside("far"), { timeout: 5000 }).toBe(true);
+  await expect.poll(() => inside("input")).toBe(true);
+});
+
+test("Rule settings shows the server's name rule under the field and holds Apply", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("editor-settings");
+  await createRule(request, { id, name: "Settings fixture", kind: "FORMULA" });
+  await page.goto(`/#/rules/${id}`);
+  await page
+    .getByRole("button", { name: "Rule settings", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  const name = dialog.getByLabel("Name", { exact: true });
+  const apply = dialog.getByRole("button", { name: "Apply changes" });
+  await name.fill("   ");
+  await expect(
+    dialog.getByText("Rule name must contain 1 to 160 characters"),
+  ).toBeVisible();
+  await expect(apply).toBeDisabled();
+  // The server trims with Java's String.trim: a no-break space stays part of the name.
+  await name.fill("\u00a0Kept");
+  await expect(dialog.getByText("Rule name must contain")).toHaveCount(0);
+  await expect(apply).toBeEnabled();
+  await dialog
+    .getByLabel("Description", { exact: true })
+    .fill("d".repeat(2001));
+  await expect(
+    dialog.getByText("Description exceeds 2,000 characters"),
+  ).toBeVisible();
+  await expect(apply).toBeDisabled();
 });

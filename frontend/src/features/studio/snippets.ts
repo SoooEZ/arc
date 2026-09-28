@@ -1,6 +1,7 @@
 import type { Definition, Rule, Version } from "../../types";
 import { quoteText } from "../../domain/expressions";
 import { shortId } from "../../domain/ids";
+import { MAX_NODE_ID_CHARACTERS } from "../../domain/limits";
 import { placeholderLiteral } from "../../domain/placeholderLiterals";
 
 /**
@@ -16,15 +17,17 @@ export function snippetStringLiteral(text: string): string {
   return escapeSnippetText(quoteText(text));
 }
 
-/** Backend Limits.MAX_NODE_ID_CHARACTERS; a rule ID alone may already use all 80. */
-const maxNodeIdLength = 80;
+// A rule ID alone may already use the whole node-ID limit.
 const reusePrefix = "reuse-";
 const reuseSuffixDigits = 4;
 
 /** A Reference node ID that names the reused rule within the node-ID limit, e.g. "reuse-apply-discount-9f86". */
 export function reuseNodeId(ruleId: string): string {
   const ruleIdLength =
-    maxNodeIdLength - reusePrefix.length - "-".length - reuseSuffixDigits;
+    MAX_NODE_ID_CHARACTERS -
+    reusePrefix.length -
+    "-".length -
+    reuseSuffixDigits;
   return shortId(
     `${reusePrefix}${ruleId.slice(0, ruleIdLength)}-`,
     reuseSuffixDigits,

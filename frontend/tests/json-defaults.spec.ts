@@ -5,13 +5,14 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 async function openArrayDefault(
   page: Page,
   request: APIRequestContext,
   defaultValue: unknown,
 ) {
-  const id = `json-default-${Date.now()}`;
+  const id = uniqueId("json-default");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [{ name: "limits", type: "ARRAY", required: false, defaultValue }],
@@ -29,10 +30,12 @@ async function openArrayDefault(
       { id: "next", source: "input", target: "out", sourceHandle: "next" },
     ],
   };
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBe(true);
   await page.goto(`/#/rules/${id}?node=input`);
   const field = page
     .locator(".inspector-sidebar")

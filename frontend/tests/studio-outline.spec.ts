@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Definition } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 // Node IDs are case-sensitive, and the renderer hoists notes above every node.
 const definition: Definition = {
@@ -42,11 +43,13 @@ test("outline navigation reveals the exact node declaration, not a comment or a 
   page,
   request,
 }) => {
-  const id = `studio-outline-${Date.now()}`;
-  const created = await request.post("/api/rules", {
-    data: { id, name: "Outline fixture", kind: "FORMULA", definition },
+  const id = uniqueId("studio-outline");
+  await createRule(request, {
+    id,
+    name: "Outline fixture",
+    kind: "FORMULA",
+    definition,
   });
-  expect(created.ok()).toBeTruthy();
   await page.goto(`/#/studio/${id}`);
   const code = page.locator(".view-lines");
   await expect(code).toContainText('node "output" OUTPUT "Lower output"');

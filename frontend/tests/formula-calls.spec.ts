@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, publishRule, uniqueStamp } from "./helpers/api";
 function definition(
   expression: string,
   inputs: Definition["inputs"],
@@ -38,7 +39,7 @@ function definition(
   };
 }
 async function fixtures(request: APIRequestContext) {
-  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const suffix = uniqueStamp();
   const amount = {
     name: "amount",
     type: "NUMBER" as const,
@@ -46,39 +47,23 @@ async function fixtures(request: APIRequestContext) {
     defaultValue: null,
   };
   const callee = `formula-price-${suffix}`;
-  const response = await request.post("/api/rules", {
-    data: {
-      id: callee,
-      name: `Tax formula ${suffix}`,
-      kind: "FORMULA",
-      definition: definition("amount * (1 + rate)", [
-        amount,
-        { name: "rate", type: "NUMBER", required: false, defaultValue: 0.1 },
-      ]),
-    },
+  const rule: Rule = await createRule(request, {
+    id: callee,
+    name: `Tax formula ${suffix}`,
+    kind: "FORMULA",
+    definition: definition("amount * (1 + rate)", [
+      amount,
+      { name: "rate", type: "NUMBER", required: false, defaultValue: 0.1 },
+    ]),
   });
-  expect(response.status()).toBe(201);
-  const rule: Rule = await response.json();
-  expect(
-    (
-      await request.post(`/api/rules/${callee}/publish`, {
-        data: { revision: rule.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, rule);
   const caller = `formula-caller-${suffix}`;
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: {
-          id: caller,
-          name: caller,
-          kind: "FORMULA",
-          definition: definition("amount", [{ ...amount, defaultValue: 100 }]),
-        },
-      })
-    ).status(),
-  ).toBe(201);
+  await createRule(request, {
+    id: caller,
+    name: caller,
+    kind: "FORMULA",
+    definition: definition("amount", [{ ...amount, defaultValue: 100 }]),
+  });
   return { callee, caller, suffix };
 }
 test("at completion pins a formula and hover explains input, formula and result symbols", async ({
@@ -218,13 +203,7 @@ test("formula picker preserves pins after publication and ignores late insertion
   });
   expect(updated.ok()).toBeTruthy();
   const saved: Rule = await updated.json();
-  expect(
-    (
-      await request.post(`/api/rules/${callee}/publish`, {
-        data: { revision: saved.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, saved);
   expect(
     (
       await (
@@ -288,13 +267,7 @@ test("formula runtime errors open the pinned child node and preserve unsaved cal
   });
   expect(updated.ok()).toBeTruthy();
   const saved: Rule = await updated.json();
-  expect(
-    (
-      await request.post(`/api/rules/${callee}/publish`, {
-        data: { revision: saved.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, saved);
   await page.goto(`/#/rules/${caller}?node=calc`);
   await page
     .getByLabel("Node name", { exact: true })

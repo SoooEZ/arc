@@ -12,7 +12,7 @@ import {
 } from "../studio/useArcLanguageSupport";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
 import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
-import type { VariableOption } from "../../domain/graph";
+import type { VariableOption } from "../../domain/variables";
 
 /** Help under the editor; a failed suggestion source explains the missing completions. */
 function helpText(

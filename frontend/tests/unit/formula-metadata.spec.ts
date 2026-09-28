@@ -37,18 +37,24 @@ const definition: Definition = {
   edges: [],
 };
 
-/** Reads that count version downloads per id:version pin. */
+/** Reads that count version downloads per id:version pin and identity reads per rule. */
 function countingReads(catalog: RuleSummary[] = [], createdAt = created) {
   const versionReads: string[] = [];
+  const ruleReads: string[] = [];
   const reads: FormulaReads = {
-    rule: async (id) => ({
-      kind: id.startsWith("rule-") ? "RULE" : "FORMULA",
-      name: `Rule ${id}`,
-      createdAt,
-    }),
-    version: async (id, version) => {
-      versionReads.push(`${id}:${version}`);
-      return { ruleId: id, version, definition, publishedAt: "" };
+    rule: async (id, signal) => {
+      ruleReads.push(id);
+      await Promise.resolve();
+      if (signal.aborted) throw new DOMException("aborted", "AbortError");
+      return {
+        kind: id.startsWith("rule-") ? "RULE" : "FORMULA",
+        name: `Rule ${id}`,
+        createdAt,
+      };
+    },
+    version: async (rule, version) => {
+      versionReads.push(`${rule.id}:${version}`);
+      return { ruleId: rule.id, version, definition, publishedAt: "" };
     },
     search: async () => ({
       items: catalog,
@@ -57,7 +63,7 @@ function countingReads(catalog: RuleSummary[] = [], createdAt = created) {
       limit: 8,
     }),
   };
-  return { reads, versionReads };
+  return { reads, versionReads, ruleReads };
 }
 
 const signal = () => new AbortController().signal;
@@ -90,13 +96,15 @@ test("the cache keeps the most recently used pins within its capacity", async ()
 });
 
 test("aborted reads and non-Formula rules are never cached", async () => {
-  const { reads, versionReads } = countingReads();
+  const { reads, versionReads, ruleReads } = countingReads();
   const metadata = new FormulaMetadata(reads);
   const aborted = new AbortController();
+  const pending = metadata.load("tax", 1, aborted.signal);
   aborted.abort();
-  await metadata.load("tax", 1, aborted.signal);
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
   await metadata.load("tax", 1, signal());
-  expect(versionReads).toEqual(["tax:1", "tax:1"]);
+  expect(ruleReads).toEqual(["tax", "tax"]);
+  expect(versionReads).toEqual(["tax:1"]);
   await expect(metadata.load("rule-x", 1, signal())).rejects.toThrow(
     "Only published Formula rules can be called in an expression.",
   );
@@ -157,4 +165,31 @@ test("a rule created again under a deleted ID is read afresh, and a same-tab del
   await forgetting.load("tax", 2, signal(), summary("tax", 2));
   await forgetting.load("taxes", 1, signal(), summary("taxes", 1));
   expect(versionReads).toEqual(["tax:2"]);
+});
+
+test("callers asking about one rule together share its identity read", async () => {
+  const { reads, ruleReads } = countingReads();
+  const metadata = new FormulaMetadata(reads);
+  // Hover, completion and insertion each read the rule: 3 reads per hover.
+  const [hover, completion, insertion] = await Promise.all([
+    metadata.load("tax", 1, signal()),
+    metadata.load("tax", 1, signal()),
+    metadata.load("tax", 2, signal()),
+  ]);
+  expect(ruleReads).toEqual(["tax"]);
+  expect([hover.version, completion.version, insertion.version]).toEqual([
+    1, 1, 2,
+  ]);
+  // The shared read ends only when its last waiter leaves.
+  const first = new AbortController();
+  const second = new AbortController();
+  const one = metadata.load("vat", 1, first.signal);
+  const two = metadata.load("vat", 1, second.signal);
+  first.abort();
+  await expect(one).rejects.toMatchObject({ name: "AbortError" });
+  expect((await two).id).toBe("vat");
+  expect(ruleReads).toEqual(["tax", "vat"]);
+  // A later call reads again: identities are checked, never cached.
+  await metadata.load("vat", 1, signal());
+  expect(ruleReads).toEqual(["tax", "vat", "vat"]);
 });

@@ -6,7 +6,11 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
-import { createRule as createApiRule, publishRule } from "./helpers/api";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueStamp,
+} from "./helpers/api";
 
 /*
  * Cards, menus, the inspector, library previews, the Script outline and the
@@ -234,7 +238,7 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const childId = `kinds-child-${stamp}`;
   const id = `kinds-parent-${stamp}`;
   const name = `Every node kind ${stamp}`;

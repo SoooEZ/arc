@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Rule, RuleNode, RuleSummary } from "../src/types";
+import { createRule, deleteRule, uniqueId } from "./helpers/api";
 
 function node(id: string, type: RuleNode["type"], label: string): RuleNode {
   return { id, type, label, position: { x: 0, y: 0 }, expression: "1" };
@@ -333,7 +334,7 @@ test("a card preview follows a rule created again under a deleted ID", async ({
   page,
   request,
 }) => {
-  const id = `overview-recreated-${Date.now()}`;
+  const id = uniqueId("overview-recreated");
   // Stored nodes carry only their kind's properties, unlike the mocked ones above.
   const input: RuleNode = {
     id: "input",
@@ -345,59 +346,53 @@ test("a card preview follows a rule created again under a deleted ID", async ({
     ...node("output", "OUTPUT", label),
     position: { x: 0, y: 200 },
   });
-  const first = await request.post("/api/rules", {
-    data: {
-      id,
-      name: `Old preview ${id}`,
-      kind: "FORMULA",
-      definition: {
-        schemaVersion: 1,
-        inputs: [],
-        nodes: [input, output("OLD result")],
-        edges: [
-          {
-            id: "next",
-            source: "input",
-            target: "output",
-            sourceHandle: "next",
-          },
-        ],
-      },
+  await createRule(request, {
+    id,
+    name: `Old preview ${id}`,
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [],
+      nodes: [input, output("OLD result")],
+      edges: [
+        {
+          id: "next",
+          source: "input",
+          target: "output",
+          sourceHandle: "next",
+        },
+      ],
     },
   });
-  expect(first.status()).toBe(201);
   await page.goto("/#/library");
   const search = page.getByRole("textbox", { name: "Search rules" });
   await search.fill(id);
   await expect(page.locator(".rule-card")).toHaveCount(1);
   await expect(page.locator("[data-preview-node]")).toHaveCount(2);
 
-  expect((await request.delete(`/api/rules/${id}`)).status()).toBe(204);
-  const second = await request.post("/api/rules", {
-    data: {
-      id,
-      name: `New preview ${id}`,
-      kind: "FORMULA",
-      definition: {
-        schemaVersion: 1,
-        inputs: [],
-        nodes: [
-          input,
-          { ...node("step", "FORMULA", "NEW step"), output: "x" },
-          output("NEW result"),
-        ],
-        edges: [
-          { id: "a", source: "input", target: "step", sourceHandle: "next" },
-          { id: "b", source: "step", target: "output", sourceHandle: "next" },
-        ],
-      },
+  await deleteRule(request, id);
+  await createRule(request, {
+    id,
+    name: `New preview ${id}`,
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [],
+      nodes: [
+        input,
+        { ...node("step", "FORMULA", "NEW step"), output: "x" },
+        output("NEW result"),
+      ],
+      edges: [
+        { id: "a", source: "input", target: "step", sourceHandle: "next" },
+        { id: "b", source: "step", target: "output", sourceHandle: "next" },
+      ],
     },
   });
-  expect(second.status()).toBe(201);
 
   // The same ID must not reuse the deleted rule's preview.
   await search.fill(`New preview ${id}`);
   await expect(page.locator(".rule-card")).toContainText(`New preview ${id}`);
   await expect(page.locator("[data-preview-node]")).toHaveCount(3);
-  expect((await request.delete(`/api/rules/${id}`)).status()).toBe(204);
+  await deleteRule(request, id);
 });

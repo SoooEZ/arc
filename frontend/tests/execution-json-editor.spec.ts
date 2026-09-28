@@ -6,7 +6,11 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
-import { createRule as createApiRule, publishRule } from "./helpers/api";
+import {
+  createRule as createApiRule,
+  publishRule,
+  uniqueId,
+} from "./helpers/api";
 import { editorLines, setEditorText } from "./helpers/editor";
 
 const definition: Definition = {
@@ -35,7 +39,7 @@ const definition: Definition = {
 };
 
 async function createRule(request: APIRequestContext, publish = false) {
-  const id = `json-editor-${Date.now()}`;
+  const id = uniqueId("json-editor");
   const rule = await createApiRule(request, { id, definition });
   if (publish) await publishRule(request, rule);
   return id;

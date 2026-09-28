@@ -1,4 +1,8 @@
-import { expect, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type APIResponse,
+} from "@playwright/test";
 import type {
   DataSource,
   Definition,
@@ -7,10 +11,27 @@ import type {
   SourceConfig,
 } from "../../src/types";
 
+/** A short text unique to this run, for IDs and names that must not collide across runs. */
+export function uniqueStamp(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
 /** A rule or source ID unique to this run, within the 80-character slug policy. */
 export function uniqueId(prefix: string): string {
-  const stamp = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  return `${prefix}-${stamp}`.slice(0, 80);
+  return `${prefix}-${uniqueStamp()}`.slice(0, 80);
+}
+
+/** Posts a rule creation (any object, or a raw JSON body) and returns the response, for tests that expect a refusal. */
+export function createRuleResponse(
+  request: APIRequestContext,
+  creation: object | string,
+): Promise<APIResponse> {
+  return typeof creation === "string"
+    ? request.post("/api/rules", {
+        headers: { "Content-Type": "application/json" },
+        data: creation,
+      })
+    : request.post("/api/rules", { data: creation });
 }
 
 /** The smallest complete graph: the Input node returns `amount`. */
@@ -50,11 +71,25 @@ export async function createRule(
     definition?: Definition;
   } = {},
 ): Promise<Rule> {
-  const response = await request.post("/api/rules", {
-    data: { id, name, kind, description, definition },
+  const response = await createRuleResponse(request, {
+    id,
+    name,
+    kind,
+    description,
+    definition,
   });
   expect(response.ok(), await response.text()).toBe(true);
   return (await response.json()) as Rule;
+}
+
+/** Posts a publication and returns the response, for tests that expect a refusal. */
+export function publishRuleResponse(
+  request: APIRequestContext,
+  rule: Pick<Rule, "id" | "revision">,
+): Promise<APIResponse> {
+  return request.post(`/api/rules/${rule.id}/publish`, {
+    data: { revision: rule.revision },
+  });
 }
 
 /** Publishes the rule's current draft at the revision the rule carries. */
@@ -62,9 +97,7 @@ export async function publishRule(
   request: APIRequestContext,
   rule: Pick<Rule, "id" | "revision">,
 ): Promise<Rule> {
-  const response = await request.post(`/api/rules/${rule.id}/publish`, {
-    data: { revision: rule.revision },
-  });
+  const response = await publishRuleResponse(request, rule);
   expect(response.ok(), await response.text()).toBe(true);
   return (await response.json()) as Rule;
 }
@@ -94,13 +127,11 @@ export async function createSource(
   return (await response.json()) as DataSource;
 }
 
-/** Deletes a rule at its current revision, for cleanup after a test. */
+/** Deletes a rule, whatever its revision: cleanup, or a fixture created again under its ID. */
 export async function deleteRule(
   request: APIRequestContext,
-  rule: Pick<Rule, "id" | "revision">,
+  id: string,
 ): Promise<void> {
-  const response = await request.delete(
-    `/api/rules/${rule.id}?revision=${rule.revision}`,
-  );
-  expect(response.ok(), await response.text()).toBe(true);
+  const response = await request.delete(`/api/rules/${id}`);
+  expect(response.status(), await response.text()).toBe(204);
 }

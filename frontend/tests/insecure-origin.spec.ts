@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 const uuidV4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -40,11 +41,13 @@ function definition(): Definition {
 }
 
 async function create(request: APIRequestContext) {
-  const id = `insecure-origin-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "DECISION_TREE", definition: definition() },
+  const id = uniqueId("insecure-origin");
+  await createRule(request, {
+    id,
+    name: id,
+    kind: "DECISION_TREE",
+    definition: definition(),
   });
-  expect(response.status()).toBe(201);
   return id;
 }
 

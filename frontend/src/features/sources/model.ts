@@ -49,7 +49,7 @@ export function sourceCandidate(
   };
 }
 
-export function sourceParameterNamesError(parameters: unknown): string | null {
+function sourceParameterNamesError(parameters: unknown): string | null {
   if (!Array.isArray(parameters))
     return "Source parameters must be a JSON array.";
   for (const [index, parameter] of parameters.entries()) {

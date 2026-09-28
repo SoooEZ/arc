@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from "@playwright/test";
 import type { NodeType } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 
 const kinds: NodeType[] = [
   "INPUT",
@@ -18,29 +19,26 @@ test("library previews colour every node kind like its canvas icon", async ({
   page,
   request,
 }) => {
-  const id = `kind-colors-${Date.now()}`;
+  const id = uniqueId("kind-colors");
   const name = `Kind colours ${id}`;
-  const created = await request.post("/api/rules", {
-    data: {
-      id,
-      name,
-      kind: "DECISION_TREE",
-      definition: {
-        schemaVersion: 1,
-        inputs: [],
-        nodes: kinds.map((type, index) => ({
-          id: type.toLowerCase(),
-          type,
-          label: `${type.toLowerCase()} step`,
-          position: { x: 0, y: index * 160 },
-        })),
-        edges: [
-          { id: "e", source: "input", target: "formula", sourceHandle: "next" },
-        ],
-      },
+  await createRule(request, {
+    id,
+    name,
+    kind: "DECISION_TREE",
+    definition: {
+      schemaVersion: 1,
+      inputs: [],
+      nodes: kinds.map((type, index) => ({
+        id: type.toLowerCase(),
+        type,
+        label: `${type.toLowerCase()} step`,
+        position: { x: 0, y: index * 160 },
+      })),
+      edges: [
+        { id: "e", source: "input", target: "formula", sourceHandle: "next" },
+      ],
     },
   });
-  expect(created.ok(), await created.text()).toBeTruthy();
 
   await page.goto("/#/library");
   const card = page.locator(".rule-card", { hasText: name });

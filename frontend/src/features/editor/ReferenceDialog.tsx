@@ -13,10 +13,7 @@ import type { ReferenceTarget } from "./types";
  * The entry after the embedded editor navigated within its rule: the view it
  * asked for, and the version it asked for or the viewer's pinned one.
  */
-export function withRoute(
-  entry: ReferenceTarget,
-  route: RuleRoute,
-): ReferenceTarget {
+function withRoute(entry: ReferenceTarget, route: RuleRoute): ReferenceTarget {
   return {
     ...entry,
     mode: route.mode,

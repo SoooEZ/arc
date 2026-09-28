@@ -30,7 +30,7 @@ import {
 } from "../studio/pinnedVersions";
 import UndeclaredBindings from "../expressions/UndeclaredBindings";
 import SourceProviderSelect from "./SourceProviderSelect";
-import type { VariableOption } from "../../domain/graph";
+import type { VariableOption } from "../../domain/variables";
 import type { Input, DataSource, SourceBinding } from "../../types";
 const SourceManagerDialog = lazy(() => import("./SourceManagerDialog"));
 export default function SourceBindingEditor({

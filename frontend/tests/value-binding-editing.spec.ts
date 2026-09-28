@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule, RuleNode } from "../src/types";
 import { editorLines } from "./helpers/editor";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 const node = (
   id: string,
@@ -38,12 +39,14 @@ async function create(
   definition: Definition,
   prefix = "binding-edit",
 ) {
-  const id = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId(`${prefix}`);
+  const response = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()) as Rule;
+  return response;
 }
 
 async function select(scope: Page | Locator, label: string, option: string) {
@@ -317,13 +320,7 @@ test("Reference parameters named like Object.prototype members show, bind and ru
     },
     "prototype-child",
   );
-  expect(
-    (
-      await request.post(`/api/rules/${child.id}/publish`, {
-        data: { revision: child.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, child);
   const parent = await create(request, {
     schemaVersion: 1,
     inputs: [],
@@ -393,13 +390,7 @@ test("an ARRAY constant refuses a list the server's tokenizer cannot read", asyn
     },
     "array-child",
   );
-  expect(
-    (
-      await request.post(`/api/rules/${child.id}/publish`, {
-        data: { revision: child.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, child);
   const parent = await create(request, {
     schemaVersion: 1,
     inputs: [],
@@ -458,13 +449,7 @@ test("a Reference mapping for a parameter the pinned version does not declare is
     },
     "undeclared-child",
   );
-  expect(
-    (
-      await request.post(`/api/rules/${child.id}/publish`, {
-        data: { revision: child.revision },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await publishRule(request, child);
   const parent = await create(request, {
     schemaVersion: 1,
     inputs: [amount],

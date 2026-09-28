@@ -5,6 +5,7 @@ import type { FlowNode } from "./GraphNode";
 import type { NodeSize, NodeSizes } from "./graphGeometry";
 import {
   cardBounds,
+  dragStartBounds,
   flowEdges,
   flowNodes,
   takenBranches,
@@ -13,9 +14,11 @@ import {
 import type { MovedCard } from "./edgeRouting";
 import {
   connectGraphNodes,
+  connectionAllowed,
   type DefinitionChange,
 } from "../../../domain/graph";
 import { newId } from "../../../domain/ids";
+import { canAddEdge, MAX_EDGES } from "../../../domain/limits";
 import { handles } from "../../../domain/nodePorts";
 import type { NodeErrors } from "../useGraphProblems";
 interface Options {
@@ -30,6 +33,8 @@ interface Options {
   nodeErrors: NodeErrors;
   /** The document's gated edit; dragging and connecting follow its rules. */
   edit: (change: DefinitionChange) => boolean;
+  /** Told why a connection gesture was refused, e.g. the connection limit. */
+  onRefused: (message: string) => void;
 }
 export function useGraphCanvas({
   definition,
@@ -41,6 +46,7 @@ export function useGraphCanvas({
   trace,
   nodeErrors,
   edit,
+  onRefused,
 }: Options) {
   const [measurements, setMeasurements] = useState<NodeSizes>(() => new Map());
   const [blockedEdges, setBlockedEdges] = useState<ReadonlySet<string>>(
@@ -64,17 +70,17 @@ export function useGraphCanvas({
   }, []);
   const bounds = cardBounds(definition.nodes, measurements);
   const geometry = JSON.stringify(bounds);
+  // Handlers keep their identity for the canvas's lifetime and read the
+  // latest draft and bounds through refs.
+  const latest = useRef({ definition, bounds });
+  latest.current = { definition, bounds };
   // The cards a drag in progress has moved: their bounds before the drag
   // started and now. Null between drags, so a settled graph routes fully.
   const [dragging, setDragging] = useState(false);
-  const dragStart = useRef<Map<string, CardBounds> | null>(null);
+  const dragStart = useRef<ReadonlyMap<string, CardBounds> | null>(null);
   const moved = useMemo((): MovedCard[] | null => {
-    if (!dragging) {
-      dragStart.current = null;
-      return null;
-    }
-    dragStart.current ??= new Map(bounds.map((card) => [card.id, card]));
-    const before = dragStart.current;
+    const before = dragging ? dragStart.current : null;
+    if (!before) return null;
     const cards: MovedCard[] = [];
     for (const card of bounds) {
       const start = before.get(card.id);
@@ -84,6 +90,11 @@ export function useGraphCanvas({
     return cards;
     // The bounds are keyed by their geometry text.
   }, [dragging, geometry]);
+  /** Ends a drag the canvas no longer reports, e.g. one its unmount interrupted. */
+  const endDrag = useCallback(() => {
+    dragStart.current = null;
+    setDragging(false);
+  }, []);
   // Label and expression edits replace node objects without moving a card.
   // Keyed by geometry, the context keeps its identity, so edges do not re-route.
   const routing = useMemo(
@@ -153,14 +164,21 @@ export function useGraphCanvas({
           return next ?? current;
         });
       }
+      // A drag's first change carries the bounds before it: captured before
+      // the edit below moves the cards, so the whole drag delta is routed.
+      const start = dragStartBounds(
+        dragStart.current,
+        changes,
+        latest.current.bounds,
+      );
+      if (start !== dragStart.current) {
+        dragStart.current = start;
+        setDragging(start !== null);
+      }
       const moved = new Map<string, { x: number; y: number }>();
-      let dragState: boolean | null = null;
       for (const change of changes)
-        if (change.type === "position") {
-          if (change.position) moved.set(change.id, change.position);
-          if (typeof change.dragging === "boolean") dragState = change.dragging;
-        }
-      if (dragState !== null) setDragging(dragState);
+        if (change.type === "position" && change.position)
+          moved.set(change.id, change.position);
       if (!moved.size) return;
       edit((d) => ({
         ...d,
@@ -181,9 +199,23 @@ export function useGraphCanvas({
     },
     [setSelectedEdge],
   );
+  /** Whether the dragged handle may drop here; React Flow shows a refused drop. */
+  const isValidConnection = useCallback(
+    (connection: Connection | Edge) =>
+      connectionAllowed(latest.current.definition, {
+        ...connection,
+        sourceHandle: connection.sourceHandle || handles.next,
+      }),
+    [],
+  );
   const connect = useCallback(
     ({ source, target, sourceHandle }: Connection) => {
       if (!source || !target || source === target) return;
+      // The limit is explained; the other refusals show while dragging.
+      if (!canAddEdge(latest.current.definition)) {
+        onRefused(`A draft holds at most ${MAX_EDGES} connections`);
+        return;
+      }
       // Document updaters can run more than once, so the ID is chosen here.
       const edgeId = newId();
       edit((definition) =>
@@ -196,7 +228,7 @@ export function useGraphCanvas({
         ),
       );
     },
-    [edit],
+    [edit, onRefused],
   );
   return {
     measurements,
@@ -208,6 +240,8 @@ export function useGraphCanvas({
     requestFit,
     onNodesChange,
     onEdgesChange,
+    isValidConnection,
     connect,
+    endDrag,
   };
 }

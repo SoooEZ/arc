@@ -4,8 +4,8 @@ import {
   isArrayLiteral,
   isNumberLiteral,
   literalText,
-  trimExpression,
 } from "./expressions";
+import { trimAsServer } from "./serverText";
 import { isIdentifier } from "./identifiers";
 import { placeholderLiteral } from "./placeholderLiterals";
 
@@ -41,7 +41,7 @@ export const constantDefaults: Record<ConstantType, string> = {
 
 /** The literal type the server would read from `value`, or null for any other expression. */
 export function inferConstantType(value: string): ConstantType | null {
-  const text = trimExpression(value);
+  const text = trimAsServer(value);
   if (literalText(text) !== null) return "STRING";
   if (/^(true|false)$/i.test(text)) return "BOOLEAN";
   if (/^null$/i.test(text)) return "NULL";

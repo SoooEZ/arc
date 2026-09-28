@@ -1,6 +1,7 @@
 import { editorLines, setEditorText } from "./helpers/editor";
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition } from "../src/types";
+import { createRule, uniqueId } from "./helpers/api";
 async function select(page: Page, label: string, option: string | RegExp) {
   await page.getByLabel(label, { exact: true }).click();
   await page
@@ -19,7 +20,7 @@ test("Output selects values of any type and round-trips typed constants through 
   page,
   request,
 }) => {
-  const id = `output-e2e-${Date.now()}`;
+  const id = uniqueId("output-e2e");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -70,13 +71,12 @@ test("Output selects values of any type and round-trips typed constants through 
       },
     ],
   };
-  expect(
-    (
-      await request.post("/api/rules", {
-        data: { id, name: "Output selection", kind: "FORMULA", definition },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await createRule(request, {
+    id,
+    name: "Output selection",
+    kind: "FORMULA",
+    definition,
+  });
   await page.goto(`/#/rules/${id}`);
   await focusOutput(page);
   await expect(

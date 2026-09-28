@@ -5,9 +5,16 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule, RuleSummary } from "../src/types";
+import {
+  createRule,
+  deleteRule,
+  publishRule,
+  uniqueId,
+  uniqueStamp,
+} from "./helpers/api";
 
 async function fixture(request: APIRequestContext, versions = 2) {
-  const id = `reference-picker-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = uniqueId("reference-picker");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [
@@ -33,22 +40,15 @@ async function fixture(request: APIRequestContext, versions = 2) {
       { id: "next", source: "input", target: "out", sourceHandle: "next" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: {
-      id: `${id}-child`,
-      name: `Selected child ${id}`,
-      kind: "FORMULA",
-      definition,
-    },
+  let child: Rule = await createRule(request, {
+    id: `${id}-child`,
+    name: `Selected child ${id}`,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.status()).toBe(201);
-  let child: Rule = await response.json();
   for (let version = 0; version < versions; version++) {
-    const published = await request.post(`/api/rules/${child.id}/publish`, {
-      data: { revision: child.revision },
-    });
-    expect(published.ok()).toBeTruthy();
-    child = await published.json();
+    const published = await publishRule(request, child);
+    child = published;
   }
   const parentDefinition: Definition = {
     ...definition,
@@ -72,11 +72,13 @@ async function fixture(request: APIRequestContext, versions = 2) {
       { id: "end", source: "ref", target: "out", sourceHandle: "next" },
     ],
   };
-  const created = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition: parentDefinition },
+  const created = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition: parentDefinition,
   });
-  expect(created.status()).toBe(201);
-  return { parent: (await created.json()) as Rule, child };
+  return { parent: created, child };
 }
 
 const sidebar = (page: Page) => page.locator(".inspector-sidebar");
@@ -426,10 +428,7 @@ test("reference pickers in the node dialog stage changes and historical pins rem
   request,
 }) => {
   const { parent, child } = await fixture(request);
-  const published = await request.post(`/api/rules/${parent.id}/publish`, {
-    data: { revision: parent.revision },
-  });
-  expect(published.ok()).toBeTruthy();
+  await publishRule(request, parent);
   await page.goto(`/#/rules/${parent.id}?node=ref`);
   const card = page.locator('.react-flow__node[data-id="ref"] .graph-node');
   const open = async () => {
@@ -544,7 +543,7 @@ test("a child renamed behind a listed library page shows its current name in the
   await expect(
     page.getByRole("heading", { name: child.name, exact: true }),
   ).toBeVisible();
-  const renamed = `Renamed child ${Date.now().toString(36)}`;
+  const renamed = `Renamed child ${uniqueStamp()}`;
   const saved = await request.put(`/api/rules/${child.id}`, {
     data: {
       name: renamed,
@@ -565,4 +564,63 @@ test("a child renamed behind a listed library page shows its current name in the
     viewer.getByRole("heading", { name: renamed, exact: true }),
   ).toBeVisible();
   await expect(viewer.locator(".reference-breadcrumb")).toContainText(renamed);
+});
+
+test("a child created again under its ID with other inputs shows the new parameters when picked again", async ({
+  page,
+  request,
+}) => {
+  const { parent, child } = await fixture(request, 1);
+  // Another published Formula the parent can call while the child is replaced.
+  const other = await publishRule(
+    request,
+    await createRule(request, {
+      id: `${parent.id}-other`,
+      name: `Other child ${parent.id}`,
+      definition: child.draft,
+    }),
+  );
+  await page.goto(`/#/rules/${parent.id}?node=ref`);
+  const inspector = sidebar(page);
+  await expect(
+    page.getByRole("group", { name: "Parameter amount" }),
+  ).toBeVisible();
+  const picker = inspector.getByRole("combobox", { name: "Published rule" });
+  await picker.fill(other.id);
+  await page.getByRole("option", { name: other.name, exact: true }).click();
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  // Deleted and created again elsewhere with one input, country, then published.
+  await deleteRule(request, child.id);
+  const recreated = await publishRule(
+    request,
+    await createRule(request, {
+      id: child.id,
+      name: `Recreated ${child.id}`,
+      definition: {
+        ...child.draft,
+        inputs: [
+          {
+            name: "country",
+            type: "STRING",
+            required: true,
+            defaultValue: null,
+          },
+        ],
+        nodes: child.draft.nodes.map((node) =>
+          node.id === "out" ? { ...node, expression: "country" } : node,
+        ),
+      },
+    }),
+  );
+  await picker.fill(child.id);
+  await page.getByRole("option", { name: recreated.name, exact: true }).click();
+  // Version 1 of the ID was cached from the first child: the new rule's
+  // version 1 has other parameters.
+  await expect(
+    page.getByRole("group", { name: "Parameter country" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Parameter amount" }),
+  ).toHaveCount(0);
 });

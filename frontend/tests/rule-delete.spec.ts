@@ -4,8 +4,14 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import type { Definition, Rule } from "../src/types";
-import { createRule as createApiRule } from "./helpers/api";
+import type { Definition } from "../src/types";
+import {
+  createRule as createApiRule,
+  deleteRule,
+  publishRule,
+  uniqueId,
+  uniqueStamp,
+} from "./helpers/api";
 
 const createRule = (
   request: APIRequestContext,
@@ -25,7 +31,7 @@ test("deleting a draft leaves for the library without asking about its unsaved c
   page,
   request,
 }) => {
-  const id = `delete-draft-${Date.now()}`;
+  const id = uniqueId("delete-draft");
   await createRule(request, id);
   const prompts: string[] = [];
   page.on("dialog", (dialog) => {
@@ -93,7 +99,7 @@ test("a deletion outlives the editor: leaving during it still reports and forget
   page,
   request,
 }) => {
-  const id = `delete-leave-${Date.now()}`;
+  const id = uniqueId("delete-leave");
   await createRule(request, id);
   const prompts: string[] = [];
   page.on("dialog", (dialog) => {
@@ -135,11 +141,8 @@ test("a deletion outlives the editor: leaving during it still reports and forget
 
 async function callee(request: APIRequestContext, id: string) {
   const rule = await createRule(request, id);
-  const published = await request.post(`/api/rules/${id}/publish`, {
-    data: { revision: rule.revision },
-  });
-  expect(published.ok(), await published.text()).toBeTruthy();
-  return (await published.json()) as Rule;
+  const published = await publishRule(request, rule);
+  return published;
 }
 
 function callerOf(calleeId: string): Definition {
@@ -182,7 +185,7 @@ test("a pending deletion keeps its dialog open, and a refusal lists every caller
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const called = await callee(request, `delete-called-${stamp}`);
   const callers: string[] = [];
   for (let index = 0; index < 7; index++) {
@@ -224,16 +227,15 @@ test("a pending deletion keeps its dialog open, and a refusal lists every caller
   await expect(listed.getByRole("listitem")).toHaveCount(7);
   await expect(listed).toContainText(`${callers[6]} (draft)`);
 
-  for (const caller of callers)
-    expect((await request.delete(`/api/rules/${caller}`)).status()).toBe(204);
-  expect((await request.delete(`/api/rules/${called.id}`)).status()).toBe(204);
+  for (const caller of callers) await deleteRule(request, caller);
+  await deleteRule(request, called.id);
 });
 
 test("a refusal that arrives after leaving is reported in the workspace", async ({
   page,
   request,
 }) => {
-  const stamp = Date.now();
+  const stamp = uniqueStamp();
   const called = await callee(request, `delete-late-${stamp}`);
   const caller = await createRule(
     request,
@@ -267,25 +269,22 @@ test("a refusal that arrives after leaving is reported in the workspace", async 
     ),
   ).toBeVisible();
   expect((await request.get(`/api/rules/${called.id}`)).ok()).toBeTruthy();
-  expect((await request.delete(`/api/rules/${caller.id}`)).status()).toBe(204);
-  expect((await request.delete(`/api/rules/${called.id}`)).status()).toBe(204);
+  await deleteRule(request, caller.id);
+  await deleteRule(request, called.id);
 });
 
 test("a rule published elsewhere is not deleted behind a draft-only confirmation", async ({
   page,
   request,
 }) => {
-  const id = `delete-stale-${Date.now()}`;
+  const id = uniqueId("delete-stale");
   const rule = await createRule(request, id);
   await page.goto(`/#/rules/${id}`);
   await page
     .getByRole("button", { name: "Rule settings", exact: true })
     .click();
   // Published from another tab while this editor still shows an unpublished draft.
-  const published = await request.post(`/api/rules/${id}/publish`, {
-    data: { revision: rule.revision },
-  });
-  expect(published.ok(), await published.text()).toBeTruthy();
+  await publishRule(request, rule);
   await page.getByRole("button", { name: "Delete rule…", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("alert")).toHaveText(
@@ -300,19 +299,16 @@ test("a rule published elsewhere is not deleted behind a draft-only confirmation
     ),
   ).toBeVisible();
   expect((await request.get(`/api/rules/${id}/versions/1`)).ok()).toBeTruthy();
-  expect((await request.delete(`/api/rules/${id}`)).status()).toBe(204);
+  await deleteRule(request, id);
 });
 
 test("a published rule asks for its ID, and a rule that another rule calls is kept", async ({
   page,
   request,
 }) => {
-  const callee = await createRule(request, `delete-callee-${Date.now()}`);
-  const published = await request.post(`/api/rules/${callee.id}/publish`, {
-    data: { revision: callee.revision },
-  });
-  expect(published.ok(), await published.text()).toBeTruthy();
-  const caller = await createRule(request, `delete-caller-${Date.now()}`, {
+  const callee = await createRule(request, uniqueId("delete-callee"));
+  await publishRule(request, callee);
+  const caller = await createRule(request, uniqueId("delete-caller"), {
     schemaVersion: 1,
     inputs: [],
     nodes: [
@@ -367,6 +363,6 @@ test("a published rule asks for its ID, and a rule that another rule calls is ke
   await expect(page).toHaveURL(new RegExp(`#/rules/${callee.id}$`));
   expect((await request.get(`/api/rules/${callee.id}`)).ok()).toBeTruthy();
 
-  expect((await request.delete(`/api/rules/${caller.id}`)).status()).toBe(204);
-  expect((await request.delete(`/api/rules/${callee.id}`)).status()).toBe(204);
+  await deleteRule(request, caller.id);
+  await deleteRule(request, callee.id);
 });

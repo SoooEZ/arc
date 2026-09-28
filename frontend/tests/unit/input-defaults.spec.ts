@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { inputDefaultProblem } from "../../src/domain/inputDefaults";
+import {
+  inputDefaultProblem,
+  valueBoundProblems,
+} from "../../src/domain/inputDefaults";
 import { DecimalNumber } from "../../src/domain/json";
 import { unsupportedNumber } from "../../src/domain/numericDefaults";
 
@@ -41,4 +44,61 @@ test("every nested number must stay within the server's precision and scale", ()
   expect(
     inputDefaultProblem("ARRAY", [new DecimalNumber("1" + "0".repeat(100))]),
   ).toBeNull();
+});
+
+test("JSON defaults are refused at the server's value bounds, in the server's words", () => {
+  // The field accepted these, and Save answered 422 from ValueBounds.
+  expect(
+    inputDefaultProblem(
+      "ARRAY",
+      Array.from({ length: 1000 }, () => 1),
+    ),
+  ).toBeNull();
+  expect(
+    inputDefaultProblem(
+      "ARRAY",
+      Array.from({ length: 1001 }, () => 1),
+    ),
+  ).toBe(valueBoundProblems.array);
+  const wide = Object.fromEntries(
+    Array.from({ length: 1001 }, (_, index) => [`f${index}`, 1]),
+  );
+  expect(inputDefaultProblem("OBJECT", wide)).toBe(valueBoundProblems.object);
+  expect(inputDefaultProblem("OBJECT", { text: "t".repeat(2000) })).toBeNull();
+  expect(inputDefaultProblem("OBJECT", { text: "t".repeat(2001) })).toBe(
+    valueBoundProblems.string,
+  );
+  // A key is a value too: the server bounds keys before their values.
+  expect(inputDefaultProblem("OBJECT", { ["k".repeat(2001)]: 1 })).toBe(
+    valueBoundProblems.string,
+  );
+  // Eight levels below the root pass; a ninth does not.
+  let nested: unknown = 1;
+  for (let level = 0; level < 8; level++) nested = [nested];
+  expect(inputDefaultProblem("ARRAY", nested as unknown[])).toBeNull();
+  expect(inputDefaultProblem("ARRAY", [nested])).toBe(
+    valueBoundProblems.sizeOrDepth,
+  );
+  // 10,000 elements in all, the root and every key counted.
+  const rows = Array.from({ length: 11 }, () =>
+    Array.from({ length: 1000 }, () => 0),
+  );
+  expect(inputDefaultProblem("ARRAY", rows)).toBe(
+    valueBoundProblems.sizeOrDepth,
+  );
+  expect(
+    inputDefaultProblem(
+      "ARRAY",
+      Array.from({ length: 9 }, () => Array.from({ length: 1000 }, () => 0)),
+    ),
+  ).toBeNull();
+});
+
+test("a very large pasted default is refused without exhausting the call stack", () => {
+  // pending.push(...current) threw RangeError for about 125,000 items, leaving the field unchecked.
+  const huge = Array.from({ length: 200_000 }, (_, index) => index);
+  expect(inputDefaultProblem("ARRAY", huge)).toBe(valueBoundProblems.array);
+  expect(inputDefaultProblem("OBJECT", { huge })).toBe(
+    valueBoundProblems.array,
+  );
 });

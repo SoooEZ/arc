@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule, RuleNode } from "../src/types";
 import { editorLines } from "./helpers/editor";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 const node = (
   id: string,
@@ -29,12 +30,14 @@ const edge = (source: string, target: string, sourceHandle = "next") => ({
   sourceHandle,
 });
 async function create(request: APIRequestContext, definition: Definition) {
-  const id = `binding-types-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const response = await request.post("/api/rules", {
-    data: { id, name: id, kind: "FORMULA", definition },
+  const id = uniqueId("binding-types");
+  const response = await createRule(request, {
+    id,
+    name: id,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as Rule;
+  return response;
 }
 async function select(page: Page, label: string, option: string) {
   await page.getByRole("combobox", { name: label, exact: true }).click();
@@ -56,10 +59,7 @@ test("an ARRAY Reference mapping keeps its literal when switching through Expres
     ],
     edges: [edge("input", "out")],
   });
-  const published = await request.post(`/api/rules/${child.id}/publish`, {
-    data: { revision: child.revision },
-  });
-  expect(published.ok()).toBeTruthy();
+  await publishRule(request, child);
   const parent = await create(request, {
     schemaVersion: 1,
     inputs: [],

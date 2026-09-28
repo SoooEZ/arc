@@ -7,6 +7,7 @@ import {
 import type { Definition, RuleNode } from "../src/types";
 import { branchHandleX } from "../src/domain/nodePorts";
 import { cardSize } from "../src/features/editor/canvas/graphGeometry";
+import { createRule, uniqueId } from "./helpers/api";
 
 // Node tests lay out in-thread; the browser runs ELK in a worker (graphLayoutWorker).
 const elk = new ELK();
@@ -158,16 +159,13 @@ test("Arrange graph uncrosses branches, persists layout, and preserves both exec
   page,
   request,
 }) => {
-  const id = `layout-e2e-${Date.now()}`;
-  const create = await request.post("/api/rules", {
-    data: {
-      id,
-      name: "Layout regression",
-      kind: "DECISION_TREE",
-      definition: split,
-    },
+  const id = uniqueId("layout-e2e");
+  await createRule(request, {
+    id,
+    name: "Layout regression",
+    kind: "DECISION_TREE",
+    definition: split,
   });
-  expect(create.ok()).toBeTruthy();
   await page.goto(`/#/rules/${id}`);
   const approved = page.locator('.react-flow__node[data-id="approved"]');
   const declined = page.locator('.react-flow__node[data-id="declined"]');

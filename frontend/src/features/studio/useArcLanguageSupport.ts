@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { monaco } from "./arcLanguage";
 import type { Definition, FunctionEntry } from "../../types";
 import { modules } from "./snippets";
-import { declaredVariables, type VariableOption } from "../../domain/graph";
+import { declaredVariables, type VariableOption } from "../../domain/variables";
 import {
   expressionSymbols,
   type ExpressionSymbol,

@@ -1,10 +1,9 @@
 import type { Definition, Diagnostic, Rule } from "../../types";
+import { ruleSnapshot, type DefinitionChange } from "../../domain/graph";
 import {
-  ruleSnapshot,
   sameDefinition,
   withNodePositions,
-  type DefinitionChange,
-} from "../../domain/graph";
+} from "../../domain/definitionEchoes";
 
 export interface DocumentState {
   rule: Rule;

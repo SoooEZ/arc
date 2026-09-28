@@ -30,7 +30,8 @@ export function useRuleLibrary(visible: boolean) {
   return {
     rules: page.data.items,
     total: page.data.total,
-    loading: page.loading,
+    // Until the typed search applies, the shown page answers an older search.
+    loading: page.loading || page.searching,
     loadError: page.error,
     retry: () => setRefresh((value) => value + 1),
     /** A rule changed elsewhere; reload when the library is next shown. */

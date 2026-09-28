@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 async function replaceCode(
   page: import("@playwright/test").Page,
@@ -15,7 +16,7 @@ test("saving from a published code editor cannot replace the current draft", asy
   page,
   request,
 }) => {
-  const id = `studio-readonly-${Date.now()}`;
+  const id = uniqueId("studio-readonly");
   const definition: Definition = {
     schemaVersion: 1,
     inputs: [],
@@ -33,16 +34,13 @@ test("saving from a published code editor cannot replace the current draft", asy
       { id: "edge", source: "input", target: "out", sourceHandle: "next" },
     ],
   };
-  const createdResponse = await request.post("/api/rules", {
-    data: { id, name: "Read-only code fixture", kind: "FORMULA", definition },
+  const created: Rule = await createRule(request, {
+    id,
+    name: "Read-only code fixture",
+    kind: "FORMULA",
+    definition,
   });
-  expect(createdResponse.ok()).toBeTruthy();
-  const created: Rule = await createdResponse.json();
-  const publishedResponse = await request.post(`/api/rules/${id}/publish`, {
-    data: { revision: created.revision },
-  });
-  expect(publishedResponse.ok()).toBeTruthy();
-  const published: Rule = await publishedResponse.json();
+  const published: Rule = await publishRule(request, created);
   const currentDraft = {
     ...definition,
     nodes: definition.nodes.map((node) =>
@@ -144,16 +142,13 @@ test("code studio builds, round-trips graph edits, inserts chips/modules, and pu
   page,
   request,
 }) => {
-  const id = `studio-e2e-${Date.now()}`;
-  const response = await request.post("/api/rules", {
-    data: {
-      id,
-      name: "Studio round trip",
-      kind: "DECISION_TREE",
-      description: "Browser integration fixture",
-    },
+  const id = uniqueId("studio-e2e");
+  await createRule(request, {
+    id,
+    name: "Studio round trip",
+    kind: "DECISION_TREE",
+    description: "Browser integration fixture",
   });
-  expect(response.ok()).toBeTruthy();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`/#/studio/${id}`);
@@ -303,7 +298,7 @@ test("data source UI creates, tests and versions a lookup table", async ({
   page,
   request,
 }) => {
-  const id = `source-e2e-${Date.now()}`;
+  const id = uniqueId("source-e2e");
   await page.goto("/#/sources");
   await expect(
     page.getByRole("heading", { name: "Data sources." }),
@@ -405,10 +400,12 @@ async function createFormula(
       { id: "next", source: "input", target: "out", sourceHandle: "next" },
     ],
   };
-  const response = await request.post("/api/rules", {
-    data: { id, name: `Canonical ${id}`, kind: "FORMULA", definition },
+  await createRule(request, {
+    id,
+    name: `Canonical ${id}`,
+    kind: "FORMULA",
+    definition,
   });
-  expect(response.ok(), await response.text()).toBeTruthy();
 }
 
 const commands = {
@@ -439,7 +436,9 @@ for (const [name, command] of Object.entries(commands)) {
     page,
     request,
   }) => {
-    const id = `studio-canonical-${name.replace(/\W+/g, "-").toLowerCase()}-${Date.now()}`;
+    const id = uniqueId(
+      `studio-canonical-${name.replace(/\W+/g, "-").toLowerCase()}`,
+    );
     await createFormula(request, id);
     await page.goto(`/#/studio/${id}`);
     const code = page.getByLabel("ARC code editor", { exact: true });
@@ -477,7 +476,7 @@ test("a build that leaves the code canonical still keeps undo", async ({
   page,
   request,
 }) => {
-  const id = `studio-canonical-control-${Date.now()}`;
+  const id = uniqueId("studio-canonical-control");
   await createFormula(request, id);
   await page.goto(`/#/studio/${id}`);
   const code = page.getByLabel("ARC code editor", { exact: true });

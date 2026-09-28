@@ -252,6 +252,42 @@ test("a deleted rule leaves the playground instead of a version that can never l
   expect(state.unexpected).toEqual([]);
 });
 
+test("a rule deleted again after its re-creation leaves the playground again", async ({
+  page,
+}) => {
+  const state = await mockCatalog(page, true, 1);
+  await page.goto("/#/playground");
+  await executeVersion(page, 1);
+  const notice = page.getByText(
+    "Publish a rule in the library to make your first API call.",
+  );
+  state.deleted = true;
+  await page.getByRole("button", { name: "Execute rule", exact: true }).click();
+  await expect(notice).toBeVisible();
+  // Created again under the same ID, with one version like before.
+  state.deleted = false;
+  state.createdAt = "2026-09-28T09:00:00Z";
+  await page
+    .getByLabel("Find published rules", { exact: true })
+    .fill("Catalog pricing");
+  await executeVersion(page, 1);
+  // Deleted a second time. The abandoned pin was remembered by ID and
+  // version, so the new rule's identical pin was kept with its error.
+  state.deleted = true;
+  await page.getByRole("button", { name: "Execute rule", exact: true }).click();
+  // With a search typed, the empty catalog reads differently.
+  await expect(
+    page.getByText("No published rules match your search."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Execute rule", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("alert").filter({ hasText: /not found/ }),
+  ).toHaveCount(0);
+  expect(state.unexpected).toEqual([]);
+});
+
 test("refreshing an off-page selected rule advances its implicit published version", async ({
   page,
 }) => {
