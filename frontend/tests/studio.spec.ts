@@ -2,6 +2,11 @@ import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, publishRule, uniqueId } from "./helpers/api";
+import {
+  installRenderProbe,
+  renderCounts,
+  resetRenderCounts,
+} from "./helpers/renderProbe";
 
 async function replaceCode(
   page: import("@playwright/test").Page,
@@ -530,4 +535,61 @@ test("a build that leaves the code canonical still keeps undo", async ({
   await expect(editorLines(code)).toContainText("return 12;");
   await page.keyboard.press("ControlOrMeta+z");
   await expect(editorLines(code)).toContainText("return 10;");
+});
+
+test("typing in Code studio leaves the function library and the outline alone", async ({
+  page,
+  request,
+}) => {
+  await installRenderProbe(page);
+  const id = uniqueId("studio-render-cost");
+  await createRule(request, {
+    id,
+    name: "Render cost fixture",
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [],
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Input",
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: "out",
+          type: "OUTPUT",
+          label: "Result",
+          expression: "1",
+          position: { x: 0, y: 200 },
+        },
+      ],
+      edges: [
+        { id: "edge", source: "input", target: "out", sourceHandle: "next" },
+      ],
+    },
+  });
+  await page.goto(`/#/studio/${id}`);
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await expect(code).toBeVisible();
+  // An open group shows its function chips, each behind a tooltip.
+  const heading = page.locator(".function-group-heading").first();
+  await heading.click();
+  await expect(heading).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".studio-outline")).toContainText("Result");
+  await code.focus();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("End");
+  await resetRenderCounts(page);
+  await page.keyboard.type("\n// noted", { delay: 40 });
+  await expect(editorLines(code)).toContainText("// noted");
+  const counts = await renderCounts(page);
+  // Each keystroke rendered the whole library and the outline again.
+  expect(counts.functionLibraryRenders).toBe(0);
+  expect(counts.outlineRenders).toBe(0);
+  expect(counts.commits).toBeGreaterThanOrEqual(9);
 });

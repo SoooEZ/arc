@@ -1,5 +1,5 @@
-import type { Definition, RuleNode } from "../types";
-import { sourcePort } from "./nodePorts";
+import type { Definition, RuleNode } from "../../types";
+import { sourcePort } from "../../domain/nodePorts";
 
 export const previewNodeWidth = 132;
 export const previewNodeHeight = 40;

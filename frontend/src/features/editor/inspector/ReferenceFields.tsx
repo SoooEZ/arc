@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react";
 import type { RuleSummary, Version, VersionSummary } from "../../../types";
 import ValueBinding from "../../expressions/ValueBinding";
 import { ruleApi } from "../../../api/rules";
-import { readRuleVersion } from "../../studio/pinnedVersions";
+import { readRuleVersion } from "../../../app/pinnedVersions";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
 import { stringifyJson } from "../../../domain/json";
 import { ownValue } from "../../../domain/records";

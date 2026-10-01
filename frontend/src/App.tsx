@@ -17,8 +17,8 @@ import { useAsyncResource } from "./hooks/useAsyncResource";
 import { ruleApi } from "./api/rules";
 import { sameRule } from "./domain/ruleIdentity";
 import { formulaMetadata } from "./features/studio/formulaMetadata";
-import { pinnedRuleVersions } from "./features/studio/pinnedVersions";
-import type { Rule } from "./types";
+import { pinnedRuleVersions } from "./app/pinnedVersions";
+import type { Rule, RuleSummary } from "./types";
 
 // The rule editor and React Flow download only when a rule opens.
 const Editor = lazy(() => import("./app/EditorRoute"));
@@ -76,6 +76,11 @@ export default function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const chunkFailed = useChunkLoadFailed();
   const newRule = () => setCreateOpen(true);
+  // Stable, so the library's memoized cards skip the renders its search causes.
+  const openRule = useCallback(
+    (rule: RuleSummary) => navigate(rulePath({ ruleId: rule.id })),
+    [navigate],
+  );
   const ruleId = view.page === "rule" ? view.ruleId : null;
   const requestedVersion = view.page === "rule" ? view.version : null;
   const [detailAttempt, setDetailAttempt] = useState(0);
@@ -178,7 +183,7 @@ export default function App() {
         return (
           <Library
             library={library}
-            onOpen={(rule) => navigate(rulePath({ ruleId: rule.id }))}
+            onOpen={openRule}
             onCreate={newRule}
             onDocs={() => navigate(pagePath("docs"))}
           />

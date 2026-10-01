@@ -8,6 +8,7 @@ import dev.arc.engine.execution.Engine;
 import dev.arc.engine.execution.Parameters;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
+import dev.arc.source.SourceBindingValidator;
 import dev.arc.source.SourceExecutionService;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -40,17 +41,17 @@ public class RuleExecutionService {
       String ruleId, Integer version, @JsonUnwrapped Engine.Result execution, Timing timing) {}
 
   private final RuleRepository rules;
-  private final RuleDefinitionService definitions;
+  private final SourceBindingValidator sourceContracts;
   private final Engine engine;
   private final SourceExecutionService sources;
 
   public RuleExecutionService(
       RuleRepository rules,
-      RuleDefinitionService definitions,
+      SourceBindingValidator sourceContracts,
       Engine engine,
       SourceExecutionService sources) {
     this.rules = rules;
-    this.definitions = definitions;
+    this.sourceContracts = sourceContracts;
     this.engine = engine;
     this.sources = sources;
   }
@@ -116,7 +117,7 @@ public class RuleExecutionService {
           id,
           version,
           () ->
-              definitions.validateSources(
+              sourceContracts.validateForExecution(
                   prepared.definition(),
                   resolver,
                   (sourceId, sourceVersion) ->

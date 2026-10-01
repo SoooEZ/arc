@@ -10,6 +10,12 @@ import { memo, useCallback } from "react";
 import { shortId } from "../../../domain/ids";
 import { MAX_SWITCH_CASES } from "../../../domain/limits";
 import { patchGraphNode } from "../../../domain/graph";
+import {
+  withCaseChanged,
+  withCaseMoved,
+  withNewCase,
+  withoutCase,
+} from "../../../domain/switchBranches";
 import type { VariableOption } from "../../../domain/variables";
 import type { Definition, RuleNode } from "../../../types";
 import ExpressionField from "../../expressions/ExpressionField";
@@ -28,43 +34,31 @@ export default function SwitchFields(props: NodeFieldsProps) {
   const nodeId = node.id;
   // Stable per-row callbacks read the current cases from the draft, so a
   // keystroke in one case re-renders that row alone.
+  const updateCases = useCallback(
+    (update: (cases: readonly Case[]) => readonly Case[]) =>
+      onDefinitionChange((definition: Definition) => {
+        const current = definition.nodes.find((n) => n.id === nodeId);
+        if (!current) return definition;
+        const cases = current.cases ?? [];
+        const next = update(cases);
+        if (next === cases) return definition;
+        return patchGraphNode(definition, nodeId, { cases: [...next] });
+      }),
+    [onDefinitionChange, nodeId],
+  );
   const updateCase = useCallback(
     (id: string, change: Partial<Case>) =>
-      onDefinitionChange((definition: Definition) => {
-        const current = definition.nodes.find((n) => n.id === nodeId);
-        if (!current) return definition;
-        return patchGraphNode(definition, nodeId, {
-          cases: (current.cases ?? []).map((c) =>
-            c.id === id ? { ...c, ...change } : c,
-          ),
-        });
-      }),
-    [onDefinitionChange, nodeId],
+      updateCases((cases) => withCaseChanged(cases, id, change)),
+    [updateCases],
   );
   const removeCase = useCallback(
-    (id: string) =>
-      onDefinitionChange((definition: Definition) => {
-        const current = definition.nodes.find((n) => n.id === nodeId);
-        if (!current) return definition;
-        return patchGraphNode(definition, nodeId, {
-          cases: (current.cases ?? []).filter((c) => c.id !== id),
-        });
-      }),
-    [onDefinitionChange, nodeId],
+    (id: string) => updateCases((cases) => withoutCase(cases, id)),
+    [updateCases],
   );
   const moveCase = useCallback(
-    (id: string, direction: number) =>
-      onDefinitionChange((definition: Definition) => {
-        const current = definition.nodes.find((n) => n.id === nodeId);
-        const list = [...(current?.cases ?? [])];
-        const index = list.findIndex((c) => c.id === id);
-        const target = index + direction;
-        if (!current || index < 0 || target < 0 || target >= list.length)
-          return definition;
-        [list[index], list[target]] = [list[target], list[index]];
-        return patchGraphNode(definition, nodeId, { cases: list });
-      }),
-    [onDefinitionChange, nodeId],
+    (id: string, direction: -1 | 1) =>
+      updateCases((cases) => withCaseMoved(cases, id, direction)),
+    [updateCases],
   );
   return (
     <>
@@ -122,18 +116,8 @@ export default function SwitchFields(props: NodeFieldsProps) {
         <Button
           startIcon={<Plus size={14} />}
           disabled={readOnly || cases.length >= MAX_SWITCH_CASES}
-          onClick={() =>
-            patch({
-              cases: [
-                ...cases,
-                {
-                  id: shortId("case-"),
-                  label: `Case ${cases.length + 1}`,
-                  expression: "true",
-                },
-              ],
-            })
-          }
+          // Document updaters can run more than once, so the ID is chosen here.
+          onClick={() => patch({ cases: withNewCase(cases, shortId("case-")) })}
         >
           Add case
         </Button>
@@ -169,7 +153,7 @@ const SwitchCaseRow = memo(function SwitchCaseRow({
   readOnly: boolean;
   onChange: (id: string, change: Partial<Case>) => void;
   onRemove: (id: string) => void;
-  onMove: (id: string, direction: number) => void;
+  onMove: (id: string, direction: -1 | 1) => void;
 }) {
   return (
     <div className="node-mapping-card" data-testid={`switch-case-${option.id}`}>

@@ -1,5 +1,5 @@
 import type { Definition, InputType } from "../types";
-import { nodeKinds } from "./nodeKinds";
+import { entryInputNode, nodeKinds } from "./nodeKinds";
 
 /** A variable an expression may read: an input parameter or a node result. */
 export interface VariableOption {
@@ -22,7 +22,7 @@ export function variableNames(definition: Definition): string[] {
 }
 
 export function inputVariables(definition: Definition): VariableOption[] {
-  const inputNode = definition.nodes.find((node) => node.type === "INPUT");
+  const inputNode = entryInputNode(definition);
   return definition.inputs.map((input) => ({
     name: input.name,
     type: input.type,

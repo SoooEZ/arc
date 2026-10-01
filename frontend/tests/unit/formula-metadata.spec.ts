@@ -193,3 +193,25 @@ test("callers asking about one rule together share its identity read", async () 
   await metadata.load("vat", 1, signal());
   expect(ruleReads).toEqual(["tax", "vat", "vat"]);
 });
+
+// The hand-written shared read started a request for a caller that had
+// already left, and an abandoned read stayed joinable until it settled, so the
+// next caller received its AbortError.
+test("a caller that has left starts no read, and a later caller never joins an abandoned one", async () => {
+  const { reads, ruleReads } = countingReads();
+  const metadata = new FormulaMetadata(reads);
+  const gone = new AbortController();
+  gone.abort();
+  await expect(metadata.load("tax", 1, gone.signal)).rejects.toMatchObject({
+    name: "AbortError",
+  });
+  expect(ruleReads).toEqual([]);
+  const first = new AbortController();
+  const pending = metadata.load("vat", 1, first.signal);
+  first.abort();
+  // Arriving as the last caller leaves: a fresh read answers it.
+  const later = metadata.load("vat", 1, signal());
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  expect((await later).id).toBe("vat");
+  expect(ruleReads).toEqual(["vat", "vat"]);
+});

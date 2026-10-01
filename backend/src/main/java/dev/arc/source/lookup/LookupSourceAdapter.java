@@ -78,10 +78,17 @@ public final class LookupSourceAdapter implements SourceAdapter {
   }
 
   private static boolean isSameNumber(String text, BigDecimal number) {
+    // Most keys are names such as "US": only text that can start a number is parsed, so a miss
+    // no longer throws once per entry. BigDecimal reads every Unicode digit, as before.
+    if (text.isEmpty() || !startsNumber(text.charAt(0))) return false;
     try {
       return new BigDecimal(text).compareTo(number) == 0;
     } catch (NumberFormatException notANumber) {
       return false;
     }
+  }
+
+  private static boolean startsNumber(char first) {
+    return Character.isDigit(first) || first == '+' || first == '-' || first == '.';
   }
 }

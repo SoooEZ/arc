@@ -11,7 +11,6 @@ import dev.arc.model.Definition;
 import dev.arc.model.NodeKind;
 import dev.arc.source.SourceBindingValidator;
 import dev.arc.source.SourceBindingValidator.CalleeCheck;
-import dev.arc.source.SourceConfigurations;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +43,9 @@ public class RuleDefinitionService {
     this.engine = engine;
   }
 
+  /** The editor's check: pins an execution has compiled are read from its plans. */
   public void validate(Definition definition) {
-    validate(definition, new MemoizingRuleResolver(rules));
+    validate(definition, new MemoizingRuleResolver(engine.cachedFirst(rules)));
   }
 
   public ExpressionCheck checkExpression(String source) {
@@ -72,12 +72,6 @@ public class RuleDefinitionService {
     return (ruleId, version, callee) -> engine.prepareForCheck(ruleId, version, callee, resolver);
   }
 
-  /** Execution's source-contract check, over the request session's configuration snapshot. */
-  public void validateSources(
-      Definition definition, RuleResolver resolver, SourceConfigurations session) {
-    sources.validateForExecution(definition, resolver, session);
-  }
-
   /** Scopes depend on the graph's structure alone: invalid structure or a cycle still fails. */
   public Map<String, Set<String>> variables(Definition definition) {
     validator.structure(definition);
@@ -89,7 +83,7 @@ public class RuleDefinitionService {
    * graph checks, so the source-contract check skips the pins they rejected.
    */
   public List<Validator.Problem> diagnostics(Definition definition) {
-    var resolver = new MemoizingRuleResolver(rules);
+    var resolver = new MemoizingRuleResolver(engine.cachedFirst(rules));
     var diagnosis = validator.diagnose(definition, resolver);
     var problems = new ArrayList<>(diagnosis.problems());
     if (diagnosis.shaped() && hasOneInputNode(definition)) {

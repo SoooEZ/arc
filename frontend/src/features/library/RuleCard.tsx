@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { ruleApi } from "../../api/rules";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { Button, Chip } from "@mui/material";
@@ -9,7 +9,11 @@ import { KindIcon } from "../../components/Icons";
 import RulePreview from "./RulePreview";
 import { cachedPreview, rememberPreview } from "./previewCache";
 
-export default function RuleCard({
+/**
+ * Memoized: a card and its graph preview render again for another summary,
+ * not for a keystroke in the library search above them.
+ */
+export default memo(function RuleCard({
   rule,
   onOpen,
 }: {
@@ -98,4 +102,4 @@ export default function RuleCard({
       </button>
     </article>
   );
-}
+});

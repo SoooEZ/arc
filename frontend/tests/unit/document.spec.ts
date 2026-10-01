@@ -26,7 +26,7 @@ import {
 } from "../../src/domain/definitionEchoes";
 import { sampleInputsJson } from "../../src/domain/executionInputs";
 import { nodeWidth } from "../../src/domain/nodePorts";
-import { setSwitchDefaultReturn } from "../../src/domain/switchBranches";
+import { addSwitchDefaultReturn } from "../../src/domain/switchBranches";
 import {
   defaultSelection,
   selectedEdgeId,
@@ -464,7 +464,7 @@ test("drafts without node positions get origin positions once they enter the edi
   const withReturn = documentReducer(opened, {
     type: "graph/change",
     change: (definition) =>
-      setSwitchDefaultReturn(definition, "route", "0", "fallback", "edge"),
+      addSwitchDefaultReturn(definition, "route", "0", "fallback", "edge"),
   });
   expect(withReturn.rule.draft.nodes.at(-1)).toMatchObject({
     id: "fallback",
@@ -775,7 +775,7 @@ test("coordinates the server writes as 400.0 become numbers before any position 
   expect(saved.rule.draft).toBe(start.rule.draft);
   expect(saved.rule.revision).toBe(2);
   expect(
-    setSwitchDefaultReturn(
+    addSwitchDefaultReturn(
       { ...placed, nodes: [...placed.nodes, switchNode] },
       "choose",
       "0",

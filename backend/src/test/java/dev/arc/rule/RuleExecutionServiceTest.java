@@ -32,7 +32,7 @@ class RuleExecutionServiceTest {
   private final RuleExecutionService service =
       new RuleExecutionService(
           rules,
-          new RuleDefinitionService(validator, rules, new SourceBindingValidator(versions), engine),
+          new SourceBindingValidator(versions),
           engine,
           new SourceExecutionService(
               sources, versions, new SourceAdapters(List.of()), new JsonPointerExtractor()));

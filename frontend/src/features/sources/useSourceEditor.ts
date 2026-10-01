@@ -4,7 +4,7 @@ import { errorMessage } from "../../api/errors";
 import { useNavigationGuard } from "../../app/navigationGuards";
 import { usePagedResource } from "../../hooks/usePagedResource";
 import { usePagedSearch } from "../../hooks/usePagedSearch";
-import { pinnedSourceVersions } from "../studio/pinnedVersions";
+import { pinnedSourceVersions } from "../../app/pinnedVersions";
 import type { DataSource, SourceConfig, SourceSummary } from "../../types";
 import {
   parseSourceTestInputs,

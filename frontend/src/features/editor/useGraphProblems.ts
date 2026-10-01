@@ -3,6 +3,7 @@ import { studioApi } from "../../api/studio";
 import type { GraphProblem } from "../../api/errors";
 import type { Definition, Rule } from "../../types";
 import { isCurrentGraphLocation } from "../../domain/graph";
+import { entryInputNode } from "../../domain/nodeKinds";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 
 /** Messages per node ID. A Map, because node IDs such as "constructor" are legal. */
@@ -49,7 +50,7 @@ export function nodeErrorsOf({
         location.version === shown.version
       )
         add(location.nodeId, problem.message);
-  const input = definition.nodes.find((node) => node.type === "INPUT");
+  const input = entryInputNode(definition);
   if (invalidDefaults && input)
     add(input.id, "Fix the invalid parameter default.");
   if (nodeCode)

@@ -1,7 +1,7 @@
-import { ruleApi } from "../../api/rules";
-import { sourceApi } from "../../api/sources";
-import { ruleIncarnation, type RuleIdentity } from "../../domain/ruleIdentity";
-import type { DataSource, Version } from "../../types";
+import { ruleApi } from "../api/rules";
+import { sourceApi } from "../api/sources";
+import { ruleIncarnation, type RuleIdentity } from "../domain/ruleIdentity";
+import type { DataSource, Version } from "../types";
 import { PinnedReads } from "./pinnedReads";
 
 /**

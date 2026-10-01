@@ -90,13 +90,20 @@ public final class Parameters {
       if (resolved.containsKey(name)) return;
       if (!resolving.add(name))
         throw ArcException.invalid("Circular source parameter dependency: " + name);
-      Object value = parameter.defaultValue();
-      if (supplied.containsKey(name)) value = supplied.get(name);
+      Object value;
+      if (supplied.containsKey(name)) value = checked(parameter, supplied.get(name));
+      // A source's value is checked inside the read, where a wrong type may still fall back; it
+      // was checked once more here, a second walk of a large value.
       else if (parameter.source() != null) value = read(parameter);
+      else value = checked(parameter, parameter.defaultValue());
       if (value == null && parameter.required())
         throw ArcException.invalid("Missing required input: " + name);
-      resolved.put(name, value == null ? null : InputTypes.check(name, parameter.type(), value));
+      resolved.put(name, value);
       resolving.remove(name);
+    }
+
+    private static Object checked(Input parameter, Object value) {
+      return value == null ? null : InputTypes.check(parameter.name(), parameter.type(), value);
     }
 
     /** Only recoverable value errors may use the DEFAULT fallback; limits and expiry propagate. */
@@ -129,13 +136,15 @@ public final class Parameters {
         value = deadline.within(() -> sources.read(source, argumentValues, deadline));
         if (value == null && parameter.required())
           throw ArcException.invalid("Source returned null for required input");
-        if (value != null) value = InputTypes.check(parameter.name(), parameter.type(), value);
+        value = checked(parameter, value);
       } catch (ArcException error) {
+        // The deadline cancels a source read, so a read that failed after it reports the deadline
+        // (ExecutionDeadline.within); a fallback never runs past it.
         deadline.check();
         if (!error.recoverable()) throw error;
         if (!source.fallsBackToDefault() || parameter.defaultValue() == null)
-          throw ArcException.invalid(parameter.name() + ": " + error.getMessage());
-        value = parameter.defaultValue();
+          throw error.withContext(parameter.name());
+        value = checked(parameter, parameter.defaultValue());
         status = Read.Status.DEFAULT;
       }
       long durationMicros = (System.nanoTime() - start) / 1000;

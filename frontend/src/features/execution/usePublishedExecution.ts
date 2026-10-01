@@ -131,9 +131,8 @@ export function usePublishedExecution(notify: (message: string) => void) {
   const run = () => {
     if (!definition || version === null) return;
     return execution.run((signal) =>
-      ruleApi.execute(id, parseExecutionInputs(inputs), version, {
+      ruleApi.execute(id, parseExecutionInputs(inputs), version, options, {
         signal,
-        ...options,
       }),
     );
   };

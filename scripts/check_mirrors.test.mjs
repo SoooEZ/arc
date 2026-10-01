@@ -73,3 +73,67 @@ test("the in-app API reference lists real operations and every /rules operation"
     if (/ \/rules(\/\{id\})?$/.test(operation))
       assert.ok(listedKeys.has(operation), `${operation} is listed`);
 });
+
+test("frontend reserved names are the backend's Identifiers.RESERVED", () => {
+  const words = (list) =>
+    [...list.matchAll(/"([^"]+)"/g)].map(([, word]) => word).sort();
+  const java = /RESERVED = Set\.of\(([^)]*)\)/.exec(
+    read("backend/src/main/java/dev/arc/engine/Identifiers.java"),
+  );
+  assert.ok(java, "Identifiers.java declares RESERVED");
+  const frontend = /const reserved = new Set\(\[([^\]]*)\]\)/.exec(
+    read("frontend/src/domain/identifiers.ts"),
+  );
+  assert.ok(frontend, "identifiers.ts declares the reserved names");
+  assert.deepEqual(words(frontend[1]), words(java[1]));
+});
+
+test("frontend timeout ranges are the server's", () => {
+  const millis = (source, name) => {
+    const match = new RegExp(`${name} = ([\\d_]+);`).exec(source);
+    assert.ok(match, `${name} is declared`);
+    return Number(match[1].replaceAll("_", ""));
+  };
+  // HTTP sources: HttpSourceAdapter refuses a timeout outside its range.
+  const adapter = read(
+    "backend/src/main/java/dev/arc/source/http/HttpSourceAdapter.java",
+  );
+  const sources = /httpTimeoutLimits = \{ min: ([\d_]+), max: ([\d_]+) \}/.exec(
+    read("frontend/src/features/sources/sourceDocument.ts"),
+  );
+  assert.ok(sources, "sourceDocument.ts declares httpTimeoutLimits");
+  assert.equal(
+    Number(sources[1].replaceAll("_", "")),
+    millis(adapter, "MIN_TIMEOUT_MS"),
+  );
+  assert.equal(
+    Number(sources[2].replaceAll("_", "")),
+    millis(adapter, "MAX_TIMEOUT_MS"),
+  );
+  // Executions: the options offer the server's default and nothing above its ceiling.
+  const deadline = read(
+    "backend/src/main/java/dev/arc/engine/ExecutionDeadline.java",
+  );
+  const options = read("frontend/src/features/execution/executionOptions.ts");
+  const offered = /executionTimeoutChoicesMs = \[([^\]]*)\]/.exec(options);
+  assert.ok(offered, "executionOptions.ts lists its timeout choices");
+  const choices = offered[1]
+    .split(",")
+    .map((choice) => Number(choice.trim().replaceAll("_", "")));
+  for (const choice of choices) {
+    assert.ok(
+      choice >= millis(deadline, "MIN_TIMEOUT_MS"),
+      `${choice} ms is allowed`,
+    );
+    assert.ok(
+      choice <= millis(deadline, "MAX_TIMEOUT_MS"),
+      `${choice} ms is allowed`,
+    );
+  }
+  const defaultTimeout = /timeoutMs: ([\d_]+),/.exec(options);
+  assert.ok(defaultTimeout, "executionOptions.ts states the default timeout");
+  assert.equal(
+    Number(defaultTimeout[1].replaceAll("_", "")),
+    millis(deadline, "DEFAULT_TIMEOUT_MS"),
+  );
+});

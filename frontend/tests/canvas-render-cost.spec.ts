@@ -148,6 +148,33 @@ test("dragging one card and selecting cards re-render only the cards involved", 
   expect(counts.cardRenders).toBeLessThanOrEqual(2 * 4);
 });
 
+// An open trace re-rendered every step on each frame of a drag (about 17 ms a
+// frame with 1,000 steps); its rows depend on the graph's structure alone.
+test("dragging a card leaves an open execution trace alone", async ({
+  page,
+  request,
+}) => {
+  const id = await create(request, "trace-cost", chain(60));
+  await openGraph(page, id, "input", 60);
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+  await expect(page.locator(".trace-list > button")).toHaveCount(60);
+  // The deep link centred the Input card above the Test panel.
+  const card = page.locator('.react-flow__node[data-id="input"]');
+  const box = await settledBox(page, card);
+  await page.mouse.move(box.x + box.width / 2, box.y + 12);
+  await page.mouse.down();
+  await resetRenderCounts(page);
+  for (let step = 1; step <= 20; step++)
+    await page.mouse.move(
+      box.x + box.width / 2 + step * 4,
+      box.y + 12 + step * 3,
+    );
+  await page.mouse.up();
+  expect((await card.boundingBox())!.x).toBeGreaterThan(box.x + 60);
+  expect((await renderCounts(page)).traceRenders).toBe(0);
+});
+
 test("typing into one Transform field or Switch case leaves the other rows alone", async ({
   page,
   request,

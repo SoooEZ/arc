@@ -1,4 +1,10 @@
-import type { BranchCase, NodeType, RuleNode, TransformField } from "../types";
+import type {
+  BranchCase,
+  Definition,
+  NodeType,
+  RuleNode,
+  TransformField,
+} from "../types";
 
 /**
  * Outgoing connection handles of a node kind. `domain/nodePorts` turns them
@@ -223,6 +229,17 @@ export const nodeTypes: readonly NodeType[] =
 export const addableNodeTypes: readonly NodeType[] = nodeTypes.filter(
   (type) => nodeKinds[type].addable,
 );
+
+/**
+ * The graph's entry Input: the first INPUT in document order, as the server's
+ * Definition.inputNode() reads it. Parameters, defaults and the scope's input
+ * labels belong to it.
+ */
+export function entryInputNode(
+  definition: Pick<Definition, "nodes">,
+): RuleNode | undefined {
+  return definition.nodes.find((node) => node.type === "INPUT");
+}
 
 /** Formula, Transform and Reference nodes assign the scoped variable named by `output`. */
 export function storesResult(type: NodeType): boolean {

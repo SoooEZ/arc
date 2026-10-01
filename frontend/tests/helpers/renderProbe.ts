@@ -16,6 +16,14 @@ export interface RenderCounts {
   otherRowRenders: number;
   /** Renders of GraphCanvas (props carry `canvas` and `onAddNode`). */
   canvasRenders: number;
+  /** Components rendered inside the Test panel's execution trace (`.trace-list`). */
+  traceRenders: number;
+  /** Components rendered inside the library's rule cards (`.rule-card`). */
+  ruleCardRenders: number;
+  /** Components rendered inside Code studio's function groups (`.function-groups`). */
+  functionLibraryRenders: number;
+  /** Renders of the component whose root element is Code studio's `.studio-outline`. */
+  outlineRenders: number;
   commits: number;
 }
 
@@ -32,6 +40,10 @@ export async function installRenderProbe(page: Page) {
       cardRenders: 0,
       otherRowRenders: 0,
       canvasRenders: 0,
+      traceRenders: 0,
+      ruleCardRenders: 0,
+      functionLibraryRenders: 0,
+      outlineRenders: 0,
       commits: 0,
     };
     const PerformedWork = 1;
@@ -95,7 +107,18 @@ export async function installRenderProbe(page: Page) {
         if (props && "canvas" in props && "onAddNode" in props && rendered)
           counts.canvasRenders++;
         if (!rendered) continue;
+        // The outline renders host elements only, so it is found by its root.
+        const root = fiber.child;
+        if (
+          root?.tag === HostComponent &&
+          root.stateNode instanceof Element &&
+          root.stateNode.matches(".studio-outline")
+        )
+          counts.outlineRenders++;
         const host = hostAncestor(fiber);
+        if (closest(host, ".trace-list")) counts.traceRenders++;
+        if (closest(host, ".rule-card")) counts.ruleCardRenders++;
+        if (closest(host, ".function-groups")) counts.functionLibraryRenders++;
         const card = closest(host, ".react-flow__node");
         if (card) cards.add(card);
         // The row being typed into holds the focus; every other row is "other".

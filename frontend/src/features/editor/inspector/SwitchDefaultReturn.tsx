@@ -2,7 +2,7 @@ import { Button } from "@mui/material";
 import { Plus } from "lucide-react";
 import {
   canAddSwitchDefaultReturn,
-  setSwitchDefaultReturn,
+  addSwitchDefaultReturn,
   switchDefaultOutput,
 } from "../../../domain/switchBranches";
 import { patchGraphNode } from "../../../domain/graph";
@@ -94,7 +94,7 @@ function DefaultRoute({
           const outputId = shortId("default-");
           const edgeId = shortId("edge-");
           onDefinitionChange((current) =>
-            setSwitchDefaultReturn(current, node.id, "0", outputId, edgeId),
+            addSwitchDefaultReturn(current, node.id, "0", outputId, edgeId),
           );
         }}
       >

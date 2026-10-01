@@ -1,8 +1,13 @@
 import { expect, test } from "@playwright/test";
+import type { BranchCase } from "../../src/types";
 import { createGraphNode } from "../../src/domain/graph";
 import {
-  setSwitchDefaultReturn,
+  addSwitchDefaultReturn,
   switchDefaultOutput,
+  withCaseChanged,
+  withCaseMoved,
+  withNewCase,
+  withoutCase,
 } from "../../src/domain/switchBranches";
 import type { Definition } from "../../src/types";
 
@@ -34,7 +39,7 @@ function definition(): Definition {
 
 test("a default return adds a real Output without changing case routes and preserves falsy values", () => {
   const before = definition();
-  const added = setSwitchDefaultReturn(
+  const added = addSwitchDefaultReturn(
     before,
     "choose",
     "false",
@@ -52,19 +57,39 @@ test("a default return adds a real Output without changing case routes and prese
   });
   expect(switchDefaultOutput(added, "choose")?.expression).toBe("false");
   expect(switchDefaultOutput(added, "choose")!.position.x).toBeGreaterThan(270);
-  const updated = setSwitchDefaultReturn(
+  // Adding again, as a repeated click's updater does, keeps the return and
+  // its value: it used to write the new expression over the edited one.
+  expect(addSwitchDefaultReturn(added, "choose", "0", "unused", "unused")).toBe(
     added,
-    "choose",
-    '""',
-    "unused",
-    "unused",
   );
-  expect(updated.nodes).toHaveLength(3);
-  expect(updated.edges).toEqual(added.edges);
-  expect(switchDefaultOutput(updated, "choose")?.expression).toBe('""');
-  expect(updated.nodes.find((node) => node.id === "match")).toEqual(
+  expect(added.nodes.find((node) => node.id === "match")).toEqual(
     before.nodes[1],
   );
+});
+
+test("case list operations keep their order, IDs and the cases they do not touch", () => {
+  const cases: BranchCase[] = [
+    { id: "a", label: "A", expression: "x > 1" },
+    { id: "b", label: "B", expression: "x > 2" },
+  ];
+  expect(withNewCase(cases, "c")).toEqual([
+    ...cases,
+    { id: "c", label: "Case 3", expression: "true" },
+  ]);
+  expect(withCaseChanged(cases, "b", { label: "Big" })[1]).toEqual({
+    id: "b",
+    label: "Big",
+    expression: "x > 2",
+  });
+  expect(withoutCase(cases, "a")).toEqual([cases[1]]);
+  expect(withCaseMoved(cases, "b", -1).map((option) => option.id)).toEqual([
+    "b",
+    "a",
+  ]);
+  // At either end nothing moves, so the draft does not change.
+  expect(withCaseMoved(cases, "a", -1)).toBe(cases);
+  expect(withCaseMoved(cases, "b", 1)).toBe(cases);
+  expect(cases.map((option) => option.id)).toEqual(["a", "b"]);
 });
 
 test("default shortcuts cannot rewrite shared Outputs or connected workflow branches", () => {
@@ -76,7 +101,7 @@ test("default shortcuts cannot rewrite shared Outputs or connected workflow bran
     target: "match",
   });
   expect(switchDefaultOutput(shared, "choose")).toBeUndefined();
-  expect(setSwitchDefaultReturn(shared, "choose", "10", "new", "edge")).toBe(
+  expect(addSwitchDefaultReturn(shared, "choose", "10", "new", "edge")).toBe(
     shared,
   );
   const downstream = definition();
@@ -90,14 +115,14 @@ test("default shortcuts cannot rewrite shared Outputs or connected workflow bran
     target: "formula",
   });
   expect(
-    setSwitchDefaultReturn(downstream, "choose", "10", "new", "edge"),
+    addSwitchDefaultReturn(downstream, "choose", "10", "new", "edge"),
   ).toBe(downstream);
 });
 
 test("generated Default Output names stay valid at the node label limit", () => {
   const before = definition();
   before.nodes[0].label = "x".repeat(149) + "😀" + "y".repeat(9);
-  const added = setSwitchDefaultReturn(
+  const added = addSwitchDefaultReturn(
     before,
     "choose",
     "0",

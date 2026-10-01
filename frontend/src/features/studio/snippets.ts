@@ -1,4 +1,4 @@
-import type { Definition, Rule, Version } from "../../types";
+import type { Definition, Input, Rule, Version } from "../../types";
 import { quoteText } from "../../domain/expressions";
 import { shortId } from "../../domain/ids";
 import { MAX_NODE_ID_CHARACTERS } from "../../domain/limits";
@@ -35,6 +35,15 @@ export function reuseNodeId(ruleId: string): string {
 }
 
 /**
+ * Whether a call must pass a value for the input: it is required and has
+ * neither a default nor a data source (the server's Input.needsCallerValue).
+ * Reference snippets bind these, and Formula calls write them out.
+ */
+export function needsCallerValue(input: Input): boolean {
+  return input.required && input.defaultValue == null && !input.source;
+}
+
+/**
  * The Reference node for a reused rule. `resultName` is the generated result
  * variable (`result_N`, unique among the caller's variables and the names the
  * unbuilt buffer declares, lesson F19); the tab stop lets the user rename it.
@@ -48,9 +57,7 @@ export function referenceSnippet(
 ): string {
   const callerInputs = new Set(caller.inputs.map((input) => input.name));
   const bindings = version.definition.inputs
-    .filter(
-      (input) => input.required && !input.source && input.defaultValue == null,
-    )
+    .filter(needsCallerValue)
     .map((input) => {
       const expression = callerInputs.has(input.name)
         ? input.name

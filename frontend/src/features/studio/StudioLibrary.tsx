@@ -12,6 +12,8 @@ import { formulaSuggestionProblem } from "./useFormulaSupport";
 import { uniqueName } from "../../domain/ids";
 import { variableNames } from "../../domain/variables";
 import { scriptVariableNames } from "../../domain/expressionSymbols";
+import { readRuleVersion } from "../../app/pinnedVersions";
+import { paginationProps } from "../../hooks/usePagedResource";
 
 type Pane = "functions" | "modules" | "reuse";
 const panes: Pane[] = ["functions", "modules", "reuse"];
@@ -71,7 +73,9 @@ export default function StudioLibrary({
     const nodeId = reuseNodeId(rule.id);
     const insert = onBeginInsert();
     insertion.onCardClick(event, rule.id, async (signal) => {
-      const version = await ruleApi.version(rule.id, pinned, { signal });
+      // The page-wide cache of pinned versions, kept per incarnation of the
+      // rule, which Reference cards and Formula metadata read too.
+      const version = await readRuleVersion(rule, pinned, signal);
       if (signal.aborted || latest.current.readOnly) return;
       const { definition: built, source: buffer } = latest.current;
       // A name in use, also one only the unbuilt buffer declares, would be overwritten.
@@ -169,11 +173,7 @@ export default function StudioLibrary({
             ))}
           <CatalogPagination
             label="Reusable rules"
-            offset={catalog.offset}
-            limit={catalog.limit}
-            total={catalog.data.total}
-            loading={catalog.loading}
-            onPage={catalog.setOffset}
+            {...paginationProps(catalog)}
           />
         </>
       )}

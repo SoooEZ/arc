@@ -75,6 +75,9 @@ final class ArcScriptNodeParser {
   private static final Pattern REFERENCE =
       Pattern.compile("use\\s+" + ID + "(?:\\s+version\\s+([1-9]\\d*))?");
 
+  /** What ends a statement's first word. */
+  private static final Pattern WHITESPACE = Pattern.compile("\\s");
+
   /** Node IDs that cannot be confused with the hyphens joining a readable connection ID. */
   private static final Pattern PLAIN_NODE_ID = Pattern.compile("[A-Za-z0-9_]+");
 
@@ -213,7 +216,7 @@ final class ArcScriptNodeParser {
 
   private void parseDeclaration(Statement statement, ScriptLocations locations) {
     String text = statement.text();
-    String keyword = text.split("\\s", 2)[0];
+    String keyword = WHITESPACE.split(text, 2)[0];
     if (!keywords.contains(keyword))
       throw error("Unsupported statement for " + kind + ": " + text, statement);
     String value = text.substring(keyword.length()).trim();

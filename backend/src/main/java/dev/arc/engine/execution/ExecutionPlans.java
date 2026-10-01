@@ -54,8 +54,14 @@ final class ExecutionPlans {
 
   /** See {@link Engine#prepareForCheck}: reads the cache and never stores. */
   CompiledGraph planForCheck(String id, int version, Definition definition, RuleResolver resolver) {
+    CompiledGraph cached = cachedPlan(id, version);
+    return cached != null ? cached : validator.compile(definition, resolver);
+  }
+
+  /** The plan an execution cached for a published version, or null. */
+  CompiledGraph cachedPlan(String id, int version) {
     Cached entry = cached(new Pin(id, version));
-    return entry != null ? entry.plan() : validator.compile(definition, resolver);
+    return entry == null ? null : entry.plan();
   }
 
   /**
@@ -158,13 +164,16 @@ final class ExecutionPlans {
 
   /**
    * Weight units estimate the retained graph, AST and scope cost, not exact JVM heap bytes: a fixed
-   * cost per node and connection, each compiled expression by its source length, and one unit per
-   * byte of the definition's JSON, which covers every field without listing them here.
+   * cost per node and connection, each compiled expression by its source length, each variable a
+   * node's scope holds, and one unit per byte of the definition's JSON, which covers every field
+   * without listing them here. Scopes grow with nodes times variables: 100 nodes with 50 inputs
+   * hold 10,000 entries, which the per-node cost left uncounted.
    */
   private long weight(CompiledGraph plan) {
     Definition definition = plan.definition();
     long weight = 1024L + definition.nodes().size() * 2048L + definition.edges().size() * 128L;
     for (String source : plan.expressions().keySet()) weight += (40L + source.length() * 2L) * 32;
+    for (Set<String> scope : plan.plan().available().values()) weight += 48L * scope.size();
     try {
       return weight + json.writeValueAsBytes(definition).length;
     } catch (JsonProcessingException failure) {

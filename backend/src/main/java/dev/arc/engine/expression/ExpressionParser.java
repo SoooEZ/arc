@@ -37,6 +37,12 @@ final class ExpressionParser {
               + SINGLE_QUOTED
               + ")|(&&|\\|\\||==|!=|<>|<=|>=|[=^\\[\\]+*/%<>()!,\\-]))");
 
+  /** A function or variable name, compiled once rather than per token. */
+  private static final Pattern NAME = Pattern.compile("\\$?[A-Za-z_][A-Za-z_0-9.]*");
+
+  /** A Formula call's version: digits without a leading zero. */
+  private static final Pattern VERSION = Pattern.compile("[1-9][0-9]*");
+
   private final List<String> tokens = new ArrayList<>();
   private final Set<String> variables = new LinkedHashSet<>();
   private final List<FormulaCall> formulaCalls = new ArrayList<>();
@@ -141,8 +147,7 @@ final class ExpressionParser {
     if (token.equalsIgnoreCase("false") && !peek().equals("(")) return context -> false;
     if (token.equalsIgnoreCase("null")) return context -> null;
     if (token.startsWith("@")) return formulaCall(token);
-    if (!token.matches("\\$?[A-Za-z_][A-Za-z_0-9.]*"))
-      throw ArcException.invalid("Unexpected token: " + token);
+    if (!NAME.matcher(token).matches()) throw ArcException.invalid("Unexpected token: " + token);
     if (peek().equals("(")) return functionCall(token);
     if (token.startsWith("$"))
       throw ArcException.invalid("Function name must be followed by '(': " + token);
@@ -192,7 +197,7 @@ final class ExpressionParser {
     String digits = token.substring(separator + 1);
     int version;
     try {
-      if (!digits.matches("[1-9][0-9]*")) throw new NumberFormatException(digits);
+      if (!VERSION.matcher(digits).matches()) throw new NumberFormatException(digits);
       version = Integer.parseInt(digits);
     } catch (NumberFormatException notAVersion) {
       throw ArcException.invalid("Formula call version must be a positive integer");

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { PinnedReads } from "../../src/features/studio/pinnedReads";
+import { PinnedReads } from "../../src/app/pinnedReads";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

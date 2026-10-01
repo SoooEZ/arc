@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Rule, RuleNode, RuleSummary } from "../src/types";
 import { createRule, deleteRule, uniqueId } from "./helpers/api";
+import {
+  installRenderProbe,
+  renderCounts,
+  resetRenderCounts,
+} from "./helpers/renderProbe";
 
 function node(id: string, type: RuleNode["type"], label: string): RuleNode {
   return { id, type, label, position: { x: 0, y: 0 }, expression: "1" };
@@ -395,4 +400,32 @@ test("a card preview follows a rule created again under a deleted ID", async ({
   await expect(page.locator(".rule-card")).toContainText(`New preview ${id}`);
   await expect(page.locator("[data-preview-node]")).toHaveCount(3);
   await deleteRule(request, id);
+});
+
+test("typing a library search leaves the shown cards and their previews alone", async ({
+  page,
+}) => {
+  await installRenderProbe(page);
+  await mockLibrary(page);
+  await page.goto("/#/library");
+  await expect(page.locator(".rule-preview-svg")).toHaveCount(2);
+  // The search's answer is held back, so only the keystrokes render.
+  await page.route(
+    (url) =>
+      url.pathname === "/api/rule-summaries" &&
+      !!url.searchParams.get("search"),
+    () => {},
+  );
+  await resetRenderCounts(page);
+  await page
+    .getByLabel("Search rules", { exact: true })
+    .pressSequentially("branch", { delay: 40 });
+  await expect(page.getByLabel("Search rules", { exact: true })).toHaveValue(
+    "branch",
+  );
+  const counts = await renderCounts(page);
+  // Each keystroke laid out and drew every card's graph preview again.
+  expect(counts.ruleCardRenders).toBe(0);
+  expect(counts.commits).toBeGreaterThanOrEqual(6);
+  await expect(page.locator(".rule-preview-svg")).toHaveCount(2);
 });

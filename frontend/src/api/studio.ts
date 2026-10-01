@@ -21,19 +21,16 @@ export const studioApi = {
     http.post<Record<string, string[]>>("/variables", definition, options),
   validate: (definition: Definition, options?: RequestOptions) =>
     http.post<{ valid: boolean }>("/validate", definition, options),
+  /** Execution options go into the body whole, as for a published execution. */
   preview: (
     definition: Definition,
     inputs: Record<string, unknown>,
-    options?: RequestOptions & ExecutionOptions,
+    execution?: ExecutionOptions,
+    options?: RequestOptions,
   ) =>
     http.post<Execution>(
       "/preview",
-      {
-        definition,
-        inputs,
-        trace: options?.trace,
-        timeoutMs: options?.timeoutMs,
-      },
+      { definition, inputs, ...execution },
       options,
     ),
   functions: (options?: RequestOptions) =>

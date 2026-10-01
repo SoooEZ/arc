@@ -7,7 +7,7 @@ Read the applicable [backend/serialization failures](../docs/review-lessons.md#b
 ## Ownership
 
 - `api` translates HTTP; `rule` coordinates commands/checks/execution; `engine` evaluates portable definitions; `source` handles provider contracts; `persistence` implements repository ports. Follow the dependency map in the maintenance guide.
-- Controllers call application services. SQL and JSONB persistence belong in JDBC adapters. Keep the existing `JdbcTemplate` approach unless changing storage is part of the task.
+- Controllers call application services. A transformation that touches no storage, such as `engine.script.ArcScript` rendering or building code and `Functions.catalog()`, may be called through its stateless engine facade, as the dependency map allows; do not add a service that only forwards to it. SQL and JSONB persistence belong in JDBC adapters. Keep the existing `JdbcTemplate` approach unless changing storage is part of the task.
 - Use constructor injection and final dependency fields. Execution code receives the narrow `RuleResolver`/`SourceReader` capabilities, not an application service or JDBC connection.
 - Keep singleton services stateless. The memoized resolver and source-read budget are created per execution and shared with nested rule calls; they must not become a global cache or reset for each child. The process-wide caches hold only immutable versions: the engine's compiled published plans with their source-contract verdicts, and the frozen source versions of `SourceVersions`.
 

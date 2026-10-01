@@ -2,7 +2,10 @@ import { Alert, CircularProgress, IconButton } from "@mui/material";
 import { Clock3, X } from "lucide-react";
 import { ruleApi } from "../../api/rules";
 import { rulePath } from "../../app/routing";
-import { usePagedResource } from "../../hooks/usePagedResource";
+import {
+  paginationProps,
+  usePagedResource,
+} from "../../hooks/usePagedResource";
 import CatalogPagination from "../../components/CatalogPagination";
 export default function VersionHistory({
   ruleId,
@@ -54,11 +57,8 @@ export default function VersionHistory({
         ))}
       <CatalogPagination
         label="Rule versions"
-        offset={page.offset}
-        limit={page.limit}
-        total={page.data.total}
+        {...paginationProps(page)}
         loading={loading}
-        onPage={page.setOffset}
       />
       <IconButton aria-label="Close history" onClick={() => onClose()}>
         <X size={15} />

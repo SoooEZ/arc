@@ -85,13 +85,16 @@ class RuleDefinitionServiceTest {
               return child;
             });
     assertThat(reads).as("the check stored no plan").hasValue(1);
-    // The pin an execution compiled is not compiled again by later checks.
+    // The pin an execution compiled is neither compiled nor read from storage again by later
+    // checks: diagnostics read and decoded every reached pin on each request.
     compiled.clear();
+    clearInvocations(rules);
     for (int request = 0; request < 3; request++) {
       checks.validate(parent);
       assertThat(checks.diagnostics(parent)).isEmpty();
     }
     assertThat(compiled).filteredOn(child::equals).isEmpty();
+    verify(rules, never()).resolve("child", 1);
   }
 
   @Test

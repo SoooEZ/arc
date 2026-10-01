@@ -61,15 +61,20 @@ export const ruleApi = {
    */
   delete: (id: string, revision: number, options?: RequestOptions) =>
     http.delete<void>(`/rules/${pathId(id)}?revision=${revision}`, options),
+  /**
+   * Execution options go into the body whole, so a new option reaches the
+   * server as it reaches the cURL example; request options stay apart.
+   */
   execute: (
     id: string,
     inputs: Record<string, unknown>,
     version?: number,
-    options?: RequestOptions & ExecutionOptions,
+    execution?: ExecutionOptions,
+    options?: RequestOptions,
   ) =>
     http.post<Execution>(
       executePath(id),
-      { inputs, version, trace: options?.trace, timeoutMs: options?.timeoutMs },
+      { inputs, version, ...execution },
       options,
     ),
   /** The execute endpoint as an absolute URL, for copyable examples such as cURL. */

@@ -1,10 +1,12 @@
+import { memo } from "react";
 import type { Definition, RuleNode } from "../../types";
 import { nodeKinds } from "../../domain/nodeKinds";
 
 /** A path ends at nodes without exits; the outline marks them like a result. */
 const endsPath = (node: RuleNode) => nodeKinds[node.type].exits === "none";
 
-export default function StudioOutline({
+/** Memoized: it renders again for another graph, not for a keystroke in its code. */
+export default memo(function StudioOutline({
   definition,
   onSelect,
 }: {
@@ -32,4 +34,4 @@ export default function StudioOutline({
       </p>
     </aside>
   );
-}
+});

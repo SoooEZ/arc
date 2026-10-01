@@ -63,12 +63,17 @@ export function useGraphFocus({
     [definition.nodes, measurements, flow, selectNode, selectEdge],
   );
 
-  const jumpToNode = (id: string) => {
-    if (!selectNode(id)) return;
-    setRequestedFocus(id);
-    if (mode === "code")
-      navigate(rulePath({ ruleId, version: requestedVersion }));
-  };
+  // Stable while the graph changes, so views such as the Test panel's trace,
+  // which re-render only for a new handler, stay put while a card is dragged.
+  const jumpToNode = useCallback(
+    (id: string) => {
+      if (!selectNode(id)) return;
+      setRequestedFocus(id);
+      if (mode === "code")
+        navigate(rulePath({ ruleId, version: requestedVersion }));
+    },
+    [selectNode, mode, navigate, ruleId, requestedVersion],
+  );
 
   useEffect(() => {
     if (!unavailable && requestedFocus !== null && pendingFocus === null)

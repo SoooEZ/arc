@@ -27,7 +27,7 @@ import ValueBinding from "../expressions/ValueBinding";
 import {
   pinnedSourceVersions,
   readSourceVersion,
-} from "../studio/pinnedVersions";
+} from "../../app/pinnedVersions";
 import UndeclaredBindings from "../expressions/UndeclaredBindings";
 import SourceProviderSelect from "./SourceProviderSelect";
 import type { VariableOption } from "../../domain/variables";

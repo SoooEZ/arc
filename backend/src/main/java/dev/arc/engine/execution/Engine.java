@@ -70,6 +70,27 @@ public class Engine {
     return plans.planForCheck(id, version, definition, resolver);
   }
 
+  /**
+   * Published definitions for a static check: a plan an execution cached holds the stored
+   * definition of its immutable version, so a reached pin is read and decoded from {@code storage}
+   * only when no plan has it; diagnostics read every reached pin again on each request. Formula
+   * calls still ask storage, which also checks the rule's kind.
+   */
+  public RuleResolver cachedFirst(RuleResolver storage) {
+    return new RuleResolver() {
+      @Override
+      public Definition resolve(String id, int version) {
+        CompiledGraph cached = plans.cachedPlan(id, version);
+        return cached != null ? cached.definition() : storage.resolve(id, version);
+      }
+
+      @Override
+      public Definition resolveFormula(String id, int version) {
+        return storage.resolveFormula(id, version);
+      }
+    };
+  }
+
   /** Drops the cached plans of a deleted rule. Call it after the deletion commits. */
   public void forget(String ruleId) {
     plans.forget(ruleId);

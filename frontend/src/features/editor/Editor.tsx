@@ -4,6 +4,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import type { GraphProblem } from "../../api/errors";
 import { LazyBoundary } from "../../components/LazyBoundary";
 import { isCurrentGraphLocation, semanticGraphKey } from "../../domain/graph";
+import { entryInputNode } from "../../domain/nodeKinds";
 import {
   applyNodeFragment,
   withNodePositions,
@@ -225,9 +226,7 @@ function EditorContent({
       version={requestedVersion}
       publishedVersion={requestedVersion ?? rule.publishedVersion}
       buildPending={sourceDirty}
-      inputNodeId={
-        rule.draft.nodes.find((node) => node.type === "INPUT")?.id ?? null
-      }
+      inputNodeId={entryInputNode(rule.draft)?.id ?? null}
       onOpenReference={openReference}
       onNode={jumpToNode}
     />

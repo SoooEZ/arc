@@ -107,7 +107,6 @@ export default function ApiPage({
             <CatalogPagination
               label="Published rules"
               {...paginationProps(request.catalog)}
-              loading={request.catalog.loading}
             />
             <div className="api-select-row">
               <TextField

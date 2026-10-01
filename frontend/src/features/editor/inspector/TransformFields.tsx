@@ -4,10 +4,12 @@ import { Plus, Trash2 } from "lucide-react";
 import ExpressionField from "../../expressions/ExpressionField";
 import ExpressionDialogButton from "../../expressions/ExpressionDialogButton";
 import ValueBinding from "../../expressions/ValueBinding";
-import { quoteText } from "../../../domain/expressions";
 import { patchGraphNode } from "../../../domain/graph";
-import { uniqueName } from "../../../domain/ids";
 import { MAX_TRANSFORM_FIELDS } from "../../../domain/limits";
+import {
+  fieldsAsObjectExpression,
+  newTransformField,
+} from "../../../domain/transformFields";
 import type { VariableOption } from "../../../domain/variables";
 import type { Definition, RuleNode } from "../../../types";
 import type { NodeFieldsProps } from "./types";
@@ -90,14 +92,9 @@ export default function TransformFields({
           <Button
             startIcon={<Plus size={14} />}
             disabled={readOnly || fields.length >= MAX_TRANSFORM_FIELDS}
-            onClick={() => {
-              const name = uniqueName(
-                "field_",
-                fields.map((field) => field.name),
-                fields.length + 1,
-              );
-              patch({ fields: [...fields, { name, expression: "null" }] });
-            }}
+            onClick={() =>
+              patch({ fields: [...fields, newTransformField(fields)] })
+            }
           >
             Add field
           </Button>
@@ -112,7 +109,7 @@ export default function TransformFields({
               disabled={readOnly}
               variables={variables}
               scopeKnown={scopeKnown}
-              value={`$OBJECT(${fields.map((field) => `${quoteText(field.name)}, ${field.expression || "null"}`).join(", ")})`}
+              value={fieldsAsObjectExpression(fields)}
               onChange={(expression) =>
                 patch({
                   fields: null,

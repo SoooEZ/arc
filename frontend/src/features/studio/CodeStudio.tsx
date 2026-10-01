@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { Button } from "@mui/material";
 import { Check, Code2 } from "lucide-react";
@@ -63,15 +63,22 @@ export default function CodeStudio({
       adopting.current = false;
     }
   }, [editor, model, source]);
-  const insert = (snippet: string, atEnd = false) => {
-    if (!latest.current.readOnly) insertSnippet(editor.current, snippet, atEnd);
-  };
+  // The insertion callbacks read the editor and the latest state through refs,
+  // so they stay the same while the code is typed, and the memoized function
+  // library and outline beside it do not render again on every keystroke.
+  const insert = useCallback(
+    (snippet: string, atEnd = false) => {
+      if (!latest.current.readOnly)
+        insertSnippet(editor.current, snippet, atEnd);
+    },
+    [editor],
+  );
   /**
    * An insertion that starts with a read: the returned function inserts only
    * while the code and the selection are as they were when the read started,
    * the rule Formula insertion applies (lesson F3).
    */
-  const beginInsert = () => {
+  const beginInsert = useCallback(() => {
     const state = captureEditorState(editor.current);
     return (snippet: string, atEnd = false) => {
       if (latest.current.readOnly) return;
@@ -81,7 +88,7 @@ export default function CodeStudio({
         );
       insertSnippet(editor.current, snippet, atEnd);
     };
-  };
+  }, [editor]);
   const { insertFormula, formulaError } = useArcLanguageSupport(
     editor,
     model,
@@ -110,14 +117,17 @@ export default function CodeStudio({
       },
     });
   };
-  const selectNode = (nodeId: string) => {
-    const model = editor.current?.getModel();
-    if (!model) return;
-    const offset = nodeDeclarationOffset(model.getValue(), nodeId);
-    if (offset === null) return;
-    const declaration = model.getPositionAt(offset);
-    reveal(declaration.lineNumber, declaration.column);
-  };
+  const selectNode = useCallback(
+    (nodeId: string) => {
+      const model = editor.current?.getModel();
+      if (!model) return;
+      const offset = nodeDeclarationOffset(model.getValue(), nodeId);
+      if (offset === null) return;
+      const declaration = model.getPositionAt(offset);
+      reveal(declaration.lineNumber, declaration.column);
+    },
+    [editor, reveal],
+  );
 
   return (
     <div className="code-studio">

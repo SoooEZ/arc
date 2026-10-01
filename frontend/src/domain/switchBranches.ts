@@ -1,4 +1,4 @@
-import type { Definition, RuleNode } from "../types";
+import type { BranchCase, Definition, RuleNode } from "../types";
 import { canAddEdge, canAddNode, MAX_LABEL_CHARACTERS } from "./limits";
 import { handles, nodeWidth } from "./nodePorts";
 
@@ -43,8 +43,13 @@ export function canAddSwitchDefaultReturn(
   );
 }
 
-/** Preserve existing routing; adding a return is allowed only for an unconnected Default. */
-export function setSwitchDefaultReturn(
+/**
+ * Adds an Output on an unconnected Default; any other graph is returned as it
+ * is. It only adds: an existing return's value changes through the Output's own
+ * form, and the update this function also made could overwrite that value
+ * with "0" when a repeated click ran its updater again.
+ */
+export function addSwitchDefaultReturn(
   definition: Definition,
   switchId: string,
   expression: string,
@@ -55,14 +60,6 @@ export function setSwitchDefaultReturn(
     (item) => item.id === switchId && item.type === "SWITCH",
   );
   if (!node) return definition;
-  const output = switchDefaultOutput(definition, switchId);
-  if (output)
-    return {
-      ...definition,
-      nodes: definition.nodes.map((item) =>
-        item.id === output.id ? { ...item, expression } : item,
-      ),
-    };
   if (
     !canAddSwitchDefaultReturn(definition, switchId) ||
     definition.nodes.some((item) => item.id === outputId) ||
@@ -101,4 +98,51 @@ export function setSwitchDefaultReturn(
       },
     ],
   };
+}
+
+/** A case the Switch does not have yet, checked last; the ID is chosen by the caller. */
+export function withNewCase(
+  cases: readonly BranchCase[],
+  id: string,
+): BranchCase[] {
+  return [
+    ...cases,
+    { id, label: `Case ${cases.length + 1}`, expression: "true" },
+  ];
+}
+
+/** The cases with one case's label or expression changed. */
+export function withCaseChanged(
+  cases: readonly BranchCase[],
+  id: string,
+  change: Partial<BranchCase>,
+): BranchCase[] {
+  return cases.map((option) =>
+    option.id === id ? { ...option, ...change } : option,
+  );
+}
+
+/** The cases without one case; patchGraphNode drops its connections. */
+export function withoutCase(
+  cases: readonly BranchCase[],
+  id: string,
+): BranchCase[] {
+  return cases.filter((option) => option.id !== id);
+}
+
+/**
+ * The cases with one case moved up (-1) or down (+1), which changes which case
+ * matches first; at either end, the same cases.
+ */
+export function withCaseMoved(
+  cases: readonly BranchCase[],
+  id: string,
+  direction: -1 | 1,
+): readonly BranchCase[] {
+  const index = cases.findIndex((option) => option.id === id);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= cases.length) return cases;
+  const moved = [...cases];
+  [moved[index], moved[target]] = [moved[target], moved[index]];
+  return moved;
 }

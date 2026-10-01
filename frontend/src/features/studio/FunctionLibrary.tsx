@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Chip, MenuItem, TextField, Tooltip } from "@mui/material";
 import { ChevronRight, Search } from "lucide-react";
 import type { FunctionEntry, RuleSummary } from "../../types";
 import PublishedFormulaLibrary from "./PublishedFormulaLibrary";
 import { insertsOnClick } from "./useLibraryInsertion";
 
-export default function FunctionLibrary({
+/**
+ * The function and published Formula libraries. Memoized: they render again
+ * only for another catalog, read-only state or insertion callback, never for a
+ * keystroke in the code beside them.
+ */
+export default memo(function FunctionLibrary({
   functions,
   readOnly,
   onInsert,
@@ -163,4 +168,4 @@ export default function FunctionLibrary({
       )}
     </>
   );
-}
+});

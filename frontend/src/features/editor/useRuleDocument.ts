@@ -473,7 +473,7 @@ export function useRuleDocument({
   const toggleTest = (preview: {
     open: boolean;
     close: () => void;
-    toggle: () => void;
+    show: () => void;
   }) => {
     if (preview.open) {
       preview.close();
@@ -481,7 +481,7 @@ export function useRuleDocument({
     }
     return runTask("test", async () => {
       await buildCode();
-      preview.toggle();
+      preview.show();
     });
   };
   /**

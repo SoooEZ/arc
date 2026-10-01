@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { monaco } from "./arcLanguage";
 import type { RuleSummary } from "../../types";
 import type { VariableOption } from "../../domain/variables";
@@ -252,52 +258,57 @@ export function useFormulaSupport(
     };
   }, [editor, editorModel, script]);
 
-  const insertFormula = async (rule: RuleSummary, signal?: AbortSignal) => {
-    const instance = editor.current;
-    const model = instance?.getModel();
-    const selection = instance?.getSelection();
-    if (
-      !instance ||
-      !model ||
-      !selection ||
-      signal?.aborted ||
-      rule.publishedVersion === null ||
-      instance.getOption(monaco.editor.EditorOption.readOnly)
-    )
-      return;
-    const state = captureEditorState(instance);
-    const controller = new AbortController();
-    for (const previous of pending.current) previous.abort();
-    pending.current.add(controller);
-    const cancel = () => controller.abort();
-    signal?.addEventListener("abort", cancel, { once: true });
-    try {
-      const formula = await formulaMetadata.load(
-        rule.id,
-        rule.publishedVersion,
-        controller.signal,
-        rule,
-      );
-      if (controller.signal.aborted) return;
+  // Reads the editor, the latest variables and the pending reads through refs,
+  // so the function libraries that receive it can skip renders while typing.
+  const insertFormula = useCallback(
+    async (rule: RuleSummary, signal?: AbortSignal) => {
+      const instance = editor.current;
+      const model = instance?.getModel();
+      const selection = instance?.getSelection();
       if (
-        editor.current !== instance ||
-        !unchangedSince(instance, state) ||
+        !instance ||
+        !model ||
+        !selection ||
+        signal?.aborted ||
+        rule.publishedVersion === null ||
         instance.getOption(monaco.editor.EditorOption.readOnly)
       )
-        throw new Error(
-          "The expression changed while the formula loaded. Select the formula again.",
+        return;
+      const state = captureEditorState(instance);
+      const controller = new AbortController();
+      for (const previous of pending.current) previous.abort();
+      pending.current.add(controller);
+      const cancel = () => controller.abort();
+      signal?.addEventListener("abort", cancel, { once: true });
+      try {
+        const formula = await formulaMetadata.load(
+          rule.id,
+          rule.publishedVersion,
+          controller.signal,
+          rule,
         );
-      insertSnippet(
-        instance,
-        formulaSnippet(
-          formula,
-          latestVariables.current.map((variable) => variable.name),
-        ),
-      );
-    } finally {
-      pending.current.delete(controller);
-      signal?.removeEventListener("abort", cancel);
-    }
-  };
+        if (controller.signal.aborted) return;
+        if (
+          editor.current !== instance ||
+          !unchangedSince(instance, state) ||
+          instance.getOption(monaco.editor.EditorOption.readOnly)
+        )
+          throw new Error(
+            "The expression changed while the formula loaded. Select the formula again.",
+          );
+        insertSnippet(
+          instance,
+          formulaSnippet(
+            formula,
+            latestVariables.current.map((variable) => variable.name),
+          ),
+        );
+      } finally {
+        pending.current.delete(controller);
+        signal?.removeEventListener("abort", cancel);
+      }
+    },
+    [editor],
+  );
   return { insertFormula, formulaError: error };
 }

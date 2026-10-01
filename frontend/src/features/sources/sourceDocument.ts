@@ -1,6 +1,6 @@
 import type { DataSource, SourceConfig } from "../../types";
 import { stringifyJson } from "../../domain/json";
-import { displayNameProblem } from "../../domain/limits";
+import { displayNameProblem, formatLimit } from "../../domain/limits";
 import { isResourceId, resourceIdGuidance } from "../../domain/resourceIds";
 import {
   providerParameterTemplate,
@@ -40,10 +40,12 @@ export function sourceVersionLabel(version: number, dirty: boolean): string {
   return dirty ? `v${version} · edited` : `v${version}`;
 }
 
-/** The server accepts whole milliseconds in this range (HttpSourceAdapter). */
+/**
+ * The server accepts whole milliseconds in this range (HttpSourceAdapter);
+ * scripts/check_mirrors.test.mjs compares it with the server's constants.
+ */
 const httpTimeoutLimits = { min: 100, max: 10_000 };
-export const httpTimeoutGuidance =
-  "Enter whole milliseconds from 100 to 10,000.";
+export const httpTimeoutGuidance = `Enter whole milliseconds from ${httpTimeoutLimits.min} to ${formatLimit(httpTimeoutLimits.max)}.`;
 
 /** The timeout in `text`, or null when the server would reject it. */
 export function parseHttpTimeout(text: string): number | null {

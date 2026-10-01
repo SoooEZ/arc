@@ -5,7 +5,7 @@ import {
   rulePreview,
   previewNodeHeight,
   previewNodeWidth,
-} from "../../domain/rulePreview";
+} from "./previewLayout";
 
 export default function RulePreview({ rule }: { rule: Rule }) {
   const graph = rulePreview(rule.draft);

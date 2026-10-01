@@ -8,7 +8,7 @@ import {
   stringifyJson,
 } from "../../domain/json";
 import { placeholderLiteral } from "../../domain/placeholderLiterals";
-import { escapeSnippetText } from "./snippets";
+import { escapeSnippetText, needsCallerValue } from "./snippets";
 
 export interface FormulaEntry {
   id: string;
@@ -84,9 +84,7 @@ function insertedArgumentCount(inputs: Input[], available: string[]): number {
   let count = inputs.length;
   while (count > 0) {
     const input = inputs[count - 1];
-    const needsArgument =
-      input.required && input.defaultValue == null && !input.source;
-    if (available.includes(input.name) || needsArgument) break;
+    if (available.includes(input.name) || needsCallerValue(input)) break;
     count--;
   }
   return count;

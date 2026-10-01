@@ -14,6 +14,17 @@ final class CatalogPages {
   private CatalogPages() {}
 
   /**
+   * A catalog's search condition: an empty search matches every row, any other matches within one
+   * of {@code columns}, ignoring case. Each column is searched on its own: joined by spaces, "tax
+   * rate" found the rule tax named "Rate table". It takes the search twice.
+   */
+  static String searchWithin(String... columns) {
+    return "(? = '' OR EXISTS (SELECT 1 FROM unnest(ARRAY["
+        + String.join(", ", columns)
+        + "]) AS field WHERE strpos(lower(field), lower(?)) > 0))";
+  }
+
+  /**
    * Both statements take {@code filterArguments} first. {@code pageSql} then takes the page size
    * and the offset as its last two parameters ({@code LIMIT ? OFFSET ?}).
    */

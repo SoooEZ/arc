@@ -4,7 +4,9 @@
  * share one request; a subscriber that aborts leaves the read to the others,
  * and the request is aborted only when every subscriber has. Only completed
  * reads are kept, least recently used first out; `forget(id)` drops every
- * version of an ID, for a rule deleted in this page.
+ * version of an ID, for a rule deleted in this page. A capacity of 0 shares
+ * reads while they run and keeps none, for what can change between reads,
+ * such as a rule's identity.
  */
 export class PinnedReads<T> {
   private readonly completed = new Map<string, T>();
@@ -103,6 +105,7 @@ export class PinnedReads<T> {
   }
 
   private remember(key: string, value: T) {
+    if (this.capacity === 0) return;
     this.completed.delete(key);
     this.completed.set(key, value);
     if (this.completed.size <= this.capacity) return;

@@ -1,6 +1,7 @@
 package dev.arc.engine.execution;
 
 import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
 
@@ -138,6 +139,40 @@ class ExecutionPlansTest {
         .isSameAs(session(plans).prepare("plain", 1, () -> plain));
     assertThat(session(plans).prepare("pointers", 1, () -> pointers))
         .isNotSameAs(session(plans).prepare("pointers", 1, () -> pointers));
+  }
+
+  /**
+   * A chain of 40 Formulas holds 820 scope entries, and 2,920 with 50 inputs: the inputs weighed
+   * only their JSON, so the larger plan fit a bound it exceeds by far.
+   */
+  @Test
+  void theVariablesInEveryNodesScopeCountTowardsAPlansWeight() {
+    var plans = new ExecutionPlans(new CountingValidator(), json, 10, 150_000);
+    var narrow = chain(40, 0);
+    var wide = chain(40, 50);
+    assertThat(session(plans).prepare("narrow", 1, () -> narrow))
+        .isSameAs(session(plans).prepare("narrow", 1, () -> narrow));
+    assertThat(session(plans).prepare("wide", 1, () -> wide))
+        .isNotSameAs(session(plans).prepare("wide", 1, () -> wide));
+  }
+
+  /** Input, a chain of Formulas each storing a result, and an Output, with optional inputs. */
+  private static Definition chain(int formulas, int inputs) {
+    var declared = new ArrayList<Input>();
+    for (int index = 0; index < inputs; index++)
+      declared.add(new Input("p" + index, "NUMBER", false, null));
+    var nodes = new ArrayList<Node>(List.of(inputNode("in", "Input")));
+    var edges = new ArrayList<Edge>();
+    String previous = "in";
+    for (int index = 0; index < formulas; index++) {
+      String id = "f" + index;
+      nodes.add(nodeOf(id, "FORMULA", "F" + index).expression("1").output("r" + index).build());
+      edges.add(new Edge("e" + index, previous, id, "next"));
+      previous = id;
+    }
+    nodes.add(outputNode("out", "Output", "1"));
+    edges.add(new Edge("last", previous, "out", "next"));
+    return new Definition(1, declared, nodes, edges);
   }
 
   @Test

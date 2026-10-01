@@ -3,7 +3,7 @@ import {
   previewNodeHeight,
   previewNodeWidth,
   rulePreview,
-} from "../../src/domain/rulePreview";
+} from "../../src/features/library/previewLayout";
 import type { Definition, RuleNode } from "../../src/types";
 
 const node = (id: string): RuleNode => ({

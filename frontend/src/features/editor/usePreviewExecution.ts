@@ -35,9 +35,8 @@ export function usePreviewExecution(definition: Definition, graphKey: string) {
   );
   const run = () =>
     execution.run((signal) =>
-      studioApi.preview(definition, parseExecutionInputs(input), {
+      studioApi.preview(definition, parseExecutionInputs(input), options, {
         signal,
-        ...options,
       }),
     );
   const close = () => {
@@ -46,7 +45,9 @@ export function usePreviewExecution(definition: Definition, graphKey: string) {
   };
   return {
     open,
-    toggle: () => (open ? close() : setOpen(true)),
+    // Opening waits for pending code to build (useRuleDocument.toggleTest),
+    // and closing runs nothing, so the two stay separate commands.
+    show: () => setOpen(true),
     close,
     inputView,
     setInputView,
