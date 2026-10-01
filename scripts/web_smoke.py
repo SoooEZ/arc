@@ -45,7 +45,8 @@ for path, target in [("/api", "/api/"), ("/assets", "/assets/")]:
 
 # Above the 1 MiB cap the web origin answers the API's JSON 413 with CORS, not nginx's HTML page.
 json_headers = {"Content-Type": "application/json", "Origin": "http://example.test"}
-padded = lambda size: b'{"pad":"' + b"x" * (size - 10) + b'"}'
+# The padding is a field rules have: requests are strict JSON, and an unknown field is a 400.
+padded = lambda size: b'{"description":"' + b"x" * (size - 18) + b'"}'
 status, headers, body = fetch("POST", "/api/rules", padded(MIB + 1), json_headers)
 assert status == 413, status
 assert headers.get("Content-Type", "").startswith("application/json"), headers.get("Content-Type")
