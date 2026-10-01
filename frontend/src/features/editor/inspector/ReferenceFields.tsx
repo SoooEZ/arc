@@ -31,13 +31,15 @@ export default function ReferenceFields({
   onOpenReference,
 }: NodeFieldsProps) {
   const { ruleId, version } = node;
-  // The picker's own summary is fresh; any other pin reads the rule it names,
-  // so a renamed rule shows its current name.
+  // The picker's own summary is fresh; any other pin reads its rule's summary,
+  // so a renamed rule shows its current name without its graph being read.
   const [chosenRule, setChosenRule] = useState<RuleChoice | null>(null);
   const knownRule = chosenRule?.id === ruleId ? chosenRule : null;
   const selectedRule = useAsyncResource<RuleChoice | null>(
     ruleId || "",
-    ruleId && !knownRule ? (signal) => ruleApi.get(ruleId, { signal }) : null,
+    ruleId && !knownRule
+      ? (signal) => ruleApi.summary(ruleId, { signal })
+      : null,
     null,
   );
   // The rule as read now; a deleted ID created again is another incarnation.

@@ -676,7 +676,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | --- | --- | --- |
 | [errors.ts](../frontend/src/api/errors.ts) | ApiError（状态码、图中位置、issues）以及错误消息、详情的提取 | [http.spec.ts](../frontend/tests/unit/http.spec.ts) |
 | [http.ts](../frontend/src/api/http.ts) | 传输层：/api 基址的 fetch 封装，无损 JSON 编解码，失败时抛出 ApiError | [http.spec.ts](../frontend/tests/unit/http.spec.ts) |
-| [rules.ts](../frontend/src/api/rules.ts) | 规则接口：目录、详情、创建、保存、发布、删除、执行、版本 | [http.spec.ts](../frontend/tests/unit/http.spec.ts) |
+| [rules.ts](../frontend/src/api/rules.ts) | 规则接口：目录、按 ID 取摘要（不含草稿，引用节点和 Formula 悬停用它取名称）、详情、创建、保存、发布、删除、执行、版本 | [http.spec.ts](../frontend/tests/unit/http.spec.ts) |
 | [sources.ts](../frontend/src/api/sources.ts) | 数据源接口：目录、版本列表与详情、创建、保存、测试 |  |
 | [studio.ts](../frontend/src/api/studio.ts) | 编辑辅助接口：表达式检查、诊断、变量、校验、预览、函数目录、ARC Script 渲染与构建 |  |
 

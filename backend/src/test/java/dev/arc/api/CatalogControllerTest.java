@@ -48,6 +48,27 @@ class CatalogControllerTest {
   }
 
   @Test
+  void aRuleSummaryIsReadByIdWithoutTheDraft() throws Exception {
+    var summary =
+        new RuleSummary(
+            "example", "Example", "", "FORMULA", 2, 1, Instant.EPOCH, Instant.EPOCH, 3, 1, 0);
+    when(rules.summary("example")).thenReturn(summary);
+    when(rules.summary("missing"))
+        .thenThrow(new dev.arc.error.ArcException(404, "Rule not found: missing"));
+    mvc.perform(get("/api/rule-summaries/example"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value("example"))
+        .andExpect(jsonPath("$.kind").value("FORMULA"))
+        .andExpect(jsonPath("$.publishedVersion").value(1))
+        .andExpect(jsonPath("$.createdAt").exists())
+        .andExpect(jsonPath("$.nodeCount").value(3))
+        .andExpect(jsonPath("$.draft").doesNotExist());
+    mvc.perform(get("/api/rule-summaries/missing"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.message").value("Rule not found: missing"));
+  }
+
+  @Test
   void catalogAndHistoryRejectInvalidBoundsBeforeQueryingStorage() throws Exception {
     for (String endpoint :
         List.of(

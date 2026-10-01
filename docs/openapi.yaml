@@ -40,6 +40,22 @@ paths:
                         type: array
                         items: {$ref: '#/components/schemas/RuleSummary'}
         default: {$ref: '#/components/responses/Error'}
+  /rule-summaries/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/RuleId'}
+    get:
+      operationId: getRuleSummary
+      description: >-
+        One rule's catalog item without its draft: its current name, kind,
+        publication, creation time and counts, for clients that need only
+        those. A missing rule returns 404.
+      responses:
+        '200':
+          description: The rule's metadata without its graph
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RuleSummary'}
+        default: {$ref: '#/components/responses/Error'}
   /source-summaries:
     parameters:
       - {$ref: '#/components/parameters/Offset'}

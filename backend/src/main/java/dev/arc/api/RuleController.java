@@ -35,6 +35,11 @@ public class RuleController {
     return rules.catalog(PageParameters.page(offset, limit, search), kind, publishedOnly);
   }
 
+  @GetMapping("/rule-summaries/{id}")
+  public RuleSummary summary(@PathVariable String id) {
+    return rules.summary(id);
+  }
+
   @GetMapping("/rules/{id}/version-summaries")
   public CatalogPage<RuleVersionSummary> versionSummaries(
       @PathVariable String id,

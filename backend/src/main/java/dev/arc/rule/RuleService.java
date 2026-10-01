@@ -54,6 +54,10 @@ public class RuleService {
     return store.versionSummaries(id, page);
   }
 
+  public RuleSummary summary(String id) {
+    return store.summary(id);
+  }
+
   public List<Rule> list() {
     return store.list();
   }

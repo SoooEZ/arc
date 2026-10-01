@@ -103,6 +103,63 @@ class JdbcRuleRepositoryTest {
   }
 
   /**
+   * The summary of one rule is the item a catalog page writes for it: the same columns, read for
+   * that rule alone and never the draft itself, so a client that needs a rule's current name or
+   * incarnation does not download its graph.
+   */
+  @Test
+  void aSummaryReadsTheCatalogColumnsOfOneRuleWithoutItsDraft() {
+    var statements = new ArrayList<String>();
+    var arguments = new ArrayList<List<Object>>();
+    when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(0L);
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              Object[] values = call.getArguments();
+              arguments.add(Arrays.asList(values).subList(2, values.length));
+              return List.of();
+            });
+
+    repository.catalog(new PageRequest(0, 10, ""), "", false);
+    assertThatThrownBy(() -> repository.summary("tax"))
+        .isInstanceOfSatisfying(
+            ArcException.class, error -> assertThat(error.status()).isEqualTo(404))
+        .hasMessage("Rule not found: tax");
+
+    String page = statements.get(0);
+    String summary = statements.get(1);
+    assertThat(columns(summary)).isEqualTo(columns(page)).contains("reference_count");
+    assertThat(selected(columns(summary))).doesNotContain("r.draft", "draft", "*", "r.*");
+    assertThat(summary).endsWith("WHERE r.id = ?");
+    assertThat(arguments.get(1)).containsExactly("tax");
+  }
+
+  /** The select list of a statement's last SELECT, up to its FROM. */
+  private static String columns(String statement) {
+    String select = statement.substring(statement.lastIndexOf("SELECT ") + "SELECT ".length());
+    return select.substring(0, select.indexOf("FROM")).strip();
+  }
+
+  /** The items of a select list: the commas outside parentheses separate them. */
+  private static List<String> selected(String columns) {
+    var items = new ArrayList<String>();
+    int depth = 0;
+    int start = 0;
+    for (int index = 0; index < columns.length(); index++) {
+      char character = columns.charAt(index);
+      if (character == '(') depth++;
+      else if (character == ')') depth--;
+      else if (character == ',' && depth == 0) {
+        items.add(columns.substring(start, index).strip());
+        start = index + 1;
+      }
+    }
+    items.add(columns.substring(start).strip());
+    return items;
+  }
+
+  /**
    * A search matches within one field. The fields joined by spaces matched across a boundary: "tax
    * rate" found the rule tax named "Rate table", and "country tax" the source country-tax.
    * PostgreSQL itself runs in scripts/smoke.py; here every catalog statement lists its fields.

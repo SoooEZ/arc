@@ -66,6 +66,45 @@ async function fixtures(request: APIRequestContext) {
   });
   return { callee, caller, suffix };
 }
+// A hover downloaded the callee's whole rule, its graph included, for its name.
+test("a Formula call's hover reads its rule's summary, never the whole rule", async ({
+  page,
+  request,
+}) => {
+  const { callee, suffix } = await fixtures(request);
+  const caller = `formula-hover-${suffix}`;
+  await createRule(request, {
+    id: caller,
+    name: caller,
+    kind: "FORMULA",
+    definition: definition(`@${callee}:1(amount)`, [
+      { name: "amount", type: "NUMBER", required: true, defaultValue: 100 },
+    ]),
+  });
+  const reads: string[] = [];
+  page.on("request", (outgoing) => {
+    const path = new URL(outgoing.url()).pathname;
+    if (
+      path === `/api/rules/${callee}` ||
+      path === `/api/rule-summaries/${callee}`
+    )
+      reads.push(path);
+  });
+  await page.goto(`/#/rules/${caller}?node=calc`);
+  const expression = page.getByLabel("Expression", { exact: true });
+  await expect(editorLines(expression)).toHaveText(`@${callee}:1(amount)`);
+  await editorLines(expression)
+    .locator("span")
+    .filter({ hasText: /^@formula-price-/ })
+    .first()
+    .hover();
+  await expect(page.locator(".monaco-hover:visible")).toContainText(
+    `Tax formula ${suffix}`,
+  );
+  expect(reads).toContain(`/api/rule-summaries/${callee}`);
+  expect(reads).not.toContain(`/api/rules/${callee}`);
+});
+
 test("at completion pins a formula and hover explains input, formula and result symbols", async ({
   page,
   request,

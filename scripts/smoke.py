@@ -248,6 +248,13 @@ try:
     assert request("GET", f"/api/source-summaries?search={PREFIX}-table")["total"] == 1
     request("GET", "/api/rule-summaries?limit=101", expected=422)
     request("GET", "/api/rule-summaries?offset=-1", expected=422)
+    # One rule's summary is its catalog item, without the draft: the editor reads it for the
+    # current name of a rule another rule calls.
+    listed = request("GET", f"/api/rule-summaries?search={parent['id']}&limit=100")["items"]
+    summary = request("GET", f"/api/rule-summaries/{parent['id']}")
+    assert summary == next(item for item in listed if item["id"] == parent["id"]), summary
+    assert "draft" not in summary and summary["referenceCount"] == 1, summary
+    request("GET", f"/api/rule-summaries/{PREFIX}-missing", expected=404)
 
     version_search = create("version-search")
     for _ in range(12):

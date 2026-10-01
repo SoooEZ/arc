@@ -28,7 +28,7 @@ type RuleIdentitySummary = Awaited<ReturnType<FormulaReads["rule"]>>;
  * bounded cache serves every editor on the page. A deleted ID can be created
  * again with other inputs, so an entry serves only the incarnation it was read
  * from: its key carries the rule's creation time, which every load learns from
- * the catalog summary when the caller has one and from one rule read otherwise.
+ * the caller's catalog summary or, without one, from the rule's summary by ID.
  * Both reads are shared while they run (PinnedReads): a caller that has left
  * starts nothing, and one that arrives as the last caller leaves gets a fresh
  * read rather than the abandoned one.
@@ -109,7 +109,7 @@ export class FormulaMetadata {
 
 /** Shared by every editor on the page; pinned versions come from the page-wide cache. */
 export const formulaMetadata = new FormulaMetadata({
-  rule: (id, signal) => ruleApi.get(id, { signal }),
+  rule: (id, signal) => ruleApi.summary(id, { signal }),
   version: (rule, version, signal) => readRuleVersion(rule, version, signal),
   search: (query, signal) =>
     ruleApi.catalog(

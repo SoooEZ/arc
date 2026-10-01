@@ -28,6 +28,12 @@ public interface RuleRepository extends RuleResolver {
   /** Version-descending metadata, filtered by a literal substring of the decimal version. */
   CatalogPage<RuleVersionSummary> versionSummaries(String id, PageRequest page);
 
+  /**
+   * One rule's catalog item, without its draft, for clients that need only its current name, kind,
+   * publication and creation time; a missing rule is a 404.
+   */
+  RuleSummary summary(String id);
+
   Rule get(String id);
 
   /** Read only the current publication pointer; missing rules return 404. */

@@ -33,6 +33,12 @@ export const ruleApi = {
       `/rules/${pathId(id)}/version-summaries?${queryString(query)}`,
       options,
     ),
+  /**
+   * One rule's catalog item without its draft: its current name, kind,
+   * publication and incarnation.
+   */
+  summary: (id: string, options?: RequestOptions) =>
+    http.get<RuleSummary>(`/rule-summaries/${pathId(id)}`, options),
   get: (id: string, options?: RequestOptions) =>
     http.get<Rule>(`/rules/${pathId(id)}`, options),
   create: (

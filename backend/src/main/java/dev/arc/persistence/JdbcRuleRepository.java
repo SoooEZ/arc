@@ -22,9 +22,24 @@ public class JdbcRuleRepository implements RuleRepository {
           + " AND (? = '' OR kind = ?) AND (NOT ? OR published_version IS NOT NULL)";
 
   /**
+   * The columns of a {@link RuleSummary}: a rule's metadata and the counts read from its draft,
+   * never the draft itself. The counted node type is spelled by {@link NodeKind}, the one
+   * vocabulary of node types.
+   */
+  private static final String SUMMARY_COLUMNS =
+      """
+      r.id, r.name, r.description, r.kind, r.revision, r.published_version,
+        r.created_at, r.updated_at,
+        jsonb_array_length(r.draft->'nodes') AS node_count,
+        jsonb_array_length(r.draft->'inputs') AS input_count,
+        jsonb_array_length(
+          jsonb_path_query_array(r.draft, '$.nodes[*] ? (@.type == "%s")')) AS reference_count
+      """
+          .formatted(NodeKind.REFERENCE.name());
+
+  /**
    * Chooses the page's IDs before reading drafts. PostgreSQL would otherwise compute the JSONB
-   * counts for every matching rule before sorting, although only one page is returned. The counted
-   * node type is spelled by {@link NodeKind}, the one vocabulary of node types.
+   * counts for every matching rule before sorting, although only one page is returned.
    */
   private static final String CATALOG_PAGE =
       """
@@ -32,16 +47,15 @@ public class JdbcRuleRepository implements RuleRepository {
         SELECT id FROM rules %s
         ORDER BY updated_at DESC, id
         LIMIT ? OFFSET ?)
-      SELECT r.id, r.name, r.description, r.kind, r.revision, r.published_version,
-        r.created_at, r.updated_at,
-        jsonb_array_length(r.draft->'nodes') AS node_count,
-        jsonb_array_length(r.draft->'inputs') AS input_count,
-        jsonb_array_length(
-          jsonb_path_query_array(r.draft, '$.nodes[*] ? (@.type == "%s")')) AS reference_count
+      SELECT %s
       FROM page JOIN rules r ON r.id = page.id
       ORDER BY r.updated_at DESC, r.id
       """
-          .formatted(CATALOG_FILTER, NodeKind.REFERENCE.name());
+          .formatted(CATALOG_FILTER, SUMMARY_COLUMNS);
+
+  /** One rule's catalog item, as a catalog page writes it. */
+  private static final String SUMMARY =
+      "SELECT %s FROM rules r WHERE r.id = ?".formatted(SUMMARY_COLUMNS);
 
   private static final String VERSION_FILTER =
       " WHERE rule_id = ? AND (? = '' OR strpos(version::text, ?) > 0)";
@@ -163,6 +177,13 @@ public class JdbcRuleRepository implements RuleRepository {
         id,
         search,
         search);
+  }
+
+  @Override
+  public RuleSummary summary(String id) {
+    var rows = jdbc.query(SUMMARY, SUMMARY_MAPPER, id);
+    if (rows.isEmpty()) throw notFound(id);
+    return rows.getFirst();
   }
 
   @Override

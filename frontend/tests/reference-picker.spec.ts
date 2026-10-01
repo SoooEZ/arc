@@ -560,6 +560,29 @@ test("selecting a Reference node again does not read its pinned version again", 
   expect(reads).toHaveLength(1);
 });
 
+// The inspector downloaded the whole rule, its graph included, for its name.
+test("a Reference node reads its rule's summary for the name, never the whole rule", async ({
+  page,
+  request,
+}) => {
+  const { parent, child } = await fixture(request);
+  const reads: string[] = [];
+  page.on("request", (outgoing) => {
+    const path = new URL(outgoing.url()).pathname;
+    if (
+      path === `/api/rules/${child.id}` ||
+      path === `/api/rule-summaries/${child.id}`
+    )
+      reads.push(path);
+  });
+  await page.goto(`/#/rules/${parent.id}?node=ref`);
+  await expect(
+    sidebar(page).getByRole("combobox", { name: "Published rule" }),
+  ).toHaveValue(child.name);
+  expect(reads).toContain(`/api/rule-summaries/${child.id}`);
+  expect(reads).not.toContain(`/api/rules/${child.id}`);
+});
+
 test("a child renamed behind a listed library page shows its current name in the picker and the viewer", async ({
   page,
   request,

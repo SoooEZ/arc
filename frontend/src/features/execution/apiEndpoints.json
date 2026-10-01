@@ -6,6 +6,11 @@
   },
   {
     "method": "GET",
+    "path": "/rule-summaries/{id}",
+    "summary": "Read one rule's metadata without its graph"
+  },
+  {
+    "method": "GET",
     "path": "/rules",
     "summary": "Legacy full rule list, including drafts"
   },
