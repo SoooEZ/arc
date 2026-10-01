@@ -18,9 +18,15 @@ import java.util.function.Supplier;
 final class ExecutionPlans {
   private record Pin(String id, int version) {}
 
+  /**
+   * A cached plan, its weight, and whether its pinned contracts were checked ({@link
+   * Session#verifyOnce}).
+   */
+  private record Cached(CompiledGraph plan, long weight, boolean verified) {}
+
   private final Validator validator;
   private final ObjectMapper json;
-  private final BoundedCache<Pin, CompiledGraph> published;
+  private final BoundedCache<Pin, Cached> published;
 
   /**
    * Advances whenever plans are forgotten. A session may have read a rule before its deletion, so
@@ -42,7 +48,7 @@ final class ExecutionPlans {
     return new Session(resolver, deadline, cachePublished);
   }
 
-  private CompiledGraph cached(Pin pin) {
+  private Cached cached(Pin pin) {
     return published.get(pin);
   }
 
@@ -60,14 +66,20 @@ final class ExecutionPlans {
   }
 
   private void remember(Pin pin, CompiledGraph plan, long sessionGeneration) {
-    store(pin, plan, weight(plan), sessionGeneration);
+    store(pin, new Cached(plan, weight(plan), false), sessionGeneration);
+  }
+
+  /** A verdict reached before a deletion is not stored after it, like a plan. */
+  private synchronized void markVerified(Pin pin, long sessionGeneration) {
+    Cached entry = published.get(pin);
+    if (entry == null || entry.verified()) return;
+    store(pin, new Cached(entry.plan(), entry.weight(), true), sessionGeneration);
   }
 
   /** A plan compiled before a deletion is not stored after it: the generation guards the store. */
-  private synchronized void store(
-      Pin pin, CompiledGraph plan, long planWeight, long sessionGeneration) {
+  private synchronized void store(Pin pin, Cached entry, long sessionGeneration) {
     if (sessionGeneration != generation) return;
-    published.put(pin, plan, planWeight);
+    published.put(pin, entry, entry.weight());
   }
 
   final class Session {
@@ -94,13 +106,30 @@ final class ExecutionPlans {
       if (version == null) return prepareDraft(definition.get());
       Pin pin = new Pin(id, version);
       CompiledGraph plan = pins.get(pin);
-      if (plan == null && cachePublished) plan = cached(pin);
+      if (plan == null && cachePublished) {
+        Cached entry = cached(pin);
+        if (entry != null) plan = entry.plan();
+      }
       if (plan == null) {
         plan = compile(definition.get());
         if (cachePublished) remember(pin, plan, startedIn);
       }
       pins.put(pin, plan);
       return plan;
+    }
+
+    /**
+     * Runs a check of a published version's pinned contracts once per cached plan. The version, the
+     * pins it reaches and their source versions are immutable while it lives: a rule that another
+     * rule calls cannot be deleted, and a deletion forgets the deleted rule's plans with their
+     * verdicts. A draft (no version) and a failed check are checked again on the next request.
+     */
+    void verifyOnce(String id, Integer version, Runnable check) {
+      Pin pin = version == null || !cachePublished ? null : new Pin(id, version);
+      Cached entry = pin == null ? null : cached(pin);
+      if (entry != null && entry.verified()) return;
+      check.run();
+      if (pin != null) markVerified(pin, startedIn);
     }
 
     private CompiledGraph prepareDraft(Definition definition) {

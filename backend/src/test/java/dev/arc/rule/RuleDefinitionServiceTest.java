@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import dev.arc.engine.ExecutionDeadline;
+import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.error.ArcException.Location;
@@ -14,6 +16,7 @@ import dev.arc.model.Definition.*;
 import dev.arc.model.SourceDefinition;
 import dev.arc.source.SourceBindingValidator;
 import dev.arc.source.SourceRepository;
+import dev.arc.source.SourceVersions;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
@@ -21,8 +24,61 @@ import org.junit.jupiter.api.Test;
 class RuleDefinitionServiceTest {
   private final RuleRepository rules = mock(RuleRepository.class);
   private final SourceRepository sources = mock(SourceRepository.class);
+  private final Validator validator = new Validator();
   private final RuleDefinitionService service =
-      new RuleDefinitionService(new Validator(), rules, new SourceBindingValidator(sources));
+      new RuleDefinitionService(
+          validator,
+          rules,
+          new SourceBindingValidator(new SourceVersions(sources)),
+          new Engine(validator));
+
+  /**
+   * The callee check compiles a pinned version once per process, through the plans executions keep:
+   * validate, diagnostics and publish compiled every reached pin on every request.
+   */
+  @Test
+  void aReachedPinIsCompiledOnceForEveryStaticCheck() {
+    var child =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                dev.arc.support.GraphFixtures.inputNode("in", "Input"),
+                dev.arc.support.GraphFixtures.outputNode("o", "O", "2")),
+            List.of(new Edge("next", "in", "o", "next")));
+    var parent =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                dev.arc.support.GraphFixtures.inputNode("input", "Inputs"),
+                nodeOf("ref", "REFERENCE", "Ref").rule("child", 1).output("r").build(),
+                dev.arc.support.GraphFixtures.outputNode("out", "Out", "r")),
+            List.of(new Edge("a", "input", "ref", "next"), new Edge("b", "ref", "out", "next")));
+    var compiled = new ArrayList<Definition>();
+    var counting =
+        new Validator() {
+          @Override
+          public dev.arc.engine.validation.CompiledGraph compile(
+              Definition definition, dev.arc.engine.RuleResolver resolver) {
+            compiled.add(definition);
+            return super.compile(definition, resolver);
+          }
+        };
+    var engine = new Engine(counting);
+    var checks =
+        new RuleDefinitionService(
+            counting, rules, new SourceBindingValidator(new SourceVersions(sources)), engine);
+    when(rules.resolve("child", 1)).thenReturn(child);
+    for (int request = 0; request < 3; request++) {
+      checks.validate(parent);
+      assertThat(checks.diagnostics(parent)).isEmpty();
+    }
+    assertThat(compiled).filteredOn(child::equals).hasSize(1);
+    // An execution reaching the same pin uses the plan the checks compiled.
+    engine.session(rules, ExecutionDeadline.start(1000)).prepare("child", 1, () -> child);
+    assertThat(compiled).filteredOn(child::equals).hasSize(1);
+  }
 
   @Test
   void formulaCallPinAndSyntaxProblemsAreReportedOnceWithTheirLabel() {

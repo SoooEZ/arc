@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.engine.execution.Engine;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.script.ArcScript;
 import dev.arc.engine.validation.Validator;
@@ -17,6 +18,7 @@ import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleRepository;
 import dev.arc.source.SourceBindingValidator;
 import dev.arc.source.SourceRepository;
+import dev.arc.source.SourceVersions;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -29,7 +31,11 @@ class FormulaCheckTest {
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
   private final RuleDefinitionService definitions =
-      new RuleDefinitionService(validator, rules, new SourceBindingValidator(sources));
+      new RuleDefinitionService(
+          validator,
+          rules,
+          new SourceBindingValidator(new SourceVersions(sources)),
+          new Engine(validator));
   private final org.springframework.test.web.servlet.MockMvc mvc =
       MockMvcBuilders.standaloneSetup(new StudioController(script, definitions)).build();
 

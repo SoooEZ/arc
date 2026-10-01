@@ -22,10 +22,10 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public final class SourceBindingValidator {
-  private final SourceRepository sources;
+  private final SourceVersions versions;
 
-  public SourceBindingValidator(SourceRepository sources) {
-    this.sources = sources;
+  public SourceBindingValidator(SourceVersions versions) {
+    this.versions = versions;
   }
 
   /**
@@ -35,9 +35,9 @@ public final class SourceBindingValidator {
    */
   @FunctionalInterface
   public interface CalleeCheck {
-    CalleeCheck NONE = (callee, resolver) -> {};
+    CalleeCheck NONE = (ruleId, version, callee) -> {};
 
-    void check(Definition callee, RuleResolver resolver);
+    void check(String ruleId, int version, Definition callee);
   }
 
   /**
@@ -115,12 +115,15 @@ public final class SourceBindingValidator {
     }
   }
 
-  /** The stored configurations, each version read once per check. */
+  /**
+   * The pinned configurations, through the frozen versions that executions read, so a version is
+   * read from storage once per process; each is looked up once per check.
+   */
   private SourceConfigurations pinnedSources() {
     var configurations = new HashMap<String, SourceDefinition>();
     return (id, version) ->
         configurations.computeIfAbsent(
-            id + "@" + version, ignored -> sources.get(id, version).definition());
+            id + "@" + version, ignored -> versions.get(id, version).definition());
   }
 
   private void validateContracts(
@@ -140,7 +143,8 @@ public final class SourceBindingValidator {
       if (!walk.reaches(pin, depth + 1)) continue;
       try {
         Definition callee = dependency.resolve(resolver);
-        if (walk.firstCheck(pin)) calleeCheck.check(callee, resolver);
+        if (walk.firstCheck(pin))
+          calleeCheck.check(dependency.ruleId(), dependency.version(), callee);
         validateContracts(
             callee,
             Validator.dependencies(callee),

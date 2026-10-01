@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -30,7 +31,8 @@ import org.junit.jupiter.api.Test;
 
 class SourceBindingValidatorTest {
   private final SourceRepository repository = mock(SourceRepository.class);
-  private final SourceBindingValidator validator = new SourceBindingValidator(repository);
+  private final SourceBindingValidator validator =
+      new SourceBindingValidator(new SourceVersions(repository));
   private final RuleResolver noRules =
       (id, version) -> {
         throw new AssertionError("Unexpected rule read");
@@ -172,11 +174,17 @@ class SourceBindingValidatorTest {
     var adapter = mock(SourceAdapter.class);
     when(adapter.kind()).thenReturn("LOOKUP");
     when(adapter.fetch(any(), any(), any(), any())).thenReturn("value");
-    var execution =
-        new SourceExecutionService(
-            repository, new SourceAdapters(List.of(adapter)), new JsonPointerExtractor());
     for (boolean required : new boolean[] {true, false})
       for (Object defaultValue : java.util.Arrays.asList(null, "US")) {
+        // Each declaration stands for another version of "table"; versions are frozen once read.
+        var versions = new SourceVersions(repository);
+        var validator = new SourceBindingValidator(versions);
+        var execution =
+            new SourceExecutionService(
+                repository,
+                versions,
+                new SourceAdapters(List.of(adapter)),
+                new JsonPointerExtractor());
         var parameter = new Input("key", "STRING", required, defaultValue);
         var table = new SourceDefinition("LOOKUP", null, List.of(parameter), Map.of(), null, 1000);
         when(repository.get("table", 1)).thenReturn(new DataSource("table", "Table", 1, table));
@@ -210,6 +218,30 @@ class SourceBindingValidatorTest {
               .isEqualTo("value");
         }
       }
+  }
+
+  /**
+   * Validate, diagnostics and publish read a pinned version through the frozen versions that
+   * executions keep, so repeated checks of an immutable version read it once per process; each
+   * check used to read and decode it again.
+   */
+  @Test
+  void staticChecksReadAPinnedVersionOncePerProcess() {
+    var mapped =
+        new Input(
+            "amount",
+            "NUMBER",
+            false,
+            null,
+            new SourceBinding("rates", 1, Map.of("key", "\"US\""), null, "FAIL"));
+    var definition =
+        new Definition(
+            1,
+            List.of(mapped),
+            List.of(inputNode("in", "Inputs"), outputNode("out", "Out", "amount")),
+            List.of());
+    for (int check = 0; check < 3; check++) validator.validatePinnedContracts(definition, noRules);
+    verify(repository, times(1)).get("rates", 1);
   }
 
   private static Definition referencing(String ruleId) {

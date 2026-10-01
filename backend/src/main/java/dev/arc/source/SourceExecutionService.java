@@ -1,6 +1,5 @@
 package dev.arc.source;
 
-import dev.arc.engine.BoundedCache;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.InputTypes;
 import dev.arc.engine.SourceReader;
@@ -25,21 +24,21 @@ public class SourceExecutionService {
   private record Version(String id, int version) {}
 
   private final SourceRepository repository;
+  private final SourceVersions versions;
   private final SourceAdapters adapters;
   private final JsonPointerExtractor extractor;
 
   /**
-   * Frozen pinned versions kept between requests. A version is immutable and a source is never
-   * deleted, so a cached copy stays right for the life of the process; the bounds keep large lookup
-   * tables from filling the heap, and a missing version is never stored. Each request still
-   * snapshots one configuration per version in its {@link Session}.
+   * Pinned versions come from the frozen {@link SourceVersions}, and each request still snapshots
+   * one configuration per version in its {@link Session}.
    */
-  private final BoundedCache<Version, DataSource> versions =
-      new BoundedCache<>(256, 16L * 1024 * 1024);
-
   public SourceExecutionService(
-      SourceRepository repository, SourceAdapters adapters, JsonPointerExtractor extractor) {
+      SourceRepository repository,
+      SourceVersions versions,
+      SourceAdapters adapters,
+      JsonPointerExtractor extractor) {
     this.repository = repository;
+    this.versions = versions;
     this.adapters = adapters;
     this.extractor = extractor;
   }
@@ -68,23 +67,8 @@ public class SourceExecutionService {
 
     /** One stored configuration per request, shared by static validation and every read. */
     private DataSource source(String id, int version) {
-      return configurations.computeIfAbsent(new Version(id, version), ignored -> load(id, version));
-    }
-
-    /**
-     * The frozen copy of a version: from the process cache, else read once and frozen. Providers
-     * receive an unmodifiable copy, so no read can change what later reads see.
-     */
-    private DataSource load(String id, int version) {
-      var key = new Version(id, version);
-      DataSource cached = versions.get(key);
-      if (cached != null) return cached;
-      DataSource source = repository.get(id, version);
-      DataSource frozen =
-          new DataSource(
-              source.id(), source.name(), source.version(), source.definition().detached());
-      versions.put(key, frozen, weightOf(frozen));
-      return frozen;
+      return configurations.computeIfAbsent(
+          new Version(id, version), ignored -> versions.get(id, version));
     }
 
     @Override
@@ -94,31 +78,6 @@ public class SourceExecutionService {
       Object value = fetch(source(binding.id(), binding.version()), inputs, deadline);
       return extractor.extract(value, binding.pointer());
     }
-  }
-
-  /** An estimate of a version's retained size: its entries, headers, URL and parameters. */
-  private static long weightOf(DataSource source) {
-    SourceDefinition definition = source.definition();
-    long weight = 256L + definition.parameters().size() * 128L;
-    if (definition.url() != null) weight += definition.url().length() * 2L;
-    return weight + weightOf(definition.entries()) + weightOf(definition.secretHeaders());
-  }
-
-  private static long weightOf(Object value) {
-    if (value == null) return 8;
-    if (value instanceof String text) return 16L + text.length() * 2L;
-    if (value instanceof Map<?, ?> map) {
-      long weight = 32;
-      for (var entry : map.entrySet())
-        weight += weightOf(entry.getKey()) + weightOf(entry.getValue());
-      return weight;
-    }
-    if (value instanceof Iterable<?> items) {
-      long weight = 32;
-      for (Object item : items) weight += weightOf(item);
-      return weight;
-    }
-    return 16;
   }
 
   private Object fetch(DataSource source, Map<String, Object> inputs, ExecutionDeadline deadline) {

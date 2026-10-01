@@ -56,6 +56,34 @@ class ExecutionPlansTest {
     assertThat(validator.compilations).isEqualTo(2);
   }
 
+  /**
+   * A published plan keeps the verdict of its contract check until its rule is forgotten; a draft
+   * and a session that started before a deletion never store one.
+   */
+  @Test
+  void aVerdictLastsAsLongAsItsCachedPlan() {
+    var plans = new ExecutionPlans(new Validator(), json);
+    var checks = new int[1];
+    Runnable check = () -> checks[0]++;
+    for (int request = 0; request < 3; request++) {
+      var session = session(plans);
+      session.prepare("rule", 1, () -> graph("1"));
+      session.verifyOnce("rule", 1, check);
+      session.verifyOnce("preview", null, check);
+    }
+    assertThat(checks[0]).isEqualTo(1 + 3);
+
+    var beforeDeletion = session(plans);
+    plans.forget("rule");
+    beforeDeletion.prepare("rule", 1, () -> graph("2"));
+    beforeDeletion.verifyOnce("rule", 1, check);
+    var afterDeletion = session(plans);
+    afterDeletion.prepare("rule", 1, () -> graph("2"));
+    afterDeletion.verifyOnce("rule", 1, check);
+    afterDeletion.verifyOnce("rule", 1, check);
+    assertThat(checks[0]).isEqualTo(4 + 2);
+  }
+
   @Test
   void publishedPinsAreVersionedAndDoNotRetainMutableCallerCollections() {
     var validator = new CountingValidator();

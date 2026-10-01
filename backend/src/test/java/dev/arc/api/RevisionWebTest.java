@@ -59,7 +59,8 @@ class RevisionWebTest {
 
   @Test
   void aSaveOrPublicationWithoutARevisionIsInvalidRatherThanStale() throws Exception {
-    when(rules.lock("rates")).thenReturn(rule());
+    when(rules.lockForSave("rates")).thenReturn(4);
+    when(rules.lockForPublication("rates")).thenReturn(rule());
     when(sources.lock("country-tax")).thenReturn(2);
     String draft = new ObjectMapper().writeValueAsString(RuleSamples.blank(RuleKind.FORMULA));
     String lookup = "{\"kind\":\"LOOKUP\",\"parameters\":[],\"entries\":{},\"timeoutMs\":3000}";

@@ -317,6 +317,8 @@ final class GraphExecution {
       if (outputs.isEmpty()) throw ArcException.invalid("Execution did not reach an Output node");
       if (outputs.size() == 1) {
         ReachedOutput output = outputs.values().iterator().next();
+        // The evaluation bounded the value; only a name wraps it in another level and field.
+        if (output.node().outputFieldName() == null) return output.value();
         try {
           return Expressions.bounded(namedOutput(output.node(), output.value()));
         } catch (ArcException error) {

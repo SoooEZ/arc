@@ -114,14 +114,16 @@ class JdbcRuleRepositoryTest {
               statements.add(call.getArgument(0));
               return List.of();
             });
-    assertThatThrownBy(() -> repository.lock("a")).hasMessage("Rule not found: a");
+    assertThatThrownBy(() -> repository.lockForSave("a")).hasMessage("Rule not found: a");
+    assertThatThrownBy(() -> repository.lockForPublication("a")).hasMessage("Rule not found: a");
     assertThatThrownBy(() -> repository.lockForDeletion("a")).hasMessage("Rule not found: a");
     repository.lockCallees(List.of("b", "a"));
     repository.lockCallees(List.of());
     assertThat(statements)
         .containsExactly(
+            "SELECT revision FROM rules WHERE id = ? FOR NO KEY UPDATE",
             "SELECT * FROM rules WHERE id = ? FOR NO KEY UPDATE",
-            "SELECT * FROM rules WHERE id = ? FOR UPDATE",
+            "SELECT revision FROM rules WHERE id = ? FOR UPDATE",
             "SELECT id FROM rules WHERE id = ANY (?) ORDER BY id FOR KEY SHARE");
   }
 
@@ -161,10 +163,41 @@ class JdbcRuleRepositoryTest {
         .thenReturn(List.of(mock(dev.arc.model.Rule.class)));
     repository.update("a", "A", "", null);
     verify(jdbc)
-        .update(
+        .query(
             eq(
                 "UPDATE rules SET name = ?, description = ?, draft = ?::jsonb, revision ="
-                    + " nextval('rule_revisions'), updated_at = now() WHERE id = ?"),
+                    + " nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING *"),
+            any(RowMapper.class),
+            any(Object[].class));
+  }
+
+  /**
+   * A save reads its draft once, from the row its write returns. The lock decoded the stored draft
+   * only to compare revisions, and a second statement read the row back after each write.
+   */
+  @Test
+  void writesReturnTheirRowAndASaveLockReadsOnlyTheRevision() {
+    var statements = new ArrayList<String>();
+    var stored = mock(dev.arc.model.Rule.class);
+    when(stored.id()).thenReturn("a");
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              String statement = call.getArgument(0);
+              statements.add(statement);
+              return statement.startsWith("SELECT revision") ? List.of(7) : List.of(stored);
+            });
+
+    assertThat(repository.lockForSave("a")).isEqualTo(7);
+    assertThat(repository.update("a", "A", "", null)).isSameAs(stored);
+    assertThat(repository.create("a", "A", "", "RULE", null)).isSameAs(stored);
+    assertThat(repository.publish(stored)).isSameAs(stored);
+
+    assertThat(statements).hasSize(4).noneMatch(statement -> statement.startsWith("SELECT *"));
+    assertThat(statements.subList(1, 4)).allMatch(statement -> statement.endsWith(" RETURNING *"));
+    verify(jdbc)
+        .update(
+            eq("INSERT INTO rule_versions (rule_id, version, definition) VALUES (?, ?, ?::jsonb)"),
             any(Object[].class));
   }
 

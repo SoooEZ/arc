@@ -30,7 +30,10 @@ class SourceExecutionServiceTest {
     when(adapter.kind()).thenReturn("MEMORY");
     execution =
         new SourceExecutionService(
-            repository, new SourceAdapters(List.of(adapter)), new JsonPointerExtractor());
+            repository,
+            new SourceVersions(repository),
+            new SourceAdapters(List.of(adapter)),
+            new JsonPointerExtractor());
   }
 
   @Test
@@ -140,7 +143,10 @@ class SourceExecutionServiceTest {
     when(repository.get("table", 1)).thenReturn(new DataSource("table", "Table", 1, definition));
     var service =
         new SourceExecutionService(
-            repository, new SourceAdapters(List.of(table)), new JsonPointerExtractor());
+            repository,
+            new SourceVersions(repository),
+            new SourceAdapters(List.of(table)),
+            new JsonPointerExtractor());
     var deadline = ExecutionDeadline.start(1000);
 
     Object value =
@@ -240,7 +246,7 @@ class SourceExecutionServiceTest {
             blank.nodes(),
             blank.edges());
     var session = execution.openSession();
-    new SourceBindingValidator(repository)
+    new SourceBindingValidator(new SourceVersions(repository))
         .validateForExecution(definition, (id, version) -> null, session::definition);
 
     assertThat(session.read(binding, Map.of(), ExecutionDeadline.start(1000))).isEqualTo(10);

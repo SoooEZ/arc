@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -63,8 +64,10 @@ class ResourceErrorsTest {
 
   @Test
   void aTakenIdIsAConflictAboutTheResourceBeingCreated() throws Exception {
-    when(jdbc.update(anyString(), any(Object[].class)))
-        .thenThrow(new DuplicateKeyException("duplicate key value violates unique constraint"));
+    var duplicate = new DuplicateKeyException("duplicate key value violates unique constraint");
+    when(jdbc.update(anyString(), any(Object[].class))).thenThrow(duplicate);
+    // A rule's insert returns its row.
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenThrow(duplicate);
 
     mvc.perform(
             post("/api/sources")

@@ -27,13 +27,15 @@ class RuleExecutionServiceTest {
   private final SourceRepository sources = mock(SourceRepository.class);
   private final CountingValidator validator = new CountingValidator();
   private final ObjectMapper json = new ObjectMapper();
+  private final SourceVersions versions = new SourceVersions(sources);
+  private final Engine engine = new Engine(validator, json);
   private final RuleExecutionService service =
       new RuleExecutionService(
           rules,
-          new RuleDefinitionService(validator, rules, new SourceBindingValidator(sources)),
-          new Engine(validator, json),
+          new RuleDefinitionService(validator, rules, new SourceBindingValidator(versions), engine),
+          engine,
           new SourceExecutionService(
-              sources, new SourceAdapters(List.of()), new JsonPointerExtractor()));
+              sources, versions, new SourceAdapters(List.of()), new JsonPointerExtractor()));
 
   private static class CountingValidator extends Validator {
     int compilations;
@@ -109,6 +111,40 @@ class RuleExecutionServiceTest {
                     .isEqualTo("Published rule version not found: rule v9");
               });
     verify(rules, times(2)).resolve("rule", 9);
+  }
+
+  /**
+   * A published version, the pins it reaches and their source versions are immutable while it
+   * lives, so its source contracts are checked once with its cached plan: every execution read each
+   * reached pin again for the check, although the plans were cached.
+   */
+  @Test
+  void aCachedPublishedPlanChecksItsSourceContractsOnce() {
+    var child =
+        new Definition(
+            1,
+            List.of(),
+            List.of(inputNode("in", "Input"), outputNode("o", "O", "2")),
+            List.of(new Edge("next", "in", "o", "next")));
+    var parent =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                inputNode("input", "Inputs"),
+                nodeOf("ref", "REFERENCE", "Ref").rule("child", 1).output("r").build(),
+                outputNode("out", "Out", "r")),
+            List.of(new Edge("a", "input", "ref", "next"), new Edge("b", "ref", "out", "next")));
+    when(rules.resolve("parent", 1)).thenReturn(parent);
+    when(rules.resolve("child", 1)).thenReturn(child);
+    for (int request = 0; request < 3; request++)
+      assertThat(service.execute("parent", new Execution(Map.of(), 1)).execution().result())
+          .isEqualTo(java.math.BigDecimal.valueOf(2));
+    verify(rules, times(1)).resolve("parent", 1);
+    verify(rules, times(1)).resolve("child", 1);
+    // A preview has no cached plan and is checked every time.
+    service.preview(new Preview(parent, Map.of()));
+    verify(rules, times(2)).resolve("child", 1);
   }
 
   @Test

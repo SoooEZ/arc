@@ -98,7 +98,8 @@ class RuleServiceTest {
 
   @Test
   void staleEditsNeverWriteOrPublish() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForSave("example")).thenReturn(draft.revision());
+    when(repository.lockForPublication("example")).thenReturn(draft);
     assertThatThrownBy(
             () -> service.update("example", new RuleService.Update("New", "", 2, draft.draft())))
         .isInstanceOf(ArcException.class)
@@ -112,7 +113,7 @@ class RuleServiceTest {
 
   @Test
   void invalidPublicationNeverPersistsAVersion() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForPublication("example")).thenReturn(draft);
     doThrow(ArcException.invalid("Missing source mapping"))
         .when(definitions)
         .validate(draft.draft());
@@ -123,11 +124,11 @@ class RuleServiceTest {
 
   @Test
   void publicationLocksAndValidatesBeforeSnapshotting() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForPublication("example")).thenReturn(draft);
     when(repository.publish(draft)).thenReturn(draft);
     assertThat(service.publish("example", 3)).isSameAs(draft);
     var order = inOrder(repository, definitions);
-    order.verify(repository).lock("example");
+    order.verify(repository).lockForPublication("example");
     order.verify(definitions).validate(draft.draft());
     order.verify(repository).publish(draft);
   }
@@ -146,7 +147,7 @@ class RuleServiceTest {
 
   @Test
   void invalidResultNamesNeverCreateOrUpdateADraft() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForSave("example")).thenReturn(draft.revision());
     for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE")) {
       for (String name : List.of("unit price", "$value", "@value")) {
         var invalid =
@@ -185,7 +186,7 @@ class RuleServiceTest {
    */
   @Test
   void aRuleThatOnlyMentionsTheDeletedOneDoesNotKeepIt() {
-    when(repository.lockForDeletion("example")).thenReturn(draft);
+    when(repository.lockForDeletion("example")).thenReturn(draft.revision());
     when(repository.definitionsMentioning("example"))
         .thenReturn(
             List.of(
@@ -201,7 +202,7 @@ class RuleServiceTest {
 
   @Test
   void aRuleThatOtherRulesCallIsKeptAndEveryCallerIsNamed() {
-    when(repository.lockForDeletion("example")).thenReturn(draft);
+    when(repository.lockForDeletion("example")).thenReturn(draft.revision());
     Node reference = nodeOf("tax", "REFERENCE", "Tax").rule("example", 1).output("tax").build();
     when(repository.definitionsMentioning("example"))
         .thenReturn(
@@ -225,7 +226,7 @@ class RuleServiceTest {
 
   @Test
   void aLongCallerListNamesTheFirstFiveAndCountsTheRest() {
-    when(repository.lockForDeletion("example")).thenReturn(draft);
+    when(repository.lockForDeletion("example")).thenReturn(draft.revision());
     var callers = new ArrayList<StoredDefinition>();
     for (String id : List.of("a", "b", "c", "d", "e", "f", "g"))
       callers.add(new StoredDefinition(id, 1, returning("@example:1()")));
@@ -249,7 +250,7 @@ class RuleServiceTest {
   /** A rule published or replaced since the client read it is kept, as a stale save would be. */
   @Test
   void aDeletionWithAStaleRevisionIsRefusedBeforeAnythingIsRead() {
-    when(repository.lockForDeletion("example")).thenReturn(draft);
+    when(repository.lockForDeletion("example")).thenReturn(draft.revision());
     assertThatThrownBy(() -> service.delete("example", 2))
         .isInstanceOfSatisfying(
             ArcException.class,
@@ -273,7 +274,7 @@ class RuleServiceTest {
    */
   @Test
   void unfinishedDraftsKeepTheRulesTheyName() {
-    when(repository.lockForDeletion("example")).thenReturn(draft);
+    when(repository.lockForDeletion("example")).thenReturn(draft.revision());
     Node unpinned = nodeOf("tax", "REFERENCE", "Tax").rule("example", null).output("tax").build();
     var sourced =
         new Definition(
@@ -307,12 +308,13 @@ class RuleServiceTest {
     var calling = graphWith(reference);
     var callingDraft =
         new Rule("example", "Example", "", "RULE", calling, 3, null, Instant.EPOCH, Instant.EPOCH);
-    when(repository.lock("example")).thenReturn(callingDraft);
+    when(repository.lockForPublication("example")).thenReturn(callingDraft);
+    when(repository.lockForSave("example")).thenReturn(callingDraft.revision());
     when(repository.publish(callingDraft)).thenReturn(callingDraft);
 
     service.publish("example", 3);
     var publication = inOrder(repository, definitions);
-    publication.verify(repository).lock("example");
+    publication.verify(repository).lockForPublication("example");
     publication.verify(repository).lockCallees(Set.of("callee"));
     publication.verify(definitions).validate(calling);
     publication.verify(repository).publish(callingDraft);
@@ -330,7 +332,7 @@ class RuleServiceTest {
 
   @Test
   void namesAreStoredTrimmedAndNeverMadeOfControlCharacters() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForSave("example")).thenReturn(draft.revision());
     service.create(new RuleService.Create("padded", "  Padded  ", "", "FORMULA", null));
     verify(repository).create(eq("padded"), eq("Padded"), eq(""), eq("FORMULA"), any());
     // Padding no longer counts toward the limit of the stored name.
@@ -363,7 +365,7 @@ class RuleServiceTest {
 
   @Test
   void notesAreStoredAsSingleTrimmedLinesAndBoundedAfterwards() {
-    when(repository.lock("example")).thenReturn(draft);
+    when(repository.lockForSave("example")).thenReturn(draft.revision());
     var base = draft.draft();
     var noted =
         new Definition(

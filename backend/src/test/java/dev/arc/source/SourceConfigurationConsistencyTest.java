@@ -34,7 +34,8 @@ class SourceConfigurationConsistencyTest {
   private final SourceService service =
       new SourceService(repository, new SourceValidator(adapters));
   private final SourceExecutionService execution =
-      new SourceExecutionService(repository, adapters, new JsonPointerExtractor());
+      new SourceExecutionService(
+          repository, new SourceVersions(repository), adapters, new JsonPointerExtractor());
   private final SourceBinding binding = new SourceBinding("tax", 1, Map.of(), "/rate", "FAIL");
 
   @Test

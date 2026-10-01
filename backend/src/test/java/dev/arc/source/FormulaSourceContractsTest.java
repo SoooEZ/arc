@@ -55,7 +55,7 @@ class FormulaSourceContractsTest {
             return child;
           }
         };
-    var validator = new SourceBindingValidator(repository);
+    var validator = new SourceBindingValidator(new SourceVersions(repository));
     var callerSource = new SourceDefinition("LOOKUP", null, List.of(), Map.of(), null, 0);
     when(repository.get("caller", 1))
         .thenReturn(new DataSource("caller", "Caller", 1, callerSource));
@@ -95,6 +95,8 @@ class FormulaSourceContractsTest {
                     .contains(new ArcException.Location("child", 1, "in", "Input"));
               });
     }
-    verify(repository, times(2)).get("remote", 1);
+    // Both checks read the child's source configuration, never its values: once, since the
+    // version is frozen for the process.
+    verify(repository, times(1)).get("remote", 1);
   }
 }

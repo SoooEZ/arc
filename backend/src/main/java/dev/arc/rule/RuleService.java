@@ -99,8 +99,7 @@ public class RuleService {
 
   @Transactional
   public Rule update(String id, Update request) {
-    Rule rule = store.lock(id);
-    revision(rule, request.revision());
+    requireRevision(store.lockForSave(id), request.revision());
     String name = DisplayNames.normalize("Rule", request.name());
     description(request.description());
     Definition d = withNormalizedNotes(request.definition());
@@ -111,8 +110,8 @@ public class RuleService {
 
   @Transactional
   public Rule publish(String id, Integer revision) {
-    Rule rule = store.lock(id);
-    revision(rule, revision);
+    Rule rule = store.lockForPublication(id);
+    requireRevision(rule.revision(), revision);
     holdCallees(rule.draft());
     definitions.validate(rule.draft());
     return store.publish(rule);
@@ -128,8 +127,8 @@ public class RuleService {
   public void delete(String id, Integer revision) {
     // A missing rule is a 404. The lock waits for every writer of this rule and of the rules
     // calling it, so the caller scan below sees each committed caller.
-    Rule rule = store.lockForDeletion(id);
-    if (revision != null) revision(rule, revision);
+    int current = store.lockForDeletion(id);
+    if (revision != null) requireRevision(current, revision);
     List<String> callers = callersOf(id);
     if (!callers.isEmpty())
       throw new ArcException(
@@ -194,9 +193,9 @@ public class RuleService {
    * A missing revision is a malformed request (422), not a stale one: read as 0 it answered 409
    * however often the client reloaded. A deletion leaves the check out when it names no revision.
    */
-  private void revision(Rule rule, Integer revision) {
-    if (revision == null) throw ArcException.invalid("Revision is required");
-    if (rule.revision() != revision)
+  private static void requireRevision(int current, Integer read) {
+    if (read == null) throw ArcException.invalid("Revision is required");
+    if (current != read)
       throw new ArcException(
           409,
           "This rule changed in another editor. Reload it before saving, publishing or deleting.");

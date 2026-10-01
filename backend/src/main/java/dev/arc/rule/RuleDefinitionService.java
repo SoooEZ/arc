@@ -2,6 +2,7 @@ package dev.arc.rule;
 
 import dev.arc.engine.MemoizingRuleResolver;
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.execution.Engine;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
 import dev.arc.engine.validation.Validator;
@@ -9,6 +10,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.NodeKind;
 import dev.arc.source.SourceBindingValidator;
+import dev.arc.source.SourceBindingValidator.CalleeCheck;
 import dev.arc.source.SourceConfigurations;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +34,14 @@ public class RuleDefinitionService {
   private final Validator validator;
   private final RuleResolver rules;
   private final SourceBindingValidator sources;
+  private final Engine engine;
 
   public RuleDefinitionService(
-      Validator validator, RuleRepository rules, SourceBindingValidator sources) {
+      Validator validator, RuleRepository rules, SourceBindingValidator sources, Engine engine) {
     this.validator = validator;
     this.rules = rules;
     this.sources = sources;
+    this.engine = engine;
   }
 
   public void validate(Definition definition) {
@@ -55,16 +59,20 @@ public class RuleDefinitionService {
   }
 
   public void validate(Definition definition, RuleResolver resolver) {
+    CalleeCheck callees = calleesCompile(resolver);
     validator.validate(definition, resolver);
-    sources.validatePinnedContracts(definition, resolver, this::prepareCallee);
+    sources.validatePinnedContracts(definition, resolver, callees);
   }
 
   /**
    * A reached pin's version must still compile: one holding a property its kind does not use, or an
-   * unprefixed call, passed every static check and then failed every execution of the parent.
+   * unprefixed call, passed every static check and then failed every execution of the parent. The
+   * engine's plans answer it, so a version is compiled once per process for checks and executions.
+   * Create it before the check reads a pin ({@link Engine#checkSession}).
    */
-  private void prepareCallee(Definition callee, RuleResolver resolver) {
-    validator.compile(callee, resolver);
+  private CalleeCheck calleesCompile(RuleResolver resolver) {
+    var plans = engine.checkSession(resolver);
+    return (ruleId, version, callee) -> plans.prepare(ruleId, version, () -> callee);
   }
 
   /** Execution's source-contract check, over the request session's configuration snapshot. */
@@ -85,12 +93,12 @@ public class RuleDefinitionService {
    */
   public List<Validator.Problem> diagnostics(Definition definition) {
     var resolver = new MemoizingRuleResolver(rules);
+    CalleeCheck callees = calleesCompile(resolver);
     var diagnosis = validator.diagnose(definition, resolver);
     var problems = new ArrayList<>(diagnosis.problems());
     if (diagnosis.shaped() && hasOneInputNode(definition)) {
       try {
-        sources.validateRemainingPins(
-            definition, resolver, diagnosis.dependencies(), this::prepareCallee);
+        sources.validateRemainingPins(definition, resolver, diagnosis.dependencies(), callees);
       } catch (ArcException error) {
         problems.add(Validator.Problem.from(error));
       }

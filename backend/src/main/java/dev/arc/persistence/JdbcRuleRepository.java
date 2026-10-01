@@ -189,7 +189,12 @@ public class JdbcRuleRepository implements RuleRepository {
    * deadlock.
    */
   @Override
-  public Rule lock(String id) {
+  public int lockForSave(String id) {
+    return lockedRevision(id, " FOR NO KEY UPDATE");
+  }
+
+  @Override
+  public Rule lockForPublication(String id) {
     return find(id, " FOR NO KEY UPDATE");
   }
 
@@ -197,8 +202,19 @@ public class JdbcRuleRepository implements RuleRepository {
    * Conflicts with every lock, including the KEY SHARE locks of a caller being saved or published.
    */
   @Override
-  public Rule lockForDeletion(String id) {
-    return find(id, " FOR UPDATE");
+  public int lockForDeletion(String id) {
+    return lockedRevision(id, " FOR UPDATE");
+  }
+
+  /** The revision of a locked rule; its draft, which may be large, is not read. */
+  private int lockedRevision(String id, String lock) {
+    var rows =
+        jdbc.query(
+            "SELECT revision FROM rules WHERE id = ?" + lock,
+            (row, index) -> row.getInt("revision"),
+            id);
+    if (rows.isEmpty()) throw notFound(id);
+    return rows.getFirst();
   }
 
   /**
@@ -239,8 +255,9 @@ public class JdbcRuleRepository implements RuleRepository {
       String id, String name, String description, String kind, Definition definition) {
     StoredText.requireStorable(name, description);
     try {
-      jdbc.update(
-          "INSERT INTO rules (id, name, description, kind, draft) VALUES (?, ?, ?, ?, ?::jsonb)",
+      return written(
+          id,
+          "INSERT INTO rules (id, name, description, kind, draft) VALUES (?, ?, ?, ?, ?::jsonb) RETURNING *",
           id,
           name,
           description,
@@ -249,19 +266,18 @@ public class JdbcRuleRepository implements RuleRepository {
     } catch (DuplicateKeyException duplicate) {
       throw new ArcException(409, "This rule ID already exists");
     }
-    return get(id);
   }
 
   @Override
   public Rule update(String id, String name, String description, Definition definition) {
     StoredText.requireStorable(name, description);
-    jdbc.update(
-        "UPDATE rules SET name = ?, description = ?, draft = ?::jsonb, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ?",
+    return written(
+        id,
+        "UPDATE rules SET name = ?, description = ?, draft = ?::jsonb, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING *",
         name,
         description,
         encode(definition),
         id);
-    return get(id);
   }
 
   @Override
@@ -272,11 +288,21 @@ public class JdbcRuleRepository implements RuleRepository {
         rule.id(),
         version,
         encode(rule.draft()));
-    jdbc.update(
-        "UPDATE rules SET published_version = ?, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ?",
+    return written(
+        rule.id(),
+        "UPDATE rules SET published_version = ?, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING *",
         version,
         rule.id());
-    return get(rule.id());
+  }
+
+  /**
+   * The row a write returns, as stored: the response carries the draft PostgreSQL holds (JSONB
+   * orders object keys its own way), without a second statement to read it back.
+   */
+  private Rule written(String id, String statement, Object... arguments) {
+    var rows = jdbc.query(statement, ruleMapper, arguments);
+    if (rows.isEmpty()) throw notFound(id);
+    return rows.getFirst();
   }
 
   @Override

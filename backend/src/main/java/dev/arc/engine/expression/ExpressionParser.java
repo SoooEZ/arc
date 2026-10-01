@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
 import dev.arc.engine.Identifiers;
 import dev.arc.engine.Limits;
+import dev.arc.engine.expression.Expressions.BoundedExpr;
 import dev.arc.engine.expression.Expressions.Expr;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
@@ -106,7 +107,8 @@ final class ExpressionParser {
     if (token.equals("<end>")) throw ArcException.invalid("Incomplete expression");
     if (token.equals("[")) {
       List<Expr> items = arguments("]");
-      return context -> bounded(items.stream().map(item -> item.eval(context)).toList());
+      return (BoundedExpr)
+          context -> bounded(items.stream().map(item -> item.eval(context)).toList());
     }
     if (token.equals("(")) {
       Expr nested = parse(0);
@@ -172,7 +174,10 @@ final class ExpressionParser {
     if (collection != null) return collectionCall(collection);
     List<Expr> arguments = arguments(")");
     Functions.arity(name, arguments.size());
-    return context -> ExpressionRuntime.function(name, arguments, context);
+    // A lazy function returns one argument's value as it is; any other bounds its result.
+    if (ExpressionRuntime.lazyFunctionNames().contains(name))
+      return context -> ExpressionRuntime.function(name, arguments, context);
+    return (BoundedExpr) context -> ExpressionRuntime.function(name, arguments, context);
   }
 
   private Expr formulaCall(String token) {
@@ -225,9 +230,10 @@ final class ExpressionParser {
     expect(")");
     String accumulatorName = accumulator;
     Expr initialValue = initial;
-    return context ->
-        ExpressionRuntime.collection(
-            function, collection, local, accumulatorName, initialValue, body, context);
+    return (BoundedExpr)
+        context ->
+            ExpressionRuntime.collection(
+                function, collection, local, accumulatorName, initialValue, body, context);
   }
 
   private List<Expr> arguments(String closingToken) {

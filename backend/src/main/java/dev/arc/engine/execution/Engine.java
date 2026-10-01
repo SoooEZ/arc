@@ -58,6 +58,17 @@ public class Engine {
     return new Session(resolver, deadline, true);
   }
 
+  /**
+   * Plans for a static check of pinned callees (validate, diagnostics, publish), shared with
+   * executions: a version that an execution or an earlier check compiled is not compiled again, and
+   * one compiled here is ready for them. Start it before the check reads a pin, as an execution
+   * starts its session, so a deletion during the check keeps what it compiled out of the cache. A
+   * check has no deadline of its own and is allowed the longest execution budget.
+   */
+  public Session checkSession(RuleResolver resolver) {
+    return session(resolver, ExecutionDeadline.start(ExecutionDeadline.MAX_TIMEOUT_MS));
+  }
+
   /** Drops the cached plans of a deleted rule. Call it after the deletion commits. */
   public void forget(String ruleId) {
     plans.forget(ruleId);
@@ -80,6 +91,14 @@ public class Engine {
      */
     public CompiledGraph prepare(String id, Integer version, Supplier<Definition> definition) {
       return prepared.prepare(id, version, definition);
+    }
+
+    /**
+     * Runs {@code check}, such as the source-contract walk of a prepared root, unless it already
+     * passed for this published version's cached plan; a draft (null version) is always checked.
+     */
+    public void verifyOnce(String id, Integer version, Runnable check) {
+      prepared.verifyOnce(id, version, check);
     }
 
     /** Runs a rule with this session's plans, which its nested calls share. */

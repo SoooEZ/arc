@@ -22,6 +22,15 @@ public final class Expressions {
     Object eval(ExpressionRuntime.Context context);
   }
 
+  /**
+   * An expression that bounds its own result: a list literal, a collection function or a function
+   * that is not lazy. {@link Compiled#evaluate} does not walk that result a second time. Variables,
+   * lazy functions and Formula calls return a value as it is, such as a Reference's aggregate
+   * (lesson B19), so an expression with such a root is bounded by the evaluation.
+   */
+  @FunctionalInterface
+  interface BoundedExpr extends Expr {}
+
   public record FormulaCall(String id, int version, int argumentCount) {}
 
   /**
@@ -75,7 +84,11 @@ public final class Expressions {
     public Object evaluate(
         Map<String, Object> scope, ExecutionDeadline deadline, FormulaCaller formulas) {
       return deadline.within(
-          () -> bounded(expression.eval(new ExpressionRuntime.Context(scope, deadline, formulas))));
+          () -> {
+            var context = new ExpressionRuntime.Context(scope, deadline, formulas);
+            Object value = expression.eval(context);
+            return expression instanceof BoundedExpr ? value : bounded(value);
+          });
     }
   }
 

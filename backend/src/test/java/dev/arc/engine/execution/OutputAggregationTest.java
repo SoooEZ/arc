@@ -192,4 +192,56 @@ class OutputAggregationTest {
                 + " node other OUTPUT \"Other\" { return null; }");
     assertThatThrownBy(() -> run(unbounded)).hasMessageContaining("collection depth or size limit");
   }
+
+  /**
+   * A Reference stores its callee's aggregate as returned (lesson B19). An unnamed Output that
+   * returns such a value, whole or through a lazy function or a Formula call, is bounded where its
+   * expression is evaluated, so the result needs no second walk.
+   */
+  @Test
+  void anUnnamedOutputStillBoundsAnAggregateItPassesThrough() {
+    var child = new StringBuilder("inputs { items: ARRAY required; } node input INPUT \"Input\" {");
+    for (int field = 0; field <= 10; field++) child.append(" next -> o").append(field).append(';');
+    child.append(" }");
+    for (int field = 0; field <= 10; field++)
+      child.append(
+          " node o%d OUTPUT \"O%d\" { return items; as f%d; }".formatted(field, field, field));
+    var callee = script.parse(child.toString());
+    var children =
+        new RuleResolver() {
+          @Override
+          public Definition resolve(String id, int version) {
+            return callee;
+          }
+
+          @Override
+          public Definition resolveFormula(String id, int version) {
+            return callee;
+          }
+        };
+    var items = new ArrayList<Object>();
+    for (int index = 0; index < 1000; index++)
+      items.add(Map.of("n", BigDecimal.valueOf(index), "name", "item", "price", BigDecimal.TEN));
+    for (String root : List.of("bundle", "$IF(true, bundle, null)", "@child:1(items)")) {
+      var parent =
+          script.parse(
+              "inputs { items: ARRAY required; }"
+                  + " node input INPUT \"Input\" { next -> bundle; }"
+                  + " node bundle REFERENCE \"Bundle\" { use \"child\" version 1;"
+                  + " bind items = items; as bundle; next -> out; }"
+                  + " node out OUTPUT \"Out\" { return "
+                  + root
+                  + "; }");
+      assertThatThrownBy(
+              () -> engine.execute("parent", 1, parent, Map.of("items", items), children))
+          .as(root)
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.getMessage()).contains("collection depth or size limit");
+                assertThat(error.locations())
+                    .containsExactly(new ArcException.Location("parent", 1, "out", "Out"));
+              });
+    }
+  }
 }

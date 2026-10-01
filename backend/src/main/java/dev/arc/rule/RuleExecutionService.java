@@ -103,11 +103,16 @@ public class RuleExecutionService {
     var execution = engine.session(resolver, deadline);
     try {
       var prepared = execution.prepare(id, version, definition);
-      definitions.validateSources(
-          prepared.definition(),
-          resolver,
-          (sourceId, sourceVersion) ->
-              deadline.within(() -> sourceSession.definition(sourceId, sourceVersion)));
+      // A cached published plan keeps its verdict: its pins and source versions are immutable.
+      execution.verifyOnce(
+          id,
+          version,
+          () ->
+              definitions.validateSources(
+                  prepared.definition(),
+                  resolver,
+                  (sourceId, sourceVersion) ->
+                      deadline.within(() -> sourceSession.definition(sourceId, sourceVersion))));
     } catch (ArcException error) {
       // A published version names itself in its root location, as its runtime failures do; a
       // preview (null version) keeps the shown graph's locations unnamed.

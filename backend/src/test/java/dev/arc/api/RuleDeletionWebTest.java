@@ -15,15 +15,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
-import dev.arc.model.Rule;
-import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
 import dev.arc.rule.RuleRepository.StoredDefinition;
-import dev.arc.rule.RuleSamples;
 import dev.arc.rule.RuleService;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -48,7 +44,7 @@ class RuleDeletionWebTest {
    */
   @Test
   void aStaleRevisionIsAConflictAndTheCurrentOneDeletes() throws Exception {
-    when(rules.lockForDeletion("rates")).thenReturn(rule("rates", 4));
+    when(rules.lockForDeletion("rates")).thenReturn(4);
     mvc.perform(delete("/api/rules/rates").param("revision", "3"))
         .andExpect(status().isConflict())
         .andExpect(
@@ -60,19 +56,6 @@ class RuleDeletionWebTest {
     mvc.perform(delete("/api/rules/rates").param("revision", "4"))
         .andExpect(status().isNoContent());
     verify(rules).delete("rates");
-  }
-
-  private static Rule rule(String id, int revision) {
-    return new Rule(
-        id,
-        "Rates",
-        "",
-        "FORMULA",
-        RuleSamples.blank(RuleKind.FORMULA),
-        revision,
-        null,
-        Instant.EPOCH,
-        Instant.EPOCH);
   }
 
   @Test

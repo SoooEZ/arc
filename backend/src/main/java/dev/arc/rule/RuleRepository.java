@@ -34,13 +34,20 @@ public interface RuleRepository extends RuleResolver {
   Integer publishedVersion(String id);
 
   /**
-   * Locks a rule for a save or publication. The lock excludes other writers of the rule but not the
-   * rules that call it, which only hold it against deletion ({@link #lockCallees}).
+   * Locks a rule for a save and returns its revision without reading its draft. The lock excludes
+   * other writers of the rule but not the rules that call it, which only hold it against deletion
+   * ({@link #lockCallees}).
    */
-  Rule lock(String id);
+  int lockForSave(String id);
 
-  /** Locks a rule for deletion, which waits for every writer of a rule that calls it. */
-  Rule lockForDeletion(String id);
+  /** Locks a rule for a publication, as {@link #lockForSave} does, and reads the draft it needs. */
+  Rule lockForPublication(String id);
+
+  /**
+   * Locks a rule for deletion and returns its revision; the lock waits for every writer of a rule
+   * that calls it.
+   */
+  int lockForDeletion(String id);
 
   /**
    * Holds the rules a definition calls against deletion until the transaction ends, so a caller
@@ -49,7 +56,10 @@ public interface RuleRepository extends RuleResolver {
    */
   void lockCallees(Collection<String> ruleIds);
 
-  /** An ID that is already stored, including by a concurrent create, is a 409 conflict. */
+  /**
+   * An ID that is already stored, including by a concurrent create, is a 409 conflict. Each write
+   * returns the rule as stored, read by the write itself.
+   */
   Rule create(String id, String name, String description, String kind, Definition definition);
 
   Rule update(String id, String name, String description, Definition definition);
