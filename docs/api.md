@@ -1,6 +1,6 @@
 # HTTP API
 
-Base URL: `http://localhost:8080/api` (also proxied by the workspace at `http://localhost:3080/api`). Send JSON with `Content-Type: application/json`. No JWT is required in this release. Responses write decimal numbers in plain notation, for example `20` and `0.0000001`, never exponent forms such as `2E+1`. See [the behavior changes in this revision](#behavior-changes-in-this-revision) for results that differ from earlier releases.
+Base URL: `http://localhost:8080/api` (also proxied by the workspace at `http://localhost:3080/api`). Send JSON with `Content-Type: application/json`. No JWT is required in this release. Responses write decimal numbers in plain notation, for example `20` and `0.0000001`, never exponent forms such as `2E+1`. See [the behavior changes from the 2026-10-01 backend review](#behavior-changes-from-the-2026-10-01-backend-review), [from the second review](#behavior-changes-from-the-second-review) and [in this revision](#behavior-changes-in-this-revision) for results that differ from earlier releases.
 
 ## Execute
 
@@ -72,7 +72,7 @@ Data sources use the same page envelope and bounds: `GET /source-summaries?offse
 }
 ```
 
-Supply the most recently read `revision`. A successful save advances it. A stale revision returns `409`; fetch the current rule and reconcile before retrying. Drafts may be incomplete, but a node's `version` needs a `ruleId` and must be at least 1; other values return `422`.
+Supply the most recently read `revision`. A successful save advances it. A stale revision returns `409`; fetch the current rule and reconcile before retrying. A save or publication without a revision (or with `"revision": null`) returns `422` "Revision is required". Drafts may be incomplete, but a node's `version` needs a `ruleId` and must be at least 1; other values return `422`.
 
 ## Validate and preview
 
@@ -114,8 +114,10 @@ Revisions come from one sequence for all rules, so they advance but are not cons
 | --- | --- |
 | `400` | Malformed JSON or invalid request value |
 | `404` | Missing rule, source or version |
+| `405` | Method not supported by the path; the `Allow` header lists the supported ones |
 | `409` | Duplicate rule or source ID (`This rule ID already exists`, `This source ID already exists`), stale revision, execution of an unpublished rule, or deletion of a rule that other rules call |
 | `413` | Request body larger than 1 MiB, for any method or path |
+| `415` | Body media type the endpoint does not read, multipart included; the `Accept` header lists the supported ones |
 | `422` | Invalid graph, expression, input, or calculation; exhausted execution limit (steps, nesting, source reads, expression operations); text containing the NUL character (U+0000) or an unpaired UTF-16 surrogate, which storage cannot hold as written |
 | `500` | Unexpected internal error (details are logged, not exposed) |
 | `504` | Execution deadline exhausted, including across nested rules and source reads |
@@ -125,6 +127,46 @@ The current release has no batch endpoint, run-history storage, or authenticatio
 ## Code studio and external parameters
 
 See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults. Entries appear in read order: an input's source dependencies are read first, in declaration order.
+
+## Behavior changes from the 2026-10-01 backend review
+
+These changes shipped with [the 2026-10-01 backend review](reviews/2026-10-01-backend-review.md). Graph JSON, the ARC Script text of complete graphs, stored versions and pins are unchanged; results listed here changed because the earlier behavior was a defect.
+
+**Calculations**
+
+- A zero computed by an operator or a function keeps at most 100 decimal places instead of failing. `amount * (rate / 365) * (1/3) * (1/7)` returned `422` "Number exceeds supported precision or magnitude" only when `amount` was 0, and `$IFERROR` around it returned its fallback. A zero written with a larger scale is still refused.
+- A number whose scale is below −100, such as `100E+2147483647`, returns `422` "Number exceeds supported precision or magnitude" instead of `500`, as an input, a default, a literal, a lookup entry or a `$TO_NUMBER` result.
+- `$MODE` refuses more than 4,472 values with `422` "MODE compares every pair of values and accepts at most 4,472 values"; its pairwise comparison of 30 arrays of 9,801 cells held a thread for up to 29 s whatever the timeout.
+- The functions that read dates (`$DAY`, `$MONTH`, `$YEAR`, `$WEEKDAY`, `$HOUR`, `$MINUTE`, `$SECOND`, `$DATE`, `$TIME`, `$DATEVALUE`, `$DAYS360`, `$TIMEVALUE`, `$VALUE`, `$TEXT`) refuse date text without a year with `422` "NAME: date text needs a year, such as "15 Jan 2026"", because Apache POI completed it with the year the server started (`$DATEVALUE`: the current year). Date text is read in UTC with the en-US locale whatever the server's settings; `$DAY("1/15/2020")` was 14 on a host in Asia/Shanghai.
+- The argument limits of `$COMBIN`, `$FIXED`, `$DOLLAR`, `$TRUNC` and `$REPT` read numeric text, booleans and blanks as the function itself does: `$REPT("a", "3")` is `aaa` and `$TRUNC(x, null)` truncates to an integer, where both failed with "Expected a number".
+- `$TEXT` with three or more sections or a condition writes one exponent sign and keeps literal text: `1.50E+00`, not `1.50E++00`.
+- `$ERROR.TYPE` is reference-only (`422` "Unsupported function: ERROR.TYPE (see function catalog)"). ARC reports an error as a failure, not as a value, so it never returned one; use `$ISERROR`, `$ISNA` or `$IFERROR`.
+- A value error that a source mapping raises after the deadline is reported as itself (`422`, named by the mapping), as in every other position; only a source mapping answered `504`.
+- Branch analysis no longer depends on the order in which connections were drawn: a ladder of 13 or more checks was "too complex" in one drawing order and valid in another.
+
+**Data sources**
+
+- An HTTP response head is bounded like the body: a header line longer than 16 KiB or more than 100 headers fails the read ("HTTP source failed", so `onError: DEFAULT` applies) instead of filling the server's memory.
+- A host that resolves to several addresses tries the next address only while the call has time left. Each address got a fresh connect timeout, so a 10 s timeout over 8 stalled addresses lasted 70 s.
+- A misspelled source parameter type returns `422` "Unknown input type", as for a rule input, instead of "Source parameters must be scalar".
+
+**Requests and responses**
+
+- A save (`PUT /rules/{id}`, `PUT /sources/{id}`) or a publication without `revision`, or with `"revision": null`, returns `422` "Revision is required" after the `404` check. It read as revision 0 and answered `409` however often the client reloaded.
+- A multipart body is not parsed: it returns `415`, or the path's `404`, where a body without a boundary was a `500` on every path.
+- `405` answers carry the `Allow` header, and `415` and `406` answers `Accept`.
+- Catalog searches match within the ID, the name or the description of a rule, and within the ID or the name of a source: `tax rate` no longer finds the rule `tax` named "Rate table".
+- A draft may call more than 65,535 rules; saving one was a `500`.
+- Rule and source names made only of Unicode spaces such as U+3000 return `422` like blank names ("Rule name must contain 1 to 160 characters", "Source name must contain 1 to 160 characters").
+
+**Drafts, diagnostics and ARC Script**
+
+- Diagnostics of a graph whose source mappings form a cycle also list its connection and reachability problems; the cycle was the only problem reported.
+- An ARC Script comment that contains a line break other than a newline (a lone CR, a form feed, a vertical tab, NEL, U+2028 or U+2029) builds as one note per line, the form a save stores and the code view shows.
+
+**Startup**
+
+- A sample rule ID that is already taken (by a rule created before the samples were seeded) no longer stops the API from starting: the samples are skipped with a warning and the workspace is not seeded again.
 
 ## Behavior changes from the second review
 

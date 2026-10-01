@@ -168,7 +168,7 @@ paths:
               properties:
                 name: {type: string, minLength: 1, maxLength: 160}
                 description: {type: string, maxLength: 2000}
-                revision: {type: integer, minimum: 1}
+                revision: {type: integer, minimum: 1, description: 'The revision the client read; a stale one is a 409, a missing or null one a 422 "Revision is required"'}
                 definition: {$ref: '#/components/schemas/Definition'}
       responses:
         '200':
@@ -184,6 +184,15 @@ paths:
         Deletes the rule with its draft and every published version; later requests for it return
         404. A rule that another rule's draft or published version calls is kept with 409, whose
         issues list every caller, such as "checkout (draft)" or "checkout v3".
+      parameters:
+        - name: revision
+          in: query
+          required: false
+          schema: {type: integer}
+          description: >-
+            The revision the client read. A rule saved, published or created again since then is
+            kept with 409 "This rule changed in another editor. Reload it before saving, publishing
+            or deleting."; without the parameter the current rule is deleted.
       responses:
         '204': {description: Rule deleted}
         default: {$ref: '#/components/responses/Error'}
@@ -199,7 +208,7 @@ paths:
               type: object
               required: [revision]
               properties:
-                revision: {type: integer, minimum: 1}
+                revision: {type: integer, minimum: 1, description: 'The revision the client read; a stale one is a 409, a missing or null one a 422 "Revision is required"'}
       responses:
         '200':
           description: Rule with incremented revision and publishedVersion
@@ -521,7 +530,7 @@ paths:
               required: [name, revision, definition]
               properties:
                 name: {type: string, maxLength: 160}
-                revision: {type: integer, description: Current source version for optimistic concurrency}
+                revision: {type: integer, description: 'Current source version for optimistic concurrency; a missing or null one is a 422 "Revision is required"'}
                 definition: {$ref: '#/components/schemas/SourceConfig'}
       responses:
         '200':
@@ -704,8 +713,8 @@ components:
       properties:
         ruleId: {type: string, nullable: true}
         version: {type: integer, nullable: true}
-        nodeId: {type: string}
-        label: {type: string}
+        nodeId: {type: string, nullable: true, description: Null when the problem belongs to the rule version as a whole}
+        label: {type: string, nullable: true}
     Problem:
       type: object
       required: [message, locations]

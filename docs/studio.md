@@ -263,6 +263,15 @@ Preview and the published API playground offer **Include execution trace** and *
 
 Results display browser request time and server preparation/execution times separately. The server timeout defaults to 30 seconds and is shared across nested rules and source reads; deadline exhaustion returns `504`, including when a source has a default fallback. A shorter per-source timeout still follows that source's configured failure policy.
 
+## Behavior changes from the 2026-10-01 backend review
+
+These editor changes shipped with [the 2026-10-01 backend review](reviews/2026-10-01-backend-review.md). Changes to API results, error messages and data sources are listed in [the API reference](api.md#behavior-changes-from-the-2026-10-01-backend-review).
+
+- A rule name made only of Unicode spaces, such as the full-width space an input method types, is refused in **Create rule** and **Rule settings** with the server's message ("Rule name must contain 1 to 160 characters") instead of saving a blank title.
+- Diagnostics of a graph whose input source mappings form a cycle also show its connection and reachability problems; the cycle used to be the only one.
+- A Code studio comment that contains a line break other than a newline (a lone CR, a form feed, U+2028, …) becomes one note per line when the code builds, the form the saved draft and the canonical code have.
+- The function catalog lists `$ERROR.TYPE` as reference only. Date functions refuse date text without a year (`$YEAR("1 Jan")`), and `$MODE` takes at most 4,472 values.
+
 ## Behavior changes from the second review
 
 These editor changes shipped with [the second full review](reviews/2026-09-27-second-review.md), after the ones listed in the next section. Changes to API results, error messages and data sources are listed in [the API reference](api.md#behavior-changes-from-the-second-review).
