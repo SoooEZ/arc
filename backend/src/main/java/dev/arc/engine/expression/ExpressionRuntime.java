@@ -4,6 +4,7 @@ import static dev.arc.engine.expression.Expressions.*;
 
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.Limits;
+import dev.arc.engine.ValueBounds;
 import dev.arc.engine.expression.Expressions.Expr;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
@@ -11,6 +12,9 @@ import java.util.*;
 
 /** Decimal operators, short-circuit calls and collection execution; no parsing or IO. */
 final class ExpressionRuntime {
+  /** The largest exponent of {@code ^}, in either direction. */
+  static final int MAX_EXPONENT = 100;
+
   private ExpressionRuntime() {}
 
   /**
@@ -144,15 +148,16 @@ final class ExpressionRuntime {
       throw ArcException.invalid("Division by zero");
     try {
       return bounded(
-          switch (op) {
-            case ADD -> x.add(y, MATH);
-            case SUBTRACT -> x.subtract(y, MATH);
-            case MULTIPLY -> x.multiply(y, MATH);
-            case DIVIDE -> x.divide(y, MATH);
-            case REMAINDER -> x.remainder(y, MATH);
-            case POWER -> power(x, y);
-            default -> throw new IllegalArgumentException(op + " is not arithmetic");
-          });
+          ValueBounds.computed(
+              switch (op) {
+                case ADD -> x.add(y, MATH);
+                case SUBTRACT -> x.subtract(y, MATH);
+                case MULTIPLY -> x.multiply(y, MATH);
+                case DIVIDE -> x.divide(y, MATH);
+                case REMAINDER -> x.remainder(y, MATH);
+                case POWER -> power(x, y);
+                default -> throw new IllegalArgumentException(op + " is not arithmetic");
+              }));
     } catch (ArithmeticException error) {
       throw ArcException.invalid("Decimal operation exceeds supported precision");
     }
@@ -165,7 +170,8 @@ final class ExpressionRuntime {
     } catch (ArithmeticException e) {
       throw ArcException.invalid("Exponent must be an integer");
     }
-    if (Math.abs((long) exponent) > 100) throw ArcException.invalid("Exponent must be -100 to 100");
+    if (Math.abs((long) exponent) > MAX_EXPONENT)
+      throw ArcException.invalid("Exponent must be -" + MAX_EXPONENT + " to " + MAX_EXPONENT);
     try {
       return exponent < 0
           ? BigDecimal.ONE.divide(x.pow(-exponent, MATH), MATH)
@@ -183,7 +189,7 @@ final class ExpressionRuntime {
         Functions.call(name, args.stream().map(a -> a.eval(context)).toList(), context.ranges);
     // POI cannot be interrupted, so a slow Excel calculation is caught as soon as it returns.
     context.deadline.check();
-    return bounded(result);
+    return bounded(result instanceof BigDecimal number ? ValueBounds.computed(number) : result);
   }
 
   private static Object coalesce(List<Expr> args, Context context) {

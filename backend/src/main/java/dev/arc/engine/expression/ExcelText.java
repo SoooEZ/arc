@@ -82,7 +82,7 @@ final class ExcelText {
 
   private static String format(double number, String code) {
     String normalized = code.replace("\\%", "'%'");
-    if (hasSections(normalized)) return formatSections(number, code, normalized);
+    if (hasSections(normalized)) return formatSections(number, normalized);
     return new DataFormatter(LOCALE).formatRawCellContents(number, -1, code);
   }
 
@@ -92,19 +92,18 @@ final class ExcelText {
         && (code.indexOf(';') != code.lastIndexOf(';') || CONDITIONAL_CODE.matcher(code).matches());
   }
 
-  /** DataFormatter's handling of CellFormat's result: trimmed, with Excel's "E+" exponent sign. */
-  private static String formatSections(double number, String code, String normalized) {
+  /**
+   * DataFormatter's handling of CellFormat's result, trimmed. DataFormatter also adds a "+" after
+   * the first "E" of any result whose code mentions "general" or "e+0", a repair for Java's
+   * DecimalFormat, which writes 1.5E3. CellFormat already writes Excel's sign, so the repair gave
+   * "1.50E++00" and corrupted literal text ("ZERO" became "ZE+RO"); it is left out here.
+   */
+  private static String formatSections(double number, String normalized) {
     Object cellValue =
         number != 0 && DateUtil.isADateFormat(-1, normalized)
             ? DateUtil.getJavaDate(number, false)
             : (Object) number;
-    String result = Sections.of(normalized).apply(cellValue).text.trim();
-    if (DateUtil.isADateFormat(-1, code) && DateUtil.isValidExcelDate(number)) return result;
-    String lowerCase = code.toLowerCase(Locale.ROOT);
-    boolean exponentFormat = lowerCase.contains("general") || lowerCase.contains("e+0");
-    return exponentFormat && result.contains("E") && !result.contains("E-")
-        ? result.replaceFirst("E", "E+")
-        : result;
+    return Sections.of(normalized).apply(cellValue).text.trim();
   }
 
   /**

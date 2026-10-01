@@ -68,6 +68,22 @@ class RuleExecutionServiceTest {
   }
 
   @Test
+  void anInputBeyondTheScaleRangeIsRefusedAsOutOfRange() {
+    // 100E+2147483647 overflowed stripTrailingZeros() inside the input check: a 500 and an ERROR
+    // stack trace instead of the documented 422.
+    when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank(RuleKind.FORMULA));
+    var huge = new java.math.BigDecimal("100E+2147483647");
+    assertThatThrownBy(() -> service.execute("rule", new Execution(Map.of("amount", huge), 1)))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(422);
+              assertThat(error.getMessage())
+                  .contains("Number exceeds supported precision or magnitude");
+            });
+  }
+
+  @Test
   void aCachedPublishedPlanIsExecutedWithoutReadingItsVersionAgain() {
     when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank(RuleKind.FORMULA));
     for (int amount : List.of(100, 200, 300))

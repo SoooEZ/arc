@@ -64,13 +64,16 @@ final class BranchScopes {
   }
 
   /**
-   * The branching nodes in the order their tests are numbered: a topological order that does not
-   * depend on node IDs, namely the reverse postorder of a depth-first walk that starts at the Input
-   * node (then at any node it cannot reach, in document order), follows each node's handles in
-   * order and the connections of one handle in document order. A child's test then stays next to
-   * its parent's, which keeps the decision diagram of "any of these pairs passes" linear. Numbering
+   * The branching nodes in the order their tests are numbered: a topological order that depends
+   * neither on node IDs nor on the order connections were drawn, namely the reverse postorder of a
+   * depth-first walk that starts at the Input node (then at any node it cannot reach, in document
+   * order) and follows each node's handles in order. A child's test then stays next to its
+   * parent's, which keeps the decision diagram of "any of these pairs passes" linear. Numbering
    * tests in the execution order, whose ties follow IDs, made the complexity cap depend on how
    * nodes were named: one graph passed as rule_01_a/rule_01_b and failed as check_01/confirm_01.
+   * Following one handle's connections in document order then made it depend on drawing order: a
+   * ladder whose true exit listed its confirming check before the next rung numbered every rung
+   * before every confirmation and was too complex, while the other drawing order passed.
    */
   private static List<Node> testOrder(Definition definition, GraphTopology topology) {
     var walk = new DepthFirstWalk(definition, topology);
@@ -85,6 +88,7 @@ final class BranchScopes {
     private final Map<String, Node> nodes = new HashMap<>();
     private final GraphTopology topology;
     private final Set<String> visited = new HashSet<>();
+    private final Map<String, Integer> decisions = new HashMap<>();
 
     /** Nodes in the order their walks finished, the last finished first. */
     private final Deque<Node> finished = new ArrayDeque<>();
@@ -94,12 +98,39 @@ final class BranchScopes {
       this.topology = topology;
     }
 
+    /**
+     * Walks each handle's targets with the most decisions below them first. The last target walked
+     * finishes last, so it is numbered right after the node: a small side branch, such as the check
+     * that confirms a rung, stays next to its parent while the rest of the graph is numbered after
+     * it. Targets with as many decisions below them keep document order.
+     */
     void visit(Node node) {
       if (!visited.add(node.id())) return;
-      for (String handle : node.handles())
+      for (String handle : node.handles()) {
+        var targets = new ArrayList<Node>();
         for (Edge edge : topology.outgoing(node.id()))
-          if (handle.equals(edge.sourceHandle())) visit(nodes.get(edge.target()));
+          if (handle.equals(edge.sourceHandle())) targets.add(nodes.get(edge.target()));
+        targets.sort(Comparator.comparingInt(this::decisionsFrom).reversed());
+        for (Node target : targets) visit(target);
+      }
       finished.push(node);
+    }
+
+    /** The branching nodes reachable from a node, the node itself included. */
+    private int decisionsFrom(Node start) {
+      Integer known = decisions.get(start.id());
+      if (known != null) return known;
+      var reached = new HashSet<String>();
+      var pending = new ArrayDeque<String>(List.of(start.id()));
+      int count = 0;
+      while (!pending.isEmpty()) {
+        String id = pending.pop();
+        if (!reached.add(id)) continue;
+        if (nodes.get(id).kind().choosesOneExit()) count++;
+        for (Edge edge : topology.outgoing(id)) pending.push(edge.target());
+      }
+      decisions.put(start.id(), count);
+      return count;
     }
 
     /** A topological order of the walked graph. */

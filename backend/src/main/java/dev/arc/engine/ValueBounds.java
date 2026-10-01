@@ -30,6 +30,20 @@ public final class ValueBounds {
   }
 
   /**
+   * A number that an operator or a function computed. BigDecimal never rounds a zero, so a zero
+   * result keeps the combined scale of its operands: {@code amount * (rate / 365) * (1/3) * (1/7)}
+   * is 0E-102 when amount is 0, while every other amount gives an ordinary 34-digit result. Such a
+   * zero keeps the most decimal places a number may have ({@link Limits#MAX_NUMBER_SCALE}) instead
+   * of failing only for a zero input. A zero written with a larger scale is still refused, because
+   * its scale is what the writer chose.
+   */
+  public static BigDecimal computed(BigDecimal number) {
+    if (number.signum() != 0 || Math.abs((long) number.scale()) <= Limits.MAX_NUMBER_SCALE)
+      return number;
+    return BigDecimal.ZERO.setScale(Integer.signum(number.scale()) * Limits.MAX_NUMBER_SCALE);
+  }
+
+  /**
    * The ARC type of a value, in the words of {@link InputTypes#NAMES} (lower case): a message named
    * JDK classes before, such as UnmodifiableMap, LinkedHashMap or ListN, depending on where the
    * same value came from.
@@ -86,10 +100,13 @@ public final class ValueBounds {
    * 101-digit integer. Accepted decimals stay below 1E+201 and so are finite as doubles; that
    * conversion is slow for 34-digit quotients, and every operand passes through here. A zero has no
    * digits to strip, so its scale counts as written: 0E-2000000000 would otherwise pass and print
-   * as two billion characters.
+   * as two billion characters. A nonzero number below scale -{@link Limits#MAX_NUMBER_SCALE} is out
+   * of range in either form, and stripping its zeros would overflow the scale of a value such as
+   * 100E+2147483647 (an ArithmeticException, so a 500 instead of this 422).
    */
   private static boolean exceedsDecimalLimits(BigDecimal number) {
     if (number.signum() == 0) return Math.abs((long) number.scale()) > Limits.MAX_NUMBER_SCALE;
+    if (number.scale() < -Limits.MAX_NUMBER_SCALE) return true;
     return exceedsWrittenLimits(number) && exceedsWrittenLimits(number.stripTrailingZeros());
   }
 

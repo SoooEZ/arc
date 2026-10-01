@@ -36,6 +36,32 @@ class ExecutionTraceTest {
   }
 
   @Test
+  void aStepBeyondTheRemainingBudgetIsRefusedWithoutSerializingItWhole() {
+    // Every step was serialized in full before the budget check: a 1.4 KB preview whose Formula
+    // built 95 x 95 strings of 2,000 characters allocated 218 MB to retain nothing.
+    var read = new int[] {0};
+    var huge =
+        new AbstractList<String>() {
+          @Override
+          public String get(int index) {
+            read[0]++;
+            return "x".repeat(100_000);
+          }
+
+          @Override
+          public int size() {
+            return 1_000;
+          }
+        };
+    var trace = new ExecutionTrace(json, true, 256 * 1024);
+    trace.add(new Engine.Step("rule", 1, "big", "Big", "FORMULA", huge, null, 0));
+    assertThat(trace.truncated()).isTrue();
+    assertThat(trace.steps()).isEmpty();
+    // Serialization stops once the step passes the 256 KiB that remain: three items, not 1,000.
+    assertThat(read[0]).isLessThan(10);
+  }
+
+  @Test
   void disablingOrTruncatingTracePreservesResultAndExecutedStepCount() {
     Definition graph = ExecutionPlansTest.graph("'" + "x".repeat(100) + "'");
     var engine = new Engine(new Validator(), json, 10);

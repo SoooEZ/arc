@@ -121,6 +121,23 @@ class ExcelTextTest {
   }
 
   @Test
+  void sectionedCodesWriteOneExponentSignAndKeepTheirText() {
+    // DataFormatter's "E" to "E+" repair for DecimalFormat output also ran on CellFormat's, which
+    // already has the sign, and on any upper-case E in literal text. POI itself answers the same,
+    // so the comparison with POI above cannot see it; these are Excel's results.
+    String scientific = "0.00E+00;-0.00E+00;0";
+    assertThat(eval("$TEXT(1.5, \"" + scientific + "\")")).isEqualTo("1.50E+00");
+    assertThat(eval("$TEXT(-1.5, \"" + scientific + "\")")).isEqualTo("-1.50E+00");
+    assertThat(eval("$TEXT(12345, \"[>=100]0.00E+00;0\")")).isEqualTo("1.23E+04");
+    assertThat(eval("$TEXT(0, \"General;General;\\\"ZERO\\\"\")")).isEqualTo("ZERO");
+    String thousands = "[>=1000000]0.0,,\\\" MEUR\\\";[>=1000]0.0,\\\" KEUR\\\";General";
+    assertThat(eval("$TEXT(2500, \"" + thousands + "\")")).isEqualTo("2.5 KEUR");
+    assertThat(eval("$TEXT(5, \"" + thousands + "\")")).isEqualTo("5");
+    // POI gives the doubled sign for the same code, which is why the repair is left out.
+    assertThat(poiText(1.5, scientific)).isEqualTo("1.50E++00");
+  }
+
+  @Test
   void multiSectionCodesThatPoiCannotApplyAreValueErrors() {
     // POI logged a warning with a stack trace for each call and fell back to reading the whole
     // code as one section; ARC reports #VALUE! instead of guessing.

@@ -1,6 +1,7 @@
 package dev.arc.engine.expression;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
@@ -294,5 +295,79 @@ class ExcelArgumentsTest {
     // "1E+10" measured 5 characters, so POI built 4,389 before the generic string bound.
     assertThatThrownBy(() -> eval("$REPT(1e10, 399)"))
         .hasMessage("REPT result exceeds string limit");
+  }
+
+  @Test
+  void boundedArgumentsAreReadAsPoiReadsThem() {
+    // The work bounds read COMBIN's n, the decimal places of FIXED, DOLLAR and TRUNC and REPT's
+    // count
+    // with ARC's strict number check, so exactly these arguments refused numeric text, booleans and
+    // null that POI, and every other POI argument, accept.
+    var noDigits = new HashMap<String, Object>();
+    noDigits.put("amount", new BigDecimal("1.55"));
+    noDigits.put("digits", null);
+    assertThat(eval("$TRUNC(amount, digits)", noDigits)).isEqualTo(new BigDecimal("1"));
+    // The refusal was recoverable, so this answered 1.55 with a 200 instead of TRUNC's 1.
+    assertThat(eval("$IFERROR($TRUNC(amount, digits), amount)", noDigits))
+        .isEqualTo(new BigDecimal("1"));
+    assertThat(eval("$REPT(\"ab\", \"3\")")).isEqualTo("ababab");
+    assertThat(eval("$COMBIN(\"10\", 2)")).isEqualTo(new BigDecimal("45"));
+    assertThat(eval("$TRUNC(1.55, true)")).isEqualTo(new BigDecimal("1.5"));
+    assertThat(eval("$FIXED(1234.5, \"1\")")).isEqualTo("1,234.5");
+    // The bounds still hold for numbers written as text.
+    assertThatThrownBy(() -> eval("$COMBIN(\"10001\", 2)"))
+        .hasMessage("COMBIN supports n up to 10,000");
+    assertThatThrownBy(() -> eval("$REPT(\"a\", \"2001\")"))
+        .hasMessage("REPT result exceeds string limit");
+    // Text that POI reads as no number fails with POI's own error, as before.
+    assertThatThrownBy(() -> eval("$REPT(\"a\", \"many\")")).hasMessage("REPT: #VALUE!");
+  }
+
+  @Test
+  void eachArgumentLimitIsStatedFromOneConstant() {
+    // The limits were retyped in each check and its message, so changing one left the other.
+    assertThatThrownBy(() -> eval("$COMBIN(" + (ExcelFunctionAdapter.MAX_COMBIN_N + 1) + ", 2)"))
+        .hasMessage("COMBIN supports n up to 10,000");
+    assertThat(eval("$COMBIN(" + ExcelFunctionAdapter.MAX_COMBIN_N + ", 1)"))
+        .isEqualTo(new BigDecimal(ExcelFunctionAdapter.MAX_COMBIN_N));
+    int places = ExcelFunctionAdapter.MAX_DECIMAL_PLACES;
+    assertThatThrownBy(() -> eval("$FIXED(1, " + (places + 1) + ")"))
+        .hasMessage("FIXED: decimal places must be -" + places + " to " + places);
+    assertThatThrownBy(() -> eval("$TRUNC(1, -" + (places + 1) + ")"))
+        .hasMessage("TRUNC: decimal places must be -" + places + " to " + places);
+    int exponent = ExpressionRuntime.MAX_EXPONENT;
+    assertThat(eval("1 ^ " + exponent)).isEqualTo(BigDecimal.ONE);
+    assertThatThrownBy(() -> eval("2 ^ " + (exponent + 1)))
+        .hasMessage("Exponent must be -" + exponent + " to " + exponent);
+  }
+
+  @Test
+  void modeRefusesMoreValuesThanItsPairwiseBudgetBeforePoiRuns() {
+    // POI's MODE compares every pair of values in one uninterruptible call: 30 arrays of 9,801
+    // cells (4.3e10 comparisons) held a request thread for 14-29 s against a 100 ms timeout.
+    int limit = ExcelFunctionAdapter.MAX_MODE_VALUES;
+    assertThat(limit).isEqualTo(4_472);
+    assertThat((long) limit * (limit - 1) / 2).isLessThanOrEqualTo(ExcelMatchingWork.MAX_STEPS);
+    assertThat((long) (limit + 1) * limit / 2).isGreaterThan(ExcelMatchingWork.MAX_STEPS);
+    var square = new ArrayList<Object>();
+    for (int row = 0; row < 99; row++) {
+      var cells = new ArrayList<Object>();
+      for (int column = 0; column < 99; column++) cells.add(BigDecimal.valueOf(row * column));
+      square.add(cells);
+    }
+    String thirty = String.join(", ", Collections.nCopies(30, "m"));
+    assertTimeoutPreemptively(
+        java.time.Duration.ofSeconds(1),
+        () ->
+            assertThatThrownBy(() -> eval("$MODE(" + thirty + ")", Map.of("m", square)))
+                .isInstanceOf(ArcException.class)
+                .hasMessage("MODE compares every pair of values and accepts at most 4,472 values"));
+    var atLimit = new ArrayList<Object>();
+    for (int i = 0; i < limit; i++) atLimit.add(BigDecimal.valueOf(i % 7));
+    assertThat(eval("$MODE(values)", Map.of("values", atLimit))).isEqualTo(BigDecimal.ZERO);
+    var beyond = new ArrayList<>(atLimit);
+    beyond.add(BigDecimal.ONE);
+    assertThatThrownBy(() -> eval("$MODE(values)", Map.of("values", beyond)))
+        .hasMessage("MODE compares every pair of values and accepts at most 4,472 values");
   }
 }

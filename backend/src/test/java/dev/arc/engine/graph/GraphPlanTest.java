@@ -200,6 +200,61 @@ class GraphPlanTest {
     }
   }
 
+  /**
+   * "Approve if any rung's two checks pass" drawn as a ladder: rung_i.true → confirm_i and the next
+   * rung, rung_i.false → the next rung (after the last rung, `none`); confirm_i.true → anyPair,
+   * confirm_i.false → none. {@code confirmFirst} says which of a rung's true connections was drawn
+   * first.
+   */
+  private Definition ladder(
+      int rungs, boolean confirmFirst, IntFunction<String> rung, IntFunction<String> confirm) {
+    var nodes = new ArrayList<Node>();
+    var edges = new ArrayList<Edge>();
+    nodes.add(node("input", "INPUT", null, null));
+    nodes.add(node("anyPair", "OUTPUT", "true", null));
+    nodes.add(node("none", "OUTPUT", "false", null));
+    edges.add(edge("input", rung.apply(0), "next"));
+    for (int i = 0; i < rungs; i++) {
+      String check = rung.apply(i), confirming = confirm.apply(i);
+      String next = i + 1 < rungs ? rung.apply(i + 1) : "none";
+      nodes.add(node(check, "CONDITION", "amount > " + i, null));
+      nodes.add(node(confirming, "CONDITION", "amount < " + (1000 + i), null));
+      if (confirmFirst) edges.add(edge(check, confirming, "true"));
+      edges.add(edge(check, next, "true"));
+      if (!confirmFirst) edges.add(edge(check, confirming, "true"));
+      edges.add(edge(check, next, "false"));
+      edges.add(edge(confirming, "anyPair", "true"));
+      edges.add(edge(confirming, "none", "false"));
+    }
+    return new Definition(1, amount, nodes, edges);
+  }
+
+  @Test
+  void branchAnalysisDoesNotDependOnTheOrderConnectionsWereDrawn() {
+    // A handle's connections were followed in document order: with each rung's confirming check
+    // drawn first, every rung was numbered before every confirmation and 13 rungs were too complex,
+    // while the other drawing order passed. The canvas appends connections as they are drawn.
+    IntFunction<String> rung = i -> "rung_%02d".formatted(i);
+    IntFunction<String> confirm = i -> "confirm_%02d".formatted(i);
+    for (boolean confirmFirst : List.of(true, false))
+      assertThatCode(
+              () -> validator.validate(ladder(13, confirmFirst, rung, confirm), noReferences))
+          .as("confirming check drawn first: " + confirmFirst)
+          .doesNotThrowAnyException();
+    assertThat(new GraphPlan(ladder(13, true, rung, confirm)).available())
+        .isEqualTo(new GraphPlan(ladder(13, false, rung, confirm)).available());
+    var random = new Random(20261001);
+    for (int attempt = 0; attempt < 20; attempt++) {
+      var names = new LinkedHashSet<String>();
+      while (names.size() < 78) names.add("node-%08x".formatted(random.nextInt()));
+      var ids = List.copyOf(names);
+      var definition = ladder(39, attempt % 2 == 0, i -> ids.get(2 * i), i -> ids.get(2 * i + 1));
+      assertThatCode(() -> validator.validate(definition, noReferences))
+          .as("attempt " + attempt)
+          .doesNotThrowAnyException();
+    }
+  }
+
   @Test
   void aGenuinelyExponentialAnalysisStillReportsTooComplex() {
     // "Any of 20 pairs passes" with every first test numbered before every second test.

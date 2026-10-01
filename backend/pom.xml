@@ -81,6 +81,14 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- Tests run with the settings ArcApplication.pinHostSettings gives the API process. -->
+          <argLine>-Duser.timezone=UTC -Duser.language=en -Duser.country=US</argLine>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

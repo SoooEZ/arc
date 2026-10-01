@@ -176,10 +176,7 @@ class ExpressionsTest {
         .isInstanceOfSatisfying(
             ArcException.class, error -> assertThat(error.status()).isEqualTo(422));
     for (String expression :
-        List.of(
-            "$TO_STRING(((((0.0 ^ 100) ^ 100) ^ 100) ^ 100) ^ 10)",
-            "$CONCAT(\"\", 0e-2000000000)",
-            "$CONTAINS(\"x\", $TO_NUMBER(\"0e-2000000000\"))"))
+        List.of("$CONCAT(\"\", 0e-2000000000)", "$CONTAINS(\"x\", $TO_NUMBER(\"0e-2000000000\"))"))
       assertTimeoutPreemptively(
           Duration.ofSeconds(1),
           () ->
@@ -192,6 +189,65 @@ class ExpressionsTest {
                         assertThat(error.getMessage())
                             .contains("Number exceeds supported precision or magnitude");
                       }));
+  }
+
+  @Test
+  void computedZerosKeepTheScaleLimitInsteadOfFailingForAZeroInput() {
+    // BigDecimal never rounds a zero, so a zero result keeps its operands' combined scale: the
+    // same formula gave 0.00 for amount 1 and 422 for amount 0.
+    var rate = new BigDecimal("0.05");
+    String daily = "amount * (rate / 365) * (1/3) * (1/7)";
+    for (int amount : List.of(0, 1))
+      assertThat(
+              Expressions.evaluate(
+                  "$ROUND(" + daily + ", 2)",
+                  Map.of("amount", BigDecimal.valueOf(amount), "rate", rate)))
+          .as("amount %d", amount)
+          .isEqualTo(new BigDecimal("0.00"));
+    var zeroInputs = Map.<String, Object>of("amount", BigDecimal.ZERO, "rate", rate);
+    // $IFERROR returned its fallback instead of the zero.
+    assertThat(Expressions.evaluate("$IFERROR(" + daily + ", -1)", zeroInputs))
+        .isEqualTo(new BigDecimal("0E-100"));
+    assertThat(Expressions.evaluate(daily + " > 0", zeroInputs)).isEqualTo(false);
+    // Division moves a zero's scale the other way; power and $MUL multiply it; $REDUCE repeats it.
+    assertThat(Expressions.evaluate("amount / (1/3) / (1/3) / (1/3) / (1/3)", zeroInputs))
+        .isEqualTo(new BigDecimal("0E+100"));
+    assertThat(Expressions.evaluate("((amount * 0.1) ^ 100) ^ 2", zeroInputs))
+        .isEqualTo(new BigDecimal("0E-100"));
+    assertThat(Expressions.evaluate("$MUL(amount, 1/3, 1/7, 1/11)", zeroInputs))
+        .isEqualTo(new BigDecimal("0E-100"));
+    assertThat(
+            Expressions.evaluate(
+                "$REDUCE([1/3, 1/7, 1/11, 1/13], r, acc, amount, acc * r)", zeroInputs))
+        .isEqualTo(new BigDecimal("0E-100"));
+    // The bound still holds: a computed zero never prints more than the scale limit allows.
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(1),
+        () ->
+            assertThat(eval("$TO_STRING(((((0.0 ^ 100) ^ 100) ^ 100) ^ 100) ^ 10)"))
+                .isEqualTo("0." + "0".repeat(100)));
+  }
+
+  @Test
+  void numbersBeyondTheScaleRangeAreOutOfRangeNotAnInternalError() {
+    // stripTrailingZeros() overflowed the scale of 100E+2147483647 with an ArithmeticException,
+    // which every caller let through as a 500.
+    for (String huge : List.of("100E+2147483647", "-100E+2147483647", "1E+2147483647"))
+      assertThatThrownBy(() -> Expressions.bounded(new BigDecimal(huge)))
+          .as(huge)
+          .isInstanceOf(ArcException.class)
+          .hasMessage("Number exceeds supported precision or magnitude");
+    assertThatThrownBy(
+            () -> InputTypes.check("amount", "NUMBER", new BigDecimal("100E+2147483647")))
+        .isInstanceOf(ArcException.class)
+        .hasMessage("Number exceeds supported precision or magnitude");
+    assertThatThrownBy(() -> Expressions.compile("100E+2147483647"))
+        .isInstanceOfSatisfying(
+            ArcException.class, error -> assertThat(error.status()).isEqualTo(422));
+    assertThat(
+            Expressions.evaluate(
+                "$IFERROR($TO_NUMBER(text), 0)", Map.of("text", "100E+2147483647")))
+        .isEqualTo(BigDecimal.ZERO);
   }
 
   @Test

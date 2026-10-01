@@ -10,6 +10,7 @@ import org.apache.poi.ss.formula.eval.*;
 import org.apache.poi.ss.formula.function.FunctionMetadata;
 import org.apache.poi.ss.formula.function.FunctionMetadataRegistry;
 import org.apache.poi.ss.formula.ptg.Ptg;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.util.LocaleUtil;
 
 /** Boundary between bounded ARC values and Apache POI's workbook-style value model. */
@@ -21,6 +22,25 @@ final class ExcelFunctionAdapter {
   /** Functions that look a value up in the range in their second argument. */
   private static final Set<String> LOOKUPS_IN_SECOND_RANGE =
       Set.of("MATCH", "VLOOKUP", "HLOOKUP", "LOOKUP");
+
+  /** COMBIN's largest n, in either direction. */
+  static final int MAX_COMBIN_N = 10_000;
+
+  /** The decimal places FIXED, DOLLAR and TRUNC accept, either side of the decimal point. */
+  static final int MAX_DECIMAL_PLACES = 100;
+
+  /**
+   * The values MODE may compare: the most whose pairs stay within {@link
+   * ExcelMatchingWork#MAX_STEPS} comparisons (4,472).
+   */
+  static final int MAX_MODE_VALUES =
+      (int) ((1 + Math.sqrt(1 + 8.0 * ExcelMatchingWork.MAX_STEPS)) / 2);
+
+  static {
+    // DateUtil fixes the locale of its date formatter when it loads, so whichever call loaded it
+    // first decided how month names read. Load it under ARC's settings.
+    inExcelLocale(() -> DateUtil.isValidExcelDate(0));
+  }
 
   /** A function's parameter, by zero-based index. */
   record ReferenceParameter(String function, int index) {}
@@ -57,6 +77,7 @@ final class ExcelFunctionAdapter {
       if (args.stream().anyMatch(ExcelFunctionAdapter::isEmptyRange))
         return emptyRangeResult(name, args);
       checkArgumentBounds(name, args);
+      ExcelDateText.refuseDatesWithoutYear(name, args);
       ValueEval[] values = args.stream().map(ranges::value).toArray(ValueEval[]::new);
       ExcelMatchingWork.checkMatchingWork(name, args);
       return converted(inExcelLocale(() -> calculate(name, metadata, values)), name);
@@ -73,11 +94,15 @@ final class ExcelFunctionAdapter {
    */
   static int choiceIndex(Object index) {
     if (index instanceof List<?>) throw notSingleValue("CHOOSE", 0);
-    try {
-      return OperandResolver.coerceValueToInt(value(index));
-    } catch (EvaluationException error) {
-      throw excelError("CHOOSE", error.getErrorEval());
-    }
+    // Text reads as a date or a number here, so the index gets ARC's locale like every POI call.
+    return inExcelLocale(
+        () -> {
+          try {
+            return OperandResolver.coerceValueToInt(value(index));
+          } catch (EvaluationException error) {
+            throw excelError("CHOOSE", error.getErrorEval());
+          }
+        });
   }
 
   private static ValueEval calculate(String name, FunctionMetadata metadata, ValueEval[] values) {
@@ -146,27 +171,73 @@ final class ExcelFunctionAdapter {
 
   /** Arguments that would make POI build values larger than ARC accepts, or work unboundedly. */
   private static void checkArgumentBounds(String name, List<Object> args) {
-    if (name.equals("COMBIN")
-        && Expressions.number(args.getFirst()).abs().compareTo(BigDecimal.valueOf(10000)) > 0)
-      throw ArcException.invalid("COMBIN supports n up to 10,000");
+    if (name.equals("COMBIN") && beyond(args.getFirst(), MAX_COMBIN_N))
+      throw ArcException.invalid("COMBIN supports n up to " + Limits.format(MAX_COMBIN_N));
     if (Set.of("FIXED", "DOLLAR", "TRUNC").contains(name)
         && args.size() > 1
-        && Expressions.number(args.get(1)).abs().compareTo(BigDecimal.valueOf(100)) > 0)
-      throw ArcException.invalid(name + ": decimal places must be -100 to 100");
+        && beyond(args.get(1), MAX_DECIMAL_PLACES))
+      throw ArcException.invalid(
+          name + ": decimal places must be -" + MAX_DECIMAL_PLACES + " to " + MAX_DECIMAL_PLACES);
     if (name.equals("REPT")) checkRepeatedLength(args);
+    if (name.equals("MODE")) checkPairwiseWork(args);
+  }
+
+  /** Whether POI would read the argument as a number beyond the bound, in either direction. */
+  private static boolean beyond(Object argument, int bound) {
+    OptionalDouble number = poiNumber(argument);
+    return number.isPresent() && Math.abs(number.getAsDouble()) > bound;
+  }
+
+  /**
+   * The number POI reads from a single-value argument inside the function: numeric text, booleans
+   * and blanks count, so a bound never refuses an argument that the function accepts. Empty when
+   * POI reads no number there; the call then fails with POI's own error.
+   */
+  private static OptionalDouble poiNumber(Object argument) {
+    return inExcelLocale(
+        () -> {
+          try {
+            return OptionalDouble.of(OperandResolver.coerceValueToDouble(value(argument)));
+          } catch (EvaluationException notANumber) {
+            return OptionalDouble.empty();
+          }
+        });
   }
 
   /** REPT must not build a string that the value bounds reject afterwards. */
   private static void checkRepeatedLength(List<Object> args) {
-    BigDecimal count = Expressions.number(args.get(1));
-    if (count.signum() < 0 || count.compareTo(BigDecimal.valueOf(Limits.MAX_STRING_CHARACTERS)) > 0)
+    OptionalDouble count = poiNumber(args.get(1));
+    if (count.isEmpty()) return;
+    if (count.getAsDouble() < 0 || count.getAsDouble() > Limits.MAX_STRING_CHARACTERS)
       throw ArcException.invalid("REPT result exceeds string limit");
     // Measure the text POI repeats ("" for a blank, "100" for 1E+2), count times truncated to an
     // int as POI does; BigDecimal.toString refused $REPT(1E+2, 600) and let $REPT(1e10, 399)
     // through.
     String text = OperandResolver.coerceValueToString(value(args.getFirst()));
-    if ((long) text.length() * (int) count.doubleValue() > Limits.MAX_STRING_CHARACTERS)
+    if ((long) text.length() * (int) count.getAsDouble() > Limits.MAX_STRING_CHARACTERS)
       throw ArcException.invalid("REPT result exceeds string limit");
+  }
+
+  /**
+   * POI's MODE compares every pair of its values in one call that the deadline cannot interrupt: 30
+   * arrays of 9,801 cells are 4.3e10 comparisons, half a minute of CPU for a 1 KB request. Counting
+   * every cell over-estimates the numbers POI compares, so the bound is safe.
+   */
+  private static void checkPairwiseWork(List<Object> args) {
+    long values = 0;
+    for (Object argument : args) values += cells(argument);
+    if (values > MAX_MODE_VALUES)
+      throw ArcException.invalid(
+          "MODE compares every pair of values and accepts at most "
+              + Limits.format(MAX_MODE_VALUES)
+              + " values");
+  }
+
+  private static long cells(Object argument) {
+    if (!(argument instanceof List<?> items)) return 1;
+    long count = 0;
+    for (Object item : items) count += item instanceof List<?> row ? row.size() : 1;
+    return count;
   }
 
   static ValueEval value(Object x) {
