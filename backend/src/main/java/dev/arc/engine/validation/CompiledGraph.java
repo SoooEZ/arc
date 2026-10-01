@@ -5,9 +5,12 @@ import dev.arc.engine.graph.GraphPlan;
 import dev.arc.model.Definition;
 import java.util.Map;
 
-/** Validated graph and immutable expressions; evaluation state belongs to each execution. */
+/**
+ * A validated definition with its scope plan and immutable expressions; evaluation state belongs to
+ * each execution.
+ */
 public record CompiledGraph(
-    Definition definition, GraphPlan graph, Map<String, Expressions.Compiled> expressions) {
+    Definition definition, GraphPlan plan, Map<String, Expressions.Compiled> expressions) {
   public CompiledGraph {
     expressions = Map.copyOf(expressions);
   }

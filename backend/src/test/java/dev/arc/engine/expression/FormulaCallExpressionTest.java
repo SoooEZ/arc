@@ -21,6 +21,17 @@ class FormulaCallExpressionTest {
     assertThat(Expressions.compile("'@child:1(amount)' + \"@other:2()\"").formulaCalls()).isEmpty();
   }
 
+  /** A pinned version is written in digits without a leading zero and fits an int. */
+  @Test
+  void aFormulaCallPinsAPositiveVersion() {
+    assertThat(Expressions.compile("@child:2147483647(1)").formulaCalls())
+        .containsExactly(new Expressions.FormulaCall("child", Integer.MAX_VALUE, 1));
+    for (String call : List.of("@child:0(1)", "@child:01(1)", "@child:2147483648(1)"))
+      assertThatThrownBy(() -> Expressions.compile(call))
+          .as(call)
+          .hasMessage("Formula call version must be a positive integer");
+  }
+
   @Test
   void formulaCallsRemainLazyAndKeepCollectionLocalsAndExplicitNullArguments() {
     var calls = new ArrayList<List<Object>>();

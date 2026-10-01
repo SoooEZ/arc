@@ -1,5 +1,6 @@
 package dev.arc.engine.script;
 
+import static dev.arc.support.GraphFixtures.calculation;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static org.assertj.core.api.Assertions.*;
 
@@ -8,15 +9,13 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Functions;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
-import dev.arc.model.RuleKind;
-import dev.arc.rule.RuleSamples;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class NodeEditorTest {
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
-  private final RuleResolver noRefs = (id, v) -> RuleSamples.blank(RuleKind.FORMULA);
+  private final RuleResolver noRefs = (id, v) -> calculation();
 
   @Test
   void executableFunctionsHaveUsefulCategories() {
@@ -201,7 +200,7 @@ node out OUTPUT "Output" { return rate; }
                 node("bad", "FORMULA", "missing + 1", "x"),
                 node("out", "OUTPUT", "1 +", null)),
             List.of());
-    var issues = validator.diagnostics(d, noRefs);
+    var issues = validator.diagnose(d, noRefs).problems();
     assertThat(issues.stream().flatMap(p -> p.locations().stream()).map(l -> l.nodeId()))
         .contains("input", "bad", "out");
     assertThat(issues.stream().map(Validator.Problem::message))
@@ -219,7 +218,7 @@ node out OUTPUT "Output" { return rate; }
             "node input INPUT \"Input\" { next -> reuse; } node reuse REFERENCE \"Reuse\" { use"
                 + " \"child\" version 1; bind x = unknown; as result; next -> out; } node out"
                 + " OUTPUT \"Out\" { return result; }");
-    var issues = validator.diagnostics(d, (id, v) -> child);
+    var issues = validator.diagnose(d, (id, v) -> child).problems();
     assertThat(issues).hasSize(1);
     assertThat(issues.getFirst().locations().getFirst().nodeId()).isEqualTo("reuse");
     assertThat(issues.getFirst().message()).contains("unknown", "x");

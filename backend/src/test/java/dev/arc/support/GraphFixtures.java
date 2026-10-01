@@ -1,8 +1,10 @@
 package dev.arc.support;
 
+import dev.arc.model.Definition;
 import dev.arc.model.Definition.BranchCase;
 import dev.arc.model.Definition.Edge;
 import dev.arc.model.Definition.Field;
+import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.Node;
 import dev.arc.model.Definition.Position;
 import java.util.List;
@@ -11,6 +13,45 @@ import java.util.Map;
 /** Small graph builders shared by evaluator, validator, script and service contract tests. */
 public final class GraphFixtures {
   private GraphFixtures() {}
+
+  /**
+   * Input {@code amount} (100 by default), Calculate {@code total = amount * 0.9}, Return total: a
+   * complete calculation for tests that need any valid graph. It is a copy of the FORMULA template
+   * when this was written, so a change to the templates new rules start from fails no engine test.
+   */
+  public static Definition calculation() {
+    return new Definition(
+        1,
+        List.of(new Input("amount", "NUMBER", true, 100)),
+        List.of(
+            nodeOf("input", "INPUT", "Inputs").at(280, 0).build(),
+            nodeOf("calculate", "FORMULA", "Calculate")
+                .at(280, 160)
+                .expression("amount * 0.9")
+                .output("total")
+                .build(),
+            nodeOf("result", "OUTPUT", "Return total").at(280, 320).expression("total").build()),
+        List.of(edge("input", "calculate", "next"), edge("calculate", "result", "next")));
+  }
+
+  /** Input {@code amount} (100 by default), Check {@code amount >= 100}, then true or false. */
+  public static Definition condition() {
+    return new Definition(
+        1,
+        List.of(new Input("amount", "NUMBER", true, 100)),
+        List.of(
+            nodeOf("input", "INPUT", "Inputs").at(300, 0).build(),
+            nodeOf("condition", "CONDITION", "Check amount")
+                .at(300, 160)
+                .expression("amount >= 100")
+                .build(),
+            nodeOf("yes", "OUTPUT", "Eligible").at(100, 340).expression("true").build(),
+            nodeOf("no", "OUTPUT", "Not eligible").at(500, 340).expression("false").build()),
+        List.of(
+            edge("input", "condition", "next"),
+            edge("condition", "yes", "true"),
+            edge("condition", "no", "false")));
+  }
 
   /** A node labelled with its ID at (0, 0); its other optional fields are unset. */
   public static Node node(String id, String type, String expression, String output) {

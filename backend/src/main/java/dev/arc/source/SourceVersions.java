@@ -2,6 +2,7 @@ package dev.arc.source;
 
 import dev.arc.engine.BoundedCache;
 import dev.arc.model.DataSource;
+import dev.arc.model.Definition.Input;
 import dev.arc.model.SourceDefinition;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -40,10 +41,16 @@ public class SourceVersions {
     return frozen;
   }
 
-  /** An estimate of a version's retained size: its entries, headers, URL and parameters. */
+  /**
+   * An estimate of a version's retained size: its entries, headers, URL and parameters with their
+   * defaults. A parameter counted as 128 units whatever its default, although a STRING default may
+   * hold 2,000 characters.
+   */
   private static long weightOf(DataSource source) {
     SourceDefinition definition = source.definition();
-    long weight = 256L + definition.parameters().size() * 128L;
+    long weight = 256L;
+    for (Input parameter : definition.parameters())
+      weight += 128L + weightOf(parameter.name()) + weightOf(parameter.defaultValue());
     if (definition.url() != null) weight += definition.url().length() * 2L;
     return weight + weightOf(definition.entries()) + weightOf(definition.secretHeaders());
   }

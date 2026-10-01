@@ -8,8 +8,6 @@ import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
-import dev.arc.model.RuleKind;
-import dev.arc.rule.RuleSamples;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -28,7 +26,7 @@ class EngineTest {
 
   @Test
   void formulasUseTypedInputsAndTraceEachStep() {
-    var result = run(RuleSamples.blank(RuleKind.FORMULA), Map.of("amount", 199));
+    var result = run(calculation(), Map.of("amount", 199));
     assertThat(result.result()).isEqualTo(new BigDecimal("179.1"));
     assertThat(result.trace())
         .extracting(Engine.Step::nodeId)
@@ -55,26 +53,25 @@ class EngineTest {
 
   @Test
   void conditionsChooseBothBranchesAndUseDefaults() {
-    assertThat(run(RuleSamples.blank(RuleKind.RULE), Map.of("amount", 100)).result())
-        .isEqualTo(true);
-    var result = run(RuleSamples.blank(RuleKind.RULE), Map.of("amount", 99));
+    assertThat(run(condition(), Map.of("amount", 100)).result()).isEqualTo(true);
+    var result = run(condition(), Map.of("amount", 99));
     assertThat(result.result()).isEqualTo(false);
     assertThat(result.trace().get(1).branch()).isEqualTo("false");
-    assertThat(run(RuleSamples.blank(RuleKind.RULE), Map.of()).result()).isEqualTo(true);
+    assertThat(run(condition(), Map.of()).result()).isEqualTo(true);
   }
 
   @Test
   void inputErrorsAreNotSilentlyCoerced() {
-    assertThatThrownBy(() -> run(RuleSamples.blank(RuleKind.RULE), Map.of("amount", "100")))
+    assertThatThrownBy(() -> run(condition(), Map.of("amount", "100")))
         .hasMessageContaining("must be number");
-    assertThatThrownBy(() -> run(RuleSamples.blank(RuleKind.RULE), Map.of("ammount", 100)))
+    assertThatThrownBy(() -> run(condition(), Map.of("ammount", 100)))
         .hasMessageContaining("Unknown input");
     var d =
         new Definition(
             1,
             List.of(new Input("amount", "NUMBER", true, null)),
-            RuleSamples.blank(RuleKind.RULE).nodes(),
-            RuleSamples.blank(RuleKind.RULE).edges());
+            condition().nodes(),
+            condition().edges());
     assertThatThrownBy(() -> run(d, Map.of())).hasMessageContaining("Missing required input");
   }
 
@@ -105,7 +102,7 @@ class EngineTest {
             (id, version) -> {
               assertThat(id).isEqualTo("child");
               assertThat(version).isEqualTo(7);
-              return RuleSamples.blank(RuleKind.FORMULA);
+              return calculation();
             });
     assertThat(result.result()).isEqualTo(new BigDecimal("181.0"));
     assertThat(result.trace())

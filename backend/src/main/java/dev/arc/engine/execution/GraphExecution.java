@@ -114,7 +114,7 @@ final class GraphExecution {
       this.ruleId = ruleId;
       this.version = version;
       this.compiled = compiled;
-      this.plan = compiled.graph();
+      this.plan = compiled.plan();
       this.depth = depth;
     }
 

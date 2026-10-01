@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -103,6 +104,28 @@ class RequestLimitWebTest {
                   .content(json("schema 1;")))
           .andExpect(status().isOk());
     verify(script, times(BUILD_PATH_SPELLINGS.size())).build("schema 1;");
+  }
+
+  /**
+   * The 413 comes from the filter, before Spring MVC applies the API's CORS policy, so it states
+   * the policy's origin itself; a browser on another origin reads both answers.
+   */
+  @Test
+  void theLimitAnswersWithTheApiCorsOrigin() throws Exception {
+    mvc.perform(
+            post("/api/studio/build")
+                .header("Origin", "https://editor.example")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json("x".repeat(LIMIT))))
+        .andExpect(status().isPayloadTooLarge())
+        .andExpect(header().string("Access-Control-Allow-Origin", ApiCors.ALLOWED_ORIGIN));
+    mvc.perform(
+            post("/api/studio/build")
+                .header("Origin", "https://editor.example")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json("schema 1;")))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Access-Control-Allow-Origin", ApiCors.ALLOWED_ORIGIN));
   }
 
   /** A deployment that turns form parsing back on still applies the limit first. */

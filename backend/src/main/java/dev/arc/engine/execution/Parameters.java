@@ -13,8 +13,16 @@ import java.util.function.Function;
 
 /** One resolver per execution. Caller values win; source dependencies resolve recursively. */
 public final class Parameters {
+  /** One source read of an execution; the JSON {@code status} is the constant's name. */
   public record Read(
-      String input, String sourceId, int version, String status, long durationMicros) {}
+      String input, String sourceId, int version, Status status, long durationMicros) {
+    public enum Status {
+      /** The source returned the value. */
+      RESOLVED,
+      /** The read failed and the input took its default value ({@code onError: DEFAULT}). */
+      DEFAULT
+    }
+  }
 
   private final SourceReader sources;
   private final List<Read> reads = new ArrayList<>();
@@ -115,7 +123,7 @@ public final class Parameters {
       if (++fetches > Limits.MAX_SOURCE_READS)
         throw ArcException.limit("Execution exceeds " + Limits.MAX_SOURCE_READS + " source reads");
       Object value;
-      String status = "RESOLVED";
+      Read.Status status = Read.Status.RESOLVED;
       try {
         // A value that arrives after the deadline is never used, whichever reader returned it.
         value = deadline.within(() -> sources.read(source, argumentValues, deadline));
@@ -125,10 +133,10 @@ public final class Parameters {
       } catch (ArcException error) {
         deadline.check();
         if (!error.recoverable()) throw error;
-        if (!"DEFAULT".equals(source.onError()) || parameter.defaultValue() == null)
+        if (!source.fallsBackToDefault() || parameter.defaultValue() == null)
           throw ArcException.invalid(parameter.name() + ": " + error.getMessage());
         value = parameter.defaultValue();
-        status = "DEFAULT";
+        status = Read.Status.DEFAULT;
       }
       long durationMicros = (System.nanoTime() - start) / 1000;
       reads.add(new Read(parameter.name(), source.id(), source.version(), status, durationMicros));

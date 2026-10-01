@@ -227,14 +227,14 @@ class SwitchTransformTest {
     var source =
         script.render(transformation()).replace("$TO_NUMBER(customer.amount)", "displayName");
     var graph = script.parse(source);
-    assertThat(validator.diagnostics(graph, noRefs))
+    assertThat(validator.diagnose(graph, noRefs).problems())
         .anySatisfy(
             problem -> {
               assertThat(problem.message()).contains("Field amount", "displayName");
               assertThat(problem.locations().getFirst().nodeId()).isEqualTo("normalize");
             });
     var invalid = script.parse(script.render(choice()).replace("amount >= 50", "missing >= 50"));
-    assertThat(validator.diagnostics(invalid, noRefs))
+    assertThat(validator.diagnose(invalid, noRefs).problems())
         .anySatisfy(
             problem -> {
               assertThat(problem.message()).contains("Case Standard", "missing");

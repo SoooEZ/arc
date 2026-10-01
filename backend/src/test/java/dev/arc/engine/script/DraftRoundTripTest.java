@@ -59,9 +59,9 @@ class DraftRoundTripTest {
       assertThat(applied.diagnostics()).as(fragment).isEmpty();
       assertThat(applied.definition()).as(fragment).isEqualTo(expected);
 
-      assertThat(validator.diagnostics(built.definition(), resolver))
+      assertThat(validator.diagnose(built.definition(), resolver).problems())
           .as(text)
-          .isEqualTo(validator.diagnostics(draft, resolver));
+          .isEqualTo(validator.diagnose(draft, resolver).problems());
     }
   }
 

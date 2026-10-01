@@ -90,7 +90,7 @@ class NodeContractsTest {
                 node("out", "OUTPUT", "1")),
             List.of(edge("first", "out", "next")));
 
-    assertThat(validator.diagnostics(draft, noRules))
+    assertThat(validator.diagnose(draft, noRules).problems())
         .containsExactly(
             new Validator.Problem(
                 "A rule must have exactly one Input node",
@@ -128,7 +128,7 @@ class NodeContractsTest {
         Node extra = setting(nodeOf("extra", kind.name(), "Extra"), property).build();
         var draft = graph(List.of(node("in", "INPUT", null), extra), List.of());
         String message = messages.get(property);
-        assertThat(validator.diagnostics(draft, noRules))
+        assertThat(validator.diagnose(draft, noRules).problems())
             .as(kind + " " + property)
             .containsExactly(
                 new Validator.Problem(

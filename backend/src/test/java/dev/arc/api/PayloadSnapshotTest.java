@@ -51,7 +51,8 @@ class PayloadSnapshotTest {
             new Engine.Step(
                 "pricing", 3, "calc", "Calc", "FORMULA", new BigDecimal("12.50"), "next", 0),
             new Engine.Step("child", 1, "out", "Out", "OUTPUT", "x", null, 1));
-    var sources = List.of(new Parameters.Read("rate", "country-tax", 2, "DEFAULT", 55));
+    var sources =
+        List.of(new Parameters.Read("rate", "country-tax", 2, Parameters.Read.Status.DEFAULT, 55));
     when(execution.preview(any()))
         .thenReturn(
             new ExecutionResponse(

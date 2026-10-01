@@ -1,5 +1,6 @@
 package dev.arc.persistence;
 
+import static dev.arc.support.GraphFixtures.calculation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,8 +14,6 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.error.ArcException;
 import dev.arc.model.PageRequest;
-import dev.arc.model.RuleKind;
-import dev.arc.rule.RuleSamples;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -217,7 +216,7 @@ class JdbcRuleRepositoryTest {
    */
   @Test
   void formulaCallsResolveOnlyPublishedFormulasFromTheKindStorageReturns() {
-    var definition = RuleSamples.blank(RuleKind.FORMULA);
+    var definition = calculation();
     String encoded = new JsonCodec(new ObjectMapper()).encode(definition);
     var byKind = new HashMap<String, String>();
     when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))

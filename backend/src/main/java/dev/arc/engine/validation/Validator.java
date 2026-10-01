@@ -2,7 +2,6 @@ package dev.arc.engine.validation;
 
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
-import dev.arc.engine.graph.GraphPlan;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.Node;
@@ -44,19 +43,11 @@ public class Validator {
   }
 
   public void validate(Definition definition, RuleResolver resolver) {
-    plan(definition, resolver);
-  }
-
-  public GraphPlan plan(Definition definition, RuleResolver resolver) {
-    return compile(definition, resolver).graph();
+    compile(definition, resolver);
   }
 
   public CompiledGraph compile(Definition definition, RuleResolver resolver) {
     return graphValidation.compile(definition, resolver);
-  }
-
-  public List<Problem> diagnostics(Definition definition, RuleResolver resolver) {
-    return diagnose(definition, resolver).problems();
   }
 
   /** One diagnostics pass: each expression compiles once and the scope plan is built once. */

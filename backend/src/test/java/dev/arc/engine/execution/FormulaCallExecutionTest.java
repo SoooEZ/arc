@@ -387,10 +387,18 @@ class FormulaCallExecutionTest {
                     null,
                     new SourceBinding("slow", 1, Map.of(), "", "FAIL"))),
             "value");
+    // A value that arrives only after the deadline. One park could return early (a permit left
+    // on the thread), and then the value arrived in time and the test failed now and then.
     SourceReader slow =
         (binding, inputs, readDeadline) -> {
-          java.util.concurrent.locks.LockSupport.parkNanos(120_000_000);
-          return 1;
+          while (true) {
+            try {
+              java.util.concurrent.locks.LockSupport.parkNanos(
+                  readDeadline.remainingMillis() * 1_000_000);
+            } catch (ArcException expired) {
+              return 1;
+            }
+          }
         };
     var parent = graph(List.of(), "$IFERROR(@slow:1(), 9)");
     assertThatThrownBy(

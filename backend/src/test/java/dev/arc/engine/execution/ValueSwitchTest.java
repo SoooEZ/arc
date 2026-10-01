@@ -134,7 +134,7 @@ class ValueSwitchTest {
   void selectorParticipatesInScopeValidationAndCyclicGraphSyntaxDiagnostics() {
     var missing =
         script.parse(script.render(choice()).replace("select data.value;", "select missing;"));
-    assertThat(validator.diagnostics(missing, noRefs))
+    assertThat(validator.diagnose(missing, noRefs).problems())
         .anySatisfy(
             problem -> {
               assertThat(problem.message()).contains("Selector", "missing");
@@ -148,13 +148,13 @@ class ValueSwitchTest {
     var edges = new ArrayList<>(graph.edges());
     edges.add(new Edge("cycle", "out", "choose", "next"));
     var cyclic = new Definition(1, graph.inputs(), nodes, edges);
-    assertThat(validator.diagnostics(cyclic, noRefs))
+    assertThat(validator.diagnose(cyclic, noRefs).problems())
         .anySatisfy(
             problem -> {
               assertThat(problem.message()).contains("Incomplete expression");
               assertThat(problem.locations().getFirst().nodeId()).isEqualTo("choose");
             });
-    assertThat(validator.diagnostics(cyclic, noRefs))
+    assertThat(validator.diagnose(cyclic, noRefs).problems())
         .anyMatch(problem -> problem.message().contains("cycles"));
   }
 

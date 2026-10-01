@@ -52,7 +52,7 @@ class GraphPlanTest {
     assertThat(planCycle(definition)).containsExactly("a", "b");
     assertThat(cycleLocations(() -> validator.validate(definition, noReferences)))
         .containsExactly("a", "b");
-    assertThat(validator.diagnostics(definition, noReferences))
+    assertThat(validator.diagnose(definition, noReferences).problems())
         .filteredOn(problem -> problem.message().contains("cycles"))
         .singleElement()
         .satisfies(

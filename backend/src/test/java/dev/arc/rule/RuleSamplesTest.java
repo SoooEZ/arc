@@ -7,11 +7,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import dev.arc.error.ArcException;
-import dev.arc.model.NodeKind;
 import dev.arc.model.Rule;
 import dev.arc.model.RuleKind;
 import java.time.Instant;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
@@ -27,20 +25,6 @@ class RuleSamplesTest {
 
   RuleSamplesTest() {
     when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-  }
-
-  /** Every kind starts from a decided template: a Condition for a RULE, a calculation otherwise. */
-  @Test
-  void eachKindStartsFromItsTemplate() {
-    var rule = RuleSamples.blank(RuleKind.RULE);
-    assertThat(rule.nodesOf(NodeKind.CONDITION)).hasSize(1);
-    assertThat(rule.nodesOf(NodeKind.OUTPUT)).hasSize(2);
-    for (RuleKind kind : List.of(RuleKind.FORMULA, RuleKind.DECISION_TREE)) {
-      var calculation = RuleSamples.blank(kind);
-      assertThat(calculation).as(kind.name()).isEqualTo(RuleSamples.blank(RuleKind.FORMULA));
-      assertThat(calculation.nodesOf(NodeKind.FORMULA)).as(kind.name()).hasSize(1);
-      assertThat(calculation.nodesOf(NodeKind.CONDITION)).as(kind.name()).isEmpty();
-    }
   }
 
   /** A workspace seeded before, even one whose rules were all deleted since, is left alone. */
@@ -71,7 +55,7 @@ class RuleSamplesTest {
             anyString(),
             anyString(),
             eq("RULE"),
-            eq(RuleSamples.blank(RuleKind.RULE)));
+            eq(RuleTemplates.blank(RuleKind.RULE)));
   }
 
   /**

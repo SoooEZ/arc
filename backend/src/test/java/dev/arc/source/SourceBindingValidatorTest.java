@@ -59,7 +59,8 @@ class SourceBindingValidatorTest {
   @Test
   void mappingProblemsAppearOnTheInputNodeAndADraftWithoutOneStillGetsTheProblem() {
     var withInput = draft(List.of(inputNode("in", "Inputs"), outputNode("out", "Out", "1")));
-    assertThatThrownBy(() -> validator.validatePinnedContracts(withInput, noRules))
+    assertThatThrownBy(
+            () -> validator.validatePinnedContracts(withInput, noRules, CalleeCheck.NONE))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -69,7 +70,8 @@ class SourceBindingValidatorTest {
             });
 
     var withoutInput = draft(List.of(outputNode("out", "Out", "1")));
-    assertThatThrownBy(() -> validator.validatePinnedContracts(withoutInput, noRules))
+    assertThatThrownBy(
+            () -> validator.validatePinnedContracts(withoutInput, noRules, CalleeCheck.NONE))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -95,7 +97,7 @@ class SourceBindingValidatorTest {
       nodes.addAll(order);
       nodes.add(outputNode("out", "Out", "1"));
       var root = new Definition(1, List.of(), nodes, List.of());
-      assertThatThrownBy(() -> validator.validatePinnedContracts(root, resolver))
+      assertThatThrownBy(() -> validator.validatePinnedContracts(root, resolver, CalleeCheck.NONE))
           .as(order.toString())
           .hasMessage("Rule nesting exceeds 16 levels");
     }
@@ -106,7 +108,7 @@ class SourceBindingValidatorTest {
             List.of(),
             List.of(inputNode("in", "Inputs"), direct, outputNode("out", "Out", "1")),
             List.of());
-    validator.validatePinnedContracts(deepest, resolver);
+    validator.validatePinnedContracts(deepest, resolver, CalleeCheck.NONE);
   }
 
   /**
@@ -204,7 +206,8 @@ class SourceBindingValidatorTest {
         boolean mustMap = parameter.needsCallerValue();
         assertThat(mustMap).as(parameter.toString()).isEqualTo(required && defaultValue == null);
         if (mustMap) {
-          assertThatThrownBy(() -> validator.validatePinnedContracts(graph, noRules))
+          assertThatThrownBy(
+                  () -> validator.validatePinnedContracts(graph, noRules, CalleeCheck.NONE))
               .as(parameter.toString())
               .hasMessage("amount: missing source mapping for key");
           assertThatThrownBy(
@@ -212,7 +215,7 @@ class SourceBindingValidatorTest {
               .as(parameter.toString())
               .hasMessage("Missing source parameter: key");
         } else {
-          validator.validatePinnedContracts(graph, noRules);
+          validator.validatePinnedContracts(graph, noRules, CalleeCheck.NONE);
           assertThat(execution.test("table", new SourceExecutionService.Test(Map.of(), 1)))
               .as(parameter.toString())
               .isEqualTo("value");
@@ -240,7 +243,8 @@ class SourceBindingValidatorTest {
             List.of(mapped),
             List.of(inputNode("in", "Inputs"), outputNode("out", "Out", "amount")),
             List.of());
-    for (int check = 0; check < 3; check++) validator.validatePinnedContracts(definition, noRules);
+    for (int check = 0; check < 3; check++)
+      validator.validatePinnedContracts(definition, noRules, CalleeCheck.NONE);
     verify(repository, times(1)).get("rates", 1);
   }
 

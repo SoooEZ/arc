@@ -78,34 +78,48 @@ public class RuleService {
               + " and hyphens (max "
               + Limits.MAX_RESOURCE_ID_CHARACTERS
               + ")");
-    String name = DisplayNames.normalize("Rule", request.name());
-    description(request.description());
+    Metadata metadata = metadata(request.name(), request.description());
     // The payload keeps the kind as text; an unknown one is a 422 here, never a Jackson 400.
     RuleKind kind =
         RuleKind.parse(request.kind())
             .orElseThrow(() -> ArcException.invalid("Choose " + RuleKind.choices()));
-    Definition d =
-        withNormalizedNotes(
-            request.definition() == null ? RuleSamples.blank(kind) : request.definition());
-    validator.shape(d);
-    holdCallees(d);
-    return store.create(
-        request.id(),
-        name,
-        request.description() == null ? "" : request.description(),
-        kind.name(),
-        d);
+    Definition draft =
+        storableDraft(
+            request.definition() == null ? RuleTemplates.blank(kind) : request.definition());
+    return store.create(request.id(), metadata.name(), metadata.description(), kind.name(), draft);
   }
 
   @Transactional
   public Rule update(String id, Update request) {
     requireRevision(store.lockForSave(id), request.revision());
-    String name = DisplayNames.normalize("Rule", request.name());
-    description(request.description());
-    Definition d = withNormalizedNotes(request.definition());
-    validator.shape(d);
-    holdCallees(d);
-    return store.update(id, name, request.description() == null ? "" : request.description(), d);
+    Metadata metadata = metadata(request.name(), request.description());
+    Definition draft = storableDraft(request.definition());
+    return store.update(id, metadata.name(), metadata.description(), draft);
+  }
+
+  /** The name and description a create or a save stores. */
+  private record Metadata(String name, String description) {}
+
+  /** The trimmed name and the description, empty when missing, within their limits. */
+  private static Metadata metadata(String name, String description) {
+    String trimmed = DisplayNames.normalize("Rule", name);
+    if (description != null && description.length() > Limits.MAX_DESCRIPTION_CHARACTERS)
+      throw ArcException.invalid(
+          "Description exceeds "
+              + Limits.format(Limits.MAX_DESCRIPTION_CHARACTERS)
+              + " characters");
+    return new Metadata(trimmed, description == null ? "" : description);
+  }
+
+  /**
+   * The draft a create or a save stores: its notes in comment form and its shape checked, with the
+   * rules it calls held against deletion until the commit.
+   */
+  private Definition storableDraft(Definition definition) {
+    Definition draft = withNormalizedNotes(definition);
+    validator.shape(draft);
+    holdCallees(draft);
+    return draft;
   }
 
   @Transactional
@@ -221,13 +235,5 @@ public class RuleService {
         definition.nodes(),
         definition.edges(),
         notes);
-  }
-
-  private static void description(String description) {
-    if (description != null && description.length() > Limits.MAX_DESCRIPTION_CHARACTERS)
-      throw ArcException.invalid(
-          "Description exceeds "
-              + Limits.format(Limits.MAX_DESCRIPTION_CHARACTERS)
-              + " characters");
   }
 }

@@ -187,12 +187,14 @@ final class ExpressionParser {
     String id = token.substring(1, separator);
     if (!Identifiers.isResourceId(id))
       throw ArcException.invalid("Formula call needs a valid rule ID");
+    // Digits without a leading zero, so the version is positive; past Integer.MAX_VALUE it does
+    // not parse.
+    String digits = token.substring(separator + 1);
     int version;
     try {
-      if (!token.substring(separator + 1).matches("[1-9][0-9]*")) throw new NumberFormatException();
-      version = Integer.parseInt(token.substring(separator + 1));
-      if (version <= 0) throw new NumberFormatException();
-    } catch (NumberFormatException error) {
+      if (!digits.matches("[1-9][0-9]*")) throw new NumberFormatException(digits);
+      version = Integer.parseInt(digits);
+    } catch (NumberFormatException notAVersion) {
       throw ArcException.invalid("Formula call version must be a positive integer");
     }
     expect("(");

@@ -9,6 +9,7 @@ import dev.arc.engine.validation.ShapeViolation.InputDeclaration;
 import dev.arc.engine.validation.ShapeViolation.InputSource;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.Input;
+import dev.arc.model.Definition.SourceBinding;
 import java.util.*;
 
 /**
@@ -30,9 +31,7 @@ final class InputValidation {
       require(names.add(parameter.name()), declaration, "Duplicate input: " + parameter.name());
       if (!contentChecks) continue;
       require(
-          InputTypes.NAMES.contains(parameter.type() == null ? "" : parameter.type()),
-          declaration,
-          "Unknown input type");
+          InputTypes.Type.parse(parameter.type()).isPresent(), declaration, "Unknown input type");
       if (parameter.defaultValue() != null) checkDefault(parameter, declaration);
       if (parameter.source() != null) checkSource(parameter);
     }
@@ -72,11 +71,11 @@ final class InputValidation {
         source,
         "Use a JSON pointer starting with /");
     require(
-        Set.of("FAIL", "DEFAULT").contains(binding.onError() == null ? "" : binding.onError()),
+        SourceBinding.OnError.parse(binding.onError()).isPresent(),
         source,
         "Choose FAIL or DEFAULT source error policy");
     require(
-        !"DEFAULT".equals(binding.onError()) || parameter.defaultValue() != null,
+        !binding.fallsBackToDefault() || parameter.defaultValue() != null,
         source,
         "Source fallback requires a default value");
   }

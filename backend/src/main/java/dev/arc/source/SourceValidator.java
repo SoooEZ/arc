@@ -18,8 +18,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public final class SourceValidator {
-  private static final Set<String> PARAMETER_TYPES = Set.of("NUMBER", "STRING", "BOOLEAN");
-
   private final SourceAdapters adapters;
 
   public SourceValidator(SourceAdapters adapters) {
@@ -37,8 +35,11 @@ public final class SourceValidator {
     for (Input p : definition.parameters()) {
       if (p == null || !Identifiers.isValid(p.name()) || !names.add(p.name()) || p.source() != null)
         throw ArcException.invalid("Invalid source parameter");
-      if (!PARAMETER_TYPES.contains(p.type() == null ? "" : p.type()))
-        throw ArcException.invalid("Source parameters must be scalar");
+      // A misspelled type is unknown, as for a rule input; a known collection type is not scalar.
+      var type =
+          InputTypes.Type.parse(p.type())
+              .orElseThrow(() -> ArcException.invalid("Unknown input type"));
+      if (!type.scalar()) throw ArcException.invalid("Source parameters must be scalar");
       if (p.defaultValue() != null) InputTypes.check(p.name(), p.type(), p.defaultValue());
     }
     validateSecretHeaderShape(definition.secretHeaders());

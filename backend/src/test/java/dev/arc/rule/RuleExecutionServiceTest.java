@@ -1,5 +1,6 @@
 package dev.arc.rule;
 
+import static dev.arc.support.GraphFixtures.calculation;
 import static dev.arc.support.GraphFixtures.inputNode;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
@@ -15,7 +16,6 @@ import dev.arc.error.ArcException;
 import dev.arc.model.DataSource;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
-import dev.arc.model.RuleKind;
 import dev.arc.model.SourceDefinition;
 import dev.arc.rule.RuleExecutionService.*;
 import dev.arc.source.*;
@@ -50,7 +50,7 @@ class RuleExecutionServiceTest {
   @Test
   void executionReadsOnlyPublishedPointerAndPinAndReusesPreparedPlan() throws Exception {
     when(rules.publishedVersion("rule")).thenReturn(1);
-    when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank(RuleKind.FORMULA));
+    when(rules.resolve("rule", 1)).thenReturn(calculation());
     var first = service.execute("rule", new Execution(Map.of("amount", 100), null));
     var second = service.execute("rule", new Execution(Map.of("amount", 200), 1, false, 30_000));
     assertThat(first.execution().result()).isEqualTo(new java.math.BigDecimal("90.0"));
@@ -73,7 +73,7 @@ class RuleExecutionServiceTest {
   void anInputBeyondTheScaleRangeIsRefusedAsOutOfRange() {
     // 100E+2147483647 overflowed stripTrailingZeros() inside the input check: a 500 and an ERROR
     // stack trace instead of the documented 422.
-    when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank(RuleKind.FORMULA));
+    when(rules.resolve("rule", 1)).thenReturn(calculation());
     var huge = new java.math.BigDecimal("100E+2147483647");
     assertThatThrownBy(() -> service.execute("rule", new Execution(Map.of("amount", huge), 1)))
         .isInstanceOfSatisfying(
@@ -87,7 +87,7 @@ class RuleExecutionServiceTest {
 
   @Test
   void aCachedPublishedPlanIsExecutedWithoutReadingItsVersionAgain() {
-    when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank(RuleKind.FORMULA));
+    when(rules.resolve("rule", 1)).thenReturn(calculation());
     for (int amount : List.of(100, 200, 300))
       assertThat(
               service
@@ -149,10 +149,8 @@ class RuleExecutionServiceTest {
 
   @Test
   void changedDraftsNeverReusePublishedOrPreviousPreviewPlans() {
-    var first =
-        service.preview(new Preview(RuleSamples.blank(RuleKind.FORMULA), Map.of("amount", 100)));
-    var second =
-        service.preview(new Preview(RuleSamples.blank(RuleKind.FORMULA), Map.of("amount", 200)));
+    var first = service.preview(new Preview(calculation(), Map.of("amount", 100)));
+    var second = service.preview(new Preview(calculation(), Map.of("amount", 200)));
     assertThat(first.execution().result()).isNotEqualTo(second.execution().result());
     assertThat(validator.compilations).isEqualTo(2);
     verifyNoInteractions(rules);
@@ -206,7 +204,7 @@ class RuleExecutionServiceTest {
 
   @Test
   void cachedPublishedPlansKeepConcurrentRequestInputsIsolated() throws Exception {
-    when(rules.resolve("rule", 1)).thenReturn(RuleSamples.blank(RuleKind.FORMULA));
+    when(rules.resolve("rule", 1)).thenReturn(calculation());
     service.execute("rule", new Execution(Map.of("amount", 100), 1, false, null));
     try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
       var tasks = new ArrayList<java.util.concurrent.Callable<ExecutionResponse>>();

@@ -1,5 +1,6 @@
 package dev.arc.api;
 
+import static dev.arc.support.GraphFixtures.calculation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -16,11 +17,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Rule;
-import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
-import dev.arc.rule.RuleSamples;
 import dev.arc.rule.RuleService;
 import dev.arc.source.SourceExecutionService;
 import dev.arc.source.SourceRepository;
@@ -62,7 +61,7 @@ class RevisionWebTest {
     when(rules.lockForSave("rates")).thenReturn(4);
     when(rules.lockForPublication("rates")).thenReturn(rule());
     when(sources.lock("country-tax")).thenReturn(2);
-    String draft = new ObjectMapper().writeValueAsString(RuleSamples.blank(RuleKind.FORMULA));
+    String draft = new ObjectMapper().writeValueAsString(calculation());
     String lookup = "{\"kind\":\"LOOKUP\",\"parameters\":[],\"entries\":{},\"timeoutMs\":3000}";
 
     for (String revision : List.of("", "\"revision\":null,")) {
@@ -89,14 +88,6 @@ class RevisionWebTest {
 
   private static Rule rule() {
     return new Rule(
-        "rates",
-        "Rates",
-        "",
-        "FORMULA",
-        RuleSamples.blank(RuleKind.FORMULA),
-        4,
-        null,
-        Instant.EPOCH,
-        Instant.EPOCH);
+        "rates", "Rates", "", "FORMULA", calculation(), 4, null, Instant.EPOCH, Instant.EPOCH);
   }
 }

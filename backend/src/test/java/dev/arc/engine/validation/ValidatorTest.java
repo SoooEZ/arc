@@ -8,8 +8,6 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
-import dev.arc.model.RuleKind;
-import dev.arc.rule.RuleSamples;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
@@ -19,11 +17,6 @@ class ValidatorTest {
       (id, version) -> {
         throw new ArcException(404, "Published version not found");
       };
-
-  @Test
-  void templatesAreValid() {
-    for (RuleKind kind : RuleKind.values()) validator.validate(RuleSamples.blank(kind), resolver);
-  }
 
   @Test
   void incompleteDraftsCanBeSavedButNotPublished() {
@@ -41,7 +34,7 @@ class ValidatorTest {
             List.of(node("input", "INPUT", null, null), node("loop", "FORMULA", "1", "x")),
             List.of(edge("input", "loop", "next"), edge("loop", "loop", "next")));
     assertThatThrownBy(() -> validator.validate(d, resolver)).hasMessageContaining("cycles");
-    var base = RuleSamples.blank(RuleKind.FORMULA);
+    var base = calculation();
     var nodes = new ArrayList<>(base.nodes());
     nodes.add(node("orphan", "OUTPUT", "0", null));
     assertThatThrownBy(
@@ -93,7 +86,7 @@ class ValidatorTest {
 
   @Test
   void duplicateAndInvalidInputsAreRejected() {
-    var base = RuleSamples.blank(RuleKind.FORMULA);
+    var base = calculation();
     assertThatThrownBy(
             () ->
                 validator.shape(
@@ -120,7 +113,7 @@ class ValidatorTest {
   @Test
   void inputAndDocumentProblemsAppearOnTheInputNodeWhereverTheShapeIsChecked() {
     // Save, render and /variables returned them unlocated, unlike /validate and /diagnostics.
-    var base = RuleSamples.blank(RuleKind.FORMULA);
+    var base = calculation();
     var input = base.inputNode().orElseThrow();
     var amount = new Input("amount", "NUMBER", true, null);
     var duplicated = new Definition(1, List.of(amount, amount), base.nodes(), base.edges());
@@ -162,7 +155,7 @@ class ValidatorTest {
 
   @Test
   void inputNamesRejectWhitespaceAndFunctionPrefixesWithoutReservingFunctionNames() {
-    var base = RuleSamples.blank(RuleKind.FORMULA);
+    var base = calculation();
     for (String name :
         List.of("unit price", "price\t", "price\u00a0", "$ROUND", "round$", "@price", "price@")) {
       var definition =
@@ -203,7 +196,7 @@ class ValidatorTest {
                       .extracting(ArcException.Location::nodeId)
                       .containsExactly("result");
                 });
-        assertThat(validator.diagnostics(definition, resolver))
+        assertThat(validator.diagnose(definition, resolver).problems())
             .extracting(Validator.Problem::message)
             .containsExactly("result: provide a valid result variable");
       }
@@ -259,10 +252,40 @@ class ValidatorTest {
         new Definition(
             1,
             List.of(new Input("amount", "NUMBER", true, null)),
-            RuleSamples.blank(RuleKind.FORMULA).nodes(),
-            RuleSamples.blank(RuleKind.FORMULA).edges());
+            calculation().nodes(),
+            calculation().edges());
     assertThatThrownBy(() -> validator.validate(d, (id, v) -> child))
         .hasMessageContaining("missing binding for amount");
+
+    // A binding must name an input of the pinned version; removing this check failed no test.
+    var bindings = new LinkedHashMap<String, String>();
+    bindings.put("amount", "1");
+    bindings.put("ghost", "2");
+    var extra =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                nodeOf("reuse", "REFERENCE", "reuse")
+                    .at(0, 0)
+                    .output("value")
+                    .rule("child", 1)
+                    .bindings(bindings)
+                    .build(),
+                node("out", "OUTPUT", "value", null)),
+            List.of(edge("input", "reuse", "next"), edge("reuse", "out", "next")));
+    assertThatThrownBy(() -> validator.validate(extra, (id, v) -> child))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage()).isEqualTo("reuse: unknown parameter ghost");
+              assertThat(error.locations())
+                  .containsExactly(new ArcException.Location(null, null, "reuse", "reuse"));
+            });
+    assertThat(validator.diagnose(extra, (id, v) -> child).problems())
+        .extracting(Validator.Problem::message)
+        .containsExactly("reuse: unknown parameter ghost");
   }
 
   @Test
@@ -291,7 +314,7 @@ class ValidatorTest {
                 edge("decision", "out", "default"),
                 edge("transform", "decision", "next")));
 
-    var problems = validator.diagnostics(definition, resolver);
+    var problems = validator.diagnose(definition, resolver).problems();
     assertThat(
             problems.stream()
                 .filter(problem -> problem.message().contains("Incomplete expression")))

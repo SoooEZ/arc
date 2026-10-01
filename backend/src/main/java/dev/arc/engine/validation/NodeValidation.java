@@ -7,6 +7,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.NodeKind;
+import dev.arc.model.NodeKind.Property;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -21,18 +22,18 @@ final class NodeValidation {
    * the only places that build these, so every check reports one fault with the same label, such as
    * {@code "Route / Case Premium"} or {@code "rate source / region"}.
    */
-  record OwnedExpression(String source, String nodeLabel, String position, String bindingName) {
+  record OwnedExpression(String source, String nodeLabel, String position) {
     /** A node's whole expression: its label alone names it. */
     static OwnedExpression whole(Node node) {
-      return new OwnedExpression(node.expression(), node.label(), null, null);
+      return new OwnedExpression(node.expression(), node.label(), null);
     }
 
     static OwnedExpression at(Node node, String source, String position) {
-      return new OwnedExpression(source, node.label(), position, null);
+      return new OwnedExpression(source, node.label(), position);
     }
 
     static OwnedExpression sourceMapping(String source, String input, String key) {
-      return new OwnedExpression(source, null, ExpressionPositions.sourceMapping(input, key), null);
+      return new OwnedExpression(source, null, ExpressionPositions.sourceMapping(input, key));
     }
 
     /** The label its problems carry. */
@@ -51,7 +52,7 @@ final class NodeValidation {
       ExpressionCache expressions) {
     try {
       NodeKind kind = node.kind();
-      if (kind == NodeKind.SWITCH)
+      if (kind.uses(Property.CASES))
         require(
             node.cases() != null && !node.cases().isEmpty(),
             node.label() + ": add at least one case");
@@ -59,14 +60,7 @@ final class NodeValidation {
       // Expressions first: a broken binding is reported before its pin, with or without a plan.
       for (OwnedExpression expression : expressions(node))
         check(expression, scope, expressions, resolver);
-      if (kind == NodeKind.REFERENCE) {
-        Set<String> referenceParameters = referenceParameters(node, resolver);
-        for (OwnedExpression expression : expressions(node))
-          if (expression.bindingName() != null)
-            require(
-                referenceParameters.contains(expression.bindingName()),
-                node.label() + ": unknown parameter " + expression.bindingName());
-      }
+      if (kind.uses(Property.RULE)) checkPinnedRule(node, resolver);
 
       if (kind.storesResult()) {
         require(
@@ -107,7 +101,11 @@ final class NodeValidation {
     }
   }
 
-  private Set<String> referenceParameters(Node node, RuleResolver resolver) {
+  /**
+   * The contract of a pinned rule: a published version is chosen, every input that needs a caller
+   * value is bound, and every binding names one of the version's inputs.
+   */
+  private static void checkPinnedRule(Node node, RuleResolver resolver) {
     require(
         node.ruleId() != null && node.version() != null && node.version() > 0,
         node.label() + ": select a published rule and version");
@@ -117,7 +115,9 @@ final class NodeValidation {
       require(
           !parameter.needsCallerValue() || bindings.containsKey(parameter.name()),
           node.label() + ": missing binding for " + parameter.name());
-    return child.inputs().stream().map(Input::name).collect(Collectors.toSet());
+    Set<String> parameters = child.inputs().stream().map(Input::name).collect(Collectors.toSet());
+    for (String name : bindings.keySet())
+      require(parameters.contains(name), node.label() + ": unknown parameter " + name);
   }
 
   /**
@@ -148,11 +148,8 @@ final class NodeValidation {
     if (node.bindings() != null)
       for (var binding : node.bindings().entrySet())
         bindings.add(
-            new OwnedExpression(
-                binding.getValue(),
-                node.label(),
-                ExpressionPositions.referenceBinding(binding.getKey()),
-                binding.getKey()));
+            OwnedExpression.at(
+                node, binding.getValue(), ExpressionPositions.referenceBinding(binding.getKey())));
     return bindings;
   }
 
@@ -207,7 +204,7 @@ final class NodeValidation {
   static List<Validator.Dependency> dependencies(
       Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
     var dependencies = new ArrayList<Validator.Dependency>();
-    for (Node node : definition.nodesOf(NodeKind.REFERENCE))
+    for (Node node : pinningNodes(definition))
       if (node.ruleId() != null && node.version() != null)
         dependencies.add(Validator.Dependency.reference(node));
     for (Node node : definition.nodes()) {
@@ -229,14 +226,21 @@ final class NodeValidation {
   static Set<String> calledRuleIds(
       Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
     var ids = new LinkedHashSet<String>();
-    for (Node node : definition.nodesOf(NodeKind.REFERENCE))
-      if (node.ruleId() != null) ids.add(node.ruleId());
+    for (Node node : pinningNodes(definition)) if (node.ruleId() != null) ids.add(node.ruleId());
     var owned = new ArrayList<OwnedExpression>();
     for (var mappings : sourceMappings(definition).values()) owned.addAll(mappings);
     for (Node node : definition.nodes()) owned.addAll(expressions(node));
     for (OwnedExpression expression : owned)
       for (var call : formulaCalls.apply(expression.source())) ids.add(call.id());
     return ids;
+  }
+
+  /**
+   * The nodes that pin a rule, chosen by the {@link Property#RULE} fact rather than by kind: a new
+   * kind that pins a rule is then held against the callee's deletion like a Reference.
+   */
+  private static List<Node> pinningNodes(Definition definition) {
+    return definition.nodes().stream().filter(node -> node.kind().uses(Property.RULE)).toList();
   }
 
   /** Calls of one expression; a malformed expression fails, located at its node by the caller. */

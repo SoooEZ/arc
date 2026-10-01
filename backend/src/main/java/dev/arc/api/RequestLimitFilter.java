@@ -58,7 +58,7 @@ public class RequestLimitFilter extends OncePerRequestFilter {
   private void rejectOversized(HttpServletResponse response) throws IOException {
     response.setStatus(413);
     response.setContentType("application/json");
-    response.setHeader("Access-Control-Allow-Origin", "*");
+    response.setHeader("Access-Control-Allow-Origin", ApiCors.ALLOWED_ORIGIN);
     var body =
         ErrorBody.transport(413, "Request body exceeds " + Limits.formatBytes(MAX_BODY_BYTES));
     response.getWriter().write(json.writeValueAsString(body));

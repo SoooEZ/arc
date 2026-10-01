@@ -1,5 +1,6 @@
 package dev.arc.engine.execution;
 
+import static dev.arc.support.GraphFixtures.calculation;
 import static dev.arc.support.GraphFixtures.inputNode;
 import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
@@ -11,8 +12,6 @@ import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
-import dev.arc.model.RuleKind;
-import dev.arc.rule.RuleSamples;
 import dev.arc.source.JsonPointerExtractor;
 import java.math.BigDecimal;
 import java.util.*;
@@ -65,7 +64,11 @@ class ParametersTest {
     var inputs = List.of(rate("DEFAULT"), new Input("country", "STRING", true, "missing"));
     var p = new Parameters(source);
     assertThat(resolve(p, inputs, Map.of()).get("rate")).isEqualTo(new BigDecimal("0.01"));
-    assertThat(p.reads().getFirst().status()).isEqualTo("DEFAULT");
+    assertThat(p.reads().getFirst().status()).isEqualTo(Parameters.Read.Status.DEFAULT);
+    // The response names the status as it did when it was a string.
+    com.fasterxml.jackson.databind.JsonNode read =
+        new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(p.reads().getFirst());
+    assertThat(read.get("status").asText()).isEqualTo("DEFAULT");
     assertThatThrownBy(
             () -> resolve(new Parameters(source), List.of(rate("FAIL"), inputs.get(1)), Map.of()))
         .hasMessageContaining("Missing key");
@@ -97,10 +100,17 @@ class ParametersTest {
 
   @Test
   void aValueReadAfterTheDeadlineIsNeverUsedEvenIfTheReaderIgnoresTheDeadline() {
+    // Returns only once the deadline has passed; one park could return early.
     SourceReader late =
         (binding, inputs, deadline) -> {
-          java.util.concurrent.locks.LockSupport.parkNanos(150_000_000);
-          return BigDecimal.ONE;
+          while (true) {
+            try {
+              java.util.concurrent.locks.LockSupport.parkNanos(
+                  deadline.remainingMillis() * 1_000_000);
+            } catch (ArcException expired) {
+              return BigDecimal.ONE;
+            }
+          }
         };
     var parameters = List.of(rate("DEFAULT"), new Input("country", "STRING", true, "US"));
     assertThatThrownBy(
@@ -234,7 +244,7 @@ class ParametersTest {
             true,
             null,
             new SourceBinding("source", 1, Map.of("key", "a"), "", "FAIL"));
-    var blank = RuleSamples.blank(RuleKind.FORMULA);
+    var blank = calculation();
     var d = new Definition(1, List.of(a, b), blank.nodes(), blank.edges());
     assertThatThrownBy(() -> new Validator().validate(d, (id, v) -> null))
         .hasMessageContaining("Circular source");

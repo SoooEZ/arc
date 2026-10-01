@@ -2,8 +2,8 @@ package dev.arc.source.lookup;
 
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.Limits;
+import dev.arc.engine.ValueBounds;
 import dev.arc.engine.ValueText;
-import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.SourceDefinition;
@@ -45,7 +45,7 @@ public final class LookupSourceAdapter implements SourceAdapter {
           "Provide a JSON object with at most "
               + Limits.format(Limits.MAX_COLLECTION_ITEMS)
               + " lookup entries");
-    Expressions.bounded(definition.entries());
+    ValueBounds.bounded(definition.entries());
   }
 
   /** The table is in memory, so the caller's deadline checks around this call suffice. */
@@ -71,7 +71,7 @@ public final class LookupSourceAdapter implements SourceAdapter {
     String text = ValueText.key(key);
     if (entries.containsKey(text)) return text;
     if (key instanceof Number) {
-      BigDecimal number = Expressions.number(key);
+      BigDecimal number = ValueBounds.number(key);
       for (String entry : entries.keySet()) if (isSameNumber(entry, number)) return entry;
     }
     return null;

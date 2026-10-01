@@ -1,9 +1,8 @@
 package dev.arc.engine;
 
+import static dev.arc.support.GraphFixtures.calculation;
 import static org.assertj.core.api.Assertions.*;
 
-import dev.arc.model.RuleKind;
-import dev.arc.rule.RuleSamples;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +13,7 @@ class MemoizingRuleResolverTest {
     RuleResolver storage =
         (id, version) -> {
           calls.incrementAndGet();
-          return RuleSamples.blank(RuleKind.FORMULA);
+          return calculation();
         };
     var first = new MemoizingRuleResolver(storage);
     assertThat(first.resolve("child", 1)).isSameAs(first.resolve("child", 1));
@@ -34,13 +33,13 @@ class MemoizingRuleResolverTest {
           @Override
           public dev.arc.model.Definition resolve(String id, int version) {
             ordinary.incrementAndGet();
-            return RuleSamples.blank(RuleKind.FORMULA);
+            return calculation();
           }
 
           @Override
           public dev.arc.model.Definition resolveFormula(String id, int version) {
             formulas.incrementAndGet();
-            return RuleSamples.blank(RuleKind.FORMULA);
+            return calculation();
           }
         };
     var resolver = new MemoizingRuleResolver(storage);
@@ -52,7 +51,7 @@ class MemoizingRuleResolverTest {
     assertThat(resolver.resolve("child", 2)).isSameAs(firstFormula);
     assertThat(ordinary).hasValue(1);
     assertThat(formulas).hasValue(2);
-    RuleResolver referenceOnly = (id, version) -> RuleSamples.blank(RuleKind.FORMULA);
+    RuleResolver referenceOnly = (id, version) -> calculation();
     assertThatThrownBy(() -> referenceOnly.resolveFormula("child", 1))
         .hasMessageContaining("unavailable");
   }

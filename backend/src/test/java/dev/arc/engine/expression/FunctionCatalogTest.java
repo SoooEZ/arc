@@ -89,6 +89,10 @@ class FunctionCatalogTest {
             .map(entry -> entry.name().substring(1))
             .toList();
     assertThat(arcEntries).hasSize(BuiltinFunctionCatalog.specs().size());
+    // An ARC function's own entry replaces any Excel help, so such help would never be shown: a
+    // ROUNDUP entry sat there unused.
+    assertThat(ExcelFunctionHelp.documentedNames())
+        .doesNotContainAnyElementsOf(BuiltinFunctionCatalog.specs().keySet());
     var evaluatedByArc = new TreeSet<String>(Functions.arcFunctionNames());
     evaluatedByArc.addAll(ExpressionRuntime.lazyFunctionNames());
     // A collection function is credited by its constant, which owns its runtime code, not by a

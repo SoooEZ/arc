@@ -26,6 +26,11 @@ final class ExcelFunctionHelp {
     return help == null ? entry : help.applyTo(entry);
   }
 
+  /** The Excel functions with curated help, for tests. */
+  static Set<String> documentedNames() {
+    return HELP.keySet();
+  }
+
   private static Map<String, Help> create() {
     var help = new HashMap<String, Help>();
     add(
@@ -145,13 +150,6 @@ final class ExcelFunctionHelp {
         "SUMPRODUCT(array, ...)",
         "Multiplies matching positions then adds the products.",
         "SUMPRODUCT(${1:prices}, ${2:quantities})");
-    add(
-        help,
-        "ROUNDUP",
-        "Math",
-        "ROUNDUP(number, digits = 0)",
-        "Rounds away from zero.",
-        "ROUNDUP(${1:amount}, ${2:2})");
     for (String n : List.of("MEDIAN", "STDEV", "STDEVP", "VAR", "VARP", "GEOMEAN"))
       add(
           help,

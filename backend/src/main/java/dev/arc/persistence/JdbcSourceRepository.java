@@ -31,6 +31,16 @@ public class JdbcSourceRepository implements SourceRepository {
       """
           .formatted(CATALOG_FILTER);
 
+  /**
+   * A source with one of its versions: the columns the version mapper reads. A current-version read
+   * adds {@code AND v.version = s.version} to the join.
+   */
+  private static final String VERSION_ROWS =
+      "SELECT s.id, s.name, v.version, v.definition FROM data_sources s"
+          + " JOIN data_source_versions v ON v.source_id = s.id";
+
+  private static final String CURRENT_VERSION_ROWS = VERSION_ROWS + " AND v.version = s.version";
+
   private static final RowMapper<SourceSummary> SUMMARY_MAPPER =
       (row, index) ->
           new SourceSummary(
@@ -64,14 +74,7 @@ public class JdbcSourceRepository implements SourceRepository {
 
   @Override
   public List<DataSource> list() {
-    return db.query(
-        """
-        SELECT s.id, s.name, v.version, v.definition
-        FROM data_sources s
-        JOIN data_source_versions v ON v.source_id = s.id AND v.version = s.version
-        ORDER BY s.updated_at DESC
-        """,
-        mapper);
+    return db.query(CURRENT_VERSION_ROWS + " ORDER BY s.updated_at DESC", mapper);
   }
 
   @Override
@@ -106,17 +109,7 @@ public class JdbcSourceRepository implements SourceRepository {
    */
   @Override
   public DataSource get(String id, int version) {
-    var rows =
-        db.query(
-            """
-            SELECT s.id, s.name, v.version, v.definition
-            FROM data_sources s
-            JOIN data_source_versions v ON v.source_id = s.id
-            WHERE s.id = ? AND v.version = ?
-            """,
-            mapper,
-            id,
-            version);
+    var rows = db.query(VERSION_ROWS + " WHERE s.id = ? AND v.version = ?", mapper, id, version);
     if (rows.isEmpty()) {
       requireSource(id);
       throw new ArcException(404, "Data source version not found: " + id + " v" + version);
@@ -126,16 +119,7 @@ public class JdbcSourceRepository implements SourceRepository {
 
   @Override
   public DataSource latest(String id) {
-    var rows =
-        db.query(
-            """
-        SELECT s.id, s.name, v.version, v.definition
-        FROM data_sources s
-        JOIN data_source_versions v ON v.source_id = s.id AND v.version = s.version
-        WHERE s.id = ?
-        """,
-            mapper,
-            id);
+    var rows = db.query(CURRENT_VERSION_ROWS + " WHERE s.id = ?", mapper, id);
     if (rows.isEmpty()) throw sourceNotFound();
     return rows.getFirst();
   }
@@ -144,16 +128,7 @@ public class JdbcSourceRepository implements SourceRepository {
   @Override
   public List<DataSource> versions(String id) {
     requireSource(id);
-    return db.query(
-        """
-        SELECT s.id, s.name, v.version, v.definition
-        FROM data_sources s
-        JOIN data_source_versions v ON v.source_id = s.id
-        WHERE s.id = ?
-        ORDER BY v.version DESC
-        """,
-        mapper,
-        id);
+    return db.query(VERSION_ROWS + " WHERE s.id = ? ORDER BY v.version DESC", mapper, id);
   }
 
   /** An ID that is already stored, including by a concurrent create, is a 409 conflict. */

@@ -31,6 +31,40 @@ class SourceValidatorTest {
         .hasMessage("Source kind must be HTTP or LOOKUP or MEMORY");
   }
 
+  /**
+   * A misspelled parameter type is unknown, as for a rule input; only a known collection type is
+   * "not scalar". Every misspelling used to be reported as not scalar.
+   */
+  @Test
+  void parameterTypesAreKnownScalarTypes() {
+    for (String type : List.of("NUMBR", "number", ""))
+      assertThatThrownBy(
+              () ->
+                  validator.validate(
+                      new SourceDefinition(
+                          "LOOKUP",
+                          null,
+                          List.of(new Input("key", type, true, null)),
+                          Map.of(),
+                          null,
+                          0)))
+          .as(type)
+          .hasMessage("Unknown input type");
+    for (String type : List.of("ARRAY", "OBJECT"))
+      assertThatThrownBy(
+              () ->
+                  validator.validate(
+                      new SourceDefinition(
+                          "LOOKUP",
+                          null,
+                          List.of(new Input("key", type, true, null)),
+                          Map.of(),
+                          null,
+                          0)))
+          .as(type)
+          .hasMessage("Source parameters must be scalar");
+  }
+
   @Test
   void everyKindRejectsSecretHeadersWithoutANameOrAlias() {
     var missingAlias = new HashMap<String, String>();

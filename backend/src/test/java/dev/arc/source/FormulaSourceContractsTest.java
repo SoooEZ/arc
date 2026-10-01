@@ -9,6 +9,7 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import dev.arc.model.Definition.*;
+import dev.arc.source.SourceBindingValidator.CalleeCheck;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
@@ -86,7 +87,8 @@ class FormulaSourceContractsTest {
                         Map.of(),
                         null,
                         0)));
-      assertThatThrownBy(() -> validator.validatePinnedContracts(parent, resolver))
+      assertThatThrownBy(
+              () -> validator.validatePinnedContracts(parent, resolver, CalleeCheck.NONE))
           .isInstanceOfSatisfying(
               ArcException.class,
               error -> {

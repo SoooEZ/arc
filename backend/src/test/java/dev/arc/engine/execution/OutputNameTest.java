@@ -46,7 +46,7 @@ class OutputNameTest {
     assertThat(result.result()).isEqualTo(Map.of("total", new BigDecimal("42")));
     assertThat(result.trace().getLast().value()).isEqualTo(result.result());
     assertThat(result.trace().getFirst().value()).isEqualTo(Map.of("value", new BigDecimal("42")));
-    assertThat(validator.plan(definition, noReferences).available().get("out"))
+    assertThat(validator.compile(definition, noReferences).plan().available().get("out"))
         .contains("value")
         .doesNotContain("total");
   }

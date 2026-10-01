@@ -17,8 +17,8 @@ import org.springframework.stereotype.Component;
 /**
  * Validates pinned contracts only: every source mapping of the definition and of each rule it
  * reaches names declared parameters and maps the ones a caller must supply. It never performs
- * external IO. The three entry points differ in where configurations come from and which pins are
- * walked; {@link #validateContracts} is the one algorithm behind them.
+ * external IO. The three entry points differ in where configurations come from, which pins are
+ * walked and what else a reached version must pass; one {@link Walk} runs each check.
  */
 @Component
 public final class SourceBindingValidator {
@@ -41,26 +41,13 @@ public final class SourceBindingValidator {
   }
 
   /**
-   * {@link #validatePinnedContracts(Definition, RuleResolver, CalleeCheck)} without a callee check.
-   */
-  public void validatePinnedContracts(Definition definition, RuleResolver resolver) {
-    validatePinnedContracts(definition, resolver, CalleeCheck.NONE);
-  }
-
-  /**
    * Validate and publish: reads the stored configurations and walks every pin the definition
    * reaches, checking each callee version once.
    */
   public void validatePinnedContracts(
       Definition definition, RuleResolver resolver, CalleeCheck calleeCheck) {
-    validateContracts(
-        definition,
-        Validator.dependencies(definition),
-        resolver,
-        pinnedSources(),
-        calleeCheck,
-        new Walk(),
-        0);
+    new Walk(resolver, pinnedSources(), calleeCheck)
+        .visit(definition, Validator.dependencies(definition), 0);
   }
 
   /**
@@ -69,14 +56,8 @@ public final class SourceBindingValidator {
    */
   public void validateForExecution(
       Definition definition, RuleResolver resolver, SourceConfigurations session) {
-    validateContracts(
-        definition,
-        Validator.dependencies(definition),
-        resolver,
-        session,
-        CalleeCheck.NONE,
-        new Walk(),
-        0);
+    new Walk(resolver, session, CalleeCheck.NONE)
+        .visit(definition, Validator.dependencies(definition), 0);
   }
 
   /**
@@ -88,31 +69,7 @@ public final class SourceBindingValidator {
       RuleResolver resolver,
       List<Validator.Dependency> unreported,
       CalleeCheck calleeCheck) {
-    validateContracts(
-        definition, unreported, resolver, pinnedSources(), calleeCheck, new Walk(), 0);
-  }
-
-  /**
-   * The pins one walk has reached. A pin is walked again when it is reached deeper than before,
-   * because a deeper arrival has less headroom under the nesting limit: with one visit per pin, the
-   * verdict depended on the order of the Reference nodes, and a root whose longer call path went
-   * past the limit was published and then failed every execution. Each pin is walked at most
-   * MAX_NESTING_DEPTH + 1 times, and its callee check runs once.
-   */
-  private static final class Walk {
-    private final Map<String, Integer> deepest = new HashMap<>();
-    private final Set<String> checked = new HashSet<>();
-
-    boolean reaches(String pin, int depth) {
-      Integer known = deepest.get(pin);
-      if (known != null && known >= depth) return false;
-      deepest.put(pin, depth);
-      return true;
-    }
-
-    boolean firstCheck(String pin) {
-      return checked.add(pin);
-    }
+    new Walk(resolver, pinnedSources(), calleeCheck).visit(definition, unreported, 0);
   }
 
   /**
@@ -126,42 +83,56 @@ public final class SourceBindingValidator {
             id + "@" + version, ignored -> versions.get(id, version).definition());
   }
 
-  private void validateContracts(
-      Definition definition,
-      List<Validator.Dependency> dependencies,
-      RuleResolver resolver,
-      SourceConfigurations configurations,
-      CalleeCheck calleeCheck,
-      Walk walk,
-      int depth) {
-    if (depth > Limits.MAX_NESTING_DEPTH)
-      throw ArcException.invalid("Rule nesting exceeds " + Limits.MAX_NESTING_DEPTH + " levels");
-    for (Input input : definition.inputs())
-      if (input.source() != null) validateSourceMappings(definition, input, configurations);
-    for (var dependency : dependencies) {
-      String pin = dependency.ruleId() + "@" + dependency.version();
-      if (!walk.reaches(pin, depth + 1)) continue;
-      try {
-        Definition callee = dependency.resolve(resolver);
-        if (walk.firstCheck(pin))
-          calleeCheck.check(dependency.ruleId(), dependency.version(), callee);
-        validateContracts(
-            callee,
-            Validator.dependencies(callee),
-            resolver,
-            configurations,
-            calleeCheck,
-            walk,
-            depth + 1);
-      } catch (ArcException error) {
-        throw error
-            .inRule(dependency.ruleId(), dependency.version())
-            .atNode(null, null, dependency.nodeId(), dependency.label());
+  /**
+   * One check's walk over a definition and the pins it reaches. A pin is walked again when it is
+   * reached deeper than before, because a deeper arrival has less headroom under the nesting limit:
+   * with one visit per pin, the verdict depended on the order of the Reference nodes, and a root
+   * whose longer call path went past the limit was published and then failed every execution. Each
+   * pin is walked at most MAX_NESTING_DEPTH + 1 times, and its callee check runs once.
+   */
+  private static final class Walk {
+    private final RuleResolver resolver;
+    private final SourceConfigurations configurations;
+    private final CalleeCheck calleeCheck;
+    private final Map<String, Integer> deepest = new HashMap<>();
+    private final Set<String> checked = new HashSet<>();
+
+    Walk(RuleResolver resolver, SourceConfigurations configurations, CalleeCheck calleeCheck) {
+      this.resolver = resolver;
+      this.configurations = configurations;
+      this.calleeCheck = calleeCheck;
+    }
+
+    void visit(Definition definition, List<Validator.Dependency> dependencies, int depth) {
+      if (depth > Limits.MAX_NESTING_DEPTH)
+        throw ArcException.invalid("Rule nesting exceeds " + Limits.MAX_NESTING_DEPTH + " levels");
+      for (Input input : definition.inputs())
+        if (input.source() != null) validateSourceMappings(definition, input, configurations);
+      for (var dependency : dependencies) {
+        String pin = dependency.ruleId() + "@" + dependency.version();
+        if (!reaches(pin, depth + 1)) continue;
+        try {
+          Definition callee = dependency.resolve(resolver);
+          if (checked.add(pin))
+            calleeCheck.check(dependency.ruleId(), dependency.version(), callee);
+          visit(callee, Validator.dependencies(callee), depth + 1);
+        } catch (ArcException error) {
+          throw error
+              .inRule(dependency.ruleId(), dependency.version())
+              .atNode(null, null, dependency.nodeId(), dependency.label());
+        }
       }
+    }
+
+    private boolean reaches(String pin, int depth) {
+      Integer known = deepest.get(pin);
+      if (known != null && known >= depth) return false;
+      deepest.put(pin, depth);
+      return true;
     }
   }
 
-  private void validateSourceMappings(
+  private static void validateSourceMappings(
       Definition definition, Input input, SourceConfigurations configurations) {
     try {
       var binding = input.source();

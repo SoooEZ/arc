@@ -33,11 +33,11 @@ test("frontend limits carry the values of backend Limits.java", () => {
   }
 });
 
-test("frontend input types list the names of backend InputTypes.NAMES", () => {
+test("frontend input types list the backend InputTypes.Type constants", () => {
   const java = read("backend/src/main/java/dev/arc/engine/InputTypes.java");
-  const names = /NAMES =\s*List\.of\(([^)]*)\)/.exec(java);
-  assert.ok(names, "InputTypes.java declares NAMES");
-  const javaNames = [...names[1].matchAll(/"(\w+)"/g)].map(([, name]) => name);
+  const constants = /enum Type \{\s*([A-Z_,\s]+);/.exec(java);
+  assert.ok(constants, "InputTypes.java declares the Type constants");
+  const javaNames = constants[1].split(",").map((name) => name.trim());
   const facts = /inputTypeFacts[^=]*= \{(.*?)\n\};/s.exec(
     read("frontend/src/domain/inputTypes.ts"),
   );

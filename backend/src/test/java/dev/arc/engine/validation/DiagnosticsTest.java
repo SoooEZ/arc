@@ -9,8 +9,6 @@ import dev.arc.error.ArcException;
 import dev.arc.error.ArcException.Location;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
-import dev.arc.model.RuleKind;
-import dev.arc.rule.RuleSamples;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -28,7 +26,7 @@ class DiagnosticsTest {
     var mappings = new TreeMap<>(Map.of("region", "missing", "zone", "gone"));
     var definition = sourced(new SourceBinding("rates", 1, mappings, null, "FAIL"));
 
-    assertThat(validator.diagnostics(definition, noRules))
+    assertThat(validator.diagnose(definition, noRules).problems())
         .containsExactly(
             atInput("rate source / region: Variables unavailable on every incoming path: missing"),
             atInput("rate source / zone: Variables unavailable on every incoming path: gone"));
@@ -72,7 +70,7 @@ class DiagnosticsTest {
                 edge("t", "r", "next"),
                 edge("r", "s", "next")));
 
-    var problems = validator.diagnostics(definition, noRules);
+    var problems = validator.diagnose(definition, noRules).problems();
 
     assertThat(problems).anyMatch(problem -> problem.message().contains("cycles"));
     assertThat(problems)
@@ -87,7 +85,7 @@ class DiagnosticsTest {
             List.of(),
             List.of(node("input", "INPUT", null, null), route(null)),
             List.of(edge("input", "s", "next"), edge("s", "s", "default")));
-    assertThat(validator.diagnostics(selfLoop, noRules))
+    assertThat(validator.diagnose(selfLoop, noRules).problems())
         .contains(
             new Validator.Problem("Route / Case Broken: " + syntaxError("1 +"), at("s", "Route")));
   }
@@ -190,8 +188,11 @@ class DiagnosticsTest {
     unconnected.add(node("extra", "OUTPUT", "1", null));
 
     assertThat(
-            validator.diagnostics(
-                new Definition(1, definition.inputs(), unconnected, definition.edges()), noRules))
+            validator
+                .diagnose(
+                    new Definition(1, definition.inputs(), unconnected, definition.edges()),
+                    noRules)
+                .problems())
         .extracting(Validator.Problem::message)
         .containsExactly(
             "rate source / key: Variables unavailable on every incoming path: missing",
@@ -200,7 +201,7 @@ class DiagnosticsTest {
 
   @Test
   void inputCyclesNameTheFirstDeclaredInput() {
-    var blank = RuleSamples.blank(RuleKind.FORMULA);
+    var blank = calculation();
     var definition = new Definition(1, cyclicInputs(), blank.nodes(), blank.edges());
     assertThatThrownBy(() -> validator.validate(definition, noRules))
         .hasMessage("Circular source parameter dependency: zeta");
@@ -216,7 +217,7 @@ class DiagnosticsTest {
             node("lost", "OUTPUT", "2", null));
     var definition = new Definition(1, cyclicInputs(), nodes, List.of());
     String unreachable = "Every node must be reachable from Input; connect or remove unused nodes";
-    assertThat(validator.diagnostics(definition, noRules))
+    assertThat(validator.diagnose(definition, noRules).problems())
         .containsExactly(
             atInput("Circular source parameter dependency: zeta"),
             atInput("input: connect [next]"),
@@ -265,7 +266,7 @@ class DiagnosticsTest {
       List<Node> nodes, List<Edge> edges, String message, String nodeId) {
     var definition = new Definition(1, List.of(), nodes, edges);
     var located = List.of(new Location(null, null, nodeId, nodeId));
-    assertThat(validator.diagnostics(definition, noRules))
+    assertThat(validator.diagnose(definition, noRules).problems())
         .containsExactly(new Validator.Problem(message, located));
     for (var check :
         List.<Runnable>of(
@@ -341,11 +342,11 @@ class DiagnosticsTest {
             new Validator.Problem("W: cannot overwrite input amount", at("w", "W")),
             new Validator.Problem("Published rule version not found: nope v3", at("r", "R")),
             new Validator.Problem("S: add at least one case", at("s", "S")));
-    assertThat(validator.diagnostics(new Definition(1, amount, nodes, edges), noRules))
+    assertThat(validator.diagnose(new Definition(1, amount, nodes, edges), noRules).problems())
         .containsExactlyInAnyOrderElementsOf(expected);
     // Without a scope plan these four vanished until the cycle was fixed.
     edges.add(edge("out", "f", "next"));
-    var problems = validator.diagnostics(new Definition(1, amount, nodes, edges), noRules);
+    var problems = validator.diagnose(new Definition(1, amount, nodes, edges), noRules).problems();
     assertThat(problems).anyMatch(problem -> problem.message().contains("cycles"));
     assertThat(problems).containsAll(expected);
     assertThat(problems)
@@ -373,7 +374,7 @@ class DiagnosticsTest {
                 edge("c3", "out1", "true")));
     String unreachable = "Every node must be reachable from Input; connect or remove unused nodes";
     // Only c1's problem was reported before, so the editor marked one node at a time.
-    assertThat(validator.diagnostics(definition, noRules))
+    assertThat(validator.diagnose(definition, noRules).problems())
         .containsExactlyInAnyOrder(
             new Validator.Problem("c1: connect [true, false]", at("c1", "c1")),
             new Validator.Problem("c2: connect [true, false]", at("c2", "c2")),

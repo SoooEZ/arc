@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.Limits;
+import dev.arc.engine.ValueBounds;
 import dev.arc.engine.ValueText;
-import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import dev.arc.model.SourceDefinition;
 import jakarta.annotation.PreDestroy;
@@ -234,7 +234,7 @@ public class HttpSource implements AutoCloseable {
         throw abort(
             request, "HTTP source response exceeds " + Limits.formatBytes(MAX_RESPONSE_BYTES));
     }
-    return Expressions.bounded(responses.readValue(body));
+    return ValueBounds.bounded(responses.readValue(body));
   }
 
   /**

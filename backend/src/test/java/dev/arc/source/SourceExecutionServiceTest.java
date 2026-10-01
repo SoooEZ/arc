@@ -1,5 +1,6 @@
 package dev.arc.source;
 
+import static dev.arc.support.GraphFixtures.calculation;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -10,9 +11,7 @@ import dev.arc.model.DataSource;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.SourceBinding;
-import dev.arc.model.RuleKind;
 import dev.arc.model.SourceDefinition;
-import dev.arc.rule.RuleSamples;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
@@ -236,7 +235,7 @@ class SourceExecutionServiceTest {
             eq("memory"), eq(source.definition()), eq(Map.of("key", new BigDecimal("12"))), any()))
         .thenReturn(10, 20);
     var binding = new SourceBinding("memory", 1, Map.of(), "", "FAIL");
-    var blank = RuleSamples.blank(RuleKind.FORMULA);
+    var blank = calculation();
     var definition =
         new Definition(
             1,

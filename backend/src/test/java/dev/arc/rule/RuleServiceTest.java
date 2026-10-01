@@ -1,5 +1,6 @@
 package dev.arc.rule;
 
+import static dev.arc.support.GraphFixtures.calculation;
 import static dev.arc.support.GraphFixtures.inputNode;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
@@ -32,15 +33,7 @@ class RuleServiceTest {
       new RuleService(repository, new Validator(), definitions, engine);
   private final Rule draft =
       new Rule(
-          "example",
-          "Example",
-          "",
-          "FORMULA",
-          RuleSamples.blank(RuleKind.FORMULA),
-          3,
-          1,
-          Instant.EPOCH,
-          Instant.EPOCH);
+          "example", "Example", "", "FORMULA", calculation(), 3, 1, Instant.EPOCH, Instant.EPOCH);
 
   @Test
   void ruleIdsFollowTheSharedResourceIdPolicy() {
@@ -93,7 +86,7 @@ class RuleServiceTest {
             eq("Tree"),
             eq(""),
             eq("DECISION_TREE"),
-            eq(RuleSamples.blank(RuleKind.DECISION_TREE)));
+            eq(RuleTemplates.blank(RuleKind.DECISION_TREE)));
   }
 
   @Test
@@ -137,12 +130,7 @@ class RuleServiceTest {
   void creationNormalizesMetadataAndUsesThePortableTemplate() {
     service.create(new RuleService.Create("valid-id", "  Example  ", null, "FORMULA", null));
     verify(repository)
-        .create(
-            eq("valid-id"),
-            eq("Example"),
-            eq(""),
-            eq("FORMULA"),
-            eq(RuleSamples.blank(RuleKind.FORMULA)));
+        .create(eq("valid-id"), eq("Example"), eq(""), eq("FORMULA"), eq(calculation()));
   }
 
   @Test
@@ -363,6 +351,16 @@ class RuleServiceTest {
     verify(repository, never()).update(anyString(), anyString(), anyString(), any());
   }
 
+  /** A create and a save store the same metadata: a missing description is stored empty. */
+  @Test
+  void aMissingDescriptionIsStoredEmptyByCreatesAndSaves() {
+    when(repository.lockForSave("example")).thenReturn(draft.revision());
+    service.create(new RuleService.Create("fresh", "Fresh", null, "FORMULA", null));
+    verify(repository).create(eq("fresh"), eq("Fresh"), eq(""), eq("FORMULA"), any());
+    service.update("example", new RuleService.Update("Example", null, 3, draft.draft()));
+    verify(repository).update(eq("example"), eq("Example"), eq(""), any());
+  }
+
   @Test
   void notesAreStoredAsSingleTrimmedLinesAndBoundedAfterwards() {
     when(repository.lockForSave("example")).thenReturn(draft.revision());
@@ -380,6 +378,15 @@ class RuleServiceTest {
             eq("example"),
             eq("Example"),
             eq(""),
+            argThat(d -> d.notes().equals(List.of("first", "second", "padded", "a", "b"))));
+    // A new rule stores its notes in the same form; only saves normalized them in a mutation run.
+    service.create(new RuleService.Create("noted", "Noted", "", "FORMULA", noted));
+    verify(repository)
+        .create(
+            eq("noted"),
+            eq("Noted"),
+            eq(""),
+            eq("FORMULA"),
             argThat(d -> d.notes().equals(List.of("first", "second", "padded", "a", "b"))));
     // One stored note with 600 line breaks rendered more comments than the code could build.
     var tooMany =

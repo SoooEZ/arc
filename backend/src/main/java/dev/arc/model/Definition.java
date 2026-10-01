@@ -51,6 +51,27 @@ public record Definition(
 
   public record SourceBinding(
       String id, int version, Map<String, String> bindings, String pointer, String onError) {
+    /**
+     * What an execution does when the read fails; the JSON {@code onError} is the constant's name.
+     */
+    public enum OnError {
+      /** The execution fails with the read's error. */
+      FAIL,
+      /** The input takes its default value. */
+      DEFAULT;
+
+      /** The policy that {@code onError} names exactly; empty for null or an unknown name. */
+      public static Optional<OnError> parse(String name) {
+        for (OnError policy : values()) if (policy.name().equals(name)) return Optional.of(policy);
+        return Optional.empty();
+      }
+    }
+
+    /** Whether a failed read gives the input its default value instead of failing. */
+    public boolean fallsBackToDefault() {
+      return OnError.parse(onError).orElse(null) == OnError.DEFAULT;
+    }
+
     SourceBinding detached() {
       return new SourceBinding(id, version, Frozen.map(bindings), pointer, onError);
     }

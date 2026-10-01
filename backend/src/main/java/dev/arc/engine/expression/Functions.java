@@ -34,12 +34,8 @@ public final class Functions {
     return FunctionCatalog.catalog();
   }
 
-  public static void arity(String name, int count) {
+  static void arity(String name, int count) {
     FunctionCatalog.arity(name, count);
-  }
-
-  public static Object call(String name, List<Object> args) {
-    return call(name, args, new RangeValues());
   }
 
   /** Calls with the evaluation's range values, so POI sees each unchanged range converted once. */
@@ -154,7 +150,7 @@ public final class Functions {
     return args.size() == 3 ? args.get(2) : null;
   }
 
-  public static List<?> array(Object value) {
+  static List<?> array(Object value) {
     if (!(value instanceof List<?> list)) throw ArcException.invalid("Expected an array");
     return list;
   }
@@ -175,7 +171,7 @@ public final class Functions {
   }
 
   /** Follows {@code segments} into nested objects and arrays; a missing one gives the fallback. */
-  public static Object get(Object value, List<String> segments, Object fallback) {
+  static Object get(Object value, List<String> segments, Object fallback) {
     for (String part : segments) {
       if (value instanceof Map<?, ?> m && m.containsKey(part)) value = m.get(part);
       else if (value instanceof List<?> a) {
