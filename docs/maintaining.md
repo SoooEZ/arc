@@ -80,6 +80,8 @@ A node kind changes the graph contract, not just a switch statement. On the back
 
 ## Frontend boundaries
 
+To learn the frontend before changing it, read [the frontend guide](frontend-guide.md) (in Chinese). It has diagrams of the editor's single draft and the module layers, each feature's entry points and tests, six flows traced to their code, and a one-line description of every file. This section remains the reference for ownership rules.
+
 | Location | Responsibility |
 | --- | --- |
 | `api/` | Typed resource clients and injectable HTTP transport; status and graph error locations; lossless JSON bodies through `domain/json`; resource URLs for copyable examples (`ruleApi.executeUrl`) |
