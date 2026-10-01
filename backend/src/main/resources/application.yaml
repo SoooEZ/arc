@@ -8,6 +8,12 @@ spring:
   jackson:
     deserialization:
       use-big-decimal-for-floats: true
+      # A misspelled field, a second document after the body or a fraction where a whole number
+      # belongs (version 1.9) is a 400, never dropped or truncated into a different request.
+      # Stored versions are read leniently (JsonCodec).
+      fail-on-unknown-properties: true
+      fail-on-trailing-tokens: true
+      accept-float-as-int: false
     # 20, never 2E+1: strict JSON clients reject or retype exponent notation.
     generator:
       write-bigdecimal-as-plain: true

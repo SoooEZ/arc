@@ -59,14 +59,15 @@ public class Engine {
   }
 
   /**
-   * Plans for a static check of pinned callees (validate, diagnostics, publish), shared with
-   * executions: a version that an execution or an earlier check compiled is not compiled again, and
-   * one compiled here is ready for them. Start it before the check reads a pin, as an execution
-   * starts its session, so a deletion during the check keeps what it compiled out of the cache. A
-   * check has no deadline of its own and is allowed the longest execution budget.
+   * The plan of a published version for a static check of a pinned callee (validate, diagnostics,
+   * publish): the plan an execution cached, else one compiled for this check only. A check may read
+   * versions that its transaction has not committed, such as the samples the seed publishes in one
+   * transaction and rolls back when an ID is taken, so only executions fill the cache. A check has
+   * no deadline.
    */
-  public Session checkSession(RuleResolver resolver) {
-    return session(resolver, ExecutionDeadline.start(ExecutionDeadline.MAX_TIMEOUT_MS));
+  public CompiledGraph prepareForCheck(
+      String id, int version, Definition definition, RuleResolver resolver) {
+    return plans.planForCheck(id, version, definition, resolver);
   }
 
   /** Drops the cached plans of a deleted rule. Call it after the deletion commits. */

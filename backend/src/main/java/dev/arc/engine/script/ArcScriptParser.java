@@ -6,8 +6,11 @@ import static dev.arc.engine.script.ArcScriptSyntax.identifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.InputTypes;
 import dev.arc.engine.Limits;
+import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.script.ArcScriptScanner.Statement;
 import dev.arc.engine.script.ArcScriptScanner.SyntaxException;
+import dev.arc.engine.validation.ExpressionPositions;
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import java.util.ArrayList;
@@ -127,27 +130,50 @@ final class ArcScriptParser {
       List<Declared<Input>> inputs,
       Map<String, Declared<SourceBinding>> sources) {
     for (Statement statement : statements) {
-      if (statement.text().startsWith("source ")) {
-        Matcher match = SOURCE.matcher(statement.text());
-        if (!match.matches())
-          throw error("Use: source parameter = { JSON source binding };", statement);
-        var binding = syntax.read(match.group(2), SourceBinding.class, statement);
-        if (sources.putIfAbsent(
-                identifier(match.group(1), statement), new Declared<>(binding, statement))
-            != null) throw error("Duplicate input source", statement);
-      } else {
-        Matcher match = INPUT.matcher(statement.text());
-        if (!match.matches())
-          throw error("Use: parameter: " + TYPES + " required|optional [default JSON];", statement);
-        var input =
+      Matcher source = SOURCE.matcher(statement.text());
+      Matcher input = INPUT.matcher(statement.text());
+      if (source.matches()) {
+        String name = identifier(source.group(1), statement);
+        var binding = syntax.read(source.group(2), SourceBinding.class, statement);
+        checkMappings(name, binding, statement);
+        if (sources.putIfAbsent(name, new Declared<>(binding, statement)) != null)
+          throw error("Duplicate input source", statement);
+      } else if (input.matches()) {
+        var declared =
             new Input(
-                identifier(match.group(1), statement),
-                match.group(2).toUpperCase(Locale.ROOT),
-                match.group(3).equalsIgnoreCase("required"),
-                match.group(4) == null
+                identifier(input.group(1), statement),
+                input.group(2).toUpperCase(Locale.ROOT),
+                input.group(3).equalsIgnoreCase("required"),
+                input.group(4) == null
                     ? null
-                    : syntax.read(match.group(4), Object.class, statement));
-        inputs.add(new Declared<>(input, statement));
+                    : syntax.read(input.group(4), Object.class, statement));
+        inputs.add(new Declared<>(declared, statement));
+      } else if (statement.text().startsWith("source ")) {
+        // Known by its whole form: "source" is also an input name, as in "source : NUMBER".
+        throw error("Use: source parameter = { JSON source binding };", statement);
+      } else {
+        throw error("Use: parameter: " + TYPES + " required|optional [default JSON];", statement);
+      }
+    }
+  }
+
+  /**
+   * A source's mappings are expressions, which a build checks as it checks a node's: an unparsable
+   * mapping built, and only the graph's diagnostics reported it, away from its statement.
+   */
+  private static void checkMappings(String input, SourceBinding binding, Statement statement) {
+    if (binding == null || binding.bindings() == null) return;
+    for (var mapping : binding.bindings().entrySet()) {
+      String expression = mapping.getValue();
+      if (expression == null || expression.isEmpty()) continue;
+      try {
+        Expressions.compile(expression);
+      } catch (ArcException failure) {
+        throw error(
+            ExpressionPositions.sourceMapping(input, mapping.getKey())
+                + ": "
+                + failure.getMessage(),
+            statement);
       }
     }
   }

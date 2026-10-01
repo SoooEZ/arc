@@ -79,8 +79,7 @@ public final class SourceBindingValidator {
   private SourceConfigurations pinnedSources() {
     var configurations = new HashMap<String, SourceDefinition>();
     return (id, version) ->
-        configurations.computeIfAbsent(
-            id + "@" + version, ignored -> versions.get(id, version).definition());
+        configurations.computeIfAbsent(id + "@" + version, ignored -> versions.get(id, version));
   }
 
   /**

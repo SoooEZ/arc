@@ -33,11 +33,14 @@ class RuleDefinitionServiceTest {
           new Engine(validator));
 
   /**
-   * The callee check compiles a pinned version once per process, through the plans executions keep:
-   * validate, diagnostics and publish compiled every reached pin on every request.
+   * A static check reuses the plan an execution compiled for a pin, and stores none of its own,
+   * because a check may read versions its transaction has not committed. The sample seed publishes
+   * apply-discount and then order-pricing in one transaction and rolls both back when a sample ID
+   * is taken; the plan its check had cached then ran a version that did not exist, and later the
+   * user's own apply-discount v1.
    */
   @Test
-  void aReachedPinIsCompiledOnceForEveryStaticCheck() {
+  void staticChecksReuseExecutionPlansAndStoreNone() {
     var child =
         new Definition(
             1,
@@ -70,14 +73,25 @@ class RuleDefinitionServiceTest {
         new RuleDefinitionService(
             counting, rules, new SourceBindingValidator(new SourceVersions(sources)), engine);
     when(rules.resolve("child", 1)).thenReturn(child);
+    checks.validate(parent);
+    var reads = new java.util.concurrent.atomic.AtomicInteger();
+    engine
+        .session(rules, ExecutionDeadline.start(1000))
+        .prepare(
+            "child",
+            1,
+            () -> {
+              reads.incrementAndGet();
+              return child;
+            });
+    assertThat(reads).as("the check stored no plan").hasValue(1);
+    // The pin an execution compiled is not compiled again by later checks.
+    compiled.clear();
     for (int request = 0; request < 3; request++) {
       checks.validate(parent);
       assertThat(checks.diagnostics(parent)).isEmpty();
     }
-    assertThat(compiled).filteredOn(child::equals).hasSize(1);
-    // An execution reaching the same pin uses the plan the checks compiled.
-    engine.session(rules, ExecutionDeadline.start(1000)).prepare("child", 1, () -> child);
-    assertThat(compiled).filteredOn(child::equals).hasSize(1);
+    assertThat(compiled).filteredOn(child::equals).isEmpty();
   }
 
   @Test

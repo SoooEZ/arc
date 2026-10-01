@@ -20,7 +20,8 @@ public record PageRequest(int offset, int limit, String search) {
     // Checked before trimming: PostgreSQL rejects a NUL parameter with an internal error.
     String problem = search == null ? null : StorableText.problem(search);
     if (problem != null) throw new IllegalArgumentException(problem);
-    search = search == null ? "" : search.trim();
+    // strip(), not trim(): an input method's ideographic space (U+3000) is whitespace too.
+    search = search == null ? "" : search.strip();
     if (search.length() > MAX_SEARCH_CHARACTERS)
       throw new IllegalArgumentException(
           "Search is limited to " + MAX_SEARCH_CHARACTERS + " characters");

@@ -51,7 +51,7 @@ test("middle formula defaults escape Monaco metacharacters and retain ARC object
 });
 test("formula tokens do not consume arguments or literal at signs", () => {
   const source =
-    '@price-with-tax:3(amount) + $ROUND(amount, 2) + "@other:4(amount)" // @ignored:1(amount)';
+    '@price-with-tax:3(amount) + $ROUND(amount, 2) + "@other:4(amount)"';
   const symbols = expressionSymbols(source, [
     { name: "amount", type: "NUMBER", label: "Inputs" },
   ]);

@@ -59,20 +59,17 @@ public class RuleDefinitionService {
   }
 
   public void validate(Definition definition, RuleResolver resolver) {
-    CalleeCheck callees = calleesCompile(resolver);
     validator.validate(definition, resolver);
-    sources.validatePinnedContracts(definition, resolver, callees);
+    sources.validatePinnedContracts(definition, resolver, calleesCompile(resolver));
   }
 
   /**
    * A reached pin's version must still compile: one holding a property its kind does not use, or an
-   * unprefixed call, passed every static check and then failed every execution of the parent. The
-   * engine's plans answer it, so a version is compiled once per process for checks and executions.
-   * Create it before the check reads a pin ({@link Engine#checkSession}).
+   * unprefixed call, passed every static check and then failed every execution of the parent. A
+   * plan an execution compiled answers it ({@link Engine#prepareForCheck}).
    */
   private CalleeCheck calleesCompile(RuleResolver resolver) {
-    var plans = engine.checkSession(resolver);
-    return (ruleId, version, callee) -> plans.prepare(ruleId, version, () -> callee);
+    return (ruleId, version, callee) -> engine.prepareForCheck(ruleId, version, callee, resolver);
   }
 
   /** Execution's source-contract check, over the request session's configuration snapshot. */
@@ -93,12 +90,12 @@ public class RuleDefinitionService {
    */
   public List<Validator.Problem> diagnostics(Definition definition) {
     var resolver = new MemoizingRuleResolver(rules);
-    CalleeCheck callees = calleesCompile(resolver);
     var diagnosis = validator.diagnose(definition, resolver);
     var problems = new ArrayList<>(diagnosis.problems());
     if (diagnosis.shaped() && hasOneInputNode(definition)) {
       try {
-        sources.validateRemainingPins(definition, resolver, diagnosis.dependencies(), callees);
+        sources.validateRemainingPins(
+            definition, resolver, diagnosis.dependencies(), calleesCompile(resolver));
       } catch (ArcException error) {
         problems.add(Validator.Problem.from(error));
       }

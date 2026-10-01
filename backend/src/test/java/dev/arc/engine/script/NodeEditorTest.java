@@ -27,6 +27,37 @@ class NodeEditorTest {
         .isGreaterThan(10);
   }
 
+  /**
+   * A fragment's connection that repeats the ID of another connection in the graph is reported at
+   * its statement, wherever the other one is. The shape check names the later of the two, so a
+   * repeat of a later connection's ID was reported at 1:1.
+   */
+  @Test
+  void aRepeatedConnectionIdIsReportedAtTheFragmentStatementWhereverTheOtherIs() {
+    Definition graph =
+        script.parse(
+            """
+            inputs { amount: NUMBER required; }
+            node input INPUT "Input" { next -> calc edge "first"; }
+            node calc FORMULA "Calc" { let total = amount; next -> out edge "second"; }
+            node out OUTPUT "Output" { return total; }
+            node mid FORMULA "Mid" { let other = 1; next -> late edge "third"; }
+            node late OUTPUT "Late" { return 1; }
+            """);
+    for (String repeated : List.of("first", "third"))
+      assertThat(
+              script
+                  .buildNode(
+                      graph,
+                      "calc",
+                      "node calc FORMULA \"Calc\" {\n  let total = amount;\n  next -> out edge \""
+                          + repeated
+                          + "\";\n}\n")
+                  .diagnostics())
+          .as(repeated)
+          .containsExactly(new ArcScript.Diagnostic("Every connection needs a unique ID", 3, 3));
+  }
+
   @Test
   void editsOneNodePreservingEverythingElse() {
     Definition d =

@@ -11,6 +11,7 @@ import {
   useArcLanguageSupport,
 } from "../studio/useArcLanguageSupport";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
+import { arcExpressionLanguage } from "../studio/arcLanguage";
 import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import type { VariableOption } from "../../domain/variables";
 
@@ -104,7 +105,7 @@ export default function InlineExpressionEditor({
         <legend>{label}</legend>
         <MonacoEditor
           height={94}
-          language="arc"
+          language={arcExpressionLanguage}
           theme="arc-light"
           value={value}
           onChange={(text) => {

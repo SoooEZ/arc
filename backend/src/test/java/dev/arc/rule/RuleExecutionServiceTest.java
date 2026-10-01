@@ -147,6 +147,54 @@ class RuleExecutionServiceTest {
     verify(rules, times(2)).resolve("child", 1);
   }
 
+  /**
+   * The deepest evaluation the limits allow: 17 nested Formula calls, each inside expressions
+   * nested 48 levels deep. On a cold JVM it needed about 1.5 MiB of stack, while request threads
+   * have 1 MiB on Linux x64, so the first such request failed with a 500; it runs on threads with a
+   * deep enough stack whatever thread asks for it.
+   */
+  @Test
+  void theDeepestEvaluationTheLimitsAllowRunsFromAShallowThread() throws Exception {
+    var chain = new HashMap<String, Definition>();
+    for (int index = 0; index <= dev.arc.engine.Limits.MAX_NESTING_DEPTH; index++) {
+      String inner =
+          index == dev.arc.engine.Limits.MAX_NESTING_DEPTH ? "x" : "@r" + (index + 1) + ":1(x)";
+      String nested = "$ABS(".repeat(46) + inner + ")".repeat(46);
+      chain.put(
+          "r" + index,
+          new Definition(
+              1,
+              List.of(new Input("x", "NUMBER", true, null)),
+              List.of(inputNode("in", "Input"), outputNode("out", "Out", nested)),
+              List.of(new Edge("next", "in", "out", "next"))));
+    }
+    when(rules.resolve(anyString(), anyInt()))
+        .thenAnswer(call -> chain.get(call.<String>getArgument(0)));
+    when(rules.resolveFormula(anyString(), anyInt()))
+        .thenAnswer(call -> chain.get(call.<String>getArgument(0)));
+    var outcome = new Object[1];
+    var shallow =
+        new Thread(
+            null,
+            () -> {
+              try {
+                outcome[0] =
+                    service
+                        .execute(
+                            "r0", new Execution(Map.of("x", new java.math.BigDecimal("-5")), 1))
+                        .execution()
+                        .result();
+              } catch (Throwable thrown) {
+                outcome[0] = thrown;
+              }
+            },
+            "shallow-request",
+            512 * 1024);
+    shallow.start();
+    shallow.join();
+    assertThat(outcome[0]).isEqualTo(new java.math.BigDecimal("5"));
+  }
+
   @Test
   void changedDraftsNeverReusePublishedOrPreviousPreviewPlans() {
     var first = service.preview(new Preview(calculation(), Map.of("amount", 100)));

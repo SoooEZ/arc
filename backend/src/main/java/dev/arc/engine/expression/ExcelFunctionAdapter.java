@@ -107,7 +107,8 @@ final class ExcelFunctionAdapter {
 
   private static ValueEval calculate(String name, FunctionMetadata metadata, ValueEval[] values) {
     if (name.equals("TEXT")) return ExcelText.evaluate(values[0], values[1]);
-    return FunctionEval.getBasicFunction(metadata.getIndex()).evaluate(values, 0, 0);
+    var function = FunctionEval.getBasicFunction(metadata.getIndex());
+    return ExcelCallShapes.evaluate(name, values, arguments -> function.evaluate(arguments, 0, 0));
   }
 
   /**

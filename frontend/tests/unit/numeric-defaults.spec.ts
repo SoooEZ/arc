@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { DecimalNumber, stringifyJson } from "../../src/domain/json";
+import {
+  DecimalNumber,
+  decimalKey,
+  stringifyJson,
+} from "../../src/domain/json";
 import {
   parseNumericDefault,
   sameNumericDefault,
@@ -82,6 +86,13 @@ test("numeric defaults reject values the server cannot store and incomplete inpu
     "5e-324",
     "1e101",
     "1".padEnd(102, "0"),
+    // The server bounds a number by its spelling without trailing zeros, so
+    // 10e100 is 1e101 however it is written.
+    "10e100",
+    "1.0e101",
+    "960e100",
+    // Kept as typed (a double would round it): 21 digits with one trailing zero.
+    "123456789012345678910e100",
     `0.${"0".repeat(100)}1`,
     // A zero keeps its written decimal places, which the server bounds like any other number.
     "0e-101",
@@ -135,4 +146,14 @@ test("numeric defaults accept exactly the texts of the shared decimal grammar", 
   for (const [text, accepted] of decimalTexts)
     if (text.trim())
       expect(parseNumericDefault(text).valid, text).toBe(accepted);
+});
+
+test("a long run of zeros is read in linear time", () => {
+  // A trailing-zero pattern backtracked over every zero: a 40,000-zero
+  // number froze the tab for seconds on each render.
+  const text = `1.${"0".repeat(40_000)}1`;
+  const started = performance.now();
+  expect(parseNumericDefault(text)).toMatchObject({ valid: false });
+  expect(decimalKey(text)).toBe(`1${"0".repeat(40_000)}1e-40001|40001`);
+  expect(performance.now() - started).toBeLessThan(500);
 });

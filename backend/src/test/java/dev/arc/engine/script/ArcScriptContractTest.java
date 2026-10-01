@@ -3,8 +3,11 @@ package dev.arc.engine.script;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.validation.Validator;
@@ -251,6 +254,90 @@ class ArcScriptContractTest {
             List.of(nodeOf("in", "INPUT", "In").build()),
             List.of());
     assertThatThrownBy(() -> new Validator().shape(undeclared)).hasMessage("Unknown input type");
+  }
+
+  /**
+   * A '//' comment is a note wherever it starts outside quotes, as the code editor shows it. Inside
+   * a statement or a node header it failed the build ("Invalid expression"), because only a comment
+   * between statements was read as one.
+   */
+  @Test
+  void aCommentInsideAStatementOrHeaderIsANoteLikeOneBetweenStatements() {
+    var built =
+        script.build(
+            """
+            inputs {
+              amount: NUMBER required; // the order total
+              rate: NUMBER optional default 0.1;
+            }
+            node input INPUT "Input" { next -> total; }
+            node total FORMULA "Total" // after tax
+              at (300, 0) {
+              let total = amount // before tax
+                // a line of its own
+                * (1 + rate);
+              next -> done;
+            }
+            node done OUTPUT "Done" { return $CONCAT("a // b", total); }
+            """);
+    assertThat(built.diagnostics()).isEmpty();
+    var definition = built.definition();
+    assertThat(definition.notes())
+        .containsExactly("the order total", "after tax", "before tax", "a line of its own");
+    Node total = definition.nodes().get(1);
+    assertThat(total.expression()).isEqualTo("amount\n    * (1 + rate)");
+    assertThat(total.position()).isEqualTo(new Definition.Position(300, 0));
+    assertThat(definition.nodes().get(2).expression()).isEqualTo("$CONCAT(\"a // b\", total)");
+    assertThat(script.build(built.source()).definition()).isEqualTo(definition);
+  }
+
+  /**
+   * A source binding is JSON read strictly whatever the application's settings: under Spring's
+   * mapper "pointr" for "pointer" was dropped, so the input read the source's whole response and
+   * fell back to its default on every run, and a version of 1.9 pinned version 1.
+   */
+  @Test
+  void aSourceBindingWithAnUnknownFieldOrAFractionalVersionIsRefused() {
+    var lenientApplicationJson =
+        new ArcScript(
+            JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build(),
+            new Validator());
+    String valid =
+        "{\"id\":\"rates\",\"version\":1,\"bindings\":{},\"pointer\":\"/rate\",\"onError\":\"DEFAULT\"}";
+    assertThat(lenientApplicationJson.build(sourcedRate(valid)).diagnostics()).isEmpty();
+    for (String binding :
+        List.of(
+            valid.replace("pointer", "pointr"),
+            valid.replace("\"version\":1", "\"version\":1.9"))) {
+      var build = lenientApplicationJson.build(sourcedRate(binding));
+      assertThat(build.definition()).isNull();
+      assertThat(build.diagnostics())
+          .extracting(ArcScript.Diagnostic::message, ArcScript.Diagnostic::line)
+          .containsExactly(tuple("Invalid JSON literal or source binding", 3));
+    }
+  }
+
+  /**
+   * A source binding's mappings are expressions, checked at build like a node's: an unparsable
+   * mapping built, and only the graph's diagnostics reported it, away from its statement.
+   */
+  @Test
+  void anUnparsableSourceMappingFailsTheBuildAtItsStatement() {
+    var build =
+        script.build(
+            sourcedRate(
+                "{\"id\":\"rates\",\"version\":1,\"bindings\":{\"key\":\"rate +\"},"
+                    + "\"pointer\":\"/rate\",\"onError\":\"DEFAULT\"}"));
+    assertThat(build.definition()).isNull();
+    assertThat(build.diagnostics())
+        .extracting(ArcScript.Diagnostic::message, ArcScript.Diagnostic::line)
+        .containsExactly(tuple("rate source / key: Incomplete expression", 3));
+  }
+
+  private static String sourcedRate(String binding) {
+    return "inputs {\n  rate: NUMBER optional default 0.1;\n  source rate = "
+        + binding
+        + ";\n}\nnode input INPUT \"Input\" { next -> done; }\nnode done OUTPUT \"Done\" { return rate; }\n";
   }
 
   @Test

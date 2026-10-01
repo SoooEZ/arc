@@ -3,10 +3,12 @@ package dev.arc.engine.script;
 import dev.arc.engine.script.ArcScriptScanner.Statement;
 import dev.arc.engine.script.ArcScriptScanner.SyntaxException;
 import dev.arc.engine.validation.ShapeViolation;
+import dev.arc.model.Definition.Edge;
 import dev.arc.model.Definition.Input;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Where one parse declared each element it created. Draft-shape problems are reported at the
@@ -58,7 +60,21 @@ final class ScriptLocations {
       case ShapeViolation.NodeDeclaration declaration -> declarations.get(declaration.node());
       case ShapeViolation.SwitchCase switchCase -> declarations.get(switchCase.option());
       case ShapeViolation.TransformField field -> declarations.get(field.field());
-      case ShapeViolation.Connection connection -> declarations.get(connection.edge());
+      case ShapeViolation.Connection connection -> connectionStatement(connection.edge());
     };
+  }
+
+  /**
+   * The statement of a connection, or of this script's connection with the same ID: a node
+   * fragment's connection that repeats the ID of a later connection in its graph is the one to
+   * correct, though the shape check names the later one.
+   */
+  private Statement connectionStatement(Edge edge) {
+    Statement declared = declarations.get(edge);
+    if (declared != null || edge == null) return declared;
+    for (var entry : declarations.entrySet())
+      if (entry.getKey() instanceof Edge own && Objects.equals(own.id(), edge.id()))
+        return entry.getValue();
+    return null;
   }
 }

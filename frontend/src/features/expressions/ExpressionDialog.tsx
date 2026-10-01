@@ -22,6 +22,7 @@ import {
   insertSnippet,
 } from "../studio/useArcLanguageSupport";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
+import { arcExpressionLanguage } from "../studio/arcLanguage";
 import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import {
@@ -136,7 +137,7 @@ export default function ExpressionDialog({
             )}
           </aside>
           <MonacoEditor
-            language="arc"
+            language={arcExpressionLanguage}
             theme="arc-light"
             value={source}
             onChange={(text) => setSource(text ?? "")}

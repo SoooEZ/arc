@@ -96,22 +96,22 @@ public final class ValueBounds {
   }
 
   /**
-   * The limits apply to the number, not to how it is written: PostgreSQL JSONB stores 1E+100 as a
-   * 101-digit integer. Accepted decimals stay below 1E+201 and so are finite as doubles; that
-   * conversion is slow for 34-digit quotients, and every operand passes through here. A zero has no
-   * digits to strip, so its scale counts as written: 0E-2000000000 would otherwise pass and print
-   * as two billion characters. A nonzero number below scale -{@link Limits#MAX_NUMBER_SCALE} is out
-   * of range in either form, and stripping its zeros would overflow the scale of a value such as
-   * 100E+2147483647 (an ArithmeticException, so a 500 instead of this 422).
+   * The limits apply to the number, not to how it is written: its one spelling without trailing
+   * zeros must have at most {@link Limits#MAX_NUMBER_PRECISION} digits and a scale within ±{@link
+   * Limits#MAX_NUMBER_SCALE}. PostgreSQL JSONB stores 1E+100 as a 101-digit integer, which is the
+   * same accepted number, and 10E+100 is 1E+101, out of range however it is spelled: checking the
+   * written spelling too accepted it, and the default failed its next save once stored. Accepted
+   * decimals stay below 1E+200 and so are finite as doubles; that conversion is slow for 34-digit
+   * quotients, and every operand passes through here. A zero has no digits to strip, so its scale
+   * counts as written: 0E-2000000000 would otherwise pass and print as two billion characters.
    */
   private static boolean exceedsDecimalLimits(BigDecimal number) {
     if (number.signum() == 0) return Math.abs((long) number.scale()) > Limits.MAX_NUMBER_SCALE;
+    // Stripping zeros only lowers the scale, so this is out of range either way; stripping the
+    // zeros of 100E+2147483647 would overflow its scale instead (an ArithmeticException, a 500).
     if (number.scale() < -Limits.MAX_NUMBER_SCALE) return true;
-    return exceedsWrittenLimits(number) && exceedsWrittenLimits(number.stripTrailingZeros());
-  }
-
-  private static boolean exceedsWrittenLimits(BigDecimal number) {
-    return number.precision() > Limits.MAX_NUMBER_PRECISION
-        || Math.abs((long) number.scale()) > Limits.MAX_NUMBER_SCALE;
+    BigDecimal stripped = number.stripTrailingZeros();
+    return stripped.precision() > Limits.MAX_NUMBER_PRECISION
+        || Math.abs((long) stripped.scale()) > Limits.MAX_NUMBER_SCALE;
   }
 }

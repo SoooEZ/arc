@@ -30,6 +30,22 @@ final class ArcScriptScanner {
     this.source = source;
   }
 
+  /**
+   * Whether a value written into a statement, as in {@code return value;}, scans back as that one
+   * value. A ';' or '}' outside quotes and brackets, a '//' outside quotes, or an unclosed quote or
+   * bracket ends the statement early, turns part of it into a comment or runs it into the next one.
+   */
+  static boolean scansAsOneValue(String value) {
+    String statement = "value " + value;
+    var scanner = new ArcScriptScanner(statement + ";");
+    try {
+      scanner.scan(false);
+      return scanner.index == statement.length() && scanner.comments.isEmpty();
+    } catch (SyntaxException endsEarlyOrNever) {
+      return false;
+    }
+  }
+
   private void advance() {
     if (source.charAt(index++) == '\n') {
       line++;
@@ -44,17 +60,22 @@ final class ArcScriptScanner {
         continue;
       }
       if (source.startsWith("//", index)) {
-        int start = index + 2;
-        int startLine = line;
-        int startColumn = column;
-        while (index < source.length() && source.charAt(index) != '\n') advance();
-        // The whitespace around a comment, such as the CR of a CRLF line end, is not its text.
-        for (String line : ArcScriptSyntax.commentLines(source.substring(start, index).strip()))
-          comments.add(new Statement(line, startLine, startColumn));
+        comment();
         continue;
       }
       break;
     }
+  }
+
+  /** A {@code //} comment up to its line break, which stays: the comment becomes a note. */
+  private void comment() {
+    int start = index + 2;
+    int startLine = line;
+    int startColumn = column;
+    while (index < source.length() && source.charAt(index) != '\n') advance();
+    // The whitespace around a comment, such as the CR of a CRLF line end, is not its text.
+    for (String line : ArcScriptSyntax.commentLines(source.substring(start, index).strip()))
+      comments.add(new Statement(line, startLine, startColumn));
   }
 
   boolean more() {
@@ -83,11 +104,16 @@ final class ArcScriptScanner {
     return list;
   }
 
+  /**
+   * One statement or header, without its comments: a {@code //} outside quotes starts a comment
+   * inside a statement as it does between statements, as the code editor shows it.
+   */
   private Statement scan(boolean header) {
     whitespace();
-    int start = index;
     int startLine = line;
     int startColumn = column;
+    var text = new StringBuilder();
+    int copied = index;
     int nesting = 0;
     char quote = 0;
     boolean escape = false;
@@ -105,6 +131,16 @@ final class ArcScriptScanner {
         advance();
         continue;
       }
+      if (source.startsWith("//", index)) {
+        // The blanks before a comment, or the blank line a whole-line comment leaves, go with it.
+        text.append(source, copied, index);
+        int end = text.length();
+        while (end > 0 && Character.isWhitespace(text.charAt(end - 1))) end--;
+        text.setLength(end);
+        comment();
+        copied = index;
+        continue;
+      }
       if (header && (c == '{' || c == ';')) break;
       if (!header && nesting == 0 && c == ';') break;
       if (!header && nesting == 0 && c == '}')
@@ -115,6 +151,7 @@ final class ArcScriptScanner {
     }
     if (quote != 0 || index >= source.length())
       throw new SyntaxException("Unfinished statement or quoted string", startLine, startColumn);
-    return new Statement(source.substring(start, index).trim(), startLine, startColumn);
+    text.append(source, copied, index);
+    return new Statement(text.toString().trim(), startLine, startColumn);
   }
 }

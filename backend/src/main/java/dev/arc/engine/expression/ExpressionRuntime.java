@@ -248,7 +248,8 @@ final class ExpressionRuntime {
       if (equal(value, args.get(i).eval(context))) return args.get(i + 1).eval(context);
     }
     if (args.size() % 2 == 0) return args.getLast().eval(context);
-    throw ArcException.invalid("SWITCH has no matching case or default");
+    // Excel's #N/A, which $ISNA recognizes and $ISERR does not.
+    throw ArcException.notAvailable("SWITCH has no matching case or default");
   }
 
   /** Like Excel, $CHOOSE evaluates only the selected value; the others may fail or be costly. */

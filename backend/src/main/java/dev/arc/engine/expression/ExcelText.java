@@ -36,15 +36,17 @@ final class ExcelText {
   /** CellFormat's text when no section of a two-section code applies to the value. */
   private static final String NO_APPLICABLE_SECTION = "\"" + "#".repeat(255) + "\"";
 
+  /** Excel's longest number format code. */
+  private static final int LONGEST_FORMAT_CODE = 255;
+
   private ExcelText() {}
 
   /** POI's {@code TEXT(value, format)} for scalar arguments, with #VALUE! as an error value. */
   static ValueEval evaluate(ValueEval value, ValueEval format) {
     try {
       return new StringEval(text(value, format));
-    } catch (RuntimeException | StackOverflowError unformattable) {
-      // POI's TEXT answers #VALUE! for anything it cannot format. The section grammar recurses per
-      // character, so a long multi-section code can exhaust the stack; CellFormat catches it too.
+    } catch (RuntimeException unformattable) {
+      // POI's TEXT answers #VALUE! for anything it cannot format.
       return ErrorEval.VALUE_INVALID;
     }
   }
@@ -72,12 +74,18 @@ final class ExcelText {
     }
   }
 
-  /** The format code: text as written, a number as its text and a blank as "". */
+  /**
+   * The format code: text as written, a number as its text and a blank as "". Excel's codes have at
+   * most 255 characters; POI's section grammar recurses per character, so a longer code overflowed
+   * the stack or not depending on JIT warm-up and the thread's stack size.
+   */
   private static String code(ValueEval format) {
     if (format == BlankEval.instance) return "";
-    if (format instanceof StringValueEval code && !(format instanceof BoolEval))
-      return code.getStringValue();
-    throw new IllegalArgumentException("TEXT needs a format code");
+    if (!(format instanceof StringValueEval code) || format instanceof BoolEval)
+      throw new IllegalArgumentException("TEXT needs a format code");
+    if (code.getStringValue().length() > LONGEST_FORMAT_CODE)
+      throw new IllegalArgumentException("Format codes have at most 255 characters");
+    return code.getStringValue();
   }
 
   private static String format(double number, String code) {

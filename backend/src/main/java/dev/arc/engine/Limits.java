@@ -93,6 +93,17 @@ public final class Limits {
   /** Embedded ARC Script parsing; HTTP separately limits the encoded request to 1 MiB of bytes. */
   public static final int MAX_SCRIPT_CHARACTERS = 1_048_576;
 
+  // Requests and what an editor saves back
+
+  /** A request body, in bytes. */
+  public static final int MAX_REQUEST_BYTES = 1024 * 1024;
+
+  /**
+   * A draft or source configuration as responses write it, every number in plain decimals, in
+   * bytes: an editor sends what it read back in one save, beside a name and a revision.
+   */
+  public static final int MAX_EDITABLE_JSON_BYTES = MAX_REQUEST_BYTES - 64 * 1024;
+
   // Values produced by inputs, expressions and sources
 
   /** Characters in one string value. */

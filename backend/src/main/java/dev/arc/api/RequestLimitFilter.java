@@ -27,7 +27,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestLimitFilter extends OncePerRequestFilter {
-  static final int MAX_BODY_BYTES = 1024 * 1024;
+  static final int MAX_BODY_BYTES = Limits.MAX_REQUEST_BYTES;
 
   private final ObjectMapper json;
 

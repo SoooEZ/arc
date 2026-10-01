@@ -255,6 +255,48 @@ class GraphPlanTest {
     }
   }
 
+  /**
+   * "Try the next tier": rung_i.true → the next rung and check_i, rung_i.false → the next rung,
+   * check_i.true → confirm_i, check_i.false → the next rung, confirm_i → approve or decline. With
+   * the next rung drawn first it was valid at 2714e7b; numbering the branches with the most
+   * decisions below them first put every confirmation after every rung, so 13 rungs were "too
+   * complex" in both drawing orders and stored versions of this shape failed every execution.
+   */
+  @Test
+  void aTieredLadderStaysValidInEveryDrawingOrder() {
+    for (boolean nextFirst : List.of(true, false))
+      assertThatCode(() -> validator.validate(tieredLadder(13, nextFirst), noReferences))
+          .as("next rung drawn first: " + nextFirst)
+          .doesNotThrowAnyException();
+    assertThat(new GraphPlan(tieredLadder(13, true)).available())
+        .isEqualTo(new GraphPlan(tieredLadder(13, false)).available());
+  }
+
+  private Definition tieredLadder(int rungs, boolean nextFirst) {
+    var nodes = new ArrayList<Node>();
+    var edges = new ArrayList<Edge>();
+    nodes.add(node("input", "INPUT", null, null));
+    nodes.add(node("approve", "OUTPUT", "true", null));
+    nodes.add(node("decline", "OUTPUT", "false", null));
+    edges.add(edge("input", "rung_0", "next"));
+    for (int i = 0; i < rungs; i++) {
+      String rung = "rung_" + i, check = "check_" + i, confirm = "confirm_" + i;
+      String next = i + 1 < rungs ? "rung_" + (i + 1) : "decline";
+      nodes.add(node(rung, "CONDITION", "amount > " + i, null));
+      nodes.add(node(check, "CONDITION", "amount < " + (1000 + i), null));
+      nodes.add(node(confirm, "CONDITION", "amount != " + (500 + i), null));
+      if (nextFirst) edges.add(edge(rung, next, "true"));
+      edges.add(edge(rung, check, "true"));
+      if (!nextFirst) edges.add(edge(rung, next, "true"));
+      edges.add(edge(rung, next, "false"));
+      edges.add(edge(check, confirm, "true"));
+      edges.add(edge(check, next, "false"));
+      edges.add(edge(confirm, "approve", "true"));
+      edges.add(edge(confirm, "decline", "false"));
+    }
+    return new Definition(1, amount, nodes, edges);
+  }
+
   @Test
   void aGenuinelyExponentialAnalysisStillReportsTooComplex() {
     // "Any of 20 pairs passes" with every first test numbered before every second test.

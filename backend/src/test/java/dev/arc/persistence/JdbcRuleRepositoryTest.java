@@ -9,16 +9,23 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.core.StreamWriteFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import dev.arc.error.ArcException;
+import dev.arc.model.Definition;
+import dev.arc.model.Definition.Input;
 import dev.arc.model.PageRequest;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -31,6 +38,41 @@ class JdbcRuleRepositoryTest {
   private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
   private final JdbcRuleRepository repository =
       new JdbcRuleRepository(jdbc, new JsonCodec(new ObjectMapper()));
+
+  /**
+   * A draft is stored as responses write it, every number in plain decimals. Twenty inputs of a
+   * thousand "1e100" each fit a 140 KB save but grew to 2 MB stored, which the editor sends back on
+   * its next save: the request limit refused every save after (413). Publishing copies a draft that
+   * was saved, so it is not refused.
+   */
+  @Test
+  void aDraftTooLargeToSaveBackOnceItsNumbersAreWrittenOutIsRefused() {
+    var plainNumbers =
+        new JdbcRuleRepository(
+            jdbc,
+            new JsonCodec(
+                JsonMapper.builder().enable(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN).build()));
+    var inputs = new ArrayList<Input>();
+    for (int index = 0; index < 20; index++)
+      inputs.add(
+          new Input(
+              "a" + index, "ARRAY", false, Collections.nCopies(1_000, new BigDecimal("1E+100"))));
+    var definition = new Definition(1, inputs, List.of(), List.of());
+    String tooLarge =
+        "Definition exceeds 960 KiB once its numbers are written out in full, more than a save"
+            + " can send back";
+    assertThatThrownBy(() -> plainNumbers.create("big", "Big", "", "FORMULA", definition))
+        .hasMessage(tooLarge);
+    assertThatThrownBy(() -> plainNumbers.update("big", "Big", "", definition))
+        .isInstanceOfSatisfying(
+            ArcException.class, error -> assertThat(error.status()).isEqualTo(422))
+        .hasMessage(tooLarge);
+    verifyNoInteractions(jdbc);
+    // Nine such inputs fit: the save reaches its UPDATE, which this mock answers with no row.
+    var fitting = new Definition(1, inputs.subList(0, 9), List.of(), List.of());
+    assertThatThrownBy(() -> plainNumbers.update("big", "Big", "", fitting))
+        .hasMessage("Rule not found: big");
+  }
 
   /**
    * PostgreSQL computes select-list JSONB functions for every matching row before a sort unless the

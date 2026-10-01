@@ -48,7 +48,10 @@ public class SourceExecutionService {
     DataSource source =
         request.version() == null ? repository.latest(id) : repository.get(id, request.version());
     return fetch(
-        source, request.inputs(), ExecutionDeadline.start(ExecutionDeadline.DEFAULT_TIMEOUT_MS));
+        source.id(),
+        source.definition(),
+        request.inputs(),
+        ExecutionDeadline.start(ExecutionDeadline.DEFAULT_TIMEOUT_MS));
   }
 
   /** A request owns this cache; provider values remain live on every read. */
@@ -57,16 +60,12 @@ public class SourceExecutionService {
   }
 
   public final class Session implements SourceReader {
-    private final Map<Version, DataSource> configurations = new HashMap<>();
+    private final Map<Version, SourceDefinition> configurations = new HashMap<>();
 
     private Session() {}
 
-    public SourceDefinition definition(String id, int version) {
-      return source(id, version).definition();
-    }
-
     /** One stored configuration per request, shared by static validation and every read. */
-    private DataSource source(String id, int version) {
+    public SourceDefinition definition(String id, int version) {
       return configurations.computeIfAbsent(
           new Version(id, version), ignored -> versions.get(id, version));
     }
@@ -75,16 +74,20 @@ public class SourceExecutionService {
     public Object read(
         SourceBinding binding, Map<String, Object> inputs, ExecutionDeadline deadline) {
       deadline.check();
-      Object value = fetch(source(binding.id(), binding.version()), inputs, deadline);
+      Object value =
+          fetch(binding.id(), definition(binding.id(), binding.version()), inputs, deadline);
       return extractor.extract(value, binding.pointer());
     }
   }
 
-  private Object fetch(DataSource source, Map<String, Object> inputs, ExecutionDeadline deadline) {
-    SourceDefinition definition = source.definition();
+  private Object fetch(
+      String id,
+      SourceDefinition definition,
+      Map<String, Object> inputs,
+      ExecutionDeadline deadline) {
     Map<String, Object> values = normalizeInputs(definition, inputs);
     return deadline.within(
-        () -> adapters.require(definition.kind()).fetch(source.id(), definition, values, deadline));
+        () -> adapters.require(definition.kind()).fetch(id, definition, values, deadline));
   }
 
   private Map<String, Object> normalizeInputs(

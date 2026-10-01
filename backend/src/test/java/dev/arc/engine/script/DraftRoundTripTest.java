@@ -143,6 +143,55 @@ class DraftRoundTripTest {
     assertThat(nodes.get(6).expression()).isEmpty();
   }
 
+  /**
+   * The code holds an expression only as one statement. A ';' or '}' outside quotes and brackets,
+   * or an unclosed quote or bracket, ended the statement early or ran it into the next one:
+   * applying the rendered code unchanged added an Output name and a connection, and an invalid
+   * Output became valid. A '//' would turn the rest of its line into a note. Such a node is refused
+   * where it is instead of rendered; ';' in text or brackets is kept.
+   */
+  @Test
+  void anExpressionThatWouldEndItsStatementIsRefusedAtItsNodeRatherThanRendered() {
+    Definition injected = graph(output("amount; as injected; next -> elsewhere", null));
+    assertThatThrownBy(() -> script.render(injected))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(422);
+              assertThat(error.locations())
+                  .extracting(ArcException.Location::nodeId)
+                  .containsExactly("n");
+            })
+        .hasMessage(
+            "N: ARC Script cannot show its expression, which has a ';', '}' or '//' outside quotes"
+                + " or an unclosed quote or bracket; correct it in the graph");
+    assertThatThrownBy(() -> script.renderNode(injected, "n")).isInstanceOf(ArcException.class);
+    for (Node node :
+        List.of(
+            formula("total", "amount }"),
+            condition("(amount > 1"),
+            output("\"amount", null),
+            switchNode("amount)", caseList("1")),
+            switchNode(null, caseList("amount > 1; as total")),
+            transform("total", fieldList("[amount; 1"), null),
+            reference("total", "child", 2, Map.of("amount", "amount; as other")),
+            output("amount // and a note", null),
+            output("$SUM(1, // one\n 2)", null)))
+      assertThatThrownBy(() -> script.render(graph(node)))
+          .as(node.toString())
+          .isInstanceOf(ArcException.class);
+    for (String kept : List.of("$CONCAT(\"a;}\", 'b;{')", "$IF(amount > 1, \"};\", \"[\")")) {
+      Definition draft = graph(output(kept, null));
+      var built = script.build(script.render(draft));
+      assertThat(built.diagnostics()).as(kept).isEmpty();
+      assertThat(built.definition().nodes()).as(kept).isEqualTo(draft.nodes());
+    }
+    // A ';' inside brackets stays in its statement, where the build reports the expression.
+    assertThat(script.build(script.render(graph(output("$SUM([1, 2]; 3)", null)))).diagnostics())
+        .extracting(ArcScript.Diagnostic::message)
+        .containsExactly("Invalid expression near character 12");
+  }
+
   private void assertRejectedWithoutExpression(Definition definition) {
     assertThatThrownBy(() -> validator.validate(definition, resolver))
         .hasMessage("Big order?: Expression is required");

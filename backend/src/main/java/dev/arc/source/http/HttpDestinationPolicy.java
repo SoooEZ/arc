@@ -58,7 +58,8 @@ final class HttpDestinationPolicy implements DnsResolver {
       throw ArcException.invalid("Provide an absolute HTTP(S) URL");
     }
     String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-    if (!Set.of("http", "https").contains(uri.getScheme() == null ? "" : uri.getScheme())
+    String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+    if (!Set.of("http", "https").contains(scheme)
         || host.isBlank()
         || uri.getUserInfo() != null
         || uri.getFragment() != null
@@ -74,7 +75,11 @@ final class HttpDestinationPolicy implements DnsResolver {
     if (!allowedHosts.isEmpty() && !allowedHosts.contains(host))
       throw ArcException.invalid("HTTP host is not in the configured allowlist");
     validateSecretHeaders(host, definition.secretHeaders());
-    return uri;
+    // A scheme is case-insensitive; the transport chooses TLS and the default port by its lower
+    // case form. The rest of the URL keeps its configured text.
+    return scheme.equals(uri.getScheme())
+        ? uri
+        : URI.create(scheme + uri.toString().substring(scheme.length()));
   }
 
   private void validateSecretHeaders(String host, Map<String, String> headers) {

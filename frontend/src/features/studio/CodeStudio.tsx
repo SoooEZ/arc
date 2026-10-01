@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { Button } from "@mui/material";
 import { Check, Code2 } from "lucide-react";
-import { monaco } from "./arcLanguage";
+import { arcScriptLanguage, monaco } from "./arcLanguage";
 import type { Definition, Diagnostic, Rule } from "../../types";
 import { useFunctionCatalog } from "./useFunctionCatalog";
 import { useArcLanguageSupport, insertSnippet } from "./useArcLanguageSupport";
@@ -152,7 +152,7 @@ export default function CodeStudio({
         </div>
         <ExpressionColorKey />
         <MonacoEditor
-          language="arc"
+          language={arcScriptLanguage}
           theme="arc-light"
           defaultValue={source}
           onChange={(value) => {

@@ -15,10 +15,11 @@ export type NumericDefault =
 
 /**
  * The server's number limits (backend Limits.MAX_NUMBER_PRECISION and
- * MAX_NUMBER_SCALE), applied like its Expressions.bound: a number passes when
- * its digits and scale, as written or without trailing zeros, stay within both.
- * That is also why a stored draft keeps saving: PostgreSQL writes 1e100 out as
- * a 101-digit integer, which is 1e100 again without its trailing zeros.
+ * MAX_NUMBER_SCALE), applied like its ValueBounds: a number passes when its
+ * spelling without trailing zeros stays within both, whatever spelling was
+ * typed. A stored draft keeps saving: PostgreSQL writes 1e100 out as a 101-digit
+ * integer, which is 1e100 again without its trailing zeros, while 10e100 is
+ * 1e101 and out of range however it is written.
  */
 const maxPrecision = BigInt(MAX_NUMBER_PRECISION);
 const maxScale = BigInt(MAX_NUMBER_SCALE);
@@ -55,10 +56,7 @@ export function withinServerLimits(token: string): boolean {
   // A zero has no digits to strip, so its scale counts as written.
   if (!digits) return -maxScale <= scale && scale <= maxScale;
   const zeros = BigInt(trailingZeros);
-  return (
-    withinLimits(precision, scale) ||
-    withinLimits(precision - zeros, scale - zeros)
-  );
+  return withinLimits(precision - zeros, scale - zeros);
 }
 
 /**

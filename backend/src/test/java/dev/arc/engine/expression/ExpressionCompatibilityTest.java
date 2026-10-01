@@ -42,6 +42,23 @@ class ExpressionCompatibilityTest {
     assertThat(eval("$SWITCH(2, 1, 1 / 0, 2, 7, 1 / 0)")).isEqualTo(new BigDecimal("7"));
   }
 
+  /**
+   * A $SWITCH without a match or a default is #N/A, as in Excel: it failed as an invalid value, so
+   * $ISNA answered false and $ISERR true.
+   */
+  @Test
+  void aSwitchWithoutAMatchOrADefaultIsNotAvailable() {
+    assertThatThrownBy(() -> eval("$SWITCH(5, 1, \"one\", 2, \"two\")"))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> assertThat(error.kind()).isEqualTo(ArcException.Kind.NOT_AVAILABLE))
+        .hasMessage("SWITCH has no matching case or default");
+    assertThat(eval("$ISNA($SWITCH(5, 1, \"one\"))")).isEqualTo(true);
+    assertThat(eval("$ISERR($SWITCH(5, 1, \"one\"))")).isEqualTo(false);
+    assertThat(eval("$IFERROR($SWITCH(5, 1, \"one\"), \"none\")")).isEqualTo("none");
+    assertThat(eval("$SWITCH(5, 1, \"one\", \"other\")")).isEqualTo("other");
+  }
+
   @Test
   void collectionLocalsShadowTheScopeWithoutCopyingIt() {
     var scope = new HashMap<String, Object>();

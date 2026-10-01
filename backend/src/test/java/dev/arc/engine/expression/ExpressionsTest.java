@@ -228,6 +228,21 @@ class ExpressionsTest {
                 .isEqualTo("0." + "0".repeat(100)));
   }
 
+  /**
+   * A number is bounded by its one spelling without trailing zeros. 10E+100 passed because its
+   * written scale fitted, while 1E+101, the same number, failed; once PostgreSQL stored the default
+   * as a 102-digit integer, its next save failed too.
+   */
+  @Test
+  void numbersAreBoundedByTheirValueWhateverTheSpelling() {
+    for (String spelling : List.of("1E+100", "10E+99", "0.1E+101", "1" + "0".repeat(100)))
+      assertThat(Expressions.bounded(new BigDecimal(spelling))).as(spelling).isNotNull();
+    for (String spelling : List.of("10E+100", "1.0E+101", "1E+101", "1" + "0".repeat(101)))
+      assertThatThrownBy(() -> Expressions.bounded(new BigDecimal(spelling)))
+          .as(spelling)
+          .hasMessage("Number exceeds supported precision or magnitude");
+  }
+
   @Test
   void numbersBeyondTheScaleRangeAreOutOfRangeNotAnInternalError() {
     // stripTrailingZeros() overflowed the scale of 100E+2147483647 with an ArithmeticException,

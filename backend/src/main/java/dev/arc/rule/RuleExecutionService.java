@@ -56,6 +56,14 @@ public class RuleExecutionService {
   }
 
   public ExecutionResponse execute(String id, Execution request) {
+    return EvaluationThreads.run(() -> executePublished(id, request));
+  }
+
+  public ExecutionResponse preview(Preview request) {
+    return EvaluationThreads.run(() -> previewDraft(request));
+  }
+
+  private ExecutionResponse executePublished(String id, Execution request) {
     long start = System.nanoTime();
     ExecutionDeadline deadline = deadline(request.timeoutMs());
     Integer version = request.version() == null ? rules.publishedVersion(id) : request.version();
@@ -75,7 +83,7 @@ public class RuleExecutionService {
         start);
   }
 
-  public ExecutionResponse preview(Preview request) {
+  private ExecutionResponse previewDraft(Preview request) {
     long start = System.nanoTime();
     ExecutionDeadline deadline = deadline(request.timeoutMs());
     Definition draft = request.definition();

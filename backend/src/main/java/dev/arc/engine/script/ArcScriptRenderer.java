@@ -2,9 +2,11 @@ package dev.arc.engine.script;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.NodeKind;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -62,6 +64,7 @@ final class ArcScriptRenderer {
   }
 
   private void appendNode(StringBuilder out, Node node, Definition definition) {
+    requireOneStatementPerExpression(node);
     out.append("\nnode ")
         .append(write(node.id()))
         .append(' ')
@@ -86,6 +89,38 @@ final class ArcScriptRenderer {
             .append(";\n");
     out.append("}\n");
   }
+
+  /**
+   * Refuses a node whose expression the code cannot hold as one statement: building the rendered
+   * text would add or drop statements (an Output name, a connection, a pin) instead of giving the
+   * draft back. Such an expression is invalid anyway, and the graph shows where it is.
+   */
+  private static void requireOneStatementPerExpression(Node node) {
+    var expressions = new ArrayList<Written>();
+    expressions.add(new Written("its expression", node.expression()));
+    expressions.add(new Written("its selector", node.selector()));
+    if (node.cases() != null)
+      for (BranchCase option : node.cases())
+        expressions.add(new Written("case " + option.label(), option.expression()));
+    if (node.fields() != null)
+      for (Field field : node.fields())
+        expressions.add(new Written("field " + field.name(), field.expression()));
+    if (node.bindings() != null)
+      for (var binding : new TreeMap<>(node.bindings()).entrySet())
+        expressions.add(new Written("binding " + binding.getKey(), binding.getValue()));
+    for (Written written : expressions)
+      if (written.expression() != null && !ArcScriptScanner.scansAsOneValue(written.expression()))
+        throw ArcException.invalid(
+                node.label()
+                    + ": ARC Script cannot show "
+                    + written.part()
+                    + ", which has a ';', '}' or '//' outside quotes or an unclosed quote or"
+                    + " bracket; correct it in the graph")
+            .atNode(null, null, node.id(), node.label());
+  }
+
+  /** An expression and the part of its node that holds it, for a refusal to name. */
+  private record Written(String part, String expression) {}
 
   /** The statements that declare what a node of its kind holds, before its connections. */
   private String declarations(Node node) {

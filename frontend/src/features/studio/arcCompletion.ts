@@ -13,7 +13,9 @@ export function isStringOrComment(
     endLineNumber: position.lineNumber,
     endColumn: model.getLineMaxColumn(position.lineNumber),
   });
-  const tokens = monaco.editor.tokenize(prefix, "arc")[position.lineNumber - 1];
+  const tokens = monaco.editor.tokenize(prefix, model.getLanguageId())[
+    position.lineNumber - 1
+  ];
   // Hover can target the first character of a continued string line.
   let token = tokens?.[0];
   for (const entry of tokens ?? []) {

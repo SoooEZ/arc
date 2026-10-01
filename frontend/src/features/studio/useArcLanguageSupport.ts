@@ -105,10 +105,12 @@ export function useArcLanguageSupport(
     // Providers must register after Monaco attaches the model. An initial token
     // request before onMount otherwise returns null and may never be retried.
     if (!editorModel || editorModel.isDisposed()) return;
+    // ARC Script or a single expression: the providers follow their model.
+    const language = editorModel.getLanguageId();
     const colorsChanged = new monaco.Emitter<void>();
     recolor.current = colorsChanged;
     const colors = monaco.languages.registerDocumentSemanticTokensProvider(
-      "arc",
+      language,
       {
         onDidChange: colorsChanged.event,
         getLegend: () => semanticLegend,
@@ -124,59 +126,63 @@ export function useArcLanguageSupport(
         releaseDocumentSemanticTokens: () => {},
       },
     );
-    const completions = monaco.languages.registerCompletionItemProvider("arc", {
-      triggerCharacters: ["$"],
-      provideCompletionItems: (model, position) => {
-        if (model !== editor.current?.getModel()) return { suggestions: [] };
-        if (isStringOrComment(model, position)) return { suggestions: [] };
-        const w = completionWord(model, position);
-        if (w.word.startsWith("@")) return { suggestions: [] };
-        const functionOnly = w.word.startsWith("$");
-        const functionPrefix = functionOnly ? w.word.toUpperCase() : "$";
-        const range = {
-          startLineNumber: position.lineNumber,
-          endLineNumber: position.lineNumber,
-          startColumn: w.startColumn,
-          endColumn: w.endColumn,
-        };
-        return {
-          // Monaco's fuzzy ranking treats '$RO' as a close match for '$OR'.
-          // Recompute the actual namespace prefix as the user types instead.
-          incomplete: functionOnly,
-          suggestions: [
-            ...functions
-              .filter((f) => f.supported && f.name.startsWith(functionPrefix))
-              .map((f) => ({
-                label: f.name,
-                kind: monaco.languages.CompletionItemKind.Function,
-                detail: f.signature,
-                documentation: f.description,
-                insertText: f.snippet,
+    const completions = monaco.languages.registerCompletionItemProvider(
+      language,
+      {
+        triggerCharacters: ["$"],
+        provideCompletionItems: (model, position) => {
+          if (model !== editor.current?.getModel()) return { suggestions: [] };
+          if (isStringOrComment(model, position)) return { suggestions: [] };
+          const w = completionWord(model, position);
+          if (w.word.startsWith("@")) return { suggestions: [] };
+          const functionOnly = w.word.startsWith("$");
+          const functionPrefix = functionOnly ? w.word.toUpperCase() : "$";
+          const range = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: w.startColumn,
+            endColumn: w.endColumn,
+          };
+          return {
+            // Monaco's fuzzy ranking treats '$RO' as a close match for '$OR'.
+            // Recompute the actual namespace prefix as the user types instead.
+            incomplete: functionOnly,
+            suggestions: [
+              ...functions
+                .filter((f) => f.supported && f.name.startsWith(functionPrefix))
+                .map((f) => ({
+                  label: f.name,
+                  kind: monaco.languages.CompletionItemKind.Function,
+                  detail: f.signature,
+                  documentation: f.description,
+                  insertText: f.snippet,
+                  insertTextRules:
+                    monaco.languages.CompletionItemInsertTextRule
+                      .InsertAsSnippet,
+                  range,
+                })),
+              ...(includeModules && !functionOnly ? modules : []).map((m) => ({
+                label: m.name,
+                kind: monaco.languages.CompletionItemKind.Snippet,
+                insertText: m.snippet,
                 insertTextRules:
                   monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                 range,
               })),
-            ...(includeModules && !functionOnly ? modules : []).map((m) => ({
-              label: m.name,
-              kind: monaco.languages.CompletionItemKind.Snippet,
-              insertText: m.snippet,
-              insertTextRules:
-                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              range,
-            })),
-            ...(functionOnly ? [] : latestVariables.current).map(
-              (variable) => ({
-                label: variable.name,
-                kind: monaco.languages.CompletionItemKind.Variable,
-                insertText: variable.name,
-                range,
-              }),
-            ),
-          ],
-        };
+              ...(functionOnly ? [] : latestVariables.current).map(
+                (variable) => ({
+                  label: variable.name,
+                  kind: monaco.languages.CompletionItemKind.Variable,
+                  insertText: variable.name,
+                  range,
+                }),
+              ),
+            ],
+          };
+        },
       },
-    });
-    const hover = monaco.languages.registerHoverProvider("arc", {
+    );
+    const hover = monaco.languages.registerHoverProvider(language, {
       provideHover: (model, position) => {
         if (model !== editor.current?.getModel()) return null;
         if (isStringOrComment(model, position)) return null;

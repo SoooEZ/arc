@@ -31,6 +31,22 @@ class IdentifierScriptTest {
     }
   }
 
+  /**
+   * "source" is an input name like any other: written with a space before its colon, its
+   * declaration was read as a source binding and refused ("Use: source parameter = ...").
+   */
+  @Test
+  void anInputNamedSourceIsDeclaredWhateverTheSpacing() {
+    for (String declaration : List.of("source: NUMBER required;", "source : NUMBER required;")) {
+      var built = script.build("inputs { " + declaration + " } node in INPUT \"In\" {}");
+      assertThat(built.diagnostics()).as(declaration).isEmpty();
+      assertThat(built.definition().inputs().getFirst().name()).isEqualTo("source");
+    }
+    assertThat(script.build("inputs { source amount; } node in INPUT \"In\" {}").diagnostics())
+        .extracting(ArcScript.Diagnostic::message)
+        .containsExactly("Use: source parameter = { JSON source binding };");
+  }
+
   @Test
   void inputAndReferenceParametersCannotBypassIdentifierPolicyThroughCode() {
     for (String name : List.of("unit price", "$value", "@value", "null", "a".repeat(65))) {

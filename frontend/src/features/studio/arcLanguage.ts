@@ -28,12 +28,18 @@ function caseSpellings(name: string): string[] {
   );
 }
 
+/**
+ * ARC Script, in Code studio and node code, reads a `//` comment anywhere
+ * outside quotes. A single expression has no comments on the server, so its
+ * editors neither color `//` as one nor toggle one with ⌘/Ctrl+/.
+ */
+export const arcScriptLanguage = "arc";
+export const arcExpressionLanguage = "arc-expression";
+
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco });
-monaco.languages.register({ id: "arc" });
-monaco.languages.setLanguageConfiguration("arc", {
+const expressionConfiguration: monaco.languages.LanguageConfiguration = {
   wordPattern: /@[a-z][a-z0-9-]*(?::[1-9]\d*)?|\$?[A-Za-z_][\w.]*/g,
-  comments: { lineComment: "//" },
   brackets: [
     ["{", "}"],
     ["(", ")"],
@@ -49,8 +55,9 @@ monaco.languages.setLanguageConfiguration("arc", {
     increaseIndentPattern: /\{[^}]*$/,
     decreaseIndentPattern: /^\s*\}/,
   },
-});
-monaco.languages.setMonarchTokensProvider("arc", {
+};
+const comment: monaco.languages.IMonarchLanguageRule = [/\/\/.*$/, "comment"];
+const expressionTokens: monaco.languages.IMonarchLanguage = {
   keywords: [
     "schema",
     "inputs",
@@ -79,7 +86,6 @@ monaco.languages.setMonarchTokensProvider("arc", {
   constants: ["true", "false", "null"],
   tokenizer: {
     root: [
-      [/\/\/.*$/, "comment"],
       [/"/, "string", "@doubleQuotedString"],
       [/'/, "string", "@singleQuotedString"],
       [/@[a-z][a-z0-9-]*(?::[1-9]\d*)?/, "formula"],
@@ -129,6 +135,27 @@ monaco.languages.setMonarchTokensProvider("arc", {
       [/\\/, "string"],
       [/'/, "string", "@pop"],
     ],
+  },
+};
+monaco.languages.register({ id: arcExpressionLanguage });
+monaco.languages.setLanguageConfiguration(
+  arcExpressionLanguage,
+  expressionConfiguration,
+);
+monaco.languages.setMonarchTokensProvider(
+  arcExpressionLanguage,
+  expressionTokens,
+);
+monaco.languages.register({ id: arcScriptLanguage });
+monaco.languages.setLanguageConfiguration(arcScriptLanguage, {
+  ...expressionConfiguration,
+  comments: { lineComment: "//" },
+});
+monaco.languages.setMonarchTokensProvider(arcScriptLanguage, {
+  ...expressionTokens,
+  tokenizer: {
+    ...expressionTokens.tokenizer,
+    root: [comment, ...expressionTokens.tokenizer.root],
   },
 });
 /**

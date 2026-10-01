@@ -69,6 +69,35 @@ class NodeContractsTest {
     assertConnectionProblem(output, "OUT: connect no outgoing branches", "out");
   }
 
+  /**
+   * A connection from an exit its node does not have is named, and nothing else is reported: the
+   * node was told to "connect [true, false]" although both were connected, and the target, reached
+   * by no exit the node can take, reported its declared input as unavailable.
+   */
+  @Test
+  void aConnectionFromAnExitTheNodeDoesNotHaveIsNamedAndNothingElse() {
+    var definition =
+        new Definition(
+            1,
+            List.of(new Definition.Input("amount", "NUMBER", true, null)),
+            List.of(
+                node("in", "INPUT", null),
+                node("check", "CONDITION", "amount > 1"),
+                node("yes", "OUTPUT", "amount"),
+                node("no", "OUTPUT", "0"),
+                node("extra", "OUTPUT", "amount * 2")),
+            List.of(
+                edge("in", "check", "next"),
+                edge("check", "yes", "true"),
+                edge("check", "no", "false"),
+                edge("check", "extra", "case:old")));
+    String stray = "CHECK: remove the connection from case:old, which this node does not have";
+    assertThat(validator.diagnose(definition, noRules).problems())
+        .containsExactly(
+            new Validator.Problem(stray, List.of(new Location(null, null, "check", "CHECK"))));
+    assertConnectionProblem(definition, stray, "check");
+  }
+
   private void assertConnectionProblem(Definition definition, String message, String nodeId) {
     assertThatThrownBy(() -> validator.validate(definition, noRules))
         .isInstanceOfSatisfying(

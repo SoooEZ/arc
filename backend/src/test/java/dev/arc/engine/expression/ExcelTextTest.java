@@ -191,4 +191,48 @@ class ExcelTextTest {
       entries += ((Map<?, ?>) perLocale).size();
     return entries;
   }
+
+  /**
+   * A format code has at most 255 characters, as in Excel. POI's section grammar recurses per
+   * character, so a longer code overflowed the stack or not depending on JIT warm-up and the
+   * thread's stack size, and the same request answered #VALUE! or a formatted number.
+   */
+  @Test
+  void aFormatCodeLongerThanExcelAllowsIsRefusedWhateverTheStack() throws Exception {
+    String longest = "0" + "a".repeat(249) + ";-0;0";
+    String tooLong = "0" + "a".repeat(250) + ";-0;0";
+    assertThat(longest).hasSize(255);
+    assertThat(
+            onStack(
+                512, () -> Expressions.evaluate("$TEXT(1234.5, code)", Map.of("code", longest))))
+        .isInstanceOf(String.class);
+    for (long kib : List.of(512L, 16_384L))
+      assertThat(
+              onStack(
+                  kib, () -> Expressions.evaluate("$TEXT(1234.5, code)", Map.of("code", tooLong))))
+          .as(kib + " KiB stack")
+          .isInstanceOfSatisfying(
+              ArcException.class, error -> assertThat(error).hasMessage("TEXT: #VALUE!"));
+  }
+
+  /** The result, or what was thrown, of a calculation on a thread with the given stack size. */
+  private static Object onStack(long kib, java.util.function.Supplier<Object> calculation)
+      throws InterruptedException {
+    var outcome = new Object[1];
+    var thread =
+        new Thread(
+            null,
+            () -> {
+              try {
+                outcome[0] = calculation.get();
+              } catch (Throwable thrown) {
+                outcome[0] = thrown;
+              }
+            },
+            "text-format",
+            kib * 1024);
+    thread.start();
+    thread.join();
+    return outcome[0];
+  }
 }

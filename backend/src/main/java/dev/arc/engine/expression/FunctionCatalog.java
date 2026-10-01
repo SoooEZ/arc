@@ -6,6 +6,7 @@ import dev.arc.error.ArcException;
 import java.util.*;
 import org.apache.poi.ss.formula.atp.AnalysisToolPak;
 import org.apache.poi.ss.formula.eval.FunctionEval;
+import org.apache.poi.ss.formula.function.FunctionMetadata;
 import org.apache.poi.ss.formula.function.FunctionMetadataRegistry;
 
 /** Immutable editor capabilities and arity validation, built once at startup. */
@@ -26,23 +27,14 @@ final class FunctionCatalog {
           "TODAY",
           "RAND",
           "RANDBETWEEN");
-
-  /**
-   * Functions that read an error value as an argument. ARC reports an error as a failure, not as a
-   * value, so ERROR.TYPE could never answer: its argument either failed first or was no error. The
-   * lazy $ISERROR, $ISERR, $ISNA and $IFERROR classify failures instead.
-   */
-  private static final Set<String> ERROR_VALUE_READERS = Set.of("ERROR.TYPE");
-
   private static final Set<String> EXCEL = executableExcelFunctions();
 
   private static final List<Entry> CATALOG = buildCatalog();
 
   private static Set<String> executableExcelFunctions() {
     var names = new TreeSet<>(FunctionEval.getSupportedFunctionNames());
-    // These functions need workbook state or nondeterministic host data, or read error values.
+    // These functions need workbook state or nondeterministic host data.
     names.removeAll(CONTEXT);
-    names.removeAll(ERROR_VALUE_READERS);
     return Set.copyOf(names);
   }
 
@@ -58,7 +50,6 @@ final class FunctionCatalog {
     names.addAll(AnalysisToolPak.getSupportedFunctionNames());
     names.addAll(AnalysisToolPak.getNotSupportedFunctionNames());
     names.addAll(CONTEXT);
-    names.addAll(ERROR_VALUE_READERS);
     for (String name : names) {
       Entry entry = excelEntry(name);
       all.put(name, ExcelFunctionHelp.describe(entry));
@@ -82,23 +73,19 @@ final class FunctionCatalog {
   private static Entry excelEntry(String name) {
     var metadata = FunctionMetadataRegistry.getFunctionByName(name);
     boolean supported = EXCEL.contains(name) && metadata != null;
-    int argumentCount = metadata == null ? 1 : Math.min(4, metadata.getMinParams());
+    int argumentCount = metadata == null ? 1 : Math.min(4, minimumArguments(name, metadata));
     var arguments = new ArrayList<String>();
     var placeholders = new ArrayList<String>();
     for (int index = 1; index <= argumentCount; index++) {
       arguments.add("argument" + index);
       placeholders.add("${" + index + ":value}");
     }
-    String signature =
-        name
-            + "("
-            + String.join(", ", arguments)
-            + (metadata != null && metadata.getMaxParams() > argumentCount ? ", ..." : "")
-            + ")";
+    if (metadata != null && metadata.getMaxParams() > argumentCount) arguments.add("...");
+    String signature = name + "(" + String.join(", ", arguments) + ")";
     String description =
         supported
             ? "Excel-compatible calculation via Apache POI. Accepts "
-                + metadata.getMinParams()
+                + minimumArguments(name, metadata)
                 + "–"
                 + metadata.getMaxParams()
                 + " arguments; arrays represent ranges. Uses Excel numeric semantics."
@@ -126,8 +113,14 @@ final class FunctionCatalog {
     var metadata = FunctionMetadataRegistry.getFunctionByName(name);
     if (!EXCEL.contains(name) || metadata == null)
       throw ArcException.invalid("Unsupported function: " + name + " (see function catalog)");
-    if (count < metadata.getMinParams() || count > metadata.getMaxParams())
+    if (count < minimumArguments(name, metadata) || count > metadata.getMaxParams())
       throw ArcException.invalid("Invalid argument count for " + name);
+  }
+
+  /** POI's fewest arguments, raised where Excel refuses the shorter call. */
+  private static int minimumArguments(String name, FunctionMetadata metadata) {
+    return Math.max(
+        metadata.getMinParams(), ExcelCallShapes.MINIMUM_ARGUMENTS.getOrDefault(name, 0));
   }
 
   static List<Entry> catalog() {

@@ -336,4 +336,80 @@ class ErrorRecoveryTest {
         () -> engine.execute("parent", 1, nested, Map.of(), formulas),
         "Rule nesting exceeds 16 levels");
   }
+
+  /**
+   * A rule run whose Input node is past the step budget reads none of its sources. The budget was
+   * checked when the Input node ran, after its inputs had read their sources, so a request that
+   * then failed with "Execution exceeds 1,000 steps" still made up to 50 external reads.
+   */
+  @Test
+  void aRunPastTheStepBudgetReadsNoSource() {
+    var one =
+        new Definition(
+            1,
+            List.of(),
+            List.of(inputNode("in", "Input"), outputNode("out", "Out", "1")),
+            List.of(new Edge("next", "in", "out", "next")));
+    var sourced =
+        new Input(
+            "rate", "NUMBER", true, null, new SourceBinding("rates", 1, Map.of(), "", "FAIL"));
+    var child =
+        new Definition(
+            1,
+            List.of(sourced),
+            List.of(inputNode("in", "Input"), outputNode("out", "Out", "rate")),
+            List.of(new Edge("next", "in", "out", "next")));
+    RuleResolver resolver =
+        new RuleResolver() {
+          @Override
+          public Definition resolve(String id, int version) {
+            return id.equals("one") ? one : child;
+          }
+
+          @Override
+          public Definition resolveFormula(String id, int version) {
+            return resolve(id, version);
+          }
+        };
+    // Four steps and 498 calls of a two-step rule leave none for the child's Input node.
+    var root =
+        new Definition(
+            1,
+            List.of(new Input("items", "ARRAY", true, Collections.nCopies(498, 1))),
+            List.of(
+                inputNode("in", "Input"),
+                nodeOf("f0", "FORMULA", "f0").expression("1").output("x").build(),
+                nodeOf("f1", "FORMULA", "f1")
+                    .expression("$COUNT($MAP(items, i, @one:1()))")
+                    .output("y")
+                    .build(),
+                nodeOf("ref", "REFERENCE", "Ref")
+                    .rule("child", 1)
+                    .bindings(Map.of())
+                    .output("r")
+                    .build(),
+                outputNode("out", "Out", "r")),
+            List.of(
+                new Edge("a", "in", "f0", "next"),
+                new Edge("b", "f0", "f1", "next"),
+                new Edge("c", "f1", "ref", "next"),
+                new Edge("d", "ref", "out", "next")));
+    var reads = new AtomicInteger();
+    assertThatThrownBy(
+            () ->
+                new Engine(validator)
+                    .execute(
+                        "root",
+                        1,
+                        root,
+                        Map.of(),
+                        resolver,
+                        new Parameters(
+                            (binding, inputs, deadline) -> {
+                              reads.incrementAndGet();
+                              return 7;
+                            })))
+        .hasMessage("Execution exceeds 1,000 steps");
+    assertThat(reads).hasValue(0);
+  }
 }

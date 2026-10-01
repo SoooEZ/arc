@@ -135,6 +135,8 @@ final class GraphExecution {
     private ExecutionScope resolveInputs(Map<String, Object> callerInputs) {
       Node input = compiled.definition().inputNode().orElseThrow();
       try {
+        // The Input node is the run's first step: a run past the budget reads none of its sources.
+        checkStepBudget();
         var resolved =
             parameters.resolve(
                 compiled.definition().inputs(),

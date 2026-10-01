@@ -135,7 +135,7 @@ public class JdbcSourceRepository implements SourceRepository {
   @Override
   public DataSource create(String id, String name, SourceDefinition definition) {
     StoredText.requireStorable(name);
-    String encoded = json.encode(definition);
+    String encoded = json.encodeEditable(definition);
     try {
       db.update("INSERT INTO data_sources(id,name) VALUES (?,?)", id, name);
     } catch (DuplicateKeyException duplicate) {
@@ -161,12 +161,13 @@ public class JdbcSourceRepository implements SourceRepository {
   public DataSource appendVersion(
       String id, String name, int currentVersion, SourceDefinition definition) {
     StoredText.requireStorable(name);
+    String encoded = json.encodeEditable(definition);
     int nextVersion = currentVersion + 1;
     db.update(
         "INSERT INTO data_source_versions(source_id,version,definition) VALUES (?,?,?::jsonb)",
         id,
         nextVersion,
-        json.encode(definition));
+        encoded);
     db.update(
         "UPDATE data_sources SET name=?,version=?,updated_at=now() WHERE id=?",
         name,

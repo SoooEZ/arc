@@ -23,6 +23,44 @@ class ExcelArgumentsTest {
     return Expressions.evaluate(expression, scope);
   }
 
+  /**
+   * Every call shape the catalog advertises answers as in Excel. POI's ROMAN needed its form and
+   * read TRUE as form 1, its INDEX failed on an area number, its IPMT refused the future value and
+   * payment type and its PPMT ignored them (PPMT(0.05, 1, 12, 1000, 0, 1) was -62.83, not -107.45),
+   * and COUNTA() compiled although it always failed.
+   */
+  @Test
+  void everyAdvertisedCallShapeAnswersAsInExcel() {
+    assertThat(eval("$ROMAN(1999)")).isEqualTo("MCMXCIX");
+    assertThat(eval("$ROMAN(499, true)")).isEqualTo("CDXCIX");
+    assertThat(eval("$ROMAN(499, false)")).isEqualTo("ID");
+    assertThat(eval("$ROMAN(499, 4)")).isEqualTo("ID");
+    assertThat(eval("$INDEX([[1, 2], [3, 4]], 2, 1, 1)")).isEqualTo(new BigDecimal("3"));
+    assertThatThrownBy(() -> eval("$INDEX([[1, 2], [3, 4]], 2, 1, 2)")).hasMessage("INDEX: #REF!");
+    // A payment at the start of the first period pays no interest.
+    assertThat((BigDecimal) eval("$IPMT(0.05, 1, 12, 1000, 0, 1)"))
+        .isEqualByComparingTo(BigDecimal.ZERO);
+    assertThat(eval("$IPMT(0.05, 1, 12, 1000, 0)")).isEqualTo(new BigDecimal("-50"));
+    assertThat((BigDecimal) eval("$IPMT(0.05, 2, 12, 1000, 0, 1)"))
+        .isCloseTo(new BigDecimal("-44.62736143"), within(new BigDecimal("0.00000001")));
+    assertThat((BigDecimal) eval("$PPMT(0.05, 1, 12, 1000, 0, 1)"))
+        .isCloseTo(new BigDecimal("-107.45277145"), within(new BigDecimal("0.00000001")));
+    assertThat((BigDecimal) eval("$PPMT(0.05, 1, 12, 1000, 500)"))
+        .isCloseTo(new BigDecimal("-94.23811503"), within(new BigDecimal("0.00000001")));
+    assertThatThrownBy(() -> Expressions.compile("$COUNTA()"))
+        .hasMessage("Invalid argument count for COUNTA");
+  }
+
+  /**
+   * Excel's CODE answers a number; POI answers the code as text, so {@code $CODE("A") == 65} was
+   * false and {@code $CODE("A") + 1} failed with "Expected a number, got string".
+   */
+  @Test
+  void codeAnswersANumber() {
+    assertThat(Expressions.evaluate("$CODE(\"A\")", Map.of())).isEqualTo(new BigDecimal("65"));
+    assertThat(Expressions.evaluate("$CODE(\"A\") + 1", Map.of())).isEqualTo(new BigDecimal("66"));
+  }
+
   @Test
   void referenceParametersThatExcelReadsAsOneValueRejectArrays() {
     // POI marks these parameters as references, so the value-class check did not cover them, and

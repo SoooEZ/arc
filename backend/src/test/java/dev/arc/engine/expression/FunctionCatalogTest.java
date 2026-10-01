@@ -26,19 +26,22 @@ class FunctionCatalogTest {
         .isInstanceOf(UnsupportedOperationException.class);
   }
 
+  /**
+   * ERROR.TYPE stays executable, because published versions use it. A non-error argument gives
+   * #N/A, as in Excel, which $ISNA and $IFERROR read; an error argument fails first, since ARC
+   * reports errors as failures. Making it reference-only stopped every version that mentions it
+   * from compiling, in an untaken branch or under $IFERROR too.
+   */
   @Test
-  void functionsThatReadErrorValuesAreReferenceOnly() {
-    // ARC reports an error as a failure, not as a value, so ERROR.TYPE could never answer: its
-    // argument failed first ($ERROR.TYPE(1 / 0) was "Division by zero") or was no error (#N/A).
-    var entry =
-        Functions.catalog().stream()
-            .filter(candidate -> candidate.name().equals("$ERROR.TYPE"))
-            .findFirst()
-            .orElseThrow();
-    assertThat(entry.supported()).isFalse();
-    assertThat(FunctionCatalog.excelFunctions()).doesNotContain("ERROR.TYPE");
-    assertThatThrownBy(() -> Expressions.evaluate("$ERROR.TYPE(1 / 0)", Map.of()))
-        .hasMessage("Unsupported function: ERROR.TYPE (see function catalog)");
+  void errorTypeKeepsTheValuesPublishedVersionsReadFromIt() {
+    assertThat(FunctionCatalog.excelFunctions()).contains("ERROR.TYPE");
+    assertThat(Expressions.evaluate("$IFERROR($ERROR.TYPE(1), 7)", Map.of()))
+        .isEqualTo(new java.math.BigDecimal("7"));
+    assertThat(Expressions.evaluate("$ISNA($ERROR.TYPE(5))", Map.of())).isEqualTo(true);
+    assertThat(
+            Expressions.evaluate(
+                "$IF($ISERROR(x), $ERROR.TYPE(x), x)", Map.of("x", new java.math.BigDecimal("5"))))
+        .isEqualTo(new java.math.BigDecimal("5"));
   }
 
   @Test

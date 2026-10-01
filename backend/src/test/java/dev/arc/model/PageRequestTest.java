@@ -34,6 +34,17 @@ class PageRequestTest {
         .withMessage("Search is limited to 200 characters");
   }
 
+  /**
+   * An input method's ideographic space (U+3000) is whitespace too: trim() kept it, so "税率　"
+   * searched for the space and matched nothing.
+   */
+  @Test
+  void searchesLoseEveryKindOfSurroundingWhitespace() {
+    assertThat(new PageRequest(0, 20, "\u3000税率\u3000").search()).isEqualTo("税率");
+    assertThat(new PageRequest(0, 20, "\u2003tax\u2028").search()).isEqualTo("tax");
+    assertThat(new PageRequest(0, 20, "sales\u3000tax").search()).isEqualTo("sales\u3000tax");
+  }
+
   @Test
   void boundsAreReportedBeforeTheSearchLength() {
     assertThatIllegalArgumentException()

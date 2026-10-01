@@ -43,10 +43,17 @@ final class ArcScriptSyntax {
     this.json = json;
   }
 
+  /**
+   * A JSON literal or source binding, read as strictly as a request body whatever the application's
+   * settings: a misspelled binding field or a fractional version is an error at its statement.
+   */
   <T> T read(String text, Class<T> type, Statement statement) {
     try {
       return json.readerFor(type)
-          .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+          .with(
+              DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
+              DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+          .without(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
           .readValue(text);
     } catch (JsonProcessingException failure) {
       throw error("Invalid JSON literal or source binding", statement);

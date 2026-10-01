@@ -16,11 +16,9 @@ function names(source: string, script = false) {
   }));
 }
 
-test("colors names by role without confusing same-name calls, properties, strings or comments", () => {
+test("colors names by role without confusing same-name calls, properties or strings", () => {
   expect(
-    names(
-      '$ROUND(ROUND, 2) + price + customer.amount + "amount price" // $ROUND(price)',
-    ),
+    names('$ROUND(ROUND, 2) + price + customer.amount + "amount price"'),
   ).toEqual([
     { text: "$ROUND", kind: "function" },
     { text: "ROUND", kind: "parameter" },
@@ -122,6 +120,22 @@ node out OUTPUT "Result" { return total; as total; }`,
     { text: "total", kind: "parameter" },
     { text: "total", kind: "parameter" },
   ]);
+});
+
+// The server reads a comment in ARC Script, also inside a statement, but has
+// none in a single expression, where `//` was colored as one and then refused.
+test("a '//' starts a comment in ARC Script and not in a single expression", () => {
+  expect(names("amount // price")).toEqual([
+    { text: "amount", kind: "parameter" },
+    { text: "price", kind: "variable" },
+  ]);
+  expect(
+    names(
+      `node out OUTPUT "Result" { return amount // $ROUND(price) @ignored:1(price)
+  * 2; }`,
+      true,
+    ),
+  ).toEqual([{ text: "amount", kind: "parameter" }]);
 });
 
 test("node-aware as declarations preserve Reference and Transform results across quoted and nested braces", () => {

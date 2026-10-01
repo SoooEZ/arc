@@ -31,6 +31,39 @@ class SourceVersionsTest {
     verify(repository, times(2)).get("rates", 1);
   }
 
+  /**
+   * A number weighs what it retains: a 100-digit decimal holds a BigInteger and its digits. Every
+   * number weighed 16 units, so 120 lookup versions of 1,000 such entries weighed about 5 MiB and
+   * stayed cached while they held about 28 MiB.
+   */
+  @Test
+  void longDecimalsCountTowardsTheCacheBound() {
+    var repository = mock(SourceRepository.class);
+    when(repository.get(eq("rates"), anyInt()))
+        .thenAnswer(call -> withLongDecimals(call.getArgument(1)));
+    var versions = new SourceVersions(repository);
+    for (int version = 1; version <= 120; version++) versions.get("rates", version);
+    versions.get("rates", 1);
+    verify(repository, times(2)).get("rates", 1);
+  }
+
+  private static DataSource withLongDecimals(int version) {
+    var entries = new java.util.LinkedHashMap<String, Object>();
+    for (int index = 0; index < 1000; index++)
+      entries.put("k" + index, new java.math.BigDecimal(version + "1".repeat(99)));
+    return new DataSource(
+        "rates",
+        "Rates",
+        version,
+        new SourceDefinition(
+            "LOOKUP",
+            null,
+            java.util.List.of(new Input("key", "STRING", true, null)),
+            entries,
+            null,
+            1000));
+  }
+
   private static DataSource withLongDefaults(int version) {
     var parameters = new ArrayList<Input>();
     for (int index = 0; index < 20; index++)

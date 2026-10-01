@@ -26,11 +26,20 @@ const identifier =
 const localIdentifier = /^[A-Za-z_][A-Za-z_0-9]*$/;
 const collections = new Set(["MAP", "FILTER", "ALL", "ANY", "REDUCE"]);
 
-/** This lexer only classifies visible names; execution and scope validation remain on the server. */
-function tokens(source: string): Token[] {
-  const pattern =
-    /\/\/[^\r\n]*|"(?:[^"\\]|\\[\s\S])*(?:"|$)|'(?:[^'\\]|\\[\s\S])*(?:'|$)|@[a-z][a-z0-9-]*(?::[1-9]\d*)?|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|\$?[A-Za-z_][A-Za-z_0-9.]*|[^\s]/g;
-  return [...source.matchAll(pattern)]
+const expressionToken =
+  /"(?:[^"\\]|\\[\s\S])*(?:"|$)|'(?:[^'\\]|\\[\s\S])*(?:'|$)|@[a-z][a-z0-9-]*(?::[1-9]\d*)?|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|\$?[A-Za-z_][A-Za-z_0-9.]*|[^\s]/g;
+const scriptToken = new RegExp(
+  String.raw`\/\/[^\r\n]*|` + expressionToken.source,
+  "g",
+);
+
+/**
+ * This lexer only classifies visible names; execution and scope validation
+ * remain on the server. A `//` comment runs to the end of its line in ARC
+ * Script; a single expression has no comments, as on the server.
+ */
+function tokens(source: string, script: boolean): Token[] {
+  return [...source.matchAll(script ? scriptToken : expressionToken)]
     .filter((match) => !match[0].startsWith("//"))
     .map((match) => ({
       text: match[0],
@@ -171,7 +180,7 @@ export function expressionSymbols(
   variables: VariableOption[],
   script = false,
 ): ExpressionSymbol[] {
-  const lexical = tokens(source);
+  const lexical = tokens(source, script);
   const names = new Map<string, ExpressionSymbolKind>(
     variables.map((variable) => [
       variable.name,
@@ -224,6 +233,6 @@ export function expressionSymbols(
  */
 export function scriptVariableNames(source: string): string[] {
   const names = new Map<string, ExpressionSymbolKind>();
-  scriptNames(tokens(source), names);
+  scriptNames(tokens(source, true), names);
   return [...names.keys()];
 }

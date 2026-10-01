@@ -1,5 +1,6 @@
 package dev.arc.api;
 
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import dev.arc.error.ArcException;
 import java.util.List;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice
 public class Errors {
   private static final Logger LOG = LoggerFactory.getLogger(Errors.class);
+  private static final int NAMED_FIELD_CHARACTERS = 200;
 
   @ExceptionHandler(ArcException.class)
   ResponseEntity<ErrorBody> arc(ArcException e) {
@@ -26,10 +28,27 @@ public class Errors {
     HttpMessageNotReadableException.class,
     MethodArgumentTypeMismatchException.class
   })
-  ResponseEntity<ErrorBody> malformed() {
-    return response(
-        ErrorBody.outsideGraph(
-            400, "Request contains malformed JSON or an invalid value", List.of()));
+  ResponseEntity<ErrorBody> malformed(Exception e) {
+    String message =
+        e.getCause() instanceof UnrecognizedPropertyException unknown
+            ? unknownField(unknown)
+            : "Request contains malformed JSON or an invalid value";
+    return response(ErrorBody.outsideGraph(400, message, List.of()));
+  }
+
+  /**
+   * Where the unknown field is, as in definition.inputs[0].source.pointr, so that a misspelling is
+   * found; a path too long to repeat is left out.
+   */
+  private static String unknownField(UnrecognizedPropertyException error) {
+    var path = new StringBuilder();
+    for (var reference : error.getPath())
+      if (reference.getFieldName() == null)
+        path.append('[').append(reference.getIndex()).append(']');
+      else path.append(path.isEmpty() ? "" : ".").append(reference.getFieldName());
+    return path.length() <= NAMED_FIELD_CHARACTERS
+        ? "Request contains an unknown field: " + path
+        : "Request contains an unknown field";
   }
 
   /**

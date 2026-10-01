@@ -52,6 +52,12 @@ final class ExecutionPlans {
     return published.get(pin);
   }
 
+  /** See {@link Engine#prepareForCheck}: reads the cache and never stores. */
+  CompiledGraph planForCheck(String id, int version, Definition definition, RuleResolver resolver) {
+    Cached entry = cached(new Pin(id, version));
+    return entry != null ? entry.plan() : validator.compile(definition, resolver);
+  }
+
   /**
    * Drops every cached plan of a deleted rule, so its ID can later name a different rule. Call it
    * after the deletion commits: a session that starts earlier can still read the rule.

@@ -278,6 +278,22 @@ class HttpDestinationPolicyTest {
         .hasMessage("Use an HTTP(S) URL without credentials or fragment");
   }
 
+  /**
+   * A scheme is case-insensitive (RFC 3986): HTTPS:// was refused as "an HTTP(S) URL without
+   * credentials or fragment". It is written in lower case for the transport, which chooses TLS and
+   * the default port by it; the rest of the URL keeps its text.
+   */
+  @Test
+  void aSchemeIsReadInAnyCase() {
+    assertThat(
+            publicDestinations
+                .validate(config("HTTPS://api.example.com/Rates?Q=%2B1", Map.of()))
+                .toString())
+        .isEqualTo("https://api.example.com/Rates?Q=%2B1");
+    assertThat(publicDestinations.validate(config("Http://api.example.com/x", Map.of())).toString())
+        .isEqualTo("http://api.example.com/x");
+  }
+
   @Test
   void rejectsUrlsThatTheTransportCouldNotSendAsWritten() {
     // HttpClient would send each non-ASCII character as one Latin-1 byte or as '?', changing the

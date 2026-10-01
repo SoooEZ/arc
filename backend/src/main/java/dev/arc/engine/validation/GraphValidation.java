@@ -143,15 +143,28 @@ final class GraphValidation {
       problems.accept(problem("Input node cannot have incoming connections", input));
     for (Node node : definition.nodes()) {
       List<Edge> edges = outgoing.getOrDefault(node.id(), List.of());
-      Set<String> handles = edges.stream().map(Edge::sourceHandle).collect(Collectors.toSet());
       List<String> expected = node.handles();
-      if (!handles.equals(Set.copyOf(expected)))
+      if (expected.isEmpty()) {
+        if (!edges.isEmpty())
+          problems.accept(problem(node.label() + ": connect no outgoing branches", node));
+        continue;
+      }
+      // An exit the node does not have is named: "connect [true, false]" read as a missing
+      // connection when both were connected.
+      var handles = new LinkedHashSet<String>();
+      for (Edge edge : edges) handles.add(edge.sourceHandle());
+      var stray = new ArrayList<>(handles);
+      stray.removeAll(expected);
+      if (!stray.isEmpty())
         problems.accept(
             problem(
                 node.label()
-                    + ": connect "
-                    + (expected.isEmpty() ? "no outgoing branches" : expected),
+                    + ": remove the connection from "
+                    + String.join(", ", stray)
+                    + ", which this node does not have",
                 node));
+      if (!handles.containsAll(expected))
+        problems.accept(problem(node.label() + ": connect " + expected, node));
     }
     Set<String> connections = new HashSet<>();
     for (Edge e : definition.edges())

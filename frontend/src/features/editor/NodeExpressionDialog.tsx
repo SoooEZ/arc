@@ -20,6 +20,7 @@ import {
   useEditorOptions,
 } from "../studio/useArcEditor";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
+import { arcScriptLanguage } from "../studio/arcLanguage";
 import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import { useNodeExpressionDraft } from "./useNodeExpressionDraft";
 import type { Definition, RuleNode } from "../../types";
@@ -99,7 +100,7 @@ export default function NodeExpressionDialog({
               />
             </aside>
             <MonacoEditor
-              language="arc"
+              language={arcScriptLanguage}
               theme="arc-light"
               value={source}
               onChange={(s) => changeSource(s ?? "")}

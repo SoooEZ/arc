@@ -262,7 +262,7 @@ public class JdbcRuleRepository implements RuleRepository {
           name,
           description,
           kind,
-          encode(definition));
+          json.encodeEditable(definition));
     } catch (DuplicateKeyException duplicate) {
       throw new ArcException(409, "This rule ID already exists");
     }
@@ -276,7 +276,7 @@ public class JdbcRuleRepository implements RuleRepository {
         "UPDATE rules SET name = ?, description = ?, draft = ?::jsonb, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING *",
         name,
         description,
-        encode(definition),
+        json.encodeEditable(definition),
         id);
   }
 
@@ -287,7 +287,8 @@ public class JdbcRuleRepository implements RuleRepository {
         "INSERT INTO rule_versions (rule_id, version, definition) VALUES (?, ?, ?::jsonb)",
         rule.id(),
         version,
-        encode(rule.draft()));
+        // A saved draft passed encodeEditable; one saved before that check still publishes.
+        json.encode(rule.draft()));
     return written(
         rule.id(),
         "UPDATE rules SET published_version = ?, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING *",
@@ -364,10 +365,6 @@ public class JdbcRuleRepository implements RuleRepository {
 
   private static Instant instant(ResultSet row, String column) throws SQLException {
     return row.getTimestamp(column).toInstant();
-  }
-
-  private String encode(Definition d) {
-    return json.encode(d);
   }
 
   private Definition decode(String value) {

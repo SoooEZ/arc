@@ -97,10 +97,11 @@ export function significantDigits({ integer, fraction }: DecimalParts): {
   trailingZeros: number;
 } {
   const digits = (integer + fraction).replace(/^0+/, "");
-  return {
-    digits,
-    trailingZeros: digits.length - digits.replace(/0+$/, "").length,
-  };
+  // A loop, not /0+$/: the pattern retried from every zero of a long run,
+  // which froze the tab on a pasted number with 40,000 zeros.
+  let end = digits.length;
+  while (end > 0 && digits[end - 1] === "0") end--;
+  return { digits, trailingZeros: digits.length - end };
 }
 
 interface Decimal {

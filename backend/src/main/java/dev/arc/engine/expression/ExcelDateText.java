@@ -12,16 +12,22 @@ import org.apache.poi.ss.formula.eval.OperandResolver;
 
 /**
  * Date text that POI would read without a year. POI fills a missing year in from the clock:
- * DateUtil, which reads date text for numeric arguments, VALUE, TIMEVALUE and TEXT, uses the year
- * in which the API process first loaded it, and DATEVALUE's parser the current year. Either is a
- * hidden TODAY(), which ARC leaves out because a published rule must not change with the date (NOW
- * and TODAY are reference-only). The functions that read dates refuse such text before POI runs:
- * {@code $YEAR("1 Jan")} is a 422 instead of the year the process started.
+ * DateUtil, which reads date text wherever a function takes a number, uses the year in which the
+ * API process first loaded it, and DATEVALUE's parser the current year. Either is a hidden TODAY(),
+ * which ARC leaves out because a published rule must not change with the date (NOW and TODAY are
+ * reference-only). The functions that read dates refuse such text before POI runs: {@code $YEAR("1
+ * Jan")} and {@code $INT("15 Jan")} are a 422 instead of a date in the year the process started.
  */
 final class ExcelDateText {
-  /** The executable functions whose text arguments POI reads as dates. */
+  /**
+   * The executable functions whose text arguments POI may read as dates: the date and time
+   * functions, and the numeric ones that convert text through DateUtil. Every argument of these is
+   * checked unless {@link #TEXT_ARGUMENTS} keeps it text. {@code ExcelDateTextTest} finds every
+   * such function and argument in the catalog.
+   */
   static final Set<String> DATE_READERS =
       Set.of(
+          // Date and time.
           "DAY",
           "MONTH",
           "YEAR",
@@ -35,7 +41,51 @@ final class ExcelDateText {
           "DAYS360",
           "TIMEVALUE",
           "VALUE",
-          "TEXT");
+          "TEXT",
+          // Math and trigonometry.
+          "ACOSH",
+          "ASINH",
+          "ATAN",
+          "ATAN2",
+          "CEILING",
+          "COS",
+          "DEGREES",
+          "EVEN",
+          "INT",
+          "LN",
+          "LOG",
+          "LOG10",
+          "MOD",
+          "ODD",
+          "POWER",
+          "RADIANS",
+          "SIN",
+          "SQRT",
+          "TAN",
+          "TRUNC",
+          // Number formatting and cell references.
+          "ADDRESS",
+          "DOLLAR",
+          "FIXED",
+          // Financial.
+          "FV",
+          "IPMT",
+          "NPER",
+          "NPV",
+          "PMT",
+          "PPMT",
+          "PV",
+          "RATE",
+          // Arrays and statistics.
+          "MDETERM",
+          "MINVERSE",
+          "MMULT",
+          "PERCENTRANK",
+          "TRANSPOSE");
+
+  /** Arguments of a date reader that stay text, by index: TEXT's format code, ADDRESS's sheet. */
+  private static final Map<String, Set<Integer>> TEXT_ARGUMENTS =
+      Map.of("TEXT", Set.of(1), "ADDRESS", Set.of(4));
 
   /**
    * The date and time patterns of POI's {@code DateUtil.parseDateTime}, without the default year
@@ -75,13 +125,14 @@ final class ExcelDateText {
   /** Refuses text that a date-reading function would complete with a year from the clock. */
   static void refuseDatesWithoutYear(String function, List<Object> args) {
     if (!DATE_READERS.contains(function)) return;
-    // TEXT reads only its value as a date; its format code stays text.
-    List<Object> dates = function.equals("TEXT") ? args.subList(0, 1) : args;
-    for (Object argument : dates)
-      for (String text : texts(argument))
+    Set<Integer> textArguments = TEXT_ARGUMENTS.getOrDefault(function, Set.of());
+    for (int index = 0; index < args.size(); index++) {
+      if (textArguments.contains(index)) continue;
+      for (String text : texts(args.get(index)))
         if (needsYear(function, text))
           throw ArcException.invalid(
               function + ": date text needs a year, such as \"15 Jan 2026\"");
+    }
   }
 
   private static List<String> texts(Object argument) {
@@ -92,17 +143,29 @@ final class ExcelDateText {
     return texts;
   }
 
+  /**
+   * The longest text that can still be a date once POI collapses its whitespace: each numeric field
+   * takes at most 19 digits. Longer text is never read as a date, so POI's number pattern, which
+   * backtracks quadratically on long digit text (lesson B14), never runs on it here.
+   */
+  private static final int LONGEST_DATE_TEXT = 256;
+
+  private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
   /** Whether POI would read the text as a date and take its year from the clock. */
   static boolean needsYear(String function, String text) {
-    if (OperandResolver.parseDouble(text) != null) return false;
+    // DATEVALUE reads its text with its own formats only, which allow any trailing text.
     if (function.equals("DATEVALUE")) {
       for (DateValueFormat format : DATE_VALUE_FORMATS)
         if (format.pattern().matcher(text).find()) return !format.hasYear();
       return false;
     }
+    // Elsewhere POI reads a number first, then date text with its whitespace collapsed.
+    String collapsed = WHITESPACE.matcher(text).replaceAll(" ");
+    if (collapsed.length() > LONGEST_DATE_TEXT) return false;
+    if (OperandResolver.parseDouble(text) != null) return false;
     try {
-      // POI collapses whitespace before parsing.
-      TemporalAccessor parsed = POI_DATE_TIME.parse(text.replaceAll("\\s+", " "));
+      TemporalAccessor parsed = POI_DATE_TIME.parse(collapsed);
       return parsed.isSupported(ChronoField.MONTH_OF_YEAR)
           && !parsed.isSupported(ChronoField.YEAR_OF_ERA);
     } catch (DateTimeParseException notDateText) {

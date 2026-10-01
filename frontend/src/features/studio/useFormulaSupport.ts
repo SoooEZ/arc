@@ -94,6 +94,8 @@ export function useFormulaSupport(
 
   useEffect(() => {
     if (!editorModel || editorModel.isDisposed()) return;
+    // ARC Script or a single expression: the providers follow their model.
+    const language = editorModel.getLanguageId();
     const requests = new Set<AbortController>();
     const load = async <T>(
       token: monaco.CancellationToken,
@@ -111,80 +113,84 @@ export function useFormulaSupport(
         requests.delete(controller);
       }
     };
-    const completions = monaco.languages.registerCompletionItemProvider("arc", {
-      triggerCharacters: ["@"],
-      provideCompletionItems: async (model, position, _context, token) => {
-        if (
-          model !== editorModel ||
-          model !== editor.current?.getModel() ||
-          isStringOrComment(model, position)
-        )
-          return { suggestions: [] };
-        const requested = completionWord(model, position);
-        if (!requested.word.startsWith("@")) return { suggestions: [] };
-        // Monaco adjusts this request-time range for characters typed since.
-        const range = new monaco.Range(
-          position.lineNumber,
-          requested.startColumn,
-          position.lineNumber,
-          requested.endColumn,
-        );
-        try {
-          if (!(await typingPaused(model, token))) return { suggestions: [] };
-          const word = settledFormulaWord(editor.current, model, {
-            lineNumber: position.lineNumber,
-            startColumn: requested.startColumn,
-          });
-          if (!word) return { suggestions: [] };
-          const query = word.slice(1).split(":")[0];
-          const entries = await load(token, (signal) =>
-            formulaMetadata.search(query, signal),
-          );
+    const completions = monaco.languages.registerCompletionItemProvider(
+      language,
+      {
+        triggerCharacters: ["@"],
+        provideCompletionItems: async (model, position, _context, token) => {
           if (
-            token.isCancellationRequested ||
-            model.isDisposed() ||
-            model !== editor.current?.getModel()
+            model !== editorModel ||
+            model !== editor.current?.getModel() ||
+            isStringOrComment(model, position)
           )
             return { suggestions: [] };
-          setError("");
-          // Monaco filters by what was typed since; a longer word re-requests.
-          return {
-            incomplete: true,
-            suggestions: entries
-              .filter(
-                (entry) =>
-                  !word.includes(":") ||
-                  formulaCallName(entry).startsWith(word),
-              )
-              .map((entry) => ({
-                label: formulaCallName(entry),
-                filterText: word,
-                kind: monaco.languages.CompletionItemKind.Function,
-                detail: `${entry.name} · ${formulaSignature(entry)}`,
-                documentation: entry.inputs
-                  .map(formulaParameterDescription)
-                  .join("\n\n"),
-                get insertText() {
-                  // Monaco keeps old suggestions selectable while a scope-
-                  // triggered refresh loads. Resolve argument placeholders
-                  // from the authoritative scope when the item is accepted.
-                  return formulaSnippet(
-                    entry,
-                    latestVariables.current.map((variable) => variable.name),
-                  );
-                },
-                insertTextRules:
-                  monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                range,
-              })),
-          };
-        } catch (failure) {
-          if (!token.isCancellationRequested) setError(errorMessage(failure));
-          return { suggestions: [] };
-        }
+          const requested = completionWord(model, position);
+          if (!requested.word.startsWith("@")) return { suggestions: [] };
+          // Monaco adjusts this request-time range for characters typed since.
+          const range = new monaco.Range(
+            position.lineNumber,
+            requested.startColumn,
+            position.lineNumber,
+            requested.endColumn,
+          );
+          try {
+            if (!(await typingPaused(model, token))) return { suggestions: [] };
+            const word = settledFormulaWord(editor.current, model, {
+              lineNumber: position.lineNumber,
+              startColumn: requested.startColumn,
+            });
+            if (!word) return { suggestions: [] };
+            const query = word.slice(1).split(":")[0];
+            const entries = await load(token, (signal) =>
+              formulaMetadata.search(query, signal),
+            );
+            if (
+              token.isCancellationRequested ||
+              model.isDisposed() ||
+              model !== editor.current?.getModel()
+            )
+              return { suggestions: [] };
+            setError("");
+            // Monaco filters by what was typed since; a longer word re-requests.
+            return {
+              incomplete: true,
+              suggestions: entries
+                .filter(
+                  (entry) =>
+                    !word.includes(":") ||
+                    formulaCallName(entry).startsWith(word),
+                )
+                .map((entry) => ({
+                  label: formulaCallName(entry),
+                  filterText: word,
+                  kind: monaco.languages.CompletionItemKind.Function,
+                  detail: `${entry.name} · ${formulaSignature(entry)}`,
+                  documentation: entry.inputs
+                    .map(formulaParameterDescription)
+                    .join("\n\n"),
+                  get insertText() {
+                    // Monaco keeps old suggestions selectable while a scope-
+                    // triggered refresh loads. Resolve argument placeholders
+                    // from the authoritative scope when the item is accepted.
+                    return formulaSnippet(
+                      entry,
+                      latestVariables.current.map((variable) => variable.name),
+                    );
+                  },
+                  insertTextRules:
+                    monaco.languages.CompletionItemInsertTextRule
+                      .InsertAsSnippet,
+                  range,
+                })),
+            };
+          } catch (failure) {
+            if (!token.isCancellationRequested) setError(errorMessage(failure));
+            return { suggestions: [] };
+          }
+        },
       },
-    });
-    const hover = monaco.languages.registerHoverProvider("arc", {
+    );
+    const hover = monaco.languages.registerHoverProvider(language, {
       provideHover: async (model, position, token) => {
         if (
           model !== editorModel ||
