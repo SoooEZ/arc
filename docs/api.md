@@ -1,6 +1,6 @@
 # HTTP API
 
-Base URL: `http://localhost:8080/api` (also proxied by the workspace at `http://localhost:3080/api`). Send JSON with `Content-Type: application/json`. No JWT is required in this release. Responses write decimal numbers in plain notation, for example `20` and `0.0000001`, never exponent forms such as `2E+1`. See [the behavior changes from the 2026-10-01 backend review](#behavior-changes-from-the-2026-10-01-backend-review), [from the second review](#behavior-changes-from-the-second-review) and [in this revision](#behavior-changes-in-this-revision) for results that differ from earlier releases.
+Base URL: `http://localhost:8080/api` (also proxied by the workspace at `http://localhost:3080/api`). Send JSON with `Content-Type: application/json`. No JWT is required in this release. Responses write decimal numbers in plain notation, for example `20` and `0.0000001`, never exponent forms such as `2E+1`. See [the behavior changes from the 2026-10-01 final review](#behavior-changes-from-the-2026-10-01-final-review), [from the 2026-10-01 backend review](#behavior-changes-from-the-2026-10-01-backend-review), [from the second review](#behavior-changes-from-the-second-review) and [in this revision](#behavior-changes-in-this-revision) for results that differ from earlier releases.
 
 ## Execute
 
@@ -112,7 +112,7 @@ Revisions come from one sequence for all rules, so they advance but are not cons
 
 | HTTP status | Meaning |
 | --- | --- |
-| `400` | Malformed JSON or invalid request value |
+| `400` | Malformed JSON, a second document after the body, a fraction where an integer belongs (`"version": 1.9`) or another invalid request value ("Request contains malformed JSON or an invalid value"); an unknown field, named by its path ("Request contains an unknown field: definition.inputs[0].source.pointr") |
 | `404` | Missing rule, source or version |
 | `405` | Method not supported by the path; the `Allow` header lists the supported ones |
 | `409` | Duplicate rule or source ID (`This rule ID already exists`, `This source ID already exists`), stale revision, execution of an unpublished rule, or deletion of a rule that other rules call |
@@ -128,6 +128,42 @@ The current release has no batch endpoint, run-history storage, or authenticatio
 
 See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults. Entries appear in read order: an input's source dependencies are read first, in declaration order.
 
+## Behavior changes from the 2026-10-01 final review
+
+These changes shipped with [the 2026-10-01 final review](reviews/2026-10-01-final-review.md). Graph JSON, stored versions and pins are unchanged, and every published version that compiled before the backend review compiles again. Results listed here changed because the earlier behavior was a defect.
+
+**Requests and storage**
+
+- Request bodies are read strictly. An unknown field returns `400` "Request contains an unknown field: definition.inputs[0].source.pointr", naming its path; it used to be dropped, so a source binding with a misspelled `pointer` read the whole response, and a misspelled `version`, `outputName` or `secretHeaders` vanished without an error. A second JSON document after the body and a fraction where an integer belongs (`"version": 1.9`, `"revision": 5.99`) return `400` "Request contains malformed JSON or an invalid value" instead of being ignored or truncated. Stored rules, versions and sources are read as before.
+- A draft or source save returns `422` "Definition exceeds 960 KiB once its numbers are written out in full, more than a save can send back" when its JSON, written as responses write it, would not fit in the next save. Stored numbers are written out in full (`1e100` has 101 digits), so a 140 KB save could store 2 MB, and every later save from the editor was a `413`. Publishing a saved draft is not refused.
+- Catalog searches ignore every kind of surrounding whitespace, including the ideographic space (U+3000) an input method types.
+- Validate, diagnostics and publish no longer run under the execution deadline, so a slow check no longer answers `504`. After a startup whose sample seeding was rolled back, a version the seed never committed returns `404`; the API ran a plan cached from it, also for a version 1 the user published later.
+
+**Calculations**
+
+- `$SWITCH` without a matching case or a default is #N/A, as in Excel: `$ISNA` answers `TRUE` and `$ISERR` `FALSE` (they answered `FALSE` and `TRUE`). The failure message and `$IFERROR` are unchanged.
+- `$ERROR.TYPE` is executable again, so published versions that mention it compile and return the values they returned before the backend review.
+- Every function argument that reads a number from date text refuses text without a year, not only the date functions: `$INT("15 Jan")`, `$MOD`, `$TRUNC`, `$FIXED` and the financial and matrix functions (36 more) took the year the server started.
+- `$CODE("A")` is the number `65`, not the text `"65"`. `$ROMAN(n)` and `$ROMAN(n, TRUE)` write the classic form, `$INDEX` accepts an area number, and `$IPMT` and `$PPMT` take a future value and a payment type, as in Excel; `$PPMT` used to ignore them (`-62.83` instead of `-107.45`). `$COUNTA()` without an argument returns `422`, as Excel refuses it. Catalog signatures of functions without required arguments read `NAME(...)` instead of `NAME(, ...)`.
+- `$TEXT` refuses format codes longer than Excel's 255 characters with `422`. Longer codes answered `#VALUE!` or a formatted value, depending on how warm the server was.
+- Number bounds judge a number's value, whatever its spelling: `10E+100` was accepted where `1E+101` was refused, and a default written that way was stored and then failed its next save. Both are refused now.
+- A called rule checks the step budget before it reads its sourced inputs: a run already past 1,000 steps no longer fetches one source per callee before failing.
+- The deepest evaluation the limits allow (17 nested rules, each inside expressions nested 48 levels deep) no longer fails its first request after a start with `500`.
+
+**ARC Script and validation**
+
+- `//` starts a comment anywhere outside quotes, inside a statement or a header too, and becomes a note, as between statements. Such code failed to build with "Invalid expression".
+- Rendering a graph returns `422` at the node when an expression holds `;`, `}` or `//` outside quotes and brackets, or an unclosed quote or bracket: "<label>: ARC Script cannot show <part>, which has a ';', '}' or '//' outside quotes or an unclosed quote or bracket; correct it in the graph". Such an expression was written as it was, and building that code turned it into other statements (an injected Output name, connection or pin) or ran it into the next one.
+- A build compiles every source mapping and reports a problem at the source statement ("rate source / key: <problem>"); an unparsable mapping built, and only the diagnostics reported it.
+- An input named `source` is a declaration however it is spaced (`source : NUMBER required`); it was read as a malformed source binding.
+- JSON literals and source bindings in ARC Script refuse unknown fields and fractional versions.
+- A node fragment whose connection repeats the ID of a later connection in the graph is reported at the fragment's connection statement instead of 1:1.
+- A connection from an exit its node does not have, such as `case:old` on a Condition, is reported as "<label>: remove the connection from case:old, which this node does not have". It was reported as a missing "connect [true, false]" although both were connected, and its target's declared inputs as unavailable. Branch analysis accepts again the "try the next tier" ladders that the backend review's test numbering made "too complex" in every drawing order: it tries three numberings and reports a graph too complex only when none fits.
+
+**Data sources**
+
+- HTTP source URLs accept the scheme in any case (`HTTPS://`), as RFC 3986 reads it; such a URL was refused.
+
 ## Behavior changes from the 2026-10-01 backend review
 
 These changes shipped with [the 2026-10-01 backend review](reviews/2026-10-01-backend-review.md). Graph JSON, the ARC Script text of complete graphs, stored versions and pins are unchanged; results listed here changed because the earlier behavior was a defect.
@@ -140,9 +176,9 @@ These changes shipped with [the 2026-10-01 backend review](reviews/2026-10-01-ba
 - The functions that read dates (`$DAY`, `$MONTH`, `$YEAR`, `$WEEKDAY`, `$HOUR`, `$MINUTE`, `$SECOND`, `$DATE`, `$TIME`, `$DATEVALUE`, `$DAYS360`, `$TIMEVALUE`, `$VALUE`, `$TEXT`) refuse date text without a year with `422` "NAME: date text needs a year, such as "15 Jan 2026"", because Apache POI completed it with the year the server started (`$DATEVALUE`: the current year). Date text is read in UTC with the en-US locale whatever the server's settings; `$DAY("1/15/2020")` was 14 on a host in Asia/Shanghai.
 - The argument limits of `$COMBIN`, `$FIXED`, `$DOLLAR`, `$TRUNC` and `$REPT` read numeric text, booleans and blanks as the function itself does: `$REPT("a", "3")` is `aaa` and `$TRUNC(x, null)` truncates to an integer, where both failed with "Expected a number".
 - `$TEXT` with three or more sections or a condition writes one exponent sign and keeps literal text: `1.50E+00`, not `1.50E++00`.
-- `$ERROR.TYPE` is reference-only (`422` "Unsupported function: ERROR.TYPE (see function catalog)"). ARC reports an error as a failure, not as a value, so it never returned one; use `$ISERROR`, `$ISNA` or `$IFERROR`.
+- `$ERROR.TYPE` was made reference-only. [The final review](#behavior-changes-from-the-2026-10-01-final-review) reverted this, because every published version that mentions it stopped compiling.
 - A value error that a source mapping raises after the deadline is reported as itself (`422`, named by the mapping), as in every other position; only a source mapping answered `504`.
-- Branch analysis no longer depends on the order in which connections were drawn: a ladder of 13 or more checks was "too complex" in one drawing order and valid in another.
+- Branch analysis no longer depends on the order in which connections were drawn: a ladder of 13 or more checks was "too complex" in one drawing order and valid in another. [The final review](#behavior-changes-from-the-2026-10-01-final-review) keeps this and accepts again the "try the next tier" ladders this change made too complex.
 
 **Data sources**
 

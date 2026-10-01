@@ -610,12 +610,15 @@ components:
   responses:
     Error:
       description: >-
-        400 malformed request; 404 missing rule, source or version; 409 revision
+        400 malformed request (malformed JSON, an unknown field named by its path,
+        a second document after the body, a fraction where an integer belongs);
+        404 missing rule, source or version; 409 revision
         conflict, duplicate rule or source ID, or execution of an unpublished
         rule; 413 request body over 1 MiB (any method or path); 422 invalid
         graph, input or calculation, exhausted execution limit (steps, nesting,
-        source reads, expression operations), Excel argument error or text
-        containing U+0000 or an unpaired surrogate; 500 server error; 504 execution
+        source reads, expression operations), Excel argument error, text
+        containing U+0000 or an unpaired surrogate, or a draft or source too large
+        to save back once its numbers are written out; 500 server error; 504 execution
         deadline exceeded
       content:
         application/json:

@@ -6,11 +6,11 @@ Open **Code studio** in the sidebar (it opens the rule you are viewing, else the
 - Modules: insert a formula, branch, output, input declaration, or source binding. Tab moves between snippet placeholders; otherwise it indents.
 - Reuse: insert a published rule/formula with an exact version and required bindings. A card shows *loading…* while its version loads; each choice inserts one Reference node, and its generated node ID stays within the 80-character limit even for long rule IDs.
 - Outline: jump to that node's declaration. Node IDs are case-sensitive; comments and strings are ignored. Node positions and IDs survive code/graph changes.
-- Comments use `//` and are retained at the top of canonical code.
+- Comments use `//` anywhere outside quotes, inside a statement or a header too, and are retained at the top of canonical code. A single expression, as typed in the inspector or an expression dialog, has no comments.
 
 Graph view uses the same functions. Expression fields in Condition, Switch, Formula, Output, parameter mappings and Transform use inline code editors. Functions use a `$` prefix: `$ROUND(amount, 2)`. Variables have no prefix, so `$SUM(SUM)` calls the function with an input named `SUM`. Typing `$` suggests built-in functions; typing `@` searches published Formula rules once you pause typing. Ordinary identifiers suggest available upstream variables and supported functions. **Tab** accepts a suggestion, moves between inserted function arguments, or indents when no suggestion is active. **Ctrl/⌘ Space** opens suggestions manually. Operators display their individual characters, including both signs in `==`, in every code surface: editors, canvas previews and JSON fields. A value keeps the control you are typing in: a cleared or half-typed constant stays a constant, and the Condition builder stays a builder while an operand is incomplete. Switch with the value-source menu or **Builder**/**Expression**. Number and array constants that ARC cannot read, such as `.5e3` or `[1, 2,`, are marked at the field; a stored value in that form opens as an expression.
 
-Expression colors distinguish built-in functions (ochre), input parameters (blue), computed node results (purple), and published Formula calls (teal). Hover an input or result to see its type and producing node; hover a Formula call to see its pinned version and parameter contract. Collection-local names keep a neutral color, including when they shadow an input. Only the root of a dotted path is classified: `customer` is the input in `customer.amount`; `amount` is an object property. Strings and comments keep their own colors. Inline expression colors use the available upstream scope. Full code views show declaration roles; validation still determines whether a value is available at a particular node.
+Expression colors distinguish built-in functions (ochre), input parameters (blue), computed node results (purple), and published Formula calls (teal). Hover an input or result to see its type and producing node; hover a Formula call to see its pinned version and parameter contract. Collection-local names keep a neutral color, including when they shadow an input. Only the root of a dotted path is classified: `customer` is the input in `customer.amount`; `amount` is an object property. Strings keep their own color, and so do comments in Code studio. Inline expression colors use the available upstream scope. Full code views show declaration roles; validation still determines whether a value is available at a particular node.
 
 A Formula node's output, such as `discountedAmount`, is an already computed value that downstream expressions can read. To call a published Formula from the rule library inside an expression, use `@rule-id:version(arguments)`, for example `$ROUND(@apply-discount:1(amount, rate), 2)`. The editor's **Published formulas** picker and `@` completion insert a pinned call. The picker searches published Formulas and loads more results as you scroll; it preserves loaded cards and offers Retry if a page fails. The stable rule ID and a positive published version are required; display names and floating latest versions are not callable. Only library entries of kind Formula can be called this way. Reference nodes remain available for explicit graph-level reuse of any rule kind.
 
@@ -263,6 +263,46 @@ Preview and the published API playground offer **Include execution trace** and *
 
 Results display browser request time and server preparation/execution times separately. The server timeout defaults to 30 seconds and is shared across nested rules and source reads; deadline exhaustion returns `504`, including when a source has a default fallback. A shorter per-source timeout still follows that source's configured failure policy.
 
+## Behavior changes from the 2026-10-01 final review
+
+These editor changes shipped with [the 2026-10-01 final review](reviews/2026-10-01-final-review.md). Changes to API results, error messages and ARC Script are listed in [the API reference](api.md#behavior-changes-from-the-2026-10-01-final-review).
+
+**Graph and inspector**
+
+- **Open problem**, a trace step or a link into a node that only a published version has focuses that node once the version loads; it was dropped while the version loaded. A `?node=` link to another node of the open rule focuses it too.
+- The Condition builder reads the `=` and `<>` comparisons: `score > 50 = passed` stays in the expression editor as written instead of being shown, and stored, as `score > (50 = passed)`.
+- Choosing another version of a Reference node's rule keeps its mappings. Parameters the new version does not declare are named with **Remove**; optional parameters used to take their defaults silently.
+- Dropping a connection on a draft at the 200-connection limit says why; the drop did nothing.
+- The inspector says "Published versions are read-only" only on a published version, not while a command runs on the draft.
+- A STRING default is checked as the server checks it (length and storable text) and stays in its field while invalid; a JSON default with a NUL or an unpaired surrogate is refused in the field. An input without a default opens with an empty JSON buffer instead of the text `null`.
+- A text constant longer than an expression may be (2,000 characters with its quotes) is named at its field instead of failing the save.
+- An Output's field name in the preview trims as the server does, so a no-break space or an ideographic space stays part of it.
+
+**Dialogs and navigation**
+
+- Escape and a click beside a dialog ask before discarding its unapplied edits (node, node code, expression and Rule settings); **Cancel** still discards at once. Rule settings also asks before Back, the sidebar or a reload discards an unapplied name or description.
+- A jump to an entry several steps away in the browser's history menu lands on that entry instead of the one after it.
+- The sidebar's **Code studio** opens the rule at the version you are viewing; it opened the draft.
+- `?version=` is read only in the form links write (1 to 9 digits without a leading zero); `0x10`, `1e1` or `1.5` named a version.
+- Each notice shows for its whole time, and a repeated notice shows again.
+
+**Code studio**
+
+- `//` comments work anywhere outside quotes. Inline expression fields and expression dialogs no longer color or toggle `//` as a comment, which the expression grammar refuses.
+- A save from the code view leaves the draft saved and shows the name as the server trimmed it.
+- A double click on a module card, a function chip or a variable chip inserts once.
+- A Formula call inserted from the library writes a placeholder for a middle input whose default ARC cannot write as one argument (an object of more than 50 fields, an empty or 200-character key, an array beyond the token limit).
+- Hovers show rule names, node labels and default values as written: Markdown in them is no longer rendered.
+- Typing no longer renders the function library and the outline again, and dragging a card no longer renders an open execution trace.
+
+**Library, playground and data sources**
+
+- Library cards are ordered by the instant they were updated; timestamps written with different fraction digits sorted wrongly. Typing a search no longer redraws every card preview.
+- A version chosen in the API playground belongs to that rule: the same ID created again starts from its newest version.
+- Source names, provider parameters (a LOOKUP table needs exactly the parameter `key`) and HTTP URLs are checked in their fields with the server's messages, and Save explains a refusal.
+- A source renamed by a save that finishes after its editor closed shows its new name on every bound card.
+- A source binding's version pager appears once its versions are read; it showed "0 results" before.
+
 ## Behavior changes from the 2026-10-01 backend review
 
 These editor changes shipped with [the 2026-10-01 backend review](reviews/2026-10-01-backend-review.md). Changes to API results, error messages and data sources are listed in [the API reference](api.md#behavior-changes-from-the-2026-10-01-backend-review).
@@ -270,7 +310,7 @@ These editor changes shipped with [the 2026-10-01 backend review](reviews/2026-1
 - A rule name made only of Unicode spaces, such as the full-width space an input method types, is refused in **Create rule** and **Rule settings** with the server's message ("Rule name must contain 1 to 160 characters") instead of saving a blank title.
 - Diagnostics of a graph whose input source mappings form a cycle also show its connection and reachability problems; the cycle used to be the only one.
 - A Code studio comment that contains a line break other than a newline (a lone CR, a form feed, U+2028, …) becomes one note per line when the code builds, the form the saved draft and the canonical code have.
-- The function catalog lists `$ERROR.TYPE` as reference only. Date functions refuse date text without a year (`$YEAR("1 Jan")`), and `$MODE` takes at most 4,472 values.
+- The function catalog listed `$ERROR.TYPE` as reference only; the final review made it executable again. Date functions refuse date text without a year (`$YEAR("1 Jan")`), and `$MODE` takes at most 4,472 values.
 
 ## Behavior changes from the second review
 
