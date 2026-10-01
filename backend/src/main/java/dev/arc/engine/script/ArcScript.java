@@ -46,6 +46,14 @@ public class ArcScript {
     return parser.parse(source).definition();
   }
 
+  /**
+   * The notes a draft keeps for one note: one per line, each without surrounding whitespace, the
+   * only form an ARC Script comment can carry. A build returns notes in this form.
+   */
+  public static List<String> noteLines(String note) {
+    return ArcScriptSyntax.commentLines(note);
+  }
+
   public String render(Definition definition) {
     validator.shape(definition);
     return renderer.render(definition, null);

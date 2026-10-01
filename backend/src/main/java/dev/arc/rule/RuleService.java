@@ -4,6 +4,7 @@ import dev.arc.engine.DisplayNames;
 import dev.arc.engine.Identifiers;
 import dev.arc.engine.Limits;
 import dev.arc.engine.execution.Engine;
+import dev.arc.engine.script.ArcScript;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.*;
@@ -21,9 +22,10 @@ public class RuleService {
   public record Create(
       String id, String name, String description, String kind, Definition definition) {}
 
-  public record Update(String name, String description, int revision, Definition definition) {}
+  /** A save names the revision its client read; without one it is refused, never taken as 0. */
+  public record Update(String name, String description, Integer revision, Definition definition) {}
 
-  public record Publish(int revision) {}
+  public record Publish(Integer revision) {}
 
   /** How many callers a refused deletion names in its message; `issues` lists them all. */
   private static final int NAMED_CALLERS = 5;
@@ -108,7 +110,7 @@ public class RuleService {
   }
 
   @Transactional
-  public Rule publish(String id, int revision) {
+  public Rule publish(String id, Integer revision) {
     Rule rule = store.lock(id);
     revision(rule, revision);
     holdCallees(rule.draft());
@@ -188,7 +190,12 @@ public class RuleService {
         });
   }
 
-  private void revision(Rule rule, int revision) {
+  /**
+   * A missing revision is a malformed request (422), not a stale one: read as 0 it answered 409
+   * however often the client reloaded. A deletion leaves the check out when it names no revision.
+   */
+  private void revision(Rule rule, Integer revision) {
+    if (revision == null) throw ArcException.invalid("Revision is required");
     if (rule.revision() != revision)
       throw new ArcException(
           409,
@@ -196,18 +203,18 @@ public class RuleService {
   }
 
   /**
-   * A note is one line without surrounding whitespace, the only form an ARC Script comment can
-   * carry, so a draft's notes take that form when they are saved: graph → code → graph then returns
-   * the same draft (lesson B12), and a note that would render more comments than the parser accepts
-   * fails the shape check here instead of making the code unbuildable. Stored drafts and versions
-   * are not rewritten; notes never affect execution.
+   * A draft's notes take the one form an ARC Script comment can carry ({@link ArcScript#noteLines})
+   * when they are saved: graph → code → graph then returns the same draft (lesson B12), and a note
+   * that would render more comments than the parser accepts fails the shape check here instead of
+   * making the code unbuildable. Stored drafts and versions are not rewritten; notes never affect
+   * execution.
    */
   private static Definition withNormalizedNotes(Definition definition) {
     if (definition == null || definition.notes() == null) return definition;
     var notes = new ArrayList<String>();
     for (String note : definition.notes()) {
       if (note == null) notes.add(null); // reported by the shape check
-      else for (String line : note.split("\\R", -1)) notes.add(line.strip());
+      else notes.addAll(ArcScript.noteLines(note));
     }
     return new Definition(
         definition.schemaVersion(),

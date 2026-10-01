@@ -8,8 +8,9 @@ import org.junit.jupiter.api.Test;
 
 class ExecutionDeadlineTest {
   /**
-   * The one owner of "check, work, check": no work after expiry, a late value discarded, and the
-   * work's own errors untouched. Definition reads, source reads and evaluations all go through it.
+   * The one owner of "check, work, check": no work after expiry, a late value or error discarded,
+   * and the work's own errors in time untouched. Definition reads, source reads and evaluations all
+   * go through it.
    */
   @Test
   void withinStartsNoWorkAfterExpiryAndDiscardsAValueThatArrivesLate() throws Exception {
@@ -45,6 +46,19 @@ class ExecutionDeadlineTest {
               assertThat(error.kind()).isEqualTo(ArcException.Kind.DEADLINE);
               assertThat(error.getMessage()).isEqualTo("Rule execution deadline exceeded");
             });
+
+    var late = ExecutionDeadline.start(100);
+    assertThatThrownBy(
+            () ->
+                late.within(
+                    () -> {
+                      sleep(150);
+                      throw ArcException.invalid("late value error");
+                    }))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> assertThat(error.kind()).isEqualTo(ArcException.Kind.DEADLINE))
+        .hasMessage("Rule execution deadline exceeded");
 
     var failure = ArcException.invalid("bad");
     assertThatThrownBy(

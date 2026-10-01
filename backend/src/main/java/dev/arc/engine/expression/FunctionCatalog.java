@@ -26,14 +26,23 @@ final class FunctionCatalog {
           "TODAY",
           "RAND",
           "RANDBETWEEN");
+
+  /**
+   * Functions that read an error value as an argument. ARC reports an error as a failure, not as a
+   * value, so ERROR.TYPE could never answer: its argument either failed first or was no error. The
+   * lazy $ISERROR, $ISERR, $ISNA and $IFERROR classify failures instead.
+   */
+  private static final Set<String> ERROR_VALUE_READERS = Set.of("ERROR.TYPE");
+
   private static final Set<String> EXCEL = executableExcelFunctions();
 
   private static final List<Entry> CATALOG = buildCatalog();
 
   private static Set<String> executableExcelFunctions() {
     var names = new TreeSet<>(FunctionEval.getSupportedFunctionNames());
-    // These functions need workbook state or nondeterministic host data.
+    // These functions need workbook state or nondeterministic host data, or read error values.
     names.removeAll(CONTEXT);
+    names.removeAll(ERROR_VALUE_READERS);
     return Set.copyOf(names);
   }
 
@@ -49,6 +58,7 @@ final class FunctionCatalog {
     names.addAll(AnalysisToolPak.getSupportedFunctionNames());
     names.addAll(AnalysisToolPak.getNotSupportedFunctionNames());
     names.addAll(CONTEXT);
+    names.addAll(ERROR_VALUE_READERS);
     for (String name : names) {
       Entry entry = excelEntry(name);
       all.put(name, ExcelFunctionHelp.describe(entry));

@@ -128,7 +128,7 @@
 {"name":"ERF","accepted":[]},
 {"name":"ERFC","accepted":[]},
 {"name":"ERROR","accepted":[]},
-{"name":"ERROR.TYPE","accepted":[[1,1]]},
+{"name":"ERROR.TYPE","accepted":[]},
 {"name":"EVALUATE","accepted":[]},
 {"name":"EVEN","accepted":[[1,1]]},
 {"name":"EXACT","accepted":[[2,2]]},

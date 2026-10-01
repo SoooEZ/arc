@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class SourceService {
   public record Create(String id, String name, SourceDefinition definition) {}
 
-  public record Update(String name, int revision, SourceDefinition definition) {}
+  /** A save names the revision its client read; without one it is refused, never taken as 0. */
+  public record Update(String name, Integer revision, SourceDefinition definition) {}
 
   private final SourceRepository repository;
   private final SourceValidator validator;
@@ -60,6 +61,7 @@ public class SourceService {
   @Transactional
   public DataSource update(String id, Update request) {
     int current = repository.lock(id);
+    if (request.revision() == null) throw ArcException.invalid("Revision is required");
     if (current != request.revision())
       throw new ArcException(409, "Source changed in another editor; reload before saving");
     String name = DisplayNames.normalize("Source", request.name());

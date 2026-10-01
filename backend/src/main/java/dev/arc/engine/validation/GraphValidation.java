@@ -39,7 +39,7 @@ final class GraphValidation {
     documentShape.validate(definition);
     var expressions = new ExpressionCache();
     var inputReads = checkSourceMappings(definition, expressions, resolver, GraphValidation::fail);
-    checkInputCycles(definition, inputReads);
+    checkInputCycles(definition, inputReads, GraphValidation::fail);
     checkConnections(definition, GraphValidation::fail);
     var plan = new GraphPlan(definition);
     checkReachability(definition, plan, GraphValidation::fail);
@@ -87,33 +87,46 @@ final class GraphValidation {
       Map<String, Set<String>> inputReads,
       GraphPlan plan,
       Consumer<ArcException> problems) {
-    checkInputCycles(definition, inputReads);
+    checkInputCycles(definition, inputReads, problems);
     checkConnections(definition, problems);
     if (plan != null) checkReachability(definition, plan, problems);
   }
 
-  private void checkInputCycles(Definition definition, Map<String, Set<String>> inputReads) {
+  /** Reports the first input whose source mappings read it back, like every structure problem. */
+  private void checkInputCycles(
+      Definition definition, Map<String, Set<String>> inputReads, Consumer<ArcException> problems) {
     var finished = new HashSet<String>();
-    for (Input input : definition.inputs())
-      visitInputReads(input.name(), definition, inputReads, finished, new HashSet<>());
+    for (Input input : definition.inputs()) {
+      String cyclic = cyclicInput(input.name(), definition, inputReads, finished, new HashSet<>());
+      if (cyclic != null) {
+        problems.accept(ArcException.invalid("Circular source parameter dependency: " + cyclic));
+        return;
+      }
+    }
   }
 
-  /** Depth-first over declared inputs in declaration order, so the reported input is stable. */
-  private void visitInputReads(
+  /**
+   * Depth-first over declared inputs in declaration order, so the reported input is stable. Returns
+   * the input a mapping reads while that input is still being resolved, or null without a cycle.
+   */
+  private String cyclicInput(
       String name,
       Definition definition,
       Map<String, Set<String>> inputReads,
       Set<String> finished,
       Set<String> active) {
-    require(!active.contains(name), "Circular source parameter dependency: " + name);
-    if (finished.contains(name)) return;
+    if (active.contains(name)) return name;
+    if (finished.contains(name)) return null;
     active.add(name);
     var reads = inputReads.getOrDefault(name, Set.of());
-    for (Input input : definition.inputs())
-      if (reads.contains(input.name()))
-        visitInputReads(input.name(), definition, inputReads, finished, active);
+    for (Input input : definition.inputs()) {
+      if (!reads.contains(input.name())) continue;
+      String cyclic = cyclicInput(input.name(), definition, inputReads, finished, active);
+      if (cyclic != null) return cyclic;
+    }
     active.remove(name);
     finished.add(name);
+    return null;
   }
 
   private void checkConnections(Definition definition, Consumer<ArcException> problems) {

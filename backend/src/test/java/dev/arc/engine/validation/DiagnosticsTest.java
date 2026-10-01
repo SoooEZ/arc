@@ -201,6 +201,33 @@ class DiagnosticsTest {
   @Test
   void inputCyclesNameTheFirstDeclaredInput() {
     var blank = RuleSamples.blank(RuleKind.FORMULA);
+    var definition = new Definition(1, cyclicInputs(), blank.nodes(), blank.edges());
+    assertThatThrownBy(() -> validator.validate(definition, noRules))
+        .hasMessage("Circular source parameter dependency: zeta");
+  }
+
+  /** The cycle used to end the structure check, hiding these problems until it was fixed. */
+  @Test
+  void anInputCycleLeavesEveryConnectionAndReachabilityProblemInTheDiagnostics() {
+    var nodes =
+        List.of(
+            node("input", "INPUT", null, null),
+            node("out", "OUTPUT", "1", null),
+            node("lost", "OUTPUT", "2", null));
+    var definition = new Definition(1, cyclicInputs(), nodes, List.of());
+    String unreachable = "Every node must be reachable from Input; connect or remove unused nodes";
+    assertThat(validator.diagnostics(definition, noRules))
+        .containsExactly(
+            atInput("Circular source parameter dependency: zeta"),
+            atInput("input: connect [next]"),
+            new Validator.Problem(unreachable, at("out", "out")),
+            new Validator.Problem(unreachable, at("lost", "lost")));
+    assertThatThrownBy(() -> validator.validate(definition, noRules))
+        .hasMessage("Circular source parameter dependency: zeta");
+  }
+
+  /** zeta's source mapping reads alpha, whose mapping reads zeta. */
+  private static List<Input> cyclicInputs() {
     var zeta =
         new Input(
             "zeta",
@@ -215,9 +242,7 @@ class DiagnosticsTest {
             true,
             null,
             new SourceBinding("s", 1, Map.of("k", "zeta"), "", "FAIL"));
-    var definition = new Definition(1, List.of(zeta, alpha), blank.nodes(), blank.edges());
-    assertThatThrownBy(() -> validator.validate(definition, noRules))
-        .hasMessage("Circular source parameter dependency: zeta");
+    return List.of(zeta, alpha);
   }
 
   @Test

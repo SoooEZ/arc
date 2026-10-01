@@ -1,5 +1,5 @@
 import type { Definition } from "../types";
-import { trimAsServer } from "./serverText";
+import { isBlankAsServer, trimAsServer } from "./serverText";
 
 /**
  * Server limits restated for the browser (backend `engine.Limits`), so that
@@ -84,7 +84,7 @@ export function ruleMetadataProblem({
   description: string;
 }): RuleMetadataProblem | null {
   const trimmed = trimAsServer(name);
-  if (!trimmed || trimmed.length > MAX_NAME_CHARACTERS)
+  if (isBlankAsServer(trimmed) || trimmed.length > MAX_NAME_CHARACTERS)
     return {
       field: "name",
       message: `Rule name must contain 1 to ${MAX_NAME_CHARACTERS} characters`,

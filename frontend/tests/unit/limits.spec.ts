@@ -96,6 +96,16 @@ test("rule metadata problems repeat the server's messages at its boundaries", ()
   });
   // The server trims with Java's String.trim: a no-break space is a name.
   expect(ruleMetadataProblem({ name: "\u00a0", description: "" })).toBeNull();
+  // The server refuses a name made only of Java whitespace (String.isBlank), such as the
+  // full-width space a Chinese input method types, though String.trim keeps it.
+  for (const blank of ["\u3000", "\u2003\u2003", " \u2028 ", " \u205f"])
+    expect(ruleMetadataProblem({ name: blank, description: "" })).toEqual({
+      field: "name",
+      message: `Rule name must contain 1 to ${MAX_NAME_CHARACTERS} characters`,
+    });
+  expect(
+    ruleMetadataProblem({ name: "\u3000Tax", description: "" }),
+  ).toBeNull();
   expect(
     ruleMetadataProblem({ name: "\t\u0000Tax\r\n", description: "" }),
   ).toBeNull();

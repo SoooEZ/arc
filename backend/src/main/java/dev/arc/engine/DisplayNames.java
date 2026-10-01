@@ -22,8 +22,10 @@ public final class DisplayNames {
     for (int index = 0; index < name.length(); index++)
       if (Character.isISOControl(name.charAt(index)))
         throw ArcException.invalid(resource + " name cannot contain control characters");
+    // trim() removes only characters up to U+0020; a name of full-width (U+3000) or em spaces
+    // would be stored and shown as a blank title.
     String trimmed = name.trim();
-    if (trimmed.isEmpty() || trimmed.length() > Limits.MAX_NAME_CHARACTERS)
+    if (trimmed.isBlank() || trimmed.length() > Limits.MAX_NAME_CHARACTERS)
       throw invalidLength(resource);
     return trimmed;
   }

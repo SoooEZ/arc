@@ -24,7 +24,7 @@ class FunctionNamespaceTest {
     assertThat(eval("$IF(false, 1 / 0, $COALESCE(null, 0, 1 / 0))")).isEqualTo(BigDecimal.ZERO);
     assertThat(eval("$AND(false, 1 / 0) || $OR(true, 1 / 0)")).isEqualTo(true);
     assertThat(eval("$SWITCH(2, 1, 1 / 0, 2, $ABS(-7), 1 / 0)")).isEqualTo(new BigDecimal("7"));
-    assertThat(eval("$IFERROR($ERROR.TYPE(1), 7)")).isEqualTo(new BigDecimal("7"));
+    assertThat(eval("$IFERROR($MATCH(\"zz\", [\"a\"], 0), 7)")).isEqualTo(new BigDecimal("7"));
     assertThat(eval("$UPPER('hello')")).isEqualTo("HELLO");
     assertThat(eval("$CONCAT('$ROUND(1) costs $5', \" and ROUND(2)\")"))
         .isEqualTo("$ROUND(1) costs $5 and ROUND(2)");

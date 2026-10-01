@@ -48,7 +48,9 @@ final class ArcScriptScanner {
         int startLine = line;
         int startColumn = column;
         while (index < source.length() && source.charAt(index) != '\n') advance();
-        comments.add(new Statement(source.substring(start, index).strip(), startLine, startColumn));
+        // The whitespace around a comment, such as the CR of a CRLF line end, is not its text.
+        for (String line : ArcScriptSyntax.commentLines(source.substring(start, index).strip()))
+          comments.add(new Statement(line, startLine, startColumn));
         continue;
       }
       break;

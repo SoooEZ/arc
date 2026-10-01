@@ -58,6 +58,40 @@ class JdbcRuleRepositoryTest {
   }
 
   /**
+   * A search matches within one field. The fields joined by spaces matched across a boundary: "tax
+   * rate" found the rule tax named "Rate table", and "country tax" the source country-tax.
+   * PostgreSQL itself runs in scripts/smoke.py; here every catalog statement lists its fields.
+   */
+  @Test
+  void catalogSearchesMatchWithinOneField() {
+    var statements = new ArrayList<String>();
+    when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              return 1L;
+            });
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              return List.of();
+            });
+
+    repository.catalog(new PageRequest(0, 10, "tax rate"), "", false);
+    int rules = statements.size();
+    new JdbcSourceRepository(jdbc, new JsonCodec(new ObjectMapper())).catalog(0, 10, "tax rate");
+
+    assertThat(statements)
+        .hasSize(2 * rules)
+        .noneMatch(statement -> statement.contains("|| ' ' ||"));
+    assertThat(statements.subList(0, rules))
+        .allMatch(statement -> statement.contains("unnest(ARRAY[id, name, description])"));
+    assertThat(statements.subList(rules, statements.size()))
+        .allMatch(statement -> statement.contains("unnest(ARRAY[s.id, s.name])"));
+  }
+
+  /**
    * Writers of a rule exclude each other but not the callers holding it (KEY SHARE), so drafts that
    * pin each other cannot deadlock; only a deletion (FOR UPDATE) waits for those callers.
    */

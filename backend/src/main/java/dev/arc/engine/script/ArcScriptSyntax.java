@@ -7,6 +7,9 @@ import dev.arc.engine.Identifiers;
 import dev.arc.engine.Limits;
 import dev.arc.engine.script.ArcScriptScanner.Statement;
 import dev.arc.engine.script.ArcScriptScanner.SyntaxException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 /** Shared lexical forms and strict JSON literals with statement-local diagnostics. */
 final class ArcScriptSyntax {
@@ -18,6 +21,21 @@ final class ArcScriptSyntax {
 
   /** A quoted name or a bare one; bare names may contain hyphens. */
   static final String ID = "(" + QUOTED + "|[A-Za-z_][A-Za-z_0-9-]*)";
+
+  /** Any line break ({@code \\R}): CRLF, LF, CR, vertical tab, form feed, NEL, U+2028, U+2029. */
+  static final Pattern LINE_BREAK = Pattern.compile("\\R");
+
+  /**
+   * The comments a note takes: one per line, each without surrounding whitespace. The renderer
+   * starts a comment at every line break in a note and the scanner splits a comment at the breaks
+   * other than the newline that ends it, so building canonical text returns the notes a save stores
+   * (lesson B12).
+   */
+  static List<String> commentLines(String text) {
+    var lines = new ArrayList<String>();
+    for (String line : LINE_BREAK.split(text, -1)) lines.add(line.strip());
+    return lines;
+  }
 
   private final ObjectMapper json;
 

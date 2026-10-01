@@ -43,7 +43,8 @@ class RuleDeletionWebTest {
           .build();
 
   /**
-   * The revision a client read is an optional precondition, as it is for saves and publications.
+   * The revision a client read is an optional precondition of a deletion; saves and publications
+   * require one ({@link RevisionWebTest}).
    */
   @Test
   void aStaleRevisionIsAConflictAndTheCurrentOneDeletes() throws Exception {

@@ -25,7 +25,8 @@ final class ArcScriptRenderer {
     StringBuilder out = new StringBuilder("schema 1;\n\n");
     if (nodeId == null && definition.notes() != null)
       for (String note : definition.notes())
-        for (String line : note.split("\\R", -1)) out.append("// ").append(line).append('\n');
+        for (String line : ArcScriptSyntax.LINE_BREAK.split(note, -1))
+          out.append("// ").append(line).append('\n');
     boolean includeInputs =
         nodeId == null
             || definition.nodesOf(NodeKind.INPUT).stream()

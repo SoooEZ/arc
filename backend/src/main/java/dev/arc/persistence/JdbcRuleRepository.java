@@ -16,8 +16,13 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class JdbcRuleRepository implements RuleRepository {
+  /**
+   * A search matches within the ID, the name or the description, ignoring case: the three joined by
+   * spaces matched across them, so "tax rate" found the rule tax named "Rate table".
+   */
   private static final String CATALOG_FILTER =
-      " WHERE (? = '' OR strpos(lower(id || ' ' || name || ' ' || description), lower(?)) > 0)"
+      " WHERE (? = '' OR EXISTS (SELECT 1 FROM unnest(ARRAY[id, name, description]) AS field"
+          + " WHERE strpos(lower(field), lower(?)) > 0))"
           + " AND (? = '' OR kind = ?) AND (NOT ? OR published_version IS NOT NULL)";
 
   /**

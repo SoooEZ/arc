@@ -333,4 +333,26 @@ class DraftRoundTripTest {
     assertThat(script.build(script.render(raw)).definition().notes())
         .isEqualTo(List.of("first", "second", "padded"));
   }
+
+  /**
+   * A comment runs to the newline, and the renderer writes every other line break in a note (a lone
+   * CR, form feed, vertical tab, NEL, U+2028 or U+2029) as a new comment. A build reads such a
+   * break inside a comment the same way, so its draft is the one its canonical text builds and the
+   * one a save stores; it kept "first\fsecond" as one note before.
+   */
+  @Test
+  void aLineBreakInsideACommentSplitsItAsTheRendererAndSavesDo() {
+    var nodes = List.of(inputNode("in", "Input"), outputNode("out", "Out", "1"));
+    String graph =
+        script.render(
+            new Definition(1, List.of(), nodes, List.of(new Edge("e", "in", "out", "next"))));
+    for (String lineBreak : List.of("\r", "\f", "\u000B", "\u0085", " ", " ")) {
+      var built = script.build("// first" + lineBreak + " second \n" + graph).definition();
+      assertThat(built.notes()).as(lineBreak).isEqualTo(List.of("first", "second"));
+      assertThat(script.build(script.render(built)).definition()).as(lineBreak).isEqualTo(built);
+    }
+    // The CR of a CRLF line end ends the line; it starts no comment of its own.
+    assertThat(script.build("// first\r\n// second\r\n" + graph).definition().notes())
+        .isEqualTo(List.of("first", "second"));
+  }
 }

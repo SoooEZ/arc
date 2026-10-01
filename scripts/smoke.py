@@ -227,6 +227,12 @@ try:
     assert "draft" not in first["items"][0] and "nodeCount" in first["items"][0]
     assert request("GET", f"/api/rule-summaries?search={PREFIX}&limit=1&offset=99")["items"] == []
     assert request("GET", f"/api/rule-summaries?search=%20{PREFIX}%20&limit=1")["total"] == first["total"]
+    # A search matches within one field; it used to span the ID "<prefix>-child" and the name
+    # "Smoke child", and a source's ID and name.
+    assert request("GET", "/api/rule-summaries?search=child%20smoke")["total"] == 0
+    assert request("GET", "/api/rule-summaries?search=smoke%20child")["total"] >= 1
+    assert request("GET", f"/api/source-summaries?search={PREFIX}-table%20table")["total"] == 0
+    assert request("GET", f"/api/source-summaries?search={PREFIX}-table")["total"] == 1
     request("GET", "/api/rule-summaries?limit=101", expected=422)
     request("GET", "/api/rule-summaries?offset=-1", expected=422)
 

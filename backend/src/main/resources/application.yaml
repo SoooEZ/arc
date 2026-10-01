@@ -16,6 +16,11 @@ spring:
     formcontent:
       filter:
         enabled: false
+  servlet:
+    # No endpoint accepts multipart bodies either. Parsing one failed before routing, so a body
+    # without a boundary was a 500 on every path; unparsed, it is a 415 (or the path's 404).
+    multipart:
+      enabled: false
 logging:
   level:
     # ARC turns POI's error values into ArcExceptions, so POI's own ERROR with a stack trace per

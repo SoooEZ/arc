@@ -11,8 +11,10 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class JdbcSourceRepository implements SourceRepository {
+  /** A search matches within the ID or the name, ignoring case, like a rule search. */
   private static final String CATALOG_FILTER =
-      " WHERE (? = '' OR strpos(lower(s.id || ' ' || s.name), lower(?)) > 0)";
+      " WHERE (? = '' OR EXISTS (SELECT 1 FROM unnest(ARRAY[s.id, s.name]) AS field"
+          + " WHERE strpos(lower(field), lower(?)) > 0))";
 
   /** Chooses the page first, so only the returned sources read their current configuration. */
   private static final String CATALOG_PAGE =

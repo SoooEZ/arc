@@ -27,6 +27,21 @@ class FunctionCatalogTest {
   }
 
   @Test
+  void functionsThatReadErrorValuesAreReferenceOnly() {
+    // ARC reports an error as a failure, not as a value, so ERROR.TYPE could never answer: its
+    // argument failed first ($ERROR.TYPE(1 / 0) was "Division by zero") or was no error (#N/A).
+    var entry =
+        Functions.catalog().stream()
+            .filter(candidate -> candidate.name().equals("$ERROR.TYPE"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(entry.supported()).isFalse();
+    assertThat(FunctionCatalog.excelFunctions()).doesNotContain("ERROR.TYPE");
+    assertThatThrownBy(() -> Expressions.evaluate("$ERROR.TYPE(1 / 0)", Map.of()))
+        .hasMessage("Unsupported function: ERROR.TYPE (see function catalog)");
+  }
+
+  @Test
   void preservesAcceptedArgumentCountsForEveryCatalogEntry() throws IOException {
     List<Arity> expected = fixture("arity.json", new TypeReference<>() {});
     assertThat(expected.stream().map(Arity::name).toList())
