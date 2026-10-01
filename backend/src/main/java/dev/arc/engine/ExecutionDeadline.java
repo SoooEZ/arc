@@ -33,21 +33,16 @@ public final class ExecutionDeadline {
   }
 
   /**
-   * Runs a read or an evaluation inside the deadline: no work starts after expiry, and a value or
-   * an ARC error that arrives after it is discarded with the deadline error, whichever reader,
-   * resolver or expression produced it, so a late failure is a 504 wherever it occurs. Work already
-   * in flight, such as a JDBC query, is not interrupted. An error the work throws in time
-   * propagates unchanged.
+   * Runs a read or an evaluation inside the deadline: no work starts after expiry, and a value that
+   * arrives after it is discarded with the deadline error, whichever reader or resolver returned
+   * it. Work already in flight, such as a JDBC query, is not interrupted. An error the work throws
+   * propagates unchanged, even after expiry: an evaluation error is the expression's answer however
+   * long it took, so the same request fails the same way on a slower host. Only a source read
+   * reports its late failure as the deadline, because the deadline cancels the read.
    */
   public <T> T within(Supplier<T> work) {
     check();
-    T value;
-    try {
-      value = work.get();
-    } catch (ArcException failure) {
-      check();
-      throw failure;
-    }
+    T value = work.get();
     check();
     return value;
   }

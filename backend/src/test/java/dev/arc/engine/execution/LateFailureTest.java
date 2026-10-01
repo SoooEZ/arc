@@ -18,9 +18,9 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * An error that arrives after the deadline is reported as the deadline, wherever its expression
- * sits. A source mapping answered 504 for such an error, while a Formula node or an Output answered
- * 422 with the same late error.
+ * A value error keeps its 422 when it arrives after the deadline, wherever its expression sits: the
+ * same request then fails the same way on a slower host. A source mapping answered 504 for such an
+ * error, while a Formula node or an Output answered 422.
  */
 class LateFailureTest {
   private final Engine engine = new Engine(new Validator());
@@ -30,7 +30,7 @@ class LateFailureTest {
       };
 
   @Test
-  void anErrorAfterTheDeadlineIsTheDeadlineInEveryExpressionPosition() {
+  void aValueErrorAfterTheDeadlineStaysAValueErrorInEveryExpressionPosition() {
     var payload = new Input("payload", "OBJECT", true, null);
     var rate =
         new Input(
@@ -82,8 +82,8 @@ class LateFailureTest {
           .as(graph.getKey())
           .isInstanceOfSatisfying(
               ArcException.class,
-              error -> assertThat(error.kind()).isEqualTo(ArcException.Kind.DEADLINE))
-          .hasMessage("Rule execution deadline exceeded");
+              error -> assertThat(error.kind()).isEqualTo(ArcException.Kind.INVALID))
+          .hasMessageEndingWith("late value error");
     }
   }
 

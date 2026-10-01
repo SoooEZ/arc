@@ -106,8 +106,8 @@ public final class Parameters {
           argumentValues.put(
               argument.getKey(), argument.getValue().evaluate(resolved, deadline, formulas));
         } catch (ArcException error) {
-          // Named like the static diagnostic; an expired deadline is reported as such first.
-          deadline.check();
+          // Named like the static diagnostic, as in every other position: a late value error stays
+          // a value error, and the deadline keeps its plain message (withContext).
           throw error.withContext(
               ExpressionPositions.sourceMapping(parameter.name(), argument.getKey()));
         }
