@@ -475,6 +475,108 @@ class HttpSourceTest {
                     target.getRawQuery() == null ? "<none>" : target.getRawQuery())));
   }
 
+  /**
+   * A raw HTTP/1.1 server on 127.0.0.1 that answers every request with {@code head}, then {@code
+   * {}}. HttpServer cannot write malformed or oversized heads.
+   */
+  private static ServerSocket rawServer(String head) throws IOException {
+    var server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+    Thread.ofVirtual()
+        .start(
+            () -> {
+              while (!server.isClosed()) {
+                try (Socket client = server.accept()) {
+                  var request = client.getInputStream();
+                  int last = 0, matched = 0;
+                  while (matched < 4 && (last = request.read()) != -1)
+                    matched = (last == (matched % 2 == 0 ? '\r' : '\n')) ? matched + 1 : 0;
+                  var response = client.getOutputStream();
+                  response.write(head.getBytes(StandardCharsets.ISO_8859_1));
+                  response.write(
+                      "Content-Length: 2\r\n\r\n{}".getBytes(StandardCharsets.ISO_8859_1));
+                  response.flush();
+                } catch (IOException closed) {
+                  // The client gave up on the response, or the server is closing.
+                }
+              }
+            });
+    return server;
+  }
+
+  @Test
+  void responseHeadsAreBoundedLikeBodies() throws Exception {
+    // HttpCore's default Http1Config has no line or header-count limit: a source server sending an
+    // endless header line was buffered until the heap ran out (OutOfMemoryError after 188 ms at
+    // -Xmx256m), while the body had a 1 MiB limit.
+    String longLine = "HTTP/1.1 200 OK\r\nX-Long: " + "a".repeat(8 * MIB) + "\r\n";
+    var manyHeaders = new StringBuilder("HTTP/1.1 200 OK\r\n");
+    for (int header = 0; header < 1_000; header++)
+      manyHeaders.append("X-").append(header).append(": v\r\n");
+    for (String head : List.of(longLine, manyHeaders.toString())) {
+      try (var server = rawServer(head);
+          var http = new HttpSource(new ObjectMapper(), "", "127.0.0.1")) {
+        var definition = config("http://127.0.0.1:" + server.getLocalPort(), 5_000);
+        assertThatThrownBy(() -> fetch(http, definition, Map.of()))
+            .isInstanceOf(ArcException.class)
+            .hasMessageStartingWith("HTTP source failed");
+      }
+    }
+    // An ordinary head still works.
+    try (var server = rawServer("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n");
+        var http = new HttpSource(new ObjectMapper(), "", "127.0.0.1")) {
+      assertThat(fetch(http, config("http://127.0.0.1:" + server.getLocalPort(), 5_000), Map.of()))
+          .isEqualTo(Map.of());
+    }
+  }
+
+  @Test
+  void aHostWithSeveralStalledAddressesStopsAtTheCallTimeout() throws Exception {
+    // The per-call cancellation closed only the socket open at that moment; HttpClient then tried
+    // every other resolved address with a fresh connect and TLS timeout, so one read took
+    // addresses x timeoutMs (a source Test answered after 70 s with a 10 s timeout and 8
+    // addresses).
+    var stalled = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+    var held = new CopyOnWriteArrayList<Socket>();
+    Thread.ofVirtual()
+        .start(
+            () -> {
+              try {
+                while (true) held.add(stalled.accept()); // never answers the TLS handshake
+              } catch (IOException closed) {
+                // The test is over.
+              }
+            });
+    var loopback = InetAddress.getLoopbackAddress();
+    var policy =
+        HttpDestinationPolicyTest.answering(
+            "stalled.example", loopback, loopback, loopback, loopback, loopback);
+    try (var http = new HttpSource(new ObjectMapper(), policy)) {
+      var definition = config("https://stalled.example:" + stalled.getLocalPort() + "/", 300);
+      long start = System.nanoTime();
+      assertThatThrownBy(() -> fetch(http, definition, Map.of()))
+          .isInstanceOf(ArcException.class)
+          .hasMessageStartingWith("HTTP source failed");
+      long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+      assertThat(elapsedMs).as("five stalled addresses with a 300 ms timeout").isLessThan(900);
+    } finally {
+      stalled.close();
+      for (Socket socket : held) socket.close();
+    }
+    // An address that refuses at once still fails over to the next one while time remains.
+    var server = HttpServer.create(new InetSocketAddress(loopback, 0), 0);
+    server.createContext("/", exchange -> respond(exchange, 200, "{\"ok\":true}"));
+    server.start();
+    var refusingFirst =
+        HttpDestinationPolicyTest.answering(
+            "two.example", InetAddress.getByName("::1"), InetAddress.getByName("127.0.0.1"));
+    try (var http = new HttpSource(new ObjectMapper(), refusingFirst)) {
+      var definition = config("http://two.example:" + server.getAddress().getPort() + "/", 2_000);
+      assertThat(fetch(http, definition, Map.of())).isEqualTo(Map.of("ok", true));
+    } finally {
+      server.stop(0);
+    }
+  }
+
   private static void respond(HttpExchange exchange, int status, String json) throws IOException {
     byte[] body = json.getBytes(StandardCharsets.UTF_8);
     exchange.sendResponseHeaders(status, body.length);

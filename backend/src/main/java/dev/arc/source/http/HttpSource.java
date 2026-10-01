@@ -17,12 +17,24 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.*;
+import org.apache.hc.client5.http.DnsResolver;
+import org.apache.hc.client5.http.SchemePortResolver;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.DefaultHttpClientConnectionOperator;
+import org.apache.hc.client5.http.impl.io.ManagedHttpClientConnectionFactory;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.io.HttpClientConnectionOperator;
+import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.client5.http.ssl.TlsSocketStrategy;
 import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.URIScheme;
+import org.apache.hc.core5.http.config.Http1Config;
+import org.apache.hc.core5.http.config.RegistryBuilder;
+import org.apache.hc.core5.http.protocol.HttpContext;
 import org.apache.hc.core5.net.PercentCodec;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,16 +43,27 @@ import org.springframework.stereotype.Component;
 
 /**
  * Bounded GET transport for HTTP sources: destination checks when a connection resolves, per-call
- * cancellation within the execution deadline, a 1 MiB JSON body, and no redirects, retries, cookies
- * or authentication state.
+ * cancellation within the execution deadline, a bounded response head and a 1 MiB JSON body, and no
+ * redirects, retries, cookies or authentication state.
  */
 @Component
 public class HttpSource implements AutoCloseable {
   /** Response bodies are read into memory, so larger ones are rejected. */
   private static final int MAX_RESPONSE_BYTES = 1024 * 1024;
 
+  /**
+   * The response head is bounded like the body: HttpCore's default has no line or header-count
+   * limit, so a server could send one endless header line until the heap ran out.
+   */
+  private static final int MAX_HEADER_LINE_CHARACTERS = 16 * 1024;
+
+  private static final int MAX_RESPONSE_HEADERS = 100;
+
   private static final int MAX_POOLED_CONNECTIONS = 100;
   private static final int MAX_POOLED_CONNECTIONS_PER_ROUTE = 20;
+
+  /** The {@link System#nanoTime} by which a call must end, kept in its HttpClient context. */
+  private static final String CALL_ENDS = "dev.arc.source.http.call-ends";
 
   private final ScheduledThreadPoolExecutor cancellations =
       new ScheduledThreadPoolExecutor(
@@ -68,8 +91,16 @@ public class HttpSource implements AutoCloseable {
     this.destinations = destinations;
     cancellations.setRemoveOnCancelPolicy(true);
     var manager =
-        PoolingHttpClientConnectionManagerBuilder.create()
+        new DeadlineAwareConnections()
             .setDnsResolver(destinations)
+            .setConnectionFactory(
+                ManagedHttpClientConnectionFactory.builder()
+                    .http1Config(
+                        Http1Config.custom()
+                            .setMaxLineLength(MAX_HEADER_LINE_CHARACTERS)
+                            .setMaxHeaderCount(MAX_RESPONSE_HEADERS)
+                            .build())
+                    .build())
             .setMaxConnTotal(MAX_POOLED_CONNECTIONS)
             .setMaxConnPerRoute(MAX_POOLED_CONNECTIONS_PER_ROUTE)
             .build();
@@ -105,9 +136,12 @@ public class HttpSource implements AutoCloseable {
           request.setHeader(header.getKey(), secret(header.getValue()));
       long timeoutMs = Math.min(definition.timeoutMs(), deadline.remainingMillis());
       request.setConfig(requestConfig(timeoutMs));
+      var context = HttpClientContext.create();
+      context.setAttribute(CALL_ENDS, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs));
       var cancellation = cancellations.schedule(request::cancel, timeoutMs, TimeUnit.MILLISECONDS);
       try {
-        Object value = client.execute(request, response -> readResponse(request, response));
+        Object value =
+            client.execute(request, context, response -> readResponse(request, response));
         deadline.check();
         return value;
       } finally {
@@ -201,6 +235,40 @@ public class HttpSource implements AutoCloseable {
             request, "HTTP source response exceeds " + Limits.formatBytes(MAX_RESPONSE_BYTES));
     }
     return Expressions.bounded(responses.readValue(body));
+  }
+
+  /**
+   * Connections that try a host's next resolved address only while the call has time left.
+   * Cancelling a call closes the socket open at that moment, and HttpClient then tried every other
+   * address with a fresh connect and TLS timeout, so one read lasted addresses x timeoutMs.
+   */
+  private static final class DeadlineAwareConnections
+      extends PoolingHttpClientConnectionManagerBuilder {
+    @Override
+    protected HttpClientConnectionOperator createConnectionOperator(
+        SchemePortResolver schemePortResolver,
+        DnsResolver dnsResolver,
+        TlsSocketStrategy tlsSocketStrategy) {
+      return new DefaultHttpClientConnectionOperator(
+          schemePortResolver,
+          dnsResolver,
+          RegistryBuilder.<TlsSocketStrategy>create()
+              .register(URIScheme.HTTPS.id, tlsSocketStrategy)
+              .build()) {
+        @Override
+        protected void onBeforeSocketConnect(HttpContext context, HttpHost host) {
+          if (context.getAttribute(CALL_ENDS) instanceof Long ends && System.nanoTime() - ends >= 0)
+            throw new CallTimedOut();
+        }
+      };
+    }
+  }
+
+  /** Ends a connection attempt whose call has run out of time; the call reports a timeout. */
+  private static final class CallTimedOut extends RuntimeException {
+    CallTimedOut() {
+      super("HTTP source call timed out", null, false, false);
+    }
   }
 
   /**
