@@ -188,7 +188,10 @@ test("a new source needs an API resource ID before it can be saved", () => {
     ).toMatch(/source ID/);
   expect(
     sourceSaveProblem(
-      apply(draft, { type: "metadata", patch: { id: "customer-profile" } }),
+      apply(draft, {
+        type: "metadata",
+        patch: { id: "customer-profile", name: "Customer profile" },
+      }),
     ),
   ).toBeNull();
   // Saved sources keep their permanent ID; the server owns any legacy value.
@@ -219,6 +222,81 @@ test("an HTTP URL the server could not send as written blocks saving", () => {
     "https://api.example.com/customer",
   ])
     expect(withUrl(url), url).toBeNull();
+});
+
+// The server's URL rules, in its order and words: these were sent and came
+// back as a generic 422 alert.
+test("an HTTP URL the server refuses for its form blocks saving with the server's reason", () => {
+  const draft = openSource({ ...httpSource(), version: 0, id: "remote" }, 1);
+  const withUrl = (url: string) =>
+    sourceSaveProblem(apply(draft, { type: "configuration", patch: { url } }));
+  // What java.net.URI cannot parse; text without a scheme parses as relative.
+  for (const url of ["https://bad host/x", "https://api.example.com/%zz"])
+    expect(withUrl(url), url).toBe(
+      "HTTP URL: Provide an absolute HTTP(S) URL.",
+    );
+  for (const url of [
+    "",
+    "api.example.com/x",
+    "/relative",
+    "ftp://api.example.com/x",
+    "https://user:secret@api.example.com/x",
+    "https://api.example.com/x#top",
+    "https:///x",
+    `https://api.example.com/${"a".repeat(2000)}`,
+  ])
+    expect(withUrl(url), url).toBe(
+      "HTTP URL: Use an HTTP(S) URL without credentials or fragment.",
+    );
+  // A scheme is read in any case, as the server now reads it.
+  expect(withUrl("HTTPS://api.example.com/x")).toBeNull();
+});
+
+// The server's name rule (DisplayNames): a pasted tab or an empty name came
+// back as a generic 422 alert, away from the Name field.
+test("a source name the server refuses blocks saving with the server's reason", () => {
+  const draft = openSource({ ...lookupSource(), version: 0, id: "rates" }, 1);
+  const named = (name: string) =>
+    sourceSaveProblem(apply(draft, { type: "metadata", patch: { name } }));
+  expect(named("Rates\ttable")).toBe(
+    "Name: Source name cannot contain control characters",
+  );
+  for (const name of ["", " \u3000 ", "r".repeat(161)])
+    expect(named(name), name).toBe(
+      "Name: Source name must contain 1 to 160 characters",
+    );
+  expect(named("Rates\u0000")).toBe(
+    "Name: Text cannot contain the NUL character (U+0000)",
+  );
+  expect(named(" Rates ")).toBeNull();
+});
+
+// LookupSourceAdapter reads a table by its key alone; an extra parameter or
+// another name came back as a 422, and the field's help said otherwise.
+test("a lookup table needs exactly one parameter named key", () => {
+  const draft = openSource({ ...lookupSource(), version: 0, id: "rates" }, 1);
+  const withParameters = (names: string[]) =>
+    sourceSaveProblem(
+      apply(draft, {
+        type: "buffer",
+        field: "parameters",
+        value: JSON.stringify(
+          names.map((name) => ({ name, type: "STRING", required: true })),
+        ),
+      }),
+    );
+  for (const names of [[], ["code"], ["key", "region"]])
+    expect(withParameters(names), names.join()).toBe(
+      "Source parameters: Lookup tables require exactly one parameter named key",
+    );
+  expect(withParameters(["key"])).toBeNull();
+  expect(
+    sourceSaveProblem(
+      apply(draft, { type: "buffer", field: "parameters", value: "[{" }),
+    ),
+  ).toBe(
+    "Source parameters: Enter valid JSON before saving source parameters.",
+  );
 });
 
 test("the version chip names an unsaved draft, a saved version and one with edits", () => {

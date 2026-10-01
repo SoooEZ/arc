@@ -59,12 +59,23 @@ function sourceParameterNamesError(parameters: unknown): string | null {
   return null;
 }
 
-export function sourceParameterBufferError(text: string): string | null {
+/** Why the parameters text cannot be saved for `kind`, or null. */
+export function sourceParameterBufferError(
+  text: string,
+  kind: SourceConfig["kind"],
+): string | null {
+  let parameters: unknown;
   try {
-    return sourceParameterNamesError(parseJson(text));
+    parameters = parseJson(text);
   } catch {
     return "Enter valid JSON before saving source parameters.";
   }
+  return (
+    sourceParameterNamesError(parameters) ??
+    sourceProviders[kind].parametersProblem(
+      (parameters as Input[]).map((parameter) => parameter.name),
+    )
+  );
 }
 
 /** Example test parameters. Source parameters are scalar: the server rejects ARRAY and OBJECT. */

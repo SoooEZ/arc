@@ -20,6 +20,7 @@ export {
   isStringOrComment,
   insertSnippet,
 } from "./arcCompletion";
+import { markdownText } from "../../domain/text";
 
 export type ArcEditorContext =
   | { kind: "expression"; variables: VariableOption[] }
@@ -222,7 +223,7 @@ export function useArcLanguageSupport(
                     ? "Node result"
                     : `Input · ${variable.type.toLowerCase()}`,
               },
-              { value: `From: ${variable.label}` },
+              { value: `From: ${markdownText(variable.label)}` },
             ],
           };
         }

@@ -217,7 +217,10 @@ test("literal at signs do not fetch formula metadata or offer formula completion
   await page.goto(`/#/rules/${caller}?node=calc`);
   const expression = page.getByLabel("Expression", { exact: true });
   await expect(editorLines(expression)).toHaveText(`@${callee}:1(amount)`);
-  for (const prefix of ['"', "'", "// "]) {
+  // Inside a string literal; a single expression has no comments, as on the
+  // server, so "// " no longer stands in front of a call here (Code studio's
+  // comments are covered with its editor).
+  for (const prefix of ['"', "'"]) {
     await setEditorText(page, expression, "");
     await page.keyboard.type(`${prefix}@${callee}:1(amount)`);
     await expect(page.locator(".suggest-widget.visible")).toHaveCount(0);

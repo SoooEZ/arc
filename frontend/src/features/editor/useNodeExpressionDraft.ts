@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { studioApi } from "../../api/studio";
 import { errorMessage } from "../../api/errors";
-import {
-  unsavedDialogWarning,
-  useNavigationGuard,
-} from "../../app/navigationGuards";
+import { useStagedDialogEdits } from "../../app/navigationGuards";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import type { Definition, Diagnostic } from "../../types";
 
@@ -31,7 +28,7 @@ export function useNodeExpressionDraft({
   // An untouched buffer follows its node's current code (lesson F25): a graph
   // change while the dialog is open, such as a finishing Arrange, would
   // otherwise be overwritten by the stale text on Apply.
-  const edited = useRef(false);
+  const [edited, setEdited] = useState(false);
   const [busy, setBusy] = useState(false);
   const [applyError, setApplyError] = useState("");
   const [applyDiagnostics, setApplyDiagnostics] = useState<Diagnostic[]>([]);
@@ -44,12 +41,15 @@ export function useNodeExpressionDraft({
   );
   useEffect(() => {
     const renderedSource = rendered.data?.source;
-    if (renderedSource !== undefined)
-      setSource((current) => (edited.current ? current : renderedSource));
-  }, [rendered.data]);
-  // Code typed here is applied only on Apply: a route change asks first.
-  const dirty = source !== null && source !== rendered.data?.source;
-  useNavigationGuard(dirty ? unsavedDialogWarning : null);
+    if (renderedSource !== undefined && !edited) setSource(renderedSource);
+  }, [rendered.data, edited]);
+  // Code typed here is applied only on Apply: leaving the dialog otherwise
+  // asks first. Only typed code counts: while the node's code is read again,
+  // an untouched buffer asked as if it had been edited.
+  const dismiss = useStagedDialogEdits(
+    edited && source !== rendered.data?.source,
+    onClose,
+  );
   const checked = useAsyncResource(
     JSON.stringify([definition, nodeId, source]),
     source !== null && !readOnly
@@ -88,7 +88,7 @@ export function useNodeExpressionDraft({
     onProblems(reportedProblems);
   }, [reportedProblems, onProblems]);
   const changeSource = (value: string) => {
-    edited.current = true;
+    setEdited(true);
     setSource(value);
     setApplyError("");
     setApplyDiagnostics([]);
@@ -116,6 +116,7 @@ export function useNodeExpressionDraft({
   return {
     source,
     changeSource,
+    dismiss,
     diagnostics,
     busy,
     apply,

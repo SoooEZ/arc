@@ -122,6 +122,33 @@ test("the repeated click of a double click never inserts a second Reference node
   expect(started).toBe(1);
 });
 
+// Cards that insert at once took both clicks of a double click: a Switch
+// module twice (a duplicate node ID) and $ROUND nested in itself.
+test("a double click on a module or a function inserts it once", async ({
+  page,
+  request,
+}) => {
+  const suffix = uniqueStamp();
+  const id = `double-insert-${suffix}`;
+  await createRule(request, id, `Double insert ${suffix}`);
+  await page.goto(`/#/studio/${id}`);
+  await expect(page.locator(".monaco-editor")).toBeVisible();
+  await page.getByRole("button", { name: "modules", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Switch cases +", exact: true })
+    .dblclick();
+  await page.getByRole("button", { name: "functions", exact: true }).click();
+  await page.getByPlaceholder("Search functions…").fill("ROUND");
+  await page.getByRole("button", { name: "$ROUND", exact: true }).dblclick();
+  const build = page.waitForRequest((outgoing) =>
+    outgoing.url().endsWith("/api/studio/build"),
+  );
+  await page.getByRole("button", { name: "Build graph", exact: true }).click();
+  const source = (await build).postDataJSON().source as string;
+  expect(source.match(/ SWITCH /g)).toHaveLength(1);
+  expect(source.match(/\$ROUND\(/g)).toHaveLength(1);
+});
+
 test("each inserted Reuse card gets its own result name", async ({
   page,
   request,

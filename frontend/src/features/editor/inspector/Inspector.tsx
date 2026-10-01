@@ -14,6 +14,12 @@ interface Props extends NodeFormProps {
   onExpression: (id: string) => void;
   /** Whether node code opens now; a running command disables it, as on the cards. */
   canOpenCode: boolean;
+  /**
+   * A published version is shown. `readOnly` also holds while a command runs
+   * or a dialog is open, when the draft is only paused: the footer named it a
+   * published version then.
+   */
+  published: boolean;
 }
 
 /** The editor's sidebar: the node's identity and problems, its form, and the draft's save note. */
@@ -23,6 +29,7 @@ export default function Inspector({
   onDelete,
   onExpression,
   canOpenCode,
+  published,
   ...form
 }: Props) {
   const { rule, node, readOnly, onNodeChange } = form;
@@ -66,7 +73,7 @@ export default function Inspector({
       <NodeForm {...form} />
       <div className="inspector-footer">
         <Info size={13} />
-        {readOnly
+        {published
           ? "Published versions are read-only"
           : "Changes are saved when you save the draft"}
       </div>

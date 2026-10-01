@@ -117,7 +117,10 @@ export default function SourceConfigurationFields(props: SectionProps) {
   const provider = sourceProviders[configuration.kind];
   const Connection = connectionSections[configuration.kind];
   const Payload = payloadSections[configuration.kind];
-  const parametersError = sourceParameterBufferError(buffers.parameters);
+  const parametersError = sourceParameterBufferError(
+    buffers.parameters,
+    configuration.kind,
+  );
   return (
     <>
       <Connection {...props} />

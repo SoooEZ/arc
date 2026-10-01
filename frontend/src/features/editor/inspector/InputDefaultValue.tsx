@@ -3,6 +3,7 @@ import type { Input } from "../../../types";
 import JsonField from "../../../components/JsonField";
 import { inputDefaultProblem } from "../../../domain/inputDefaults";
 import NumericDefaultField from "./NumericDefaultField";
+import StringDefaultField from "./StringDefaultField";
 
 export default function InputDefaultValue({
   input,
@@ -56,14 +57,11 @@ export default function InputDefaultValue({
       />
     );
   return (
-    <TextField
-      label="Default value (optional)"
-      value={input.defaultValue ?? ""}
+    <StringDefaultField
+      value={input.defaultValue}
       disabled={disabled}
-      onChange={(event) => {
-        const value = event.target.value;
-        onChange(value === "" ? null : value);
-      }}
+      onChange={onChange}
+      onValidity={onValidity}
     />
   );
 }

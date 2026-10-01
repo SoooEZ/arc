@@ -133,6 +133,7 @@ export default function GraphCanvas({
     onEdgesChange,
     isValidConnection,
     connect,
+    connectEnd,
     endDrag,
   } = canvas;
   const flow = useReactFlow<FlowNode>();
@@ -249,6 +250,7 @@ export default function GraphCanvas({
             onEdgeClick={handlers.onEdgeClick}
             onEdgeContextMenu={handlers.onEdgeContextMenu}
             onConnect={connect}
+            onConnectEnd={connectEnd}
             isValidConnection={isValidConnection}
             nodesDraggable={can.edit}
             nodesConnectable={can.edit}

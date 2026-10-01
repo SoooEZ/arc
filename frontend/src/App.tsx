@@ -1,4 +1,4 @@
-import { lazy, useState, type ReactNode } from "react";
+import { lazy, useCallback, useState, type ReactNode } from "react";
 import { Alert, Button, CircularProgress, Snackbar } from "@mui/material";
 import WorkspaceHeader from "./app/WorkspaceHeader";
 import Library from "./features/library/LibraryPage";
@@ -62,7 +62,17 @@ export default function App() {
   const view = parseRoute(route);
   const library = useRuleLibrary(view.page === "library");
   const [savedRule, setSavedRule] = useState<Rule | null>(null);
-  const [notice, setNotice] = useState("");
+  // Each notice is its own Snackbar (keyed by its number), so it gets the
+  // whole display time: a replaced message kept the old one's timer (a publish
+  // notice shown for 0.2 s) and a repeated one did not show again.
+  const [notice, setNotice] = useState<{ id: number; message: string } | null>(
+    null,
+  );
+  const notify = useCallback(
+    (message: string) =>
+      setNotice((shown) => ({ id: (shown?.id ?? 0) + 1, message })),
+    [],
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const chunkFailed = useChunkLoadFailed();
   const newRule = () => setCreateOpen(true);
@@ -91,10 +101,11 @@ export default function App() {
   const codeStudio = useCodeStudioTarget({
     route,
     routeRuleId: ruleId,
+    routeVersion: requestedVersion,
     openedRuleId: selected?.id ?? null,
     navigate,
     createRule: newRule,
-    notify: setNotice,
+    notify,
   });
   /**
    * Nothing keeps offering a deleted rule: saved copy, library page, Code studio
@@ -128,7 +139,7 @@ export default function App() {
             onDeleted={forgetDeletedRule}
             navigate={navigate}
             redirect={redirect}
-            notify={setNotice}
+            notify={notify}
           />
         </LazyBoundary>
       );
@@ -159,10 +170,10 @@ export default function App() {
       case "rule":
         return ruleContent(view);
       case "sources":
-        return <SourcesPage notify={setNotice} />;
+        return <SourcesPage notify={notify} />;
       case "playground":
       case "docs":
-        return <ApiPage mode={view.page} notify={setNotice} />;
+        return <ApiPage mode={view.page} notify={notify} />;
       case "library":
         return (
           <Library
@@ -202,19 +213,20 @@ export default function App() {
             acknowledgeSave(rule);
             setCreateOpen(false);
             navigate(rulePath({ ruleId: rule.id }));
-            setNotice("Rule created. Make it yours.");
+            notify("Rule created. Make it yours.");
           }}
         />
       )}
       <Snackbar
-        open={!!notice}
+        key={notice?.id}
+        open={notice !== null}
         autoHideDuration={4000}
         // Only the timeout or Escape closes a notice: MUI also reports any click elsewhere
         // as "clickaway", which made error notices vanish at once.
         onClose={(_event, reason) => {
-          if (reason !== "clickaway") setNotice("");
+          if (reason !== "clickaway") setNotice(null);
         }}
-        message={notice}
+        message={notice?.message}
       />
     </div>
   );

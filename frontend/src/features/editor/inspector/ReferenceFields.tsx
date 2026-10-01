@@ -152,9 +152,13 @@ export default function ReferenceFields({
             }
             itemKey={(version) => String(version.version)}
             itemLabel={(version) => `Version ${version.version}`}
+            // Another version of the same rule keeps every mapping: the
+            // parameters it still declares keep their values, and the notice
+            // below names any others for removal. Dropping them all let an
+            // optional parameter silently take its default.
             onChange={(version) => {
               if (!readOnly && version.version !== node.version)
-                patch({ version: version.version, bindings: {} });
+                patch({ version: version.version });
             }}
           />
         )}

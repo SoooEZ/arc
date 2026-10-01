@@ -446,6 +446,55 @@ test("a pushed graph arrival with unbuildable code steps back once and shows why
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+// A transient failure is not remembered, so the next arrival builds again;
+// but while its step back was pending the graph route still showed, and a
+// second build ran at once. When that one succeeded, the code was committed
+// while the step back still returned to the code.
+test("a graph arrival whose build fails in transit builds once and returns to the code", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request, "transient-arrival");
+  await page.goto("/#/library");
+  await expect(
+    page.getByRole("heading", { name: "Rule library" }),
+  ).toBeVisible();
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await code.focus();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("End");
+  await page.keyboard.type("\n// unbuilt note");
+  let builds = 0;
+  await page.route("**/api/studio/build", async (route) => {
+    builds += 1;
+    if (builds === 1) await route.abort("failed");
+    else await route.continue();
+  });
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
+  await expect(code).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(builds).toBe(1);
+  await expect(page.locator(".studio-filebar")).toContainText("edited");
+  // The next arrival builds again, and this time the graph shows.
+  await page.evaluate((ruleId) => {
+    window.location.hash = `/rules/${ruleId}`;
+  }, id);
+  await expect(page).toHaveURL(new RegExp(`#/rules/${id}$`));
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  expect(builds).toBe(2);
+});
+
 test("Back and Forward continue past an entry rewritten in place", async ({
   page,
   request,
@@ -494,4 +543,44 @@ test("Back and Forward continue past an entry rewritten in place", async ({
   expect(prompts[0]).toContain("Leave this rule");
   await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
   await expect(code).toBeVisible();
+});
+
+// Continuing past a duplicate entry is for one Back or Forward press: a jump
+// from the history menu to an entry of the shown route, several entries away,
+// went one entry further and landed on the library.
+test("a jump to an entry several steps away stays on that entry", async ({
+  page,
+  request,
+}) => {
+  const id = await createRule(request, "history-jump");
+  await page.goto("/#/library");
+  await expect(
+    page.getByRole("heading", { name: "Rule library" }),
+  ).toBeVisible();
+  for (const route of [
+    `/rules/${id}`,
+    `/rules/${id}?node=out`,
+    `/rules/${id}`,
+  ]) {
+    await page.evaluate((hash) => {
+      window.location.hash = hash;
+    }, route);
+    await expect(page).toHaveURL(new RegExp(`#${route.replace("?", "\\?")}$`));
+  }
+  const before = await sessionHistory(page);
+  const target = before.index - 2;
+  expect(before.entries[target]).toBe(`#/rules/${id}`);
+  const cdp = await page.context().newCDPSession(page);
+  const { entries } = await cdp.send("Page.getNavigationHistory");
+  await cdp.send("Page.navigateToHistoryEntry", {
+    entryId: entries[target].id,
+  });
+  await cdp.detach();
+  await expect
+    .poll(async () => (await sessionHistory(page)).index)
+    .toBe(target);
+  // The overshoot was immediate; give it time to show.
+  await page.waitForTimeout(500);
+  expect((await sessionHistory(page)).index).toBe(target);
+  await expect(page).toHaveURL(new RegExp(`#/rules/${id}$`));
 });

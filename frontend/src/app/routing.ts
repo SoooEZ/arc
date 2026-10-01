@@ -42,12 +42,20 @@ export function parseRoute(route: string): WorkspaceRoute {
       page: "rule",
       ruleId,
       mode: rule[1] === "studio" ? "code" : "graph",
-      version: Number(parameters.get("version")) || null,
+      version: publishedVersion(parameters.get("version")),
       node: parameters.get("node"),
     };
   }
   // Unknown paths show the library, like the empty default route.
   return pagePaths.get(path) ?? { page: "library" };
+}
+
+/**
+ * A version number as rulePath writes it: Number() also read 0x10, 1e1, 1.5
+ * and -2, which named versions no link writes and no rule has.
+ */
+function publishedVersion(text: string | null): number | null {
+  return text !== null && /^[1-9]\d{0,8}$/.test(text) ? Number(text) : null;
 }
 
 /**

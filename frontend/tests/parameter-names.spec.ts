@@ -175,12 +175,12 @@ test("source parameter JSON retains invalid drafts, blocks invalid names before 
       }
       await page.setViewportSize({ width: 1440, height: 1000 });
     }
-    await page
-      .getByRole("button", { name: "Create source", exact: true })
-      .click();
+    // Save is refused with the reason under the field, as for an invalid ID,
+    // URL or timeout; it used to send nothing and say so after the click.
     await expect(
-      page.getByRole("alert").filter({ hasText: "Parameter 1:" }),
-    ).toBeVisible();
+      page.getByRole("button", { name: "Create source", exact: true }),
+    ).toBeDisabled();
+    await expect(page.getByText(/^Parameter 1: /)).toBeVisible();
     await expect(parameters).toHaveValue(text);
     expect(writes).toEqual([]);
   }

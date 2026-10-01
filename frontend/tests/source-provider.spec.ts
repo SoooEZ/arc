@@ -798,6 +798,220 @@ test("five inputs bound to one source read its pinned version once and no versio
   await expect.poll(() => reads.lists).toBe(1);
 });
 
+// A binding reads its source's versions when the select first opens; until
+// then its pager said "0 results" for a source that has versions.
+test("a source binding's version pager shows once the versions are read", async ({
+  page,
+  request,
+}) => {
+  const stamp = uniqueStamp();
+  const sourceId = `paged-versions-${stamp}`;
+  const definition = (entries: Record<string, number>) => ({
+    kind: "LOOKUP",
+    parameters: [
+      { name: "key", type: "STRING", required: true, defaultValue: null },
+    ],
+    entries,
+    timeoutMs: 3000,
+  });
+  const created = await request.post("/api/sources", {
+    data: {
+      id: sourceId,
+      name: `Paged ${stamp}`,
+      definition: definition({ US: 1 }),
+    },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const second = await request.put(`/api/sources/${sourceId}`, {
+    data: {
+      name: `Paged ${stamp}`,
+      revision: 1,
+      definition: definition({ US: 2 }),
+    },
+  });
+  expect(second.ok(), await second.text()).toBeTruthy();
+  const ruleId = `paged-versions-rule-${stamp}`;
+  await createRule(request, {
+    id: ruleId,
+    name: ruleId,
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [
+        {
+          name: "a",
+          type: "NUMBER",
+          required: true,
+          defaultValue: 1,
+          source: {
+            id: sourceId,
+            version: 1,
+            bindings: { key: '"US"' },
+            pointer: "",
+            onError: "FAIL",
+          },
+        },
+      ],
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Inputs",
+          position: { x: 200, y: 0 },
+        },
+        {
+          id: "out",
+          type: "OUTPUT",
+          label: "Result",
+          expression: "a",
+          position: { x: 200, y: 200 },
+        },
+      ],
+      edges: [
+        { id: "next", source: "input", target: "out", sourceHandle: "next" },
+      ],
+    },
+  });
+  await page.goto(`/#/rules/${ruleId}?node=input`);
+  const version = page.getByRole("combobox", {
+    name: "Source version",
+    exact: true,
+  });
+  await expect(version).toHaveText("v1");
+  const pager = page.getByRole("navigation", { name: "Source versions pages" });
+  await expect(pager).toHaveCount(0);
+  await version.click();
+  await expect(page.getByRole("option")).toHaveCount(2);
+  await page.getByRole("option", { name: "v1", exact: true }).click();
+  await expect(pager).toContainText("1–2 of 2");
+});
+
+// A save that finished after its editor closed skipped forgetting the
+// page-wide cache, so cards bound to the source kept its old name until reload.
+test("a source renamed by a save that finishes after its editor closed shows its new name", async ({
+  page,
+  request,
+}) => {
+  const stamp = uniqueStamp();
+  const sourceId = `late-rename-${stamp}`;
+  const created = await request.post("/api/sources", {
+    data: {
+      id: sourceId,
+      name: `Before ${stamp}`,
+      definition: {
+        kind: "LOOKUP",
+        parameters: [
+          { name: "key", type: "STRING", required: true, defaultValue: null },
+        ],
+        entries: { US: 1 },
+        timeoutMs: 3000,
+      },
+    },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const ruleId = `late-rename-rule-${stamp}`;
+  await createRule(request, {
+    id: ruleId,
+    name: ruleId,
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [
+        {
+          name: "a",
+          type: "NUMBER",
+          required: true,
+          defaultValue: 1,
+          source: {
+            id: sourceId,
+            version: 1,
+            bindings: { key: '"US"' },
+            pointer: "",
+            onError: "FAIL",
+          },
+        },
+      ],
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Inputs",
+          position: { x: 200, y: 0 },
+        },
+        {
+          id: "out",
+          type: "OUTPUT",
+          label: "Result",
+          expression: "a",
+          position: { x: 200, y: 200 },
+        },
+      ],
+      edges: [
+        { id: "next", source: "input", target: "out", sourceHandle: "next" },
+      ],
+    },
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let held = false;
+  await page.route(`**/api/sources/${sourceId}`, async (route) => {
+    if (route.request().method() !== "PUT") return route.continue();
+    held = true;
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.goto(`/#/rules/${ruleId}?node=input`);
+    const picker = page.getByRole("combobox", {
+      name: "Value provider",
+      exact: true,
+    });
+    await expect(picker).toHaveValue(`Before ${stamp}`);
+    await page
+      .getByRole("button", { name: "Manage data sources", exact: true })
+      .click();
+    const manager = page.getByRole("dialog", {
+      name: "Manage data sources",
+      exact: true,
+    });
+    await manager
+      .getByLabel("Search data sources", { exact: true })
+      .fill(`Before ${stamp}`);
+    await manager
+      .locator(".source-list > button")
+      .filter({ hasText: `Before ${stamp}` })
+      .click();
+    await manager.getByLabel("Name", { exact: true }).fill(`After ${stamp}`);
+    await manager
+      .getByRole("button", { name: "Save new version", exact: true })
+      .click();
+    await expect.poll(() => held).toBe(true);
+    // Leaving during the save asks first; confirmed, the editor unmounts.
+    page.once("dialog", (prompt) => void prompt.accept());
+    await page.evaluate(() => {
+      window.location.hash = "#/library";
+    });
+    await expect(
+      page.getByRole("heading", { name: "Rule library" }),
+    ).toBeVisible();
+    release();
+    // The save finishes after the editor closed.
+    await expect
+      .poll(async () =>
+        (await request.get(`/api/sources/${sourceId}/versions/2`)).status(),
+      )
+      .toBe(200);
+    await page.evaluate((id) => {
+      window.location.hash = `#/rules/${id}?node=input`;
+    }, ruleId);
+    await expect(picker).toHaveValue(`After ${stamp}`);
+  } finally {
+    release();
+  }
+});
+
 test("a source renamed from another card's manager shows its new name on the card bound to it", async ({
   page,
   request,

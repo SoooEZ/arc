@@ -54,6 +54,31 @@ test("expression text is trimmed like the server's String.trim, not Unicode whit
   expect(trimAsServer("\ufeff1")).toBe("\ufeff1");
 });
 
+// "score > 50 = passed" is (score > 50) = passed: the builder showed it as
+// score > (50 = passed) and stored that on the next edit, and "a == b = c"
+// took the other branch silently.
+test("a comparison counts every operator the server reads, aliases included", () => {
+  for (const expression of [
+    "score > 50 = passed",
+    "a == b = c",
+    "a = b",
+    "a <> b",
+  ])
+    expect(simpleComparison(expression), expression).toBeNull();
+  expect(simpleComparison("score >= 50")).toEqual([
+    "score >= 50",
+    "score",
+    ">=",
+    "50",
+  ]);
+  expect(simpleComparison('$IF(a = b, 1, 2) == "a = b"')).toEqual([
+    '$IF(a = b, 1, 2) == "a = b"',
+    "$IF(a = b, 1, 2)",
+    "==",
+    '"a = b"',
+  ]);
+});
+
 test("comparisonText parenthesizes operands whose top-level operators bind no tighter than the comparison", () => {
   // Stored as flag == a || b, the server read (flag == a) || b (lesson: X59).
   expect(comparisonText("flag", "==", "a || b")).toBe("flag == (a || b)");

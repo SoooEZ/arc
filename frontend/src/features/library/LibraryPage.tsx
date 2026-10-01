@@ -20,6 +20,7 @@ import { kinds, ruleKinds } from "../../domain/ruleKinds";
 import type { useRuleLibrary } from "../../app/useRuleLibrary";
 import CatalogPagination from "../../components/CatalogPagination";
 import RuleCard from "./RuleCard";
+import { newestFirst } from "./libraryOrder";
 
 type KindFilter = Kind | "ALL";
 /** One tab for every rule kind, in the order the create dialog offers them. */
@@ -184,11 +185,9 @@ export default function Library({
         </Alert>
       )}
       <div className="rule-grid">
-        {[...rules]
-          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-          .map((rule) => (
-            <RuleCard key={rule.id} rule={rule} onOpen={onOpen} />
-          ))}
+        {newestFirst(rules).map((rule) => (
+          <RuleCard key={rule.id} rule={rule} onOpen={onOpen} />
+        ))}
         {!library.loading && !library.loadError && !rules.length && (
           <EmptyLibrary
             filtered={query !== "" || filter !== "ALL"}

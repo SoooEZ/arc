@@ -3,6 +3,7 @@ import { Chip, MenuItem, TextField, Tooltip } from "@mui/material";
 import { ChevronRight, Search } from "lucide-react";
 import type { FunctionEntry, RuleSummary } from "../../types";
 import PublishedFormulaLibrary from "./PublishedFormulaLibrary";
+import { insertsOnClick } from "./useLibraryInsertion";
 
 export default function FunctionLibrary({
   functions,
@@ -142,7 +143,9 @@ export default function FunctionLibrary({
                               label={f.name}
                               variant="outlined"
                               disabled={readOnly || !f.supported}
-                              onClick={() => onInsert(f.snippet)}
+                              onClick={(event) => {
+                                if (insertsOnClick(event)) onInsert(f.snippet);
+                              }}
                             />
                           </span>
                         </Tooltip>

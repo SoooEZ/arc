@@ -91,7 +91,10 @@ test("source declaration validation rejects invalid names without changing raw b
       },
     ]);
     const invalid = { ...buffers, parameters: raw };
-    expect(sourceParameterBufferError(raw), name).toContain("Parameter 1:");
+    // Identifier rules hold for every kind; HTTP adds no rule of its own.
+    expect(sourceParameterBufferError(raw, "HTTP"), name).toContain(
+      "Parameter 1:",
+    );
     expect(() => sourceCandidate(source, invalid), name).toThrow(
       "Parameter 1:",
     );
@@ -107,10 +110,12 @@ test("source declaration validation rejects invalid names without changing raw b
     },
   ];
   const valid = { ...buffers, parameters: JSON.stringify(parameters) };
-  expect(sourceParameterBufferError(valid.parameters)).toBeNull();
+  expect(sourceParameterBufferError(valid.parameters, "HTTP")).toBeNull();
   expect(sourceCandidate(source, valid).definition.parameters).toEqual(
     parameters,
   );
-  expect(sourceParameterBufferError("[unfinished")).toContain("valid JSON");
-  expect(sourceParameterBufferError("null")).toContain("JSON array");
+  expect(sourceParameterBufferError("[unfinished", "HTTP")).toContain(
+    "valid JSON",
+  );
+  expect(sourceParameterBufferError("null", "HTTP")).toContain("JSON array");
 });

@@ -5,6 +5,7 @@ import {
   isNumberLiteral,
   literalText,
 } from "./expressions";
+import { formatLimit, MAX_EXPRESSION_CHARACTERS } from "./limits";
 import { trimAsServer } from "./serverText";
 import { isIdentifier } from "./identifiers";
 import { placeholderLiteral } from "./placeholderLiterals";
@@ -74,6 +75,10 @@ export function constantTextError(
   type: ConstantType,
   text: string,
 ): string | null {
+  // A constant is stored as its literal, an expression the server bounds: a
+  // text of 2,000 characters is 2,002 with its quotes, and the save failed.
+  if (text.length > MAX_EXPRESSION_CHARACTERS)
+    return `Constants are stored as expressions of at most ${formatLimit(MAX_EXPRESSION_CHARACTERS)} characters (this one has ${formatLimit(text.length)}).`;
   const format = constantFormats[type];
   if (!format || !text.trim() || inferConstantType(text) === type) return null;
   // A well-formed array that is too long for the server gets its own reason.

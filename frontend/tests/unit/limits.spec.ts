@@ -106,9 +106,24 @@ test("rule metadata problems repeat the server's messages at its boundaries", ()
   expect(
     ruleMetadataProblem({ name: "\u3000Tax", description: "" }),
   ).toBeNull();
+  // The server refuses what storage cannot hold first, then any control
+  // character (DisplayNames): a pasted tab came back as a generic 422.
   expect(
     ruleMetadataProblem({ name: "\t\u0000Tax\r\n", description: "" }),
-  ).toBeNull();
+  ).toEqual({
+    field: "name",
+    message: "Text cannot contain the NUL character (U+0000)",
+  });
+  expect(ruleMetadataProblem({ name: "Tax\trate", description: "" })).toEqual({
+    field: "name",
+    message: "Rule name cannot contain control characters",
+  });
+  expect(
+    ruleMetadataProblem({ name: "Tax", description: "Rate \ud800" }),
+  ).toEqual({
+    field: "description",
+    message: "Text cannot contain an unpaired UTF-16 surrogate",
+  });
   expect(
     ruleMetadataProblem({
       name: ` ${"a".repeat(MAX_NAME_CHARACTERS)}\u00a0`,

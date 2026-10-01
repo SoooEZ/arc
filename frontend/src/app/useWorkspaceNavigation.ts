@@ -99,16 +99,19 @@ export function useWorkspaceNavigation() {
 
   useEffect(() => {
     // A traversal between two entries of the shown route fires no hashchange:
-    // a refused arrival rewrote one of them in place (lesson F24). The press
-    // would show nothing, so the position is re-read and the traversal goes
-    // on in its direction to the next entry that differs.
+    // a refused arrival rewrote one of them in place (lesson F24). A Back or
+    // Forward press would show nothing, so the position is re-read and the
+    // traversal goes on in its direction to the next entry that differs. A
+    // jump from the history menu to an entry several steps away chose that
+    // entry, which shows this route: going on overshot it.
     const traversed = () => {
       const recorded = recordedPosition();
       if (recorded === null || currentRoute() !== shown.current.route) return;
       const previous = shown.current.position;
       if (recorded === previous) return;
       shown.current = { ...shown.current, position: recorded };
-      window.history.go(Math.sign(recorded - previous));
+      if (Math.abs(recorded - previous) === 1)
+        window.history.go(Math.sign(recorded - previous));
     };
     window.addEventListener("popstate", traversed);
     return () => window.removeEventListener("popstate", traversed);

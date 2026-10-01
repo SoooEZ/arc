@@ -62,7 +62,7 @@ function expressionTokenCount(text: string): number {
 }
 
 /** Whether the server's tokenizer refuses `text` for its length alone. */
-function exceedsTokenLimit(text: string): boolean {
+export function exceedsTokenLimit(text: string): boolean {
   return expressionTokenCount(text) > MAX_EXPRESSION_TOKENS;
 }
 
@@ -173,13 +173,24 @@ export function comparisonText(
   return [operand(left), operator, operand(right)].join(" ");
 }
 
+/**
+ * The builder's reading of a single comparison, or null. Every comparison
+ * operator the server reads counts, its aliases `=` and `<>` included:
+ * "score > 50 = passed" means (score > 50) = passed, which was shown as
+ * score > (50 = passed) and stored so on the next edit. The builder offers
+ * the canonical spellings only, so a comparison written with an alias stays in
+ * the expression editor as written.
+ */
 export function simpleComparison(expression: string): string[] | null {
   const masked = topLevelText(expression);
   if (masked === null || hasTopLevelLogic(expression, masked)) return null;
-  const operators = [...masked.matchAll(/==|!=|>=|<=|>|</g)];
+  const operators = [
+    ...masked.matchAll(new RegExp(comparisonOperator.source, "g")),
+  ];
   if (operators.length !== 1) return null;
   const operator = operators[0],
     index = operator.index!;
+  if (operator[0] === "=" || operator[0] === "<>") return null;
   return [
     expression,
     expression.slice(0, index).trim(),

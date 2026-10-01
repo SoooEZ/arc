@@ -7,7 +7,7 @@ import FunctionLibrary from "./FunctionLibrary";
 import { ruleApi } from "../../api/rules";
 import type { Definition, FunctionEntry, RuleSummary } from "../../types";
 import { modules, referenceSnippet, reuseNodeId } from "./snippets";
-import { useLibraryInsertion } from "./useLibraryInsertion";
+import { insertsOnClick, useLibraryInsertion } from "./useLibraryInsertion";
 import { formulaSuggestionProblem } from "./useFormulaSupport";
 import { uniqueName } from "../../domain/ids";
 import { variableNames } from "../../domain/variables";
@@ -124,9 +124,10 @@ export default function StudioLibrary({
               className="snippet-card"
               key={module.name}
               disabled={readOnly}
-              onClick={() =>
-                onInsert(module.snippet, module.placement === "end")
-              }
+              onClick={(event) => {
+                if (insertsOnClick(event))
+                  onInsert(module.snippet, module.placement === "end");
+              }}
             >
               <Braces size={17} />
               <span>{module.name}</span>

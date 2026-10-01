@@ -12,10 +12,7 @@ import {
 import { X } from "lucide-react";
 import type { Rule } from "../../types";
 import { patchGraphNode, type DefinitionChange } from "../../domain/graph";
-import {
-  unsavedDialogWarning,
-  useNavigationGuard,
-} from "../../app/navigationGuards";
+import { useStagedDialogEdits } from "../../app/navigationGuards";
 import NodeForm from "./inspector/NodeForm";
 import NodeIdentity from "./inspector/NodeIdentity";
 import { applyNodeFormDraft } from "./nodeFormDraft";
@@ -48,7 +45,7 @@ export default function NodeEditDialog({
   const [error, setError] = useState("");
   const node = draft.nodes.find((candidate) => candidate.id === nodeId)!;
   // Staged edits leave with the editor: a route change asks first (lesson F23).
-  useNavigationGuard(draft !== before ? unsavedDialogWarning : null);
+  const dismiss = useStagedDialogEdits(draft !== before, onClose);
   const hasInvalidDefaults = Object.values(invalidDefaults).some(Boolean);
   const onInvalidDefault = useCallback((key: string, invalid: boolean) => {
     setInvalidDefaults((current) =>
@@ -81,7 +78,7 @@ export default function NodeEditDialog({
   return (
     <Dialog
       open
-      onClose={onClose}
+      onClose={dismiss}
       maxWidth="md"
       fullWidth
       aria-labelledby="node-edit-title"

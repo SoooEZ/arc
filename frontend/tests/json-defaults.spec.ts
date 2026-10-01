@@ -111,6 +111,22 @@ test("a JSON default shows values applied from outside and keeps a cleared buffe
   );
 });
 
+// A stored "no default" showed as the text null, and typing after it gave
+// null[1], which the field refused as invalid JSON.
+test("an input without a default opens with an empty JSON buffer", async ({
+  page,
+  request,
+}) => {
+  const { id, field } = await openArrayDefault(page, request, null);
+  await expect(field).toHaveValue("");
+  await field.pressSequentially("[1]");
+  await expect(field).toHaveValue("[1]");
+  await expect(field).toHaveAttribute("aria-invalid", "false");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(await storedDraft(request, id)).toContain('"defaultValue":[1]');
+});
+
 test("wrong-type and out-of-limit JSON defaults show a field error and block saving", async ({
   page,
   request,

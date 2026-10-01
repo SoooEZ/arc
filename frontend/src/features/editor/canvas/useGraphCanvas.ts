@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Connection, Edge, EdgeChange, NodeChange } from "@xyflow/react";
+import type {
+  Connection,
+  Edge,
+  EdgeChange,
+  FinalConnectionState,
+  NodeChange,
+} from "@xyflow/react";
 import type { Definition, Execution } from "../../../types";
 import type { FlowNode } from "./GraphNode";
 import type { NodeSize, NodeSizes } from "./graphGeometry";
@@ -211,11 +217,6 @@ export function useGraphCanvas({
   const connect = useCallback(
     ({ source, target, sourceHandle }: Connection) => {
       if (!source || !target || source === target) return;
-      // The limit is explained; the other refusals show while dragging.
-      if (!canAddEdge(latest.current.definition)) {
-        onRefused(`A draft holds at most ${MAX_EDGES} connections`);
-        return;
-      }
       // Document updaters can run more than once, so the ID is chosen here.
       const edgeId = newId();
       edit((definition) =>
@@ -228,7 +229,23 @@ export function useGraphCanvas({
         ),
       );
     },
-    [edit, onRefused],
+    [edit],
+  );
+  /**
+   * A drop on a handle the limit refused is explained. Every refusal shows while
+   * the handle is dragged, and React Flow never calls onConnect for a refused
+   * drop, so the explanation there was never reached.
+   */
+  const connectEnd = useCallback(
+    (_event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+      if (
+        state.isValid === false &&
+        state.toHandle &&
+        !canAddEdge(latest.current.definition)
+      )
+        onRefused(`A draft holds at most ${MAX_EDGES} connections`);
+    },
+    [onRefused],
   );
   return {
     measurements,
@@ -242,6 +259,7 @@ export function useGraphCanvas({
     onEdgesChange,
     isValidConnection,
     connect,
+    connectEnd,
     endDrag,
   };
 }

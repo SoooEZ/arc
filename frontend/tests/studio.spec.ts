@@ -472,6 +472,42 @@ for (const [name, command] of Object.entries(commands)) {
   });
 }
 
+// A build echo spells coordinates as stored (200.0); submitted as it came,
+// every code-view save looked edited meanwhile, so the draft stayed unsaved
+// and the server's trimmed name was not adopted.
+test("a save from the code view leaves the draft saved and adopts the trimmed name", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("studio-save-clean");
+  await createFormula(request, id);
+  await page.goto(`/#/studio/${id}`);
+  const code = page.getByLabel("ARC code editor", { exact: true });
+  await expect(editorLines(code)).toContainText("return 10;");
+  await page
+    .getByRole("button", { name: "Rule settings", exact: true })
+    .click();
+  const settings = page.getByRole("dialog", { name: "Rule settings" });
+  await settings
+    .getByLabel("Name", { exact: true })
+    .fill("  Saved from code  ");
+  await settings
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
+  await page.locator(".monaco-editor").click({ position: { x: 300, y: 60 } });
+  const mac = (await page.evaluate(() => navigator.platform)).startsWith("Mac");
+  await page.keyboard.press(mac ? "Meta+ArrowDown" : "Control+End");
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("// saved from code");
+  await page.keyboard.press("ControlOrMeta+s");
+  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Saved from code", exact: true }),
+  ).toBeVisible();
+});
+
 test("a build that leaves the code canonical still keeps undo", async ({
   page,
   request,

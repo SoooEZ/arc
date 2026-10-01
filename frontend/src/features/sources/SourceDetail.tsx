@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { Save } from "lucide-react";
 import { stringifyJson } from "../../domain/json";
+import { displayNameProblem } from "../../domain/limits";
 import { sourceVersionLabel } from "./sourceDocument";
 import { isSourceKind, sourceKinds, sourceProviders } from "./sourceProviders";
 import type { SourceEditor } from "./useSourceEditor";
@@ -30,6 +31,11 @@ export default function SourceDetail({
 }) {
   const { open, saving, historical, dirty } = document;
   const selected = open?.source;
+  // The server's own rule, shown under the field it refuses (lesson F28).
+  const nameProblem =
+    selected && !historical
+      ? displayNameProblem("Source", selected.name)
+      : null;
   return (
     <section className="source-detail">
       {document.error && (
@@ -83,6 +89,8 @@ export default function SourceDetail({
               label="Name"
               value={selected.name}
               disabled={saving || historical}
+              error={!!nameProblem}
+              helperText={nameProblem}
               onChange={(event) =>
                 commands.changeMetadata({ name: event.target.value })
               }

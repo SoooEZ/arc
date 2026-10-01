@@ -348,6 +348,7 @@ function EditorContent({
             rule={rule}
             node={node}
             readOnly={!can.edit || !!activeDialog}
+            published={readOnly}
             nameInputRef={nodeNameInput}
             onNodeChange={patchNode}
             onDelete={removeNode}

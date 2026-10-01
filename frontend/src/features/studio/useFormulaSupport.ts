@@ -19,6 +19,7 @@ import {
   isStringOrComment,
   unchangedSince,
 } from "./arcCompletion";
+import { markdownText } from "../../domain/text";
 
 /** The help or alert text for a failed `@` search, the same in every editor. */
 export function formulaSuggestionProblem(formulaError: string): string {
@@ -229,13 +230,13 @@ export function useFormulaSupport(
             return null;
           return {
             contents: [
-              { value: entry.name },
+              { value: markdownText(entry.name) },
               { value: "```arc\n" + formulaSignature(entry) + "\n```" },
               {
                 value: `Published Formula · ${entry.id} · version ${entry.version}`,
               },
               ...entry.inputs.map((input) => ({
-                value: formulaParameterDescription(input),
+                value: markdownText(formulaParameterDescription(input)),
               })),
             ],
           };

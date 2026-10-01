@@ -41,7 +41,7 @@ export default function NodeExpressionDialog({
   onClose: () => void;
   onProblems: (messages: string[]) => void;
 }) {
-  const { source, changeSource, diagnostics, error, busy, apply } =
+  const { source, changeSource, dismiss, diagnostics, error, busy, apply } =
     useNodeExpressionDraft({
       definition,
       nodeId: node.id,
@@ -70,7 +70,7 @@ export default function NodeExpressionDialog({
   return (
     <Dialog
       open
-      onClose={busy ? undefined : onClose}
+      onClose={busy ? undefined : dismiss}
       maxWidth="lg"
       fullWidth
       aria-labelledby="node-expression-title"

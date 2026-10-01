@@ -19,8 +19,14 @@ export function sameDefinition(left: Definition, right: Definition): boolean {
   return left === right || canonicalJson(left) === canonicalJson(right);
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+/**
+ * `inValue` is true below an input's defaultValue: the server echoes a
+ * record's unset field as null, but a null inside a value is part of it, so
+ * {"a": null} and {} are different defaults.
+ */
+function canonicalJson(value: unknown, inValue = false): string {
+  if (Array.isArray(value))
+    return `[${value.map((item) => canonicalJson(item, inValue)).join(",")}]`;
   // A number is its value and decimal places however it is spelled: the server echoes
   // exponent notation in plain digits, which used to replace the local draft.
   if (isDecimalNumber(value)) return decimalKey(value.text) ?? value.text;
@@ -30,9 +36,12 @@ function canonicalJson(value: unknown): string {
   }
   if (!isJsonObject(value)) return JSON.stringify(value) ?? "null";
   const fields: string[] = [];
-  for (const key of Object.keys(value).sort())
-    if (value[key] != null)
-      fields.push(`${JSON.stringify(key)}:${canonicalJson(value[key])}`);
+  for (const key of Object.keys(value).sort()) {
+    const field = value[key];
+    if (field === undefined || (field === null && !inValue)) continue;
+    const json = canonicalJson(field, inValue || key === "defaultValue");
+    fields.push(`${JSON.stringify(key)}:${json}`);
+  }
   return `{${fields.join(",")}}`;
 }
 

@@ -18,6 +18,7 @@ import { useNavigationGuard } from "../../app/navigationGuards";
 import { leavesRuleDocument, pagePath, rulePath } from "../../app/routing";
 import type { Definition, Rule } from "../../types";
 import { ruleSnapshot, type DefinitionChange } from "../../domain/graph";
+import { withNodePositions } from "../../domain/definitionEchoes";
 import { documentReducer, initialDocument } from "./documentState";
 import {
   acceptsEdits,
@@ -262,13 +263,17 @@ export function useRuleDocument({
       throw new CodeBuildFailure(
         result.diagnostics[0]?.message || "Code could not be built",
       );
+    // The draft the document stores and the one a save submits are one object:
+    // the raw echo (coordinates as written, 300.0) made every code-view save
+    // look edited meanwhile, so it stayed dirty and kept an untrimmed name.
+    const built = withNodePositions(result.definition);
     dispatch({
       type: "source/built",
       before: source,
-      definition: result.definition,
+      definition: built,
       source: result.source,
     });
-    return result.definition;
+    return built;
   }, [hasInvalidDefaults, sourceDirty, source, readOnly, rule.draft]);
   // Graph/code switches. The header button switches through switchView, which
   // checks first. The sidebar and browser history change the route before the
@@ -330,13 +335,24 @@ export function useRuleDocument({
   const failedArrival = useRef<{ source: string; message: string } | null>(
     null,
   );
+  // An arrival on its way back to the code: until the route changes, the graph
+  // route still shows and must not build again. After a transient failure a
+  // second build ran at once, and when it succeeded the code was committed
+  // while the step back still returned to the code.
+  const returningToCode = useRef(false);
   useEffect(() => {
     // Unbuilt code builds before the graph shows; a failure returns to the
     // code. The rule applies whenever it is due: a graph arrival during a
     // command waits for the lock and then builds, and never stays half-applied.
-    if (mode !== "graph" || busy !== "" || !current.current.sourceDirty) return;
+    if (mode !== "graph") {
+      returningToCode.current = false;
+      return;
+    }
+    if (busy !== "" || !current.current.sourceDirty || returningToCode.current)
+      return;
     const latest = current.current;
-    const returnToCode = () =>
+    const returnToCode = () => {
+      returningToCode.current = true;
       latest.redirect(
         rulePath({
           ruleId: latest.ruleId,
@@ -344,6 +360,7 @@ export function useRuleDocument({
           version: latest.requestedVersion,
         }),
       );
+    };
     const remembered = failedArrival.current;
     if (latest.source !== null && remembered?.source === latest.source) {
       setError(remembered.message);

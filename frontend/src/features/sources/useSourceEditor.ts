@@ -216,10 +216,11 @@ export function useSourceEditor({
             candidate.name,
             candidate.definition,
           );
-      if (!mounted.current) return;
       // Every version of the source carries its current name: cards bound to
-      // it read the renamed source again instead of the cached name.
+      // it read the renamed source again instead of the cached name. The cache
+      // is page-wide, so this holds after the editor closed during the save.
       pinnedSourceVersions.forget(saved.id);
+      if (!mounted.current) return;
       // Refresh the library even when another source is being edited.
       if (loadingSourceId.current === saved.id)
         savedDuringSelection.current = saved;

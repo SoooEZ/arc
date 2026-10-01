@@ -49,6 +49,44 @@ test("middle formula defaults escape Monaco metacharacters and retain ARC object
   );
   expect(snippet).toContain("${2:amount}");
 });
+// A middle default is written out as its literal, which ARC must read as one
+// argument: a 51-field object did not compile, an empty or 200-character key
+// failed every run, and a 130-item array passed the token limit.
+test("a middle default ARC cannot write as one argument is inserted as a placeholder", () => {
+  const before = (type: Input["type"], defaultValue: unknown) =>
+    formulaSnippet(
+      {
+        ...formula,
+        inputs: [
+          { name: "options", type, required: false, defaultValue },
+          formula.inputs[0],
+        ],
+      },
+      ["amount"],
+    );
+  const fields = (count: number) =>
+    Object.fromEntries(
+      Array.from({ length: count }, (_, index) => [`f${index}`, 1]),
+    );
+  for (const [type, value] of [
+    ["OBJECT", fields(51)],
+    ["OBJECT", { "": 1 }],
+    ["OBJECT", { [" \u3000"]: 1 }],
+    ["OBJECT", { ["k".repeat(161)]: 1 }],
+    ["OBJECT", { nested: [{ "": 1 }] }],
+  ] as const)
+    expect(before(type, value)).toBe(
+      "@price-with-tax:3(${1:\\$OBJECT()}, ${2:amount})",
+    );
+  expect(before("ARRAY", Array(130).fill(1))).toBe(
+    "@price-with-tax:3(${1:[]}, ${2:amount})",
+  );
+  // Within the limits, the default is written out as before.
+  expect(before("OBJECT", fields(50))).toContain('${1:\\$OBJECT("f0", 1,');
+  expect(before("ARRAY", [1, 2])).toBe(
+    "@price-with-tax:3(${1:[1, 2]}, ${2:amount})",
+  );
+});
 test("formula tokens do not consume arguments or literal at signs", () => {
   const source =
     '@price-with-tax:3(amount) + $ROUND(amount, 2) + "@other:4(amount)"';

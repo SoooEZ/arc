@@ -34,6 +34,27 @@ test("routes are a discriminated page with rule details only on rule pages", () 
     expect(parseRoute(unknown)).toEqual({ page: "library" });
 });
 
+// Number() also read 0x10 as version 16, 1e1 as 10, and 1.5 and -2 as
+// versions no rule has; only the form rulePath writes names a version.
+test("a version is read only in the form a link writes it", () => {
+  for (const [text, version] of [
+    ["7", 7],
+    ["123456789", 123456789],
+    ["0x10", null],
+    ["1e1", null],
+    ["1.5", null],
+    ["-2", null],
+    ["0", null],
+    ["07", null],
+    [" 7", null],
+    ["1234567890", null],
+  ] as const)
+    expect(
+      parseRoute(`/rules/tax?version=${encodeURIComponent(text)}`),
+      text,
+    ).toMatchObject({ version });
+});
+
 test("graph and code views of one rule version are the same document", () => {
   expect(sameRuleDocument("/rules/tax", "/studio/tax?node=input")).toBe(true);
   expect(sameRuleDocument("/rules/tax", "/rules/tax?version=2")).toBe(false);

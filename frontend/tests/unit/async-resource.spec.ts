@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { pendingResourceState } from "../../src/hooks/useAsyncResource";
+import {
+  pendingResourceState,
+  resourceStateFor,
+} from "../../src/hooks/useAsyncResource";
 
 const loaded = {
   key: "a",
@@ -58,4 +61,20 @@ test("the same key stores a new loading state after a completed read or when ena
       initial: [],
     }),
   ).toEqual({ ...loaded, data: [], loading: true });
+});
+
+test("returning to a key before the new read finishes shows it loading, not its earlier answer", () => {
+  // The earlier answer stayed stored while another key loaded, so going back
+  // mounted a deleted rule's editor or flashed a stale "not found" for a commit.
+  const initial: string[] = [];
+  const options = { enabled: true, keepData: false, initial };
+  const toB = resourceStateFor(loaded, { ...options, key: "b" });
+  expect(toB).toEqual({ ...loaded, key: "b", data: initial, loading: true });
+  const backToA = resourceStateFor(toB, { ...options, key: "a" });
+  expect(backToA).toEqual({ ...loaded, data: initial, loading: true });
+  expect(resourceStateFor(loaded, { ...options, key: "a" })).toBe(loaded);
+  // keepPrevious keeps showing the rows it has while the next key loads.
+  expect(
+    resourceStateFor(loaded, { ...options, key: "b", keepData: true }),
+  ).toEqual({ ...loaded, key: "b", loading: true });
 });

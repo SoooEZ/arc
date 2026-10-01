@@ -1,5 +1,7 @@
 import type { Input } from "../../types";
-import { quoteText } from "../../domain/expressions";
+import { exceedsTokenLimit, quoteText } from "../../domain/expressions";
+import { MAX_FIELD_NAME_CHARACTERS } from "../../domain/limits";
+import { isBlankAsServer } from "../../domain/serverText";
 import {
   isDecimalNumber,
   isJsonObject,
@@ -36,10 +38,43 @@ function valueExpression(value: unknown): string {
   return "null";
 }
 
-/** An in-scope variable of the same name, the input's default, null for an optional input, else a typed placeholder. */
+/** $OBJECT takes up to 100 arguments: 50 key/value pairs (BuiltinFunctionCatalog). */
+const MAX_OBJECT_FIELDS = 50;
+
+/**
+ * Whether every object in a default can be rebuilt with $OBJECT: at most 50
+ * fields, each named by text of 1 to 160 characters that is not blank.
+ */
+function objectsFit(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(objectsFit);
+  if (!isJsonObject(value)) return true;
+  const entries = Object.entries(value);
+  return (
+    entries.length <= MAX_OBJECT_FIELDS &&
+    entries.every(
+      ([key, entry]) =>
+        !isBlankAsServer(key) &&
+        key.length <= MAX_FIELD_NAME_CHARACTERS &&
+        objectsFit(entry),
+    )
+  );
+}
+
+/**
+ * An in-scope variable of the same name, the input's default, null for an
+ * optional input, else a typed placeholder. A default ARC cannot write as one
+ * argument gets the placeholder too: written out, a 51-field object did not
+ * compile, an empty or 200-character key failed every run, and a 130-item
+ * array passed the token limit.
+ */
 function argumentExpression(input: Input, available: string[]): string {
   if (available.includes(input.name)) return input.name;
-  if (input.defaultValue != null) return valueExpression(input.defaultValue);
+  if (input.defaultValue != null) {
+    const written = valueExpression(input.defaultValue);
+    if (objectsFit(input.defaultValue) && !exceedsTokenLimit(written))
+      return written;
+    return placeholderLiteral[input.type];
+  }
   if (!input.required) return "null";
   return placeholderLiteral[input.type];
 }

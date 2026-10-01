@@ -122,6 +122,20 @@ test("typed constant fields name partial or rejected text without flagging an em
     expect(constantTextError(type, text), `${type}: ${text}`).toBeNull();
 });
 
+// A constant is stored as its literal, an expression the server bounds at
+// 2,000 characters: a long text constant looked valid, the save failed and
+// the diagnostics stopped at it.
+test("a constant longer than an expression may be is named at its field", () => {
+  const longest = `"${"a".repeat(1998)}"`;
+  expect(constantTextError("STRING", longest)).toBeNull();
+  expect(constantTextError("STRING", `"${"a".repeat(1999)}"`)).toBe(
+    "Constants are stored as expressions of at most 2,000 characters (this one has 2,001).",
+  );
+  expect(constantTextError("ARRAY", `[${"1, ".repeat(700)}1]`)).toMatch(
+    /^Constants are stored as expressions of at most 2,000 characters/,
+  );
+});
+
 test("variable-shaped values follow the shared identifier policy", () => {
   expect(inferBindingMode("total_2", "ANY", [])).toBe("variable");
   expect(inferBindingMode("and", "ANY", [])).toBe("expression");

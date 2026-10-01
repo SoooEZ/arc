@@ -74,7 +74,11 @@ test("the timeout is checked only where the provider uses one, and each provider
     kind: "HTTP",
   });
   expect(sourceProviders.HTTP.usesTimeout).toBe(true);
-  expect(sourceSaveProblem(http!)).toMatch(/^Timeout: /);
+  const located = sourceDocumentReducer(http, {
+    type: "configuration",
+    patch: { url: "https://api.example.com/rates" },
+  });
+  expect(sourceSaveProblem(located!)).toMatch(/^Timeout: /);
   expect(providerParameterTemplate("LOOKUP")[0].name).toBe(
     sourceProviders.LOOKUP.starterParameter,
   );

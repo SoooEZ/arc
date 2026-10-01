@@ -8,6 +8,7 @@ import {
   DialogTitle,
   TextField,
 } from "@mui/material";
+import { useStagedDialogEdits } from "../../app/navigationGuards";
 import { ruleMetadataProblem } from "../../domain/limits";
 import { ruleKinds } from "../../domain/ruleKinds";
 import type { Rule } from "../../types";
@@ -35,6 +36,11 @@ export default function RuleSettings({
 }) {
   const [name, setName] = useState(rule.name);
   const [description, setDescription] = useState(rule.description);
+  // Settings are applied only on Apply: leaving the dialog otherwise asks first.
+  const dismiss = useStagedDialogEdits(
+    !readOnly && (name !== rule.name || description !== rule.description),
+    onClose,
+  );
   // The server's own rule, shown under the field it refuses (lesson F28).
   const problem = ruleMetadataProblem({ name, description });
   const problemOf = (field: "name" | "description") =>
@@ -42,7 +48,7 @@ export default function RuleSettings({
   return (
     <Dialog
       open
-      onClose={deleting ? undefined : onClose}
+      onClose={deleting ? undefined : dismiss}
       fullWidth
       maxWidth="sm"
       aria-labelledby="rule-settings-title"

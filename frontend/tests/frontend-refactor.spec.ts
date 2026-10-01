@@ -139,9 +139,8 @@ for (const defaultValue of [null, []]) {
     await expectInvalidDefaultCannotSave(page, request, id);
     await page.getByRole("combobox", { name: "Type", exact: true }).click();
     await page.getByRole("option", { name: "object", exact: true }).click();
-    await expect(page.getByLabel("Default JSON (optional)")).toHaveValue(
-      "null",
-    );
+    // No default is an empty buffer; "null" there became null[1] when typed after.
+    await expect(page.getByLabel("Default JSON (optional)")).toHaveValue("");
     await expect(page.getByText("Enter valid JSON before saving")).toHaveCount(
       0,
     );

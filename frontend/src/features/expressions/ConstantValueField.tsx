@@ -48,18 +48,19 @@ export default function ConstantValueField({
       </TextField>
     );
   }
+  const error = constantTextError(type, stored);
   if (type === "STRING") {
     return (
       <TextField
         label={label}
         value={literalText(trimAsServer(stored)) ?? stored}
         disabled={disabled}
+        error={!!error}
         onChange={(event) => onChange(quoteText(event.target.value))}
-        helperText="Text value · no quotation marks needed"
+        helperText={error ?? "Text value · no quotation marks needed"}
       />
     );
   }
-  const error = constantTextError(type, stored);
   if (type === "NUMBER")
     return (
       <TextField

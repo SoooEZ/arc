@@ -22,13 +22,11 @@ import {
   insertSnippet,
 } from "../studio/useArcLanguageSupport";
 import { useFunctionCatalog } from "../studio/useFunctionCatalog";
+import { insertsOnClick } from "../studio/useLibraryInsertion";
 import { arcExpressionLanguage } from "../studio/arcLanguage";
 import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
-import {
-  unsavedDialogWarning,
-  useNavigationGuard,
-} from "../../app/navigationGuards";
+import { useStagedDialogEdits } from "../../app/navigationGuards";
 import { studioApi } from "../../api/studio";
 import {
   variableOptionLabel,
@@ -54,8 +52,8 @@ export default function ExpressionDialog({
   onApply: (value: string) => void;
 }) {
   const [source, setSource] = useState(value);
-  // The text is applied only on Apply: a route change asks first.
-  useNavigationGuard(source !== value ? unsavedDialogWarning : null);
+  // The text is applied only on Apply: leaving the dialog otherwise asks first.
+  const dismiss = useStagedDialogEdits(source !== value, onClose);
   const { editor, model, onMount } = useArcEditor();
   const options = useEditorOptions(
     expressionDialogOptions,
@@ -94,7 +92,7 @@ export default function ExpressionDialog({
   return (
     <Dialog
       open
-      onClose={onClose}
+      onClose={dismiss}
       maxWidth="lg"
       fullWidth
       aria-labelledby="expression-editor-title"
@@ -116,7 +114,9 @@ export default function ExpressionDialog({
                 size="small"
                 label={variable.name}
                 disabled={readOnly}
-                onClick={() => insert(variable.name)}
+                onClick={(event) => {
+                  if (insertsOnClick(event)) insert(variable.name);
+                }}
               />
             </Tooltip>
           ))}

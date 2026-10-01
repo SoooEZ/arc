@@ -103,6 +103,28 @@ const deferred = () => {
   return { promise, release };
 };
 
+// Every mapping was dropped with the old version, so an optional parameter
+// silently took its default and a required one failed only at publish.
+test("a new pinned version keeps the mappings of the parameters it declares", async ({
+  page,
+  request,
+}) => {
+  const { parent } = await fixture(request, 2);
+  await page.goto(`/#/rules/${parent.id}?node=ref`);
+  const version = sidebar(page).getByRole("combobox", {
+    name: "Pinned version",
+    exact: true,
+  });
+  const amount = sidebar(page).getByRole("group", { name: "Parameter amount" });
+  await expect(version).toHaveValue("Version 1");
+  await expect(amount.getByRole("spinbutton")).toHaveValue("7");
+  await version.click();
+  await page.getByRole("option", { name: "Version 2", exact: true }).click();
+  await expect(version).toHaveValue("Version 2");
+  await expect(amount.getByRole("spinbutton")).toHaveValue("7");
+  await expect(sidebar(page).locator(".undeclared-bindings")).toHaveCount(0);
+});
+
 test("reference header actions stay separate from collapse and parameter cards describe the pinned contract", async ({
   page,
   request,
@@ -327,9 +349,10 @@ test("reference typeahead preserves off-page pins, appends without focus or scro
         url.searchParams.get("search")?.startsWith("Version"),
       ),
     ).toBe(false);
+    // Version 2 declares amount too, so its mapping stays.
     await expect(
       sidebar(page).getByLabel("amount * · value source", { exact: true }),
-    ).toHaveText("Upstream variable");
+    ).toHaveText("Constant");
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect(page.getByText("All changes saved")).toBeVisible();
     const saved: Rule = await (
@@ -338,7 +361,7 @@ test("reference typeahead preserves off-page pins, appends without focus or scro
     expect(saved.draft.nodes.find((node) => node.id === "ref")).toMatchObject({
       ruleId: child.id,
       version: 2,
-      bindings: {},
+      bindings: { amount: "7" },
     });
   } finally {
     gate.release();
@@ -455,9 +478,14 @@ test("reference pickers in the node dialog stage changes and historical pins rem
     sidebar(page).getByLabel("amount *", { exact: true }),
   ).toHaveValue("7");
   dialog = await open();
-  await dialog
-    .getByRole("combobox", { name: "Published rule", exact: true })
-    .fill(child.id);
+  const rulePicker = dialog.getByRole("combobox", {
+    name: "Published rule",
+    exact: true,
+  });
+  // The picker shows the pinned rule's ID until its name loads; typing that
+  // same ID before then changes nothing, so no search would start.
+  await expect(rulePicker).toHaveValue(child.name);
+  await rulePicker.fill(child.id);
   await page.getByRole("option", { name: child.name, exact: true }).click();
   await expect(
     dialog.getByRole("combobox", { name: "Pinned version", exact: true }),

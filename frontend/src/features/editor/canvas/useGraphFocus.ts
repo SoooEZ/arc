@@ -32,9 +32,19 @@ export function useGraphFocus({
   navigate,
 }: Options) {
   const flow = useReactFlow<FlowNode>();
-  const [requestedFocus, setPendingFocus] = useState(requestedNode || null);
-  // A deep link or a trace step may name a node the draft no longer has: such
-  // a request is dropped, so it cannot hold every canvas mount unfitted.
+  const [requestedFocus, setRequestedFocus] = useState(requestedNode || null);
+  // A link to another node of the open graph (?node=) asks again: the editor
+  // stays mounted for the same rule and version, so its first request was all
+  // it read.
+  const [linkedNode, setLinkedNode] = useState(requestedNode);
+  if (requestedNode !== linkedNode) {
+    setLinkedNode(requestedNode);
+    if (requestedNode) setRequestedFocus(requestedNode);
+  }
+  // A deep link or a trace step may name a node the graph does not have: such
+  // a request is dropped, so it cannot hold every canvas mount unfitted. It is
+  // judged by the graph it names, so not while a pinned version loads: the
+  // draft shown meanwhile may lack a node only that version has.
   const pendingFocus =
     requestedFocus !== null &&
     definition.nodes.some((node) => node.id === requestedFocus)
@@ -55,14 +65,15 @@ export function useGraphFocus({
 
   const jumpToNode = (id: string) => {
     if (!selectNode(id)) return;
-    setPendingFocus(id);
+    setRequestedFocus(id);
     if (mode === "code")
       navigate(rulePath({ ruleId, version: requestedVersion }));
   };
 
   useEffect(() => {
-    if (requestedFocus !== null && pendingFocus === null) setPendingFocus(null);
-  }, [requestedFocus, pendingFocus]);
+    if (!unavailable && requestedFocus !== null && pendingFocus === null)
+      setRequestedFocus(null);
+  }, [unavailable, requestedFocus, pendingFocus]);
 
   useEffect(() => {
     if (
@@ -74,7 +85,7 @@ export function useGraphFocus({
       return;
     const frame = requestAnimationFrame(() => {
       focusNode(pendingFocus);
-      setPendingFocus(null);
+      setRequestedFocus(null);
     });
     return () => cancelAnimationFrame(frame);
   }, [mode, unavailable, pendingFocus, measurements, focusNode]);

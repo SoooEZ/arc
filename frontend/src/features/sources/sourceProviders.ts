@@ -26,6 +26,8 @@ export interface SourceProvider {
   usesTimeout: boolean;
   /** The parameters field's help, before the shared identifier guidance. */
   parametersHelp: string;
+  /** Why the server would refuse these parameter names for this kind, or null. */
+  parametersProblem(names: string[]): string | null;
   /** The provider's payload fields from the definition and the raw buffers; throws today's messages for unusable text. */
   activeFields(
     definition: SourceConfig,
@@ -57,7 +59,12 @@ export const sourceProviders: Record<SourceKind, SourceProvider> = {
     starterParameter: "key",
     usesUrl: false,
     usesTimeout: false,
-    parametersHelp: 'Lookup tables require a parameter named "key".',
+    parametersHelp: 'Lookup tables take exactly one parameter, named "key".',
+    // LookupSourceAdapter: a table is read by its key and nothing else.
+    parametersProblem: (names) =>
+      names.length === 1 && names[0] === "key"
+        ? null
+        : "Lookup tables require exactly one parameter named key",
     activeFields: (_definition, buffers) => ({
       entries: parseJsonObject(
         buffers.entries,
@@ -72,6 +79,7 @@ export const sourceProviders: Record<SourceKind, SourceProvider> = {
     usesTimeout: true,
     parametersHelp:
       "Declare name, type (STRING / NUMBER / BOOLEAN), required, and optional defaultValue.",
+    parametersProblem: () => null,
     activeFields: (definition, buffers) => ({
       url: definition.url,
       secretHeaders: secretHeaderAliases(buffers.secretHeaders),

@@ -21,3 +21,20 @@ const javaWhitespace =
 export function isBlankAsServer(text: string): boolean {
   return javaWhitespace.test(text);
 }
+
+/**
+ * The server's StorableText.problem: PostgreSQL text cannot hold U+0000, and
+ * the JDBC driver turns an unpaired UTF-16 surrogate into '?'. Null for text
+ * it stores as written, else the server's message.
+ */
+export function storableTextProblem(text: string): string | null {
+  if (text.includes("\u0000"))
+    return "Text cannot contain the NUL character (U+0000)";
+  if (
+    /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(
+      text,
+    )
+  )
+    return "Text cannot contain an unpaired UTF-16 surrogate";
+  return null;
+}

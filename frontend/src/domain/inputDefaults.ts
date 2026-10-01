@@ -8,6 +8,7 @@ import {
   MAX_VALUE_ELEMENTS,
 } from "./limits";
 import { unsupportedNumber, withinServerLimits } from "./numericDefaults";
+import { storableTextProblem } from "./serverText";
 
 const typeProblems: Partial<Record<InputType, string>> = {
   ARRAY: "An ARRAY default must be a JSON array such as [1, 2].",
@@ -67,6 +68,9 @@ function valueBoundProblem(root: unknown): string | null {
     } else if (typeof value === "string") {
       if (value.length > MAX_STRING_CHARACTERS)
         return valueBoundProblems.string;
+      // Text and keys the database cannot hold fail the save (StorableText).
+      const unstorable = storableTextProblem(value);
+      if (unstorable) return unstorable;
     } else if (Array.isArray(value)) {
       if (value.length > MAX_COLLECTION_ITEMS) return valueBoundProblems.array;
       for (let index = value.length - 1; index >= 0; index--)

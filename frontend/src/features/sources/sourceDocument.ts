@@ -1,9 +1,11 @@
 import type { DataSource, SourceConfig } from "../../types";
 import { stringifyJson } from "../../domain/json";
+import { displayNameProblem } from "../../domain/limits";
 import { isResourceId, resourceIdGuidance } from "../../domain/resourceIds";
 import {
   providerParameterTemplate,
   sourceBuffers,
+  sourceParameterBufferError,
   sourceSample,
   type SourceBuffers,
 } from "./model";
@@ -137,16 +139,35 @@ export function canRunSourceTest(
   );
 }
 
+/** The longest URL the server accepts (HttpDestinationPolicy). */
+const MAX_URL_CHARACTERS = 2_000;
+/** What java.net.URI refuses unescaped, which the server reads as no URL at all. */
+const unescapedInUri = /[\s"<>\\^`{|}\u0000-\u001f\u007f]|%(?![0-9a-f]{2})/i;
+
 /**
- * Why the server would refuse an HTTP URL that its transport could not send as
- * written, or null. The server checks the rest of the URL.
+ * Why the server would refuse an HTTP URL, in its order and with its words, or
+ * null (HttpDestinationPolicy). The host allowlist and the address checks need
+ * the server's configuration and stay there.
  */
 export function httpUrlProblem(url: string): string | null {
+  if (unescapedInUri.test(url)) return "Provide an absolute HTTP(S) URL.";
+  // Text without a scheme parses as a relative URL, which the next check names.
+  const parts = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)/i.exec(url);
+  const scheme = parts?.[1] ?? "";
+  const authority = parts?.[2] ?? "";
+  // The port goes; an IPv6 literal keeps its brackets.
+  const host = authority.replace(/:\d*$/, "");
+  if (
+    !/^https?$/i.test(scheme) ||
+    host === "" ||
+    authority.includes("@") ||
+    url.includes("#") ||
+    url.length > MAX_URL_CHARACTERS
+  )
+    return "Use an HTTP(S) URL without credentials or fragment.";
   if (/[^\x00-\x7f]/.test(url))
     return "Percent-encode non-ASCII characters as UTF-8 (Zürich → Z%C3%BCrich).";
-  const port = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]*:(\d+)(?=[/?#]|$)/i.exec(
-    url,
-  )?.[1];
+  const port = /:(\d+)$/.exec(authority)?.[1];
   if (port !== undefined && (Number(port) < 1 || Number(port) > 65535))
     return "Use a port from 1 to 65535.";
   return null;
@@ -156,7 +177,14 @@ export function httpUrlProblem(url: string): string | null {
 export function sourceSaveProblem(document: SourceDocument): string | null {
   if (!document.source.version && !isResourceId(document.source.id))
     return `Enter a valid source ID. ${resourceIdGuidance}`;
+  const nameProblem = displayNameProblem("Source", document.source.name);
+  if (nameProblem) return `Name: ${nameProblem}`;
   const { kind, url } = document.source.definition;
+  const parametersProblem = sourceParameterBufferError(
+    document.buffers.parameters,
+    kind,
+  );
+  if (parametersProblem) return `Source parameters: ${parametersProblem}`;
   const provider = sourceProviders[kind];
   if (provider.usesUrl) {
     const urlProblem = httpUrlProblem(url ?? "");

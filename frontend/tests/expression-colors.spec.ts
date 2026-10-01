@@ -234,7 +234,7 @@ test("expression colors distinguish functions, input roots, results and shadowin
   });
 });
 
-test("expanded expression colors leave string, comment and property text unclassified", async ({
+test("expanded expression colors leave string and property text unclassified, and a single expression has no comments", async ({
   page,
   request,
 }) => {
@@ -256,7 +256,7 @@ test("expanded expression colors leave string, comment and property text unclass
   await setEditorText(
     page,
     expression,
-    '$OBJECT("amount price $ROUND", customer.amount,\n"nested", customer.rows.0.price,\n"total", amount + price)\n// amount price $ROUND customer.amount',
+    '$OBJECT("amount price $ROUND", customer.amount,\n"nested", customer.rows.0.price,\n"total", amount + price) // price',
   );
   await expectColor(expression, "$OBJECT", colors.function);
   await expectColor(expression, '"amount price $ROUND"', colors.string);
@@ -266,11 +266,9 @@ test("expanded expression colors leave string, comment and property text unclass
   await expectUnclassified(expression, "price", 1);
   await expectColor(expression, "amount", colors.input, 2);
   await expectColor(expression, "price", colors.result, 2);
-  await expectColor(
-    expression,
-    "// amount price $ROUND customer.amount",
-    colors.comment,
-  );
+  // The server reads no comment in an expression ("Unexpected token: /"), so
+  // the editor colors what follows "//" as code, not as a comment.
+  await expectColor(expression, "price", colors.result, 3);
   await page.screenshot({
     path: test.info().outputPath("expression-colors-expanded.png"),
   });

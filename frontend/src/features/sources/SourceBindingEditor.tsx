@@ -167,10 +167,14 @@ export default function SourceBindingEditor({
             onOpen={() => setVersionsRequested(true)}
             onChange={(version) => void chooseVersion(version)}
           />
-          <CatalogPagination
-            label="Source versions"
-            {...paginationProps(versionsResource)}
-          />
+          {/* Versions are read when the select first opens; before that the
+              pager said "0 results" for a source that has versions. */}
+          {versionsRequested && (
+            <CatalogPagination
+              label="Source versions"
+              {...paginationProps(versionsResource)}
+            />
+          )}
           {config?.parameters.map((p) => (
             <ValueBinding
               key={`${source.id}:${source.version}:${p.name}`}

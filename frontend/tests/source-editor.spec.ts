@@ -877,18 +877,20 @@ test("switching the provider away and back leaves an unchanged source clean", as
   await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
   const parameters = page.getByLabel("Source parameters · JSON");
   await expect(parameters).toHaveValue(/country/);
-  const save = page.getByRole("button", { name: "Save new version" });
-  await expect(save).toBeDisabled();
+  // The version chip says whether the source has unsaved edits; Save also
+  // waits for a URL here, which the HTTP provider needs.
+  const edited = page.locator(".source-detail-heading").getByText(/· edited$/);
+  await expect(edited).toHaveCount(0);
   const provider = page.getByRole("combobox", { name: "Provider" });
   await provider.click();
   await page.getByRole("option", { name: "HTTP GET · JSON response" }).click();
   await expect(parameters).toHaveValue(/customerId/);
-  await expect(save).toBeEnabled();
+  await expect(edited).toHaveCount(1);
   // The round trip used to leave the LOOKUP template, an edit the user never made.
   await provider.click();
   await page.getByRole("option", { name: "Local lookup table" }).click();
   await expect(parameters).toHaveValue(/country/);
-  await expect(save).toBeDisabled();
+  await expect(edited).toHaveCount(0);
 });
 
 test("a failed catalog read offers Retry without a close button, while document errors stay dismissible", async ({

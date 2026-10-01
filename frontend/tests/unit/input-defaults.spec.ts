@@ -102,3 +102,22 @@ test("a very large pasted default is refused without exhausting the call stack",
     valueBoundProblems.array,
   );
 });
+
+// JsonCodec refuses text PostgreSQL cannot hold (StorableText) when the draft
+// is saved: such a default passed the field and the save failed with a 422
+// that named no input. A STRING default had no check at all.
+test("a default holding text the server cannot store is refused in the field", () => {
+  expect(inputDefaultProblem("STRING", "a\u0000b")).toBe(
+    "Text cannot contain the NUL character (U+0000)",
+  );
+  expect(inputDefaultProblem("ARRAY", ["ok", "\ud800"])).toBe(
+    "Text cannot contain an unpaired UTF-16 surrogate",
+  );
+  expect(inputDefaultProblem("OBJECT", { "\u0000key": 1 })).toBe(
+    "Text cannot contain the NUL character (U+0000)",
+  );
+  expect(inputDefaultProblem("STRING", "a".repeat(2001))).toBe(
+    "String exceeds 2,000 characters",
+  );
+  expect(inputDefaultProblem("STRING", "😀 ok")).toBeNull();
+});

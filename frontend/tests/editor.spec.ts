@@ -519,6 +519,187 @@ test("a deep link to a node the rule does not have shows the whole graph", async
   await expect.poll(() => inside("input")).toBe(true);
 });
 
+// React Flow never calls onConnect for a drop isValidConnection refused, so the
+// limit's explanation there was never shown: the drop just did nothing.
+test("a connection dropped on a draft at the connection limit says why", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("editor-edge-limit");
+  const outputs = Array.from({ length: 97 }, (_, index) =>
+    node(
+      `o${index}`,
+      "OUTPUT",
+      "1",
+      undefined,
+      300 + (index % 10) * 280,
+      360 + Math.floor(index / 10) * 160,
+    ),
+  );
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      node("input", "INPUT", undefined, undefined, 300, 0),
+      node("f", "FORMULA", "1", "x", 300, 180),
+      node("g", "FORMULA", "2", "y", 580, 180),
+      ...outputs,
+    ],
+    edges: [
+      edge("input", "f"),
+      edge("input", "g"),
+      ...outputs.flatMap((output) => [
+        edge("f", output.id),
+        edge("g", output.id),
+      ]),
+      ...outputs.slice(0, 4).map((output) => edge("input", output.id)),
+    ],
+  };
+  expect(definition.edges).toHaveLength(200);
+  await createRule(request, { id, definition });
+  await page.goto(`/#/rules/${id}`);
+  await expect(page.locator(".react-flow__node")).toHaveCount(100);
+  await page
+    .locator('.react-flow__node[data-id="input"] .react-flow__handle.source')
+    .dragTo(
+      page.locator(
+        '.react-flow__node[data-id="o9"] .react-flow__handle.target',
+      ),
+    );
+  await expect(
+    page.getByText("A draft holds at most 200 connections"),
+  ).toBeVisible();
+  await expect(page.locator(".react-flow__edge")).toHaveCount(200);
+});
+
+// The inspector is read-only while a dialog is open or a command runs, and its
+// footer then called the draft a published version.
+test("the inspector footer names a published version only for one", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("editor-footer");
+  const rule = await publishRule(
+    request,
+    await createRule(request, { id, definition: nearAndFar }),
+  );
+  expect(rule.publishedVersion).toBe(1);
+  const footer = page.locator(".inspector-footer");
+  await page.goto(`/#/rules/${id}?node=near`);
+  await expect(footer).toHaveText("Changes are saved when you save the draft");
+  await page
+    .locator('.react-flow__node[data-id="near"] .graph-node')
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: /^Edit node/ })).toBeVisible();
+  await expect(footer).toHaveText("Changes are saved when you save the draft");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.goto(`/#/rules/${id}?version=1&node=near`);
+  await expect(footer).toHaveText("Published versions are read-only");
+});
+
+// The sidebar's Code studio opens the rule in view; it dropped the version
+// in view and opened the editable draft instead.
+test("Code studio in the sidebar opens the published version in view", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("editor-studio-version");
+  await publishRule(
+    request,
+    await createRule(request, { id, definition: nearAndFar }),
+  );
+  await page.goto(`/#/rules/${id}?version=1`);
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
+  await page
+    .getByRole("navigation", { name: "Workspace" })
+    .getByRole("button", { name: "Code studio", exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`#/studio/${id}\\?version=1$`));
+});
+
+/** Whether the node's card lies wholly inside the canvas pane. */
+async function cardInsidePane(page: Page, nodeId: string) {
+  const flow = await page.locator(".react-flow").boundingBox();
+  const card = await page
+    .locator(`.react-flow__node[data-id="${nodeId}"]`)
+    .boundingBox();
+  if (!flow || !card) return false;
+  return (
+    card.x >= flow.x &&
+    card.y >= flow.y &&
+    card.x + card.width <= flow.x + flow.width &&
+    card.y + card.height <= flow.y + flow.height
+  );
+}
+
+const nearAndFar: Definition = {
+  schemaVersion: 1,
+  inputs: [],
+  nodes: [
+    node("input", "INPUT"),
+    node("near", "FORMULA", "1", "x", 300, 180),
+    node("far", "OUTPUT", "x", undefined, 3000, 2400),
+  ],
+  edges: [edge("input", "near"), edge("near", "far")],
+};
+
+test("a link to another node of the open rule focuses that node", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("editor-relink");
+  await createRule(request, { id, definition: nearAndFar });
+  await page.goto(`/#/rules/${id}?node=near`);
+  await expect(page.locator('.react-flow__node[data-id="near"]')).toHaveClass(
+    /selected/,
+  );
+  // The editor stays mounted for the same rule and version, and it read only
+  // the first link's node.
+  await page.goto(`/#/rules/${id}?node=far`);
+  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
+    /selected/,
+  );
+  await expect
+    .poll(() => cardInsidePane(page, "far"), { timeout: 5000 })
+    .toBe(true);
+});
+
+test("a link to a node only a published version has focuses it once the version loads", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("editor-version-focus");
+  const rule = await publishRule(
+    request,
+    await createRule(request, { id, definition: nearAndFar }),
+  );
+  const draft: Definition = {
+    ...nearAndFar,
+    nodes: [node("input", "INPUT"), node("near", "OUTPUT", "1")],
+    edges: [edge("input", "near")],
+  };
+  const saved = await request.put(`/api/rules/${id}`, {
+    data: {
+      name: rule.name,
+      description: rule.description,
+      revision: rule.revision,
+      definition: draft,
+    },
+  });
+  expect(saved.ok(), await saved.text()).toBe(true);
+  // While version 1 loaded, the draft lacked "far" and the request was dropped,
+  // so opening a problem in a published version never reached its node.
+  await page.goto(`/#/rules/${id}?version=1&node=far`);
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
+  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
+    /selected/,
+  );
+  await expect
+    .poll(() => cardInsidePane(page, "far"), { timeout: 5000 })
+    .toBe(true);
+});
+
 test("Rule settings shows the server's name rule under the field and holds Apply", async ({
   page,
   request,

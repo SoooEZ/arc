@@ -5,8 +5,13 @@ import {
   type ParsedText,
 } from "../hooks/useParsedTextBuffer";
 
-/** Indented JSON for a value; an undefined value (no default at all) is an empty buffer. */
-const jsonText = (value: unknown) => stringifyJson(value, 2) ?? "";
+/**
+ * Indented JSON for a value. No default is an empty buffer, as empty text
+ * parses back to no default: a stored null showed as "null", and typing after
+ * it gave null[1].
+ */
+const jsonText = (value: unknown) =>
+  value == null ? "" : (stringifyJson(value, 2) ?? "");
 
 /** Values are the same when they serialize identically, including DecimalNumber digits. */
 const sameJson = (left: unknown, right: unknown) =>

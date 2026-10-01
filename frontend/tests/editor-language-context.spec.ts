@@ -175,7 +175,8 @@ test("Code studio lists a variable that several nodes assign once, naming every 
     ...definition,
     nodes: [
       input,
-      { ...calc, id: "left", label: "Left price", output: "price" },
+      // Hovers render Markdown: a label keeps its own characters (A7-3).
+      { ...calc, id: "left", label: "Left *price*", output: "price" },
       {
         ...calc,
         id: "right",
@@ -214,5 +215,5 @@ test("Code studio lists a variable that several nodes assign once, naming every 
   // Monaco keeps a second, glyph-margin hover widget; the content hover names the producers.
   await expect(
     page.locator(".monaco-hover-content").filter({ hasText: "From:" }),
-  ).toContainText("From: Left price / Right price");
+  ).toContainText("From: Left *price* / Right price");
 });

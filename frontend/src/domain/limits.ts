@@ -1,5 +1,9 @@
 import type { Definition } from "../types";
-import { isBlankAsServer, trimAsServer } from "./serverText";
+import {
+  isBlankAsServer,
+  storableTextProblem,
+  trimAsServer,
+} from "./serverText";
 
 /**
  * Server limits restated for the browser (backend `engine.Limits`), so that
@@ -32,6 +36,10 @@ export const MAX_RESOURCE_ID_CHARACTERS = 80;
 export const MAX_NODE_ID_CHARACTERS = 80;
 /** ExpressionParser reads at most this many tokens from one expression. */
 export const MAX_EXPRESSION_TOKENS = 256;
+/** Characters in every stored expression, a constant's literal included. */
+export const MAX_EXPRESSION_CHARACTERS = 2_000;
+/** Characters in a Transform field name or an $OBJECT key. */
+export const MAX_FIELD_NAME_CHARACTERS = 160;
 /** UTF-16 units of one text value (ValueBounds). */
 export const MAX_STRING_CHARACTERS = 2_000;
 /** Items of one array, or fields of one object (ValueBounds). */
@@ -72,9 +80,29 @@ export interface RuleMetadataProblem {
 }
 
 /**
+ * Why the server would refuse a rule's or a source's name, with its message,
+ * or null (DisplayNames.normalize): text storage cannot hold, a control
+ * character such as a pasted tab, or not 1 to 160 characters once trimmed as
+ * the server trims.
+ */
+export function displayNameProblem(
+  resource: "Rule" | "Source",
+  name: string,
+): string | null {
+  const unstorable = storableTextProblem(name);
+  if (unstorable) return unstorable;
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(name))
+    return `${resource} name cannot contain control characters`;
+  const trimmed = trimAsServer(name);
+  if (isBlankAsServer(trimmed) || trimmed.length > MAX_NAME_CHARACTERS)
+    return `${resource} name must contain 1 to ${MAX_NAME_CHARACTERS} characters`;
+  return null;
+}
+
+/**
  * Why the server would refuse a rule's name and description, or null: the
  * messages are the server's, so a dialog can show them under the field and
- * refuse before sending. The name is trimmed as the server trims it.
+ * refuse before sending.
  */
 export function ruleMetadataProblem({
   name,
@@ -83,16 +111,13 @@ export function ruleMetadataProblem({
   name: string;
   description: string;
 }): RuleMetadataProblem | null {
-  const trimmed = trimAsServer(name);
-  if (isBlankAsServer(trimmed) || trimmed.length > MAX_NAME_CHARACTERS)
-    return {
-      field: "name",
-      message: `Rule name must contain 1 to ${MAX_NAME_CHARACTERS} characters`,
-    };
-  if (description.length > MAX_DESCRIPTION_CHARACTERS)
-    return {
-      field: "description",
-      message: `Description exceeds ${formatLimit(MAX_DESCRIPTION_CHARACTERS)} characters`,
-    };
+  const nameProblem = displayNameProblem("Rule", name);
+  if (nameProblem) return { field: "name", message: nameProblem };
+  const descriptionProblem =
+    description.length > MAX_DESCRIPTION_CHARACTERS
+      ? `Description exceeds ${formatLimit(MAX_DESCRIPTION_CHARACTERS)} characters`
+      : storableTextProblem(description);
+  if (descriptionProblem)
+    return { field: "description", message: descriptionProblem };
   return null;
 }

@@ -229,6 +229,52 @@ test("a rule created again under the same ID replaces the selection and its reme
   expect(state.unexpected).toEqual([]);
 });
 
+// A chosen version belongs to its incarnation: kept as a bare number, the
+// same ID created again ran its own version 2 instead of its newest.
+test("a version chosen for a rule does not carry over to the rule created again under its ID", async ({
+  page,
+}) => {
+  const state = await mockCatalog(page, true, 3);
+  await page.goto("/#/playground");
+  await expect(
+    page.getByRole("combobox", { name: "Version", exact: true }),
+  ).toHaveText("v3");
+  await page.getByRole("combobox", { name: "Version", exact: true }).click();
+  await page.getByRole("option", { name: "v2", exact: true }).click();
+  await executeVersion(page, 2);
+
+  state.createdAt = "2026-09-28T09:00:00Z";
+  await page
+    .getByLabel("Find published rules", { exact: true })
+    .fill("Catalog pricing");
+  await executeVersion(page, 3);
+
+  expect(state.executions.map((execution) => execution.version)).toEqual([
+    2, 3,
+  ]);
+  expect(state.unexpected).toEqual([]);
+});
+
+// Each notice gets its whole display time: a repeated or replaced notice kept
+// the first one's timer and left about a second after it was asked for again.
+test("a repeated notice is shown for its whole time again", async ({
+  page,
+}) => {
+  await mockCatalog(page, false, 1);
+  await page.goto("/#/playground");
+  const copy = page.getByRole("button", { name: "Copy", exact: true });
+  await expect(copy).toBeEnabled();
+  const notice = page
+    .getByRole("alert")
+    .filter({ hasText: /cURL copied|Clipboard unavailable/ });
+  await copy.click();
+  await expect(notice).toBeVisible();
+  await page.waitForTimeout(3000);
+  await copy.click();
+  await page.waitForTimeout(2000);
+  await expect(notice).toBeVisible();
+});
+
 test("a deleted rule leaves the playground instead of a version that can never load", async ({
   page,
 }) => {

@@ -611,6 +611,39 @@ test("a save echo that respells a number keeps the local draft, one that rescale
   ).toBe(false);
 });
 
+// A value's own null is part of it: {"a": null} and {} are different
+// defaults. Echo comparison dropped every null, so changing a default from one
+// to the other in node code kept the old value.
+test("a null inside a value is part of it, unlike a record's unset field", () => {
+  const draft = (defaultValue: unknown): Definition => ({
+    schemaVersion: 1,
+    inputs: [
+      { name: "payload", type: "OBJECT", required: false, defaultValue },
+    ],
+    nodes: [
+      { id: "input", type: "INPUT", label: "In", position: { x: 0, y: 0 } },
+    ],
+    edges: [],
+  });
+  expect(sameDefinition(draft({ a: null }), draft({}))).toBe(false);
+  expect(sameDefinition(draft({ a: { b: null } }), draft({ a: {} }))).toBe(
+    false,
+  );
+  expect(
+    sameDefinition(draft({ a: null, b: 1 }), draft({ b: 1, a: null })),
+  ).toBe(true);
+  const applied = applyNodeFragment(draft({ a: null }), "input", draft({}));
+  expect(applied.inputs[0].defaultValue).toEqual({});
+  // A record field the server echoes as null is still unset.
+  const unset = draft(null);
+  expect(
+    sameDefinition(unset, {
+      ...unset,
+      nodes: [{ ...unset.nodes[0], expression: null, selector: null }],
+    }),
+  ).toBe(true);
+});
+
 test("declared variables list a name assigned by several nodes once, with every producer", () => {
   // Code studio completion listed price twice, once per producing node.
   expect(declaredVariables(rule().draft)).toEqual([

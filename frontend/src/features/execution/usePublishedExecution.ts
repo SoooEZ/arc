@@ -26,7 +26,13 @@ export function usePublishedExecution(notify: (message: string) => void) {
   const [search, setSearch] = useState("");
   const [retry, setRetry] = useState(0);
   const [selectedRule, setSelectedRule] = useState<RuleSummary | null>(null);
-  const [pinnedVersion, setPinnedVersion] = useState<number | null>(null);
+  // A chosen version belongs to one incarnation of the rule: the same ID
+  // created again has other versions, so its newest one applies. Kept as a
+  // bare number, the choice ran another rule's version 2, or found no version
+  // 2 and left for another rule.
+  const [pin, setPin] = useState<{ identity: string; version: number } | null>(
+    null,
+  );
   const { options, change: changeOptions } = useExecutionOptions();
   // A new search starts at the first page; Retry reloads the page that is
   // shown. The hidden library page is not an input: keying on it read the
@@ -52,6 +58,7 @@ export function usePublishedExecution(notify: (message: string) => void) {
   // Reads and results belong to one incarnation of the rule: an ID deleted and
   // created again has other versions and inputs, and its pins start over.
   const identity = selectedRule ? ruleIncarnation(selectedRule) : "";
+  const pinnedVersion = pin?.identity === identity ? pin.version : null;
   // History page 0 holds the newest release; the selected catalog row is the
   // other place a release is learned.
   const listedVersion = selectedRule?.publishedVersion ?? 0;
@@ -109,7 +116,7 @@ export function usePublishedExecution(notify: (message: string) => void) {
     if (!gone || abandoned.current === pin) return;
     abandoned.current = pin;
     setSelectedRule(null);
-    setPinnedVersion(null);
+    setPin(null);
     setHistoryNewest(noRelease);
     setRetry((value) => value + 1);
   }, [gone, identity, version]);
@@ -119,7 +126,7 @@ export function usePublishedExecution(notify: (message: string) => void) {
     const next = catalogRules.find((rule) => rule.id === nextId);
     if (!next) return;
     setSelectedRule(next);
-    setPinnedVersion(null);
+    setPin(null);
   };
   const run = () => {
     if (!definition || version === null) return;
@@ -169,7 +176,7 @@ export function usePublishedExecution(notify: (message: string) => void) {
     curl,
     copy,
     selectRule,
-    selectVersion: setPinnedVersion,
+    selectVersion: (chosen: number) => setPin({ identity, version: chosen }),
     setInputs: inputBuffer.change,
     run,
     clear: execution.clear,

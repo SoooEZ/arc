@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import { setEditorText } from "./helpers/editor";
+import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
@@ -247,4 +247,92 @@ test("adding a node is refused whole while a parameter default is invalid", asyn
   await expect(page.getByLabel("Node name", { exact: true })).toHaveValue(
     "Inputs",
   );
+});
+
+// Escape and a backdrop click discarded a dialog's staged edits without
+// asking, and Rule settings guarded nothing, not even a route change.
+test("edits a dialog has not applied are discarded only after confirming", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("dialog-guards");
+  await createRule(request, {
+    id,
+    name: "Dialog guards",
+    kind: "FORMULA",
+    definition: {
+      ...definition,
+      nodes: definition.nodes.map((node) =>
+        node.id === "out" ? { ...node, expression: "$COUNT(payload)" } : node,
+      ),
+    },
+  });
+  const warning =
+    "Discard the edits in this dialog? They are not applied to the draft yet.";
+  const prompts: string[] = [];
+  let discard = false;
+  page.on("dialog", async (prompt) => {
+    prompts.push(prompt.message());
+    await (discard ? prompt.accept() : prompt.dismiss());
+  });
+  await page.goto(`/#/rules/${id}?node=out`);
+  const openEditor = page.getByRole("button", {
+    name: "Open in Editor · Return value",
+    exact: true,
+  });
+  const expressionDialog = page.getByRole("dialog", {
+    name: "Expression editor · Return value",
+    exact: true,
+  });
+  const code = expressionDialog.getByLabel("Expression code editor", {
+    exact: true,
+  });
+  // An untouched dialog closes at once.
+  await openEditor.click();
+  await expect(editorLines(code)).toHaveText("$COUNT(payload)");
+  await page.keyboard.press("Escape");
+  await expect(expressionDialog).toHaveCount(0);
+  expect(prompts).toEqual([]);
+
+  await openEditor.click();
+  await setEditorText(page, code, "$COUNT(payload) + 1");
+  await expressionDialog.getByRole("heading").click();
+  await page.keyboard.press("Escape");
+  await expect.poll(() => prompts).toEqual([warning]);
+  await expect(expressionDialog).toBeVisible();
+  await page.mouse.click(4, 4);
+  await expect.poll(() => prompts).toEqual([warning, warning]);
+  await expect(editorLines(code)).toHaveText("$COUNT(payload) + 1");
+  discard = true;
+  await page.keyboard.press("Escape");
+  await expect(expressionDialog).toHaveCount(0);
+  await openEditor.click();
+  await expect(editorLines(code)).toHaveText("$COUNT(payload)");
+  await expressionDialog.getByRole("button", { name: "Cancel" }).click();
+
+  discard = false;
+  prompts.length = 0;
+  await page
+    .getByRole("button", { name: "Rule settings", exact: true })
+    .click();
+  const settings = page.getByRole("dialog", { name: "Rule settings" });
+  await settings.getByLabel("Name", { exact: true }).fill("Renamed");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => prompts).toEqual([warning]);
+  await expect(settings).toBeVisible();
+  // A route change while the modal is open, as a link or Back makes one.
+  await page.evaluate(() => {
+    location.hash = "#/library";
+  });
+  await expect.poll(() => prompts).toEqual([warning, warning]);
+  await expect(page).toHaveURL(new RegExp(`#/rules/${id}`));
+  await expect(settings.getByLabel("Name", { exact: true })).toHaveValue(
+    "Renamed",
+  );
+  discard = true;
+  await page.keyboard.press("Escape");
+  await expect(settings).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Dialog guards", exact: true }),
+  ).toBeVisible();
 });

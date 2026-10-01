@@ -22,10 +22,31 @@ type Stored<T> = Resource<T> & { key: string; enabled: boolean };
 export type ResourceLoader<T> = (signal: AbortSignal) => Promise<T>;
 
 /**
+ * The state the hook holds for `key`: the stored one when it is this key's,
+ * else this key's pending view, which the render stores at once. Another key's
+ * answer used to stay stored while the render derived around it, so returning
+ * to that key before the new read finished showed the earlier answer for a
+ * commit: a deleted rule's editor mounted, a stale "not found" flashed.
+ */
+export function resourceStateFor<T>(
+  stored: Stored<T>,
+  {
+    key,
+    enabled,
+    keepData,
+    initial,
+  }: { key: string; enabled: boolean; keepData: boolean; initial: T },
+): Stored<T> {
+  if (stored.key === key && stored.enabled === enabled) return stored;
+  const data = keepData ? stored.data : initial;
+  return { key, enabled, data, error: "", status: null, loading: enabled };
+}
+
+/**
  * The state to store when a read starts: the pending view of `key`. It returns
  * `previous` untouched when that view is already what the hook renders, so a
- * key change costs one render, not two: for another stored key the render
- * derives the pending view itself, and a fresh mount already stored it.
+ * key change costs one render, not two: the render stored the new key's
+ * pending view (resourceStateFor), and a fresh mount already stored it.
  */
 export function pendingResourceState<T>(
   previous: Stored<T>,
@@ -72,6 +93,9 @@ export function useAsyncResource<T>(
     loading: enabled,
   });
   const keepData = keepPrevious && enabled;
+  const current = resourceStateFor(state, { key, enabled, keepData, initial });
+  // Stored during the render: React renders again before any child or commit.
+  if (current !== state) setState(current);
   useEffect(() => {
     const controller = new AbortController();
     setState((previous) =>
@@ -111,11 +135,5 @@ export function useAsyncResource<T>(
     };
     // key is the resource identity; consumers may supply inline loaders and defaults.
   }, [key, delay, enabled, keepData]);
-  if (state.key === key && state.enabled === enabled) return state;
-  return {
-    data: keepData ? state.data : initial,
-    error: "",
-    status: null,
-    loading: enabled,
-  };
+  return current;
 }

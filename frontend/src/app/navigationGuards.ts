@@ -55,8 +55,25 @@ export function createNavigationGuards() {
 const workspaceGuards = createNavigationGuards();
 
 /** Edits staged in a dialog (node form, node code, expression) that Apply has not taken yet. */
-export const unsavedDialogWarning =
+const unsavedDialogWarning =
   "Discard the edits in this dialog? They are not applied to the draft yet.";
+
+/**
+ * Edits a dialog stages until Apply: a route change, a page unload, Escape and
+ * a backdrop click ask before discarding them; pass the returned handler as
+ * the Dialog's onClose. An explicit Cancel discards without asking. Escape and
+ * the backdrop discarded silently, and Rule settings guarded nothing.
+ */
+export function useStagedDialogEdits(
+  staged: boolean,
+  onClose: () => void,
+): () => void {
+  useNavigationGuard(staged ? unsavedDialogWarning : null);
+  return () => {
+    if (staged && !window.confirm(unsavedDialogWarning)) return;
+    onClose();
+  };
+}
 
 /**
  * Guards workspace navigation with `message` while it is non-null. By default
