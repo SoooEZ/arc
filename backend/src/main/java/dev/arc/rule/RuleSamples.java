@@ -2,6 +2,7 @@ package dev.arc.rule;
 
 import static dev.arc.model.NodeKind.*;
 
+import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.Handles;
@@ -9,19 +10,30 @@ import dev.arc.model.NodeKind;
 import dev.arc.model.RuleKind;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 public class RuleSamples implements ApplicationRunner {
+  private static final Logger LOG = LoggerFactory.getLogger(RuleSamples.class);
+
   private final RuleRepository store;
   private final RuleService service;
+  private final TransactionTemplate savepoint;
 
-  public RuleSamples(RuleRepository store, RuleService service) {
+  public RuleSamples(
+      RuleRepository store, RuleService service, PlatformTransactionManager transactions) {
     this.store = store;
     this.service = service;
+    this.savepoint = new TransactionTemplate(transactions);
+    savepoint.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
   }
 
   private static Node node(
@@ -109,13 +121,24 @@ public class RuleSamples implements ApplicationRunner {
   }
 
   /**
-   * Seeds the examples once per workspace. The claim is a row in the same transaction, so a failed
-   * seed rolls it back, and a workspace whose rules were all deleted is not seeded again.
+   * Seeds the examples once per workspace; the claim is a row, so a workspace whose rules were all
+   * deleted is not seeded again. The samples are written behind a savepoint. The API accepts
+   * requests before this runs, so a sample ID can be taken already, as can one created before the
+   * claim existed: then only the samples roll back, the claim stays and the API starts. Such a seed
+   * rolled the claim back and failed every start of the API.
    */
   @Override
   @Transactional
   public void run(ApplicationArguments args) {
     if (!store.claimSampleSeeding()) return;
+    try {
+      savepoint.executeWithoutResult(status -> seed());
+    } catch (ArcException failure) {
+      LOG.warn("Sample rules were not added: {}", failure.getMessage());
+    }
+  }
+
+  private void seed() {
     Definition discount =
         new Definition(
             1,

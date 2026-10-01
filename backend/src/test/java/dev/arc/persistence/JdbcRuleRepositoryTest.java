@@ -15,13 +15,17 @@ import dev.arc.error.ArcException;
 import dev.arc.model.PageRequest;
 import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleSamples;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.RowMapper;
 
 class JdbcRuleRepositoryTest {
@@ -96,9 +100,15 @@ class JdbcRuleRepositoryTest {
    * pin each other cannot deadlock; only a deletion (FOR UPDATE) waits for those callers.
    */
   @Test
-  void locksDistinguishWritersCallersAndDeletion() {
+  void locksDistinguishWritersCallersAndDeletion() throws Exception {
     var statements = new ArrayList<String>();
     when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              return List.of();
+            });
+    when(jdbc.query(anyString(), any(PreparedStatementSetter.class), any(RowMapper.class)))
         .thenAnswer(
             call -> {
               statements.add(call.getArgument(0));
@@ -112,7 +122,36 @@ class JdbcRuleRepositoryTest {
         .containsExactly(
             "SELECT * FROM rules WHERE id = ? FOR NO KEY UPDATE",
             "SELECT * FROM rules WHERE id = ? FOR UPDATE",
-            "SELECT id FROM rules WHERE id IN (?, ?) ORDER BY id FOR KEY SHARE");
+            "SELECT id FROM rules WHERE id = ANY (?) ORDER BY id FOR KEY SHARE");
+  }
+
+  /**
+   * A draft may call more rules than one statement may have parameters (65,535 in PostgreSQL's
+   * protocol), so the callee lock binds them as one array: a placeholder per callee was a 500.
+   */
+  @Test
+  void calleesAreLockedThroughOneArrayParameter() throws Exception {
+    var ids = IntStream.range(0, 70_000).mapToObj(index -> "r" + index).toList();
+    var connection = mock(Connection.class);
+    var statement = mock(PreparedStatement.class);
+    var array = mock(java.sql.Array.class);
+    when(statement.getConnection()).thenReturn(connection);
+    when(connection.createArrayOf(eq("text"), any(Object[].class))).thenReturn(array);
+    var statements = new ArrayList<String>();
+    when(jdbc.query(anyString(), any(PreparedStatementSetter.class), any(RowMapper.class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              call.<PreparedStatementSetter>getArgument(1).setValues(statement);
+              return List.of();
+            });
+
+    repository.lockCallees(ids);
+
+    assertThat(statements)
+        .containsExactly("SELECT id FROM rules WHERE id = ANY (?) ORDER BY id FOR KEY SHARE");
+    verify(connection).createArrayOf("text", ids.toArray());
+    verify(statement).setArray(1, array);
   }
 
   /** Revisions come from one sequence, so a re-created rule never repeats a deleted one's. */

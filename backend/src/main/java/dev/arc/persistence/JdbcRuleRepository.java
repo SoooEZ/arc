@@ -7,7 +7,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -202,14 +201,19 @@ public class JdbcRuleRepository implements RuleRepository {
     return find(id, " FOR UPDATE");
   }
 
+  /**
+   * The IDs travel as one array parameter: a draft may call more rules than a statement may have
+   * parameters (65,535), and a placeholder per callee failed such a save with a 500.
+   */
   @Override
   public void lockCallees(Collection<String> ruleIds) {
     if (ruleIds.isEmpty()) return;
-    String placeholders = String.join(", ", Collections.nCopies(ruleIds.size(), "?"));
     jdbc.query(
-        "SELECT id FROM rules WHERE id IN (" + placeholders + ") ORDER BY id FOR KEY SHARE",
-        (row, index) -> row.getString("id"),
-        ruleIds.toArray());
+        "SELECT id FROM rules WHERE id = ANY (?) ORDER BY id FOR KEY SHARE",
+        statement ->
+            statement.setArray(
+                1, statement.getConnection().createArrayOf("text", ruleIds.toArray())),
+        (row, index) -> row.getString("id"));
   }
 
   private Rule find(String id, String lock) {

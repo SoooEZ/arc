@@ -51,6 +51,19 @@ def raw_text_request(method, path, text):
     return response.status, response.read().decode()
 
 
+def typed_request(method, path, text, content_type):
+    """Status, headers and body text of a request with any content type."""
+    global checks
+    req = urllib.request.Request(BASE + path, data=text.encode(), method=method,
+                                 headers={"Content-Type": content_type})
+    try:
+        response = urllib.request.urlopen(req, timeout=20)
+    except urllib.error.HTTPError as error:
+        response = error
+    checks += 1
+    return response.status, response.headers, response.read().decode()
+
+
 def create(suffix, kind="FORMULA", definition=None):
     rule_id = PREFIX + "-" + suffix
     rule = request("POST", "/api/rules", {"id": rule_id, "name": "Smoke " + suffix,
@@ -448,6 +461,31 @@ try:
             created.remove(racing_callee["id"])
         else:
             delete(racing_callee["id"])
+
+    # A draft may call more rules than one SQL statement may have parameters (65,535): the callee
+    # lock binds them as one array, where a placeholder per callee made the save a 500.
+    calls = [f"@c{index}:1()" for index in range(66_000)]
+    calls_per_field, fields_per_node = 64, 50
+    many_nodes = [{"id": "input", "type": "INPUT", "label": "Inputs", "position": {"x": 0, "y": 0}}]
+    for start in range(0, len(calls), calls_per_field * fields_per_node):
+        chunk = calls[start:start + calls_per_field * fields_per_node]
+        number = len(many_nodes)
+        many_nodes.append({"id": f"calls{number}", "type": "TRANSFORM", "label": f"Calls {number}",
+                           "position": {"x": 0, "y": 160 * number}, "output": f"calls{number}",
+                           "fields": [{"name": f"f{offset}", "expression": "+".join(chunk[offset:offset + calls_per_field])}
+                                      for offset in range(0, len(chunk), calls_per_field)]})
+    many_callees = create("many-callees", definition={"schemaVersion": 1, "inputs": [], "nodes": many_nodes, "edges": []})
+    save(many_callees)
+
+    # A save or publication without a revision is malformed rather than stale.
+    no_revision = create("no-revision")
+    request("PUT", "/api/rules/" + no_revision["id"], {"name": "No revision", "definition": no_revision["draft"]}, 422)
+    assert request("POST", "/api/rules/" + no_revision["id"] + "/publish", {}, 422)["message"] == "Revision is required"
+    # Multipart bodies are not parsed; one without a boundary failed before routing with a 500.
+    assert typed_request("POST", "/api/preview", "x", "multipart/form-data")[0] == 415
+    assert typed_request("POST", "/api/no-such-endpoint", "x", "multipart/form-data")[0] == 404
+    status, headers, _ = typed_request("PATCH", "/api/rules/" + no_revision["id"], "{}", "application/json")
+    assert status == 405 and "PUT" in headers.get("Allow", ""), (status, dict(headers))
 
     # Row locks + revision checks allow exactly one competing update.
     race = create("concurrent")
