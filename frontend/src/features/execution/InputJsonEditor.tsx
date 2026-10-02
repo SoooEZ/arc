@@ -1,36 +1,8 @@
 import { useEffect, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { monaco } from "../studio/arcLanguage";
+import { jsonLanguage } from "../studio/jsonLanguage";
 import { jsonInputOptions, useEditorOptions } from "../studio/useArcEditor";
-
-const language = "arc-input-json";
-monaco.languages.register({ id: language });
-monaco.languages.setLanguageConfiguration(language, {
-  brackets: [
-    ["{", "}"],
-    ["[", "]"],
-  ],
-  autoClosingPairs: [
-    { open: '"', close: '"', notIn: ["string"] },
-    { open: "{", close: "}" },
-    { open: "[", close: "]" },
-  ],
-  indentationRules: {
-    increaseIndentPattern: /^.*[\[{]\s*$/,
-    decreaseIndentPattern: /^\s*[\]}]/,
-  },
-});
-monaco.languages.setMonarchTokensProvider(language, {
-  tokenizer: {
-    root: [
-      [/"([^"\\]|\\.)*"/, "string"],
-      [/\b(true|false|null)\b/, "keyword"],
-      [/-?\d+(\.\d+)?([eE][+-]?\d+)?/, "number"],
-      [/[{}[\]]/, "@brackets"],
-      [/[,:]/, "delimiter"],
-    ],
-  },
-});
 
 export default function InputJsonEditor({
   value,
@@ -53,7 +25,7 @@ export default function InputJsonEditor({
   return (
     <div className="execution-json-editor">
       <MonacoEditor
-        language={language}
+        language={jsonLanguage}
         theme="arc-light"
         value={value}
         onChange={(text) => onChange(text ?? "")}

@@ -593,3 +593,99 @@ test("typing in Code studio leaves the function library and the outline alone", 
   expect(counts.outlineRenders).toBe(0);
   expect(counts.commits).toBeGreaterThanOrEqual(9);
 });
+
+test("the code view shows the rule's JSON on request, and the code keeps its edits", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("studio-json");
+  const steps = 30;
+  const nodes: Definition["nodes"] = [
+    { id: "input", type: "INPUT", label: "Inputs", position: { x: 0, y: 0 } },
+  ];
+  for (let step = 1; step <= steps; step++)
+    nodes.push({
+      id: `n${step}`,
+      type: "FORMULA",
+      label: `Step ${step}`,
+      expression: step === 1 ? "1" : `v${step - 1}`,
+      output: `v${step}`,
+      position: { x: 0, y: step * 150 },
+    });
+  nodes.push({
+    id: "out",
+    type: "OUTPUT",
+    label: "Result",
+    expression: `v${steps}`,
+    position: { x: 0, y: (steps + 1) * 150 },
+  });
+  await createRule(request, {
+    id,
+    name: "JSON view fixture",
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: [],
+      nodes,
+      edges: nodes.slice(1).map((node, index) => ({
+        id: `e${index}`,
+        source: nodes[index].id,
+        target: node.id,
+        sourceHandle: "next",
+      })),
+    },
+  });
+  await page.goto(`/#/studio/${id}`);
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await expect(code).toBeVisible();
+  // Monaco binds "go to document end" per platform (Cmd+Down on macOS).
+  const mac = (await page.evaluate(() => navigator.platform)).startsWith("Mac");
+  const documentEnd = mac ? "Meta+ArrowDown" : "Control+End";
+  await code.focus();
+  await page.keyboard.press(documentEnd);
+  await page.keyboard.type("\n// unbuilt", { delay: 20 });
+
+  await page.getByRole("button", { name: "JSON", exact: true }).click();
+  const json = page.getByRole("textbox", { name: "Rule JSON", exact: true });
+  await expect(editorLines(json)).toContainText('"schemaVersion": 1');
+  const filebar = page.locator(".studio-filebar");
+  await expect(filebar).toContainText(`${id}.json`);
+  // The JSON is the last build; the typed comment is not in it yet.
+  await expect(filebar).toContainText("build to update");
+  await expect(code).toBeHidden();
+  // Read-only: typing changes nothing.
+  await json.focus();
+  await page.keyboard.type("zzz");
+  await expect(editorLines(json)).not.toContainText("zzz");
+
+  // The outline reveals a node's JSON, far below the first screen.
+  await expect(editorLines(json)).not.toContainText('"id": "out"');
+  await page
+    .locator(".studio-outline")
+    .getByRole("button")
+    .filter({ hasText: "Result" })
+    .click();
+  await expect(editorLines(json)).toContainText('"id": "out"');
+
+  // Ctrl/Cmd+S in the JSON builds the code and saves, as in the code.
+  await page.keyboard.press("ControlOrMeta+s");
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  await expect(filebar).toContainText("read-only");
+  await expect(filebar).not.toContainText("build to update");
+  // The comment built into the graph's notes, the JSON's last field.
+  await page.keyboard.press(documentEnd);
+  await expect(editorLines(json)).toContainText('"unbuilt"');
+
+  await page.getByRole("button", { name: "Code", exact: true }).click();
+  await expect(code).toBeVisible();
+  await expect(filebar).toContainText(`${id}.arc`);
+  // The same editor: it still shows the end, where the comment was typed.
+  await expect(editorLines(code)).toContainText('node "out" OUTPUT "Result"');
+  // The save built the comment into a note, which the code shows at the top.
+  await code.focus();
+  await page.keyboard.press(mac ? "Meta+ArrowUp" : "Control+Home");
+  await expect(editorLines(code)).toContainText("// unbuilt");
+});

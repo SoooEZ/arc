@@ -79,6 +79,7 @@ PURE_FRONTEND = {
     "features/execution/executionOptions.ts": (),
     "features/studio/snippets.ts": ("types", "domain/"),
     "features/studio/formulaCalls.ts": ("types", "domain/", "features/studio/snippets"),
+    "features/studio/definitionJson.ts": ("types", "domain/"),
     "features/studio/scriptOutline.ts": (),
     "features/studio/cssColor.ts": (),
     "features/editor/canvas/edgeRouting.ts": (),

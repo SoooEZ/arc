@@ -51,7 +51,7 @@ flowchart TB
 - `domain/` 只能 import `types.ts` 和 `domain/` 自己的文件：不能用 React、MUI、React Flow，也不能发请求。所以它的函数都能在 Node 里直接做单元测试。
 - `api/` 只能 import `types.ts`、`api/` 和 `domain/json`。
 - `components/` 不能 import `features/`、`app/`、`api/`：通用控件不认识任何功能。
-- features 里另有 20 个文件也按纯模块检查，例如 `documentState.ts`、`editorCapabilities.ts`、`edgeRouting.ts`、`sourceDocument.ts`、`previewLayout.ts`，以及 `app/routing.ts` 和 `app/pinnedReads.ts`。
+- features 里另有 21 个文件也按纯模块检查，例如 `documentState.ts`、`editorCapabilities.ts`、`edgeRouting.ts`、`sourceDocument.ts`、`previewLayout.ts`，以及 `app/routing.ts` 和 `app/pinnedReads.ts`。
 - 除了 [`nodePorts.ts`](../frontend/src/domain/nodePorts.ts)，任何文件都不许手写连线句柄的字符串（`"true"`、`"default"`、`` `case:${id}` ``），要用 `handles` 和 `sourcePort`。
 
 features 之间的依赖：
@@ -164,9 +164,9 @@ flowchart TB
 
 ### 代码视图
 
-- **入口**：`#/studio/<id>` 还是同一个 Editor 会话，只是 mode 变成 `"code"`；[`Editor`](../frontend/src/features/editor/Editor.tsx) 懒加载 [`CodeStudio`](../frontend/src/features/studio/CodeStudio.tsx) 和 Monaco。前端不解析 ARC Script，渲染和解析都在后端。
+- **入口**：`#/studio/<id>` 还是同一个 Editor 会话，只是 mode 变成 `"code"`；[`Editor`](../frontend/src/features/editor/Editor.tsx) 懒加载 [`CodeStudio`](../frontend/src/features/studio/CodeStudio.tsx) 和 Monaco。前端不解析 ARC Script，渲染和解析都在后端。文件栏的 Code / JSON 切换可以改看规则的 JSON：就是前后端交换、数据库存储的那份草稿，只读，由前端本地格式化，不调用后端。
 - **先读**：[`useRuleDocument`](../frontend/src/features/editor/useRuleDocument.ts) 里进入代码视图时的渲染 effect 和 [`buildCode`](../frontend/src/features/editor/useRuleDocument.ts) → [`CodeStudio`](../frontend/src/features/studio/CodeStudio.tsx) → [`adoptSource`](../frontend/src/features/studio/useArcEditor.ts)（Monaco 跟随文档，保留光标和撤销）→ [`useArcLanguageSupport`](../frontend/src/features/studio/useArcLanguageSupport.ts)（补全、悬停、语义着色）。
-- **状态**：文本在 `DocumentState.source`；`sourceDirty` 表示改过但还没构建，这时保存、测试、切回画布之前都会先构建。Monaco 是非受控的，规范化后的文本用 `adoptSource` 只替换变化的部分。
+- **状态**：JSON 视图只是 `CodeStudio` 的界面状态，代码编辑器在切过去时保持挂载（隐藏），光标和撤销历史都在。文本在 `DocumentState.source`；`sourceDirty` 表示改过但还没构建，这时保存、测试、切回画布之前都会先构建。Monaco 是非受控的，规范化后的文本用 `adoptSource` 只替换变化的部分。
 - **接口**：`POST /api/studio/render`（草稿 → 文本）、`POST /api/studio/build`（文本 → 草稿和诊断）、`GET /api/functions`、`GET /api/rule-summaries` 和 `GET /api/rules/{id}/versions/{v}`（Reuse 面板和 `@` 公式）。
 - **测试**：[studio.spec.ts](../frontend/tests/studio.spec.ts)、[studio-outline.spec.ts](../frontend/tests/studio-outline.spec.ts)、[studio-reuse.spec.ts](../frontend/tests/studio-reuse.spec.ts)、[studio-refactor.spec.ts](../frontend/tests/studio-refactor.spec.ts)、[formula-calls.spec.ts](../frontend/tests/formula-calls.spec.ts)、[formula-completion.spec.ts](../frontend/tests/formula-completion.spec.ts)、[editor-language-context.spec.ts](../frontend/tests/editor-language-context.spec.ts)、[expression-colors.spec.ts](../frontend/tests/expression-colors.spec.ts)、[function-namespace.spec.ts](../frontend/tests/function-namespace.spec.ts)，单元测试 [studio-snippets.spec.ts](../frontend/tests/unit/studio-snippets.spec.ts)、[studio-outline.spec.ts](../frontend/tests/unit/studio-outline.spec.ts)、[formula-metadata.spec.ts](../frontend/tests/unit/formula-metadata.spec.ts)、[expression-symbols.spec.ts](../frontend/tests/unit/expression-symbols.spec.ts)。
 
@@ -546,7 +546,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [ExecutionOptionsFields.tsx](../frontend/src/features/execution/ExecutionOptionsFields.tsx) | trace 开关和超时下拉框 |  |
 | [ExecutionResult.tsx](../frontend/src/features/execution/ExecutionResult.tsx) | 测试结果：返回值、耗时、数据源读取、trace 步骤和分支标记 | [trace-badges.spec.ts](../frontend/tests/unit/trace-badges.spec.ts) |
 | [ExecutionTiming.tsx](../frontend/src/features/execution/ExecutionTiming.tsx) | 显示请求往返、服务器、准备、执行各段耗时 |  |
-| [InputJsonEditor.tsx](../frontend/src/features/execution/InputJsonEditor.tsx) | 输入 JSON 的 Monaco 编辑器（注册 arc-input-json 语言） |  |
+| [InputJsonEditor.tsx](../frontend/src/features/execution/InputJsonEditor.tsx) | 输入 JSON 的 Monaco 编辑器（着色用 studio 的 jsonLanguage） |  |
 | [LazyInputJsonEditor.tsx](../frontend/src/features/execution/LazyInputJsonEditor.tsx) | InputJsonEditor 的懒加载包装 |  |
 | [publishedCurl.ts](../frontend/src/features/execution/publishedCurl.ts) | 用输入缓冲生成已发布接口的 cURL；缓冲不是对象时发送空输入 |  |
 | [publishedSelection.ts](../frontend/src/features/execution/publishedSelection.ts) | 纯函数：Playground 选中的规则和最新发布版本，按规则化身区分 | [published-selection.spec.ts](../frontend/tests/unit/published-selection.spec.ts) |
@@ -597,13 +597,15 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | --- | --- | --- |
 | [arcCompletion.ts](../frontend/src/features/studio/arcCompletion.ts) | 补全辅助：是否在字符串或注释里、取光标处的词、插入片段、刷新已打开的建议 |  |
 | [arcLanguage.ts](../frontend/src/features/studio/arcLanguage.ts) | 注册 arc 语言（Monarch 词法、括号和缩进规则）、worker 和 arc-light 主题 |  |
-| [CodeStudio.tsx](../frontend/src/features/studio/CodeStudio.tsx) | ARC Script 视图：挂载 Monaco，用 adoptSource 接收规范化文本，组合库、大纲、问题栏和快捷键 |  |
+| [CodeStudio.tsx](../frontend/src/features/studio/CodeStudio.tsx) | ARC Script 视图：挂载 Monaco，用 adoptSource 接收规范化文本，组合库、大纲、问题栏和快捷键；Code / JSON 切换显示只读的规则 JSON |  |
 | [cssColor.ts](../frontend/src/features/studio/cssColor.ts) | 把 CSS token 颜色转成 Monaco 能用的 #rrggbb | [css-color.spec.ts](../frontend/tests/unit/css-color.spec.ts) |
+| [definitionJson.ts](../frontend/src/features/studio/definitionJson.ts) | 代码视图里的规则 JSON：按存储格式缩进两格（保留数字的每一位），以及大纲跳转时找节点在 JSON 里的位置 | [definition-json.spec.ts](../frontend/tests/unit/definition-json.spec.ts) |
 | [ExpressionColorKey.tsx](../frontend/src/features/studio/ExpressionColorKey.tsx) | 符号颜色图例：$函数、@公式、输入、节点结果 |  |
 | [formulaCalls.ts](../frontend/src/features/studio/formulaCalls.ts) | 生成 @id:version 调用名、签名、参数说明，以及带默认值或占位参数的片段 | [formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts) |
 | [formulaMetadata.ts](../frontend/src/features/studio/formulaMetadata.ts) | 已发布 Formula 的输入元数据，建在 PinnedReads 上：规则身份只合并同时发出的读取、不保留；元数据按规则化身（createdAt）缓存，每次取用都换上当前名称 | [formula-metadata.spec.ts](../frontend/tests/unit/formula-metadata.spec.ts) |
 | [FunctionLibrary.tsx](../frontend/src/features/studio/FunctionLibrary.tsx) | $函数目录（搜索、分类、仅供参考），可切到 @已发布公式，点击插入；memo 组件，代码区打字时不重新渲染 |  |
 | [PublishedFormulaLibrary.tsx](../frontend/src/features/studio/PublishedFormulaLibrary.tsx) | 滚动分页搜索已发布的 Formula，点击插入固定版本的调用 |  |
+| [jsonLanguage.ts](../frontend/src/features/studio/jsonLanguage.ts) | 注册 JSON 的 Monaco 着色语言（arc-json），测试面板的输入和代码视图的规则 JSON 共用 |  |
 | [scriptOutline.ts](../frontend/src/features/studio/scriptOutline.ts) | 在 Script 文本里找 node 声明的位置，跳过注释、字符串和节点体 | [studio-outline.spec.ts](../frontend/tests/unit/studio-outline.spec.ts) |
 | [snippets.ts](../frontend/src/features/studio/snippets.ts) | Monaco 片段转义、Reuse 用的 Reference 节点片段、模块片段表 | [execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts)、[studio-snippets.spec.ts](../frontend/tests/unit/studio-snippets.spec.ts) |
 | [StudioLibrary.tsx](../frontend/src/features/studio/StudioLibrary.tsx) | Code studio 左栏：functions、modules、reuse 三个面板 |  |
