@@ -39,9 +39,10 @@ export default function PublishedFormulaLibrary({
       ),
     (rule) => rule.id,
   );
+  const query = search.trim();
   useEffect(() => {
     list.current?.scrollTo({ top: 0 });
-  }, [search.trim()]);
+  }, [query]);
   // A new search or read-only switch abandons the pending insertion.
   useEffect(() => {
     cancel();

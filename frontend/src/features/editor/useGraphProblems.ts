@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { studioApi } from "../../api/studio";
 import type { GraphProblem } from "../../api/errors";
 import type { Definition, Rule } from "../../types";
 import { isCurrentGraphLocation } from "../../domain/graph";
 import { entryInputNode } from "../../domain/nodeKinds";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
+import { useKeyedValue } from "../../hooks/useKeyedValue";
 
 /** Messages per node ID. A Map, because node IDs such as "constructor" are legal. */
 export type NodeErrors = ReadonlyMap<string, string[]>;
@@ -108,7 +109,9 @@ export function useGraphProblems({
   });
   // Keep one Map while its content is unchanged, so memoized canvas nodes and
   // the inspector keep their error lists.
-  const errorsKey = JSON.stringify([...errors]);
-  const nodeErrors: NodeErrors = useMemo(() => errors, [errorsKey]);
+  const nodeErrors: NodeErrors = useKeyedValue(
+    errors,
+    JSON.stringify([...errors]),
+  );
   return { allProblems, nodeErrors };
 }

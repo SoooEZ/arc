@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { studioApi } from "../../api/studio";
 import { errorMessage } from "../../api/errors";
 import { useStagedDialogEdits } from "../../app/navigationGuards";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
+import { useKeyedValue } from "../../hooks/useKeyedValue";
 import type { Definition, Diagnostic } from "../../types";
 
 interface Options {
@@ -83,8 +84,7 @@ export function useNodeExpressionDraft({
     ...messages,
   ];
   // One array while the messages stay the same, so only changes are reported.
-  const problemsKey = JSON.stringify(problems);
-  const reportedProblems = useMemo(() => problems, [problemsKey]);
+  const reportedProblems = useKeyedValue(problems, JSON.stringify(problems));
   useEffect(() => {
     onProblems(reportedProblems);
   }, [reportedProblems, onProblems]);

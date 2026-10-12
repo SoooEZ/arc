@@ -5,6 +5,7 @@ import type { Definition, Execution, Step } from "../../types";
 import { semanticGraphKey } from "../../domain/graph";
 import { stringifyJson } from "../../domain/json";
 import { fixedExitCaption, handles, sourcePort } from "../../domain/nodePorts";
+import { useKeyedValue } from "../../hooks/useKeyedValue";
 import ExecutionTiming from "./ExecutionTiming";
 import TraceNotices from "./TraceNotices";
 
@@ -42,13 +43,13 @@ export default function ExecutionResult({
   onNode: (id: string) => void;
   requestDurationMs: number | null;
 }) {
-  // Branch badges read the graph's structure, not its positions, so the key
-  // `structure` stands for `definition`: a drag re-rendered every step of a
-  // 1,000-step trace on each frame.
-  const structure = semanticGraphKey(definition);
+  // Branch badges read the graph's structure, not its positions: the graph
+  // they read keeps its identity while its semantic key is unchanged, because
+  // a drag re-rendered every step of a 1,000-step trace on each frame.
+  const graph = useKeyedValue(definition, semanticGraphKey(definition));
   const badges = useMemo(
-    () => result.trace.map((step) => branchBadge(step, definition)),
-    [result.trace, structure],
+    () => result.trace.map((step) => branchBadge(step, graph)),
+    [result.trace, graph],
   );
   return (
     <>

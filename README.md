@@ -341,8 +341,9 @@ mvn clean verify
 cd ../frontend
 npm ci
 
-# Frontend formatting, pure unit tests (no browser/server), type checks and build
+# Frontend formatting, React hooks lint, pure unit tests (no browser/server), type checks and build
 npm run format:check
+npm run lint
 npm run test:unit
 npm run typecheck:tests
 npm run build

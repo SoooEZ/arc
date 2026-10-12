@@ -14,6 +14,7 @@ import { useFunctionCatalog } from "../language/useFunctionCatalog";
 import { arcExpressionLanguage } from "../language/arcLanguage";
 import { formulaSuggestionProblem } from "../language/useFormulaSupport";
 import type { VariableOption } from "../../domain/variables";
+import { useKeyedValue } from "../../hooks/useKeyedValue";
 
 /** Help under the editor; a failed suggestion source explains the missing completions. */
 function helpText(
@@ -57,10 +58,18 @@ export default function InlineExpressionEditor({
     kind: "expression",
     variables,
   });
-  const completionNames = JSON.stringify([
-    ...variables.map((variable) => variable.name),
-    ...functions.filter((entry) => entry.supported).map((entry) => entry.name),
-  ]);
+  // The completion sources of the render that last changed a name: every graph
+  // edit creates a new variables array, but only a changed name is a reason to
+  // refresh an open suggestion list.
+  const completion = useKeyedValue(
+    { variables, functions },
+    JSON.stringify([
+      ...variables.map((variable) => variable.name),
+      ...functions
+        .filter((entry) => entry.supported)
+        .map((entry) => entry.name),
+    ]),
+  );
   useEffect(() => {
     const instance = editor.current;
     const model = instance?.getModel();
@@ -79,11 +88,11 @@ export default function InlineExpressionEditor({
     const functionPrefix = word.startsWith("$") ? word : "$" + word;
     const hasMatch =
       (!word.startsWith("$") &&
-        variables.some(
+        completion.variables.some(
           (variable) =>
             variable.name !== word && variable.name.startsWith(word),
         )) ||
-      functions.some(
+      completion.functions.some(
         (entry) =>
           entry.supported &&
           entry.name.startsWith(functionPrefix.toUpperCase()),
@@ -91,8 +100,7 @@ export default function InlineExpressionEditor({
     // Scope and catalog reads can finish after Monaco's initial suggestion
     // request. Refresh only the focused, still-matching prefix with fresh data.
     if (hasMatch) instance.trigger("arc", "editor.action.triggerSuggest", {});
-    // The serialized names describe completion changes, not every graph edit.
-  }, [completionNames, editor, readOnly]);
+  }, [completion, editor, readOnly]);
 
   return (
     <div className="inline-expression-field">

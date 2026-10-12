@@ -84,6 +84,9 @@ export function useAsyncResource<T>(
   const enabled = load !== null;
   const latest = useRef(load);
   latest.current = load;
+  // Consumers may supply an inline default: the read keeps the one of its render.
+  const defaults = useRef(initial);
+  defaults.current = initial;
   const [state, setState] = useState<Stored<T>>({
     key,
     enabled,
@@ -98,6 +101,7 @@ export function useAsyncResource<T>(
   if (current !== state) setState(current);
   useEffect(() => {
     const controller = new AbortController();
+    const initial = defaults.current;
     setState((previous) =>
       pendingResourceState(previous, { key, enabled, keepData, initial }),
     );
@@ -133,7 +137,7 @@ export function useAsyncResource<T>(
       controller.abort();
       clearTimeout(timer);
     };
-    // key is the resource identity; consumers may supply inline loaders and defaults.
+    // The key is the resource identity; the loader and default of the render are read through refs.
   }, [key, delay, enabled, keepData]);
   return current;
 }

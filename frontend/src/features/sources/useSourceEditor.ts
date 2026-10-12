@@ -164,10 +164,15 @@ export function useSourceEditor({
       }
     }
   };
+  // The initial selection reads the latest `select` without re-running for it.
+  const selectLatest = useRef(select);
+  selectLatest.current = select;
   useEffect(() => {
+    // Initial selection is one-time: `select` counts selections before its
+    // first await, so once one was made the effect does nothing, and page or
+    // search changes never replace the open document.
     if (selection.current === 0 && catalog.data.items.length)
-      void select(catalog.data.items[0]);
-    // Initial selection is one-time; page/search changes must not replace the open document.
+      void selectLatest.current(catalog.data.items[0]);
   }, [catalog.data]);
 
   const inspectVersion = async (version: number) => {

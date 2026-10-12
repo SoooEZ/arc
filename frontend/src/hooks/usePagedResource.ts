@@ -53,7 +53,7 @@ export function usePagedResource<T>(
     if (settledTotal === null) return;
     const last = lastPageOffset(settledTotal, limit);
     if (offset > last) setPosition({ key, offset: last });
-  }, [key, offset, settledTotal]);
+  }, [key, offset, settledTotal, limit]);
   return {
     ...resource,
     offset,

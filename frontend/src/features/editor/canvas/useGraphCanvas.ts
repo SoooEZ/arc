@@ -74,8 +74,11 @@ export function useGraphCanvas({
       return next;
     });
   }, []);
-  const bounds = cardBounds(definition.nodes, measurements);
-  const geometry = JSON.stringify(bounds);
+  // One bounds array per geometry: label and expression edits replace node
+  // objects without moving a card, so the bounds are parsed from their own
+  // geometry text and keep their identity until a card moves or is measured.
+  const geometry = JSON.stringify(cardBounds(definition.nodes, measurements));
+  const bounds = useMemo((): CardBounds[] => JSON.parse(geometry), [geometry]);
   // Handlers keep their identity for the canvas's lifetime and read the
   // latest draft and bounds through refs.
   const latest = useRef({ definition, bounds });
@@ -94,18 +97,16 @@ export function useGraphCanvas({
         cards.push({ id: card.id, before: start, after: card });
     }
     return cards;
-    // The bounds are keyed by their geometry text.
-  }, [dragging, geometry]);
+  }, [dragging, bounds]);
   /** Ends a drag the canvas no longer reports, e.g. one its unmount interrupted. */
   const endDrag = useCallback(() => {
     dragStart.current = null;
     setDragging(false);
   }, []);
-  // Label and expression edits replace node objects without moving a card.
-  // Keyed by geometry, the context keeps its identity, so edges do not re-route.
+  // The context keeps its identity while no card moves, so edges do not re-route.
   const routing = useMemo(
     () => ({ nodes: bounds, moved, reportBlocked }),
-    [geometry, moved, reportBlocked],
+    [bounds, moved, reportBlocked],
   );
   const visited = useMemo(
     () =>

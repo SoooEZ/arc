@@ -641,6 +641,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [useAsyncResource.ts](../frontend/src/hooks/useAsyncResource.ts) | 以 key 为身份的异步读取：可禁用、可延迟，取消过期请求，可保留旧数据 | [async-resource.spec.ts](../frontend/tests/unit/async-resource.spec.ts) |
 | [useAutocompletePages.ts](../frontend/src/hooks/useAutocompletePages.ts) | 联想下拉的分页加载：按 owner + 搜索词追加、去重、丢弃过期页 |  |
 | [useDebouncedValue.ts](../frontend/src/hooks/useDebouncedValue.ts) | 防抖取值；定义目录搜索 250ms 和联想 150ms 两个延迟 |  |
+| [useKeyedValue.ts](../frontend/src/hooks/useKeyedValue.ts) | 内容没变就保持同一个对象：以描述内容的 key 为准，key 不变时返回上次的值，变了当场换成新值；给需要稳定身份的 Map、列表和图用，effect 和 memo 直接依赖这个值 | [keyed-value.spec.ts](../frontend/tests/unit/keyed-value.spec.ts) |
 | [usePagedResource.ts](../frontend/src/hooks/usePagedResource.ts) | 每页 20 条的分页读取：key 变化回到第一页，总数变少时退到最后一页 | [library-previews.spec.ts](../frontend/tests/unit/library-previews.spec.ts) |
 | [usePagedSearch.ts](../frontend/src/hooks/usePagedSearch.ts) | 防抖搜索 + 分页：停止输入后查询才生效，searching 表示结果还属于旧查询 |  |
 | [useParsedTextBuffer.ts](../frontend/src/hooks/useParsedTextBuffer.ts) | “文本归用户、值归草稿”的输入缓冲：边输边解析，只有外部新值才覆盖文本 |  |

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   CircleHelp,
@@ -29,15 +29,18 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
   });
   const toggleButton = useRef<HTMLButtonElement>(null);
   const mobile = useMediaQuery("(max-width:760px)");
-  const toggleExpanded = (next: boolean) => {
-    setExpanded(next);
-    if (!next && mobile) toggleButton.current?.focus();
-    try {
-      localStorage.setItem(preferenceKey, String(next));
-    } catch {
-      // Navigation remains usable when browser storage is unavailable.
-    }
-  };
+  const toggleExpanded = useCallback(
+    (next: boolean) => {
+      setExpanded(next);
+      if (!next && mobile) toggleButton.current?.focus();
+      try {
+        localStorage.setItem(preferenceKey, String(next));
+      } catch {
+        // Navigation remains usable when browser storage is unavailable.
+      }
+    },
+    [mobile],
+  );
   useEffect(() => {
     if (!expanded || !mobile) return;
     const close = (event: KeyboardEvent) => {
@@ -45,7 +48,7 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
-  }, [expanded, mobile]);
+  }, [expanded, mobile, toggleExpanded]);
   const open = (path: string) => {
     navigate(path);
     if (mobile) toggleExpanded(false);
