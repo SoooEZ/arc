@@ -32,6 +32,13 @@ class LimitsTest {
     }
   }
 
+  /** A computed zero keeps as many decimal places as a nonzero DECIMAL128 result has digits. */
+  @Test
+  void aComputedZeroKeepsThePlacesOfTheArithmeticPrecision() {
+    assertThat(Limits.MAX_COMPUTED_ZERO_SCALE).isEqualTo(Expressions.MATH.getPrecision());
+    assertThat(Limits.MAX_COMPUTED_ZERO_SCALE).isLessThan(Limits.MAX_NUMBER_SCALE);
+  }
+
   /** Byte limits are stated from their constants too, in the units the messages always used. */
   @Test
   void byteSizesAreShownInWholeUnits() {

@@ -2,8 +2,10 @@ package dev.arc.engine.expression;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.arc.engine.InputTypes;
 import dev.arc.engine.Limits;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,40 @@ class ResultBoundsTest {
           .evaluate(Map.of("items", List.of(item), "item", item, "holder", Map.of("item", item)));
       assertThat(item.walks).as(expression).isEqualTo(1);
     }
+  }
+
+  /**
+   * Operators read their operands without bounding them again: every number an expression holds
+   * entered through a bound. Each entry point refuses a number out of range, so the invariant holds
+   * for literals, converted text, typed inputs (collection items included) and every operator and
+   * function result; sources and Formula calls bound theirs in Parameters and the graph session.
+   */
+  @Test
+  void everyEntryPointBoundsItsNumbersSoOperandsAreNotBoundedAgain() {
+    String outOfRange = "Number exceeds supported precision or magnitude";
+    var tooLarge = new BigDecimal("1E+" + (Limits.MAX_NUMBER_SCALE + 1));
+    var hugeInteger = new BigInteger("1" + "0".repeat(Limits.MAX_NUMBER_PRECISION + 1));
+    assertThatThrownBy(() -> Expressions.compile(tooLarge.toString())).hasMessage(outOfRange);
+    assertThatThrownBy(() -> Expressions.evaluate("$TO_NUMBER(\"1E+101\")", Map.of()))
+        .hasMessage(outOfRange);
+    assertThatThrownBy(() -> InputTypes.check("amount", "NUMBER", tooLarge)).hasMessage(outOfRange);
+    assertThatThrownBy(() -> InputTypes.check("items", "ARRAY", List.of(hugeInteger)))
+        .hasMessage(outOfRange);
+    assertThatThrownBy(() -> InputTypes.check("item", "OBJECT", Map.of("n", tooLarge)))
+        .hasMessage(outOfRange);
+    assertThatThrownBy(() -> Expressions.evaluate("1E+99 * 1E+99", Map.of()))
+        .hasMessage(outOfRange);
+    assertThatThrownBy(() -> Expressions.evaluate("$POWER(10, 200)", Map.of()))
+        .hasMessage(outOfRange);
+    assertThatThrownBy(() -> Expressions.evaluate("$SUM([1E+100, 9E+100])", Map.of()))
+        .hasMessage(outOfRange);
+    // A value an entry point bounded is read as it is: JSON integers inside a collection input
+    // arrive as Integer, Long or BigInteger and are converted when an operator reads them.
+    var items = InputTypes.check("items", "ARRAY", List.of(1, 2L, new BigInteger("3")));
+    assertThat(Expressions.evaluate("$SUM($MAP(items, x, x * 2))", Map.of("items", items)))
+        .isEqualTo(new BigDecimal("12"));
+    assertThat(Expressions.evaluate("$GET(items, 0) < $GET(items, 2)", Map.of("items", items)))
+        .isEqualTo(true);
   }
 
   /** Variables, lazy functions and Formula calls pass a value through; the evaluation bounds it. */

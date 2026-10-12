@@ -18,8 +18,7 @@ public class Validator {
   private final NodeValidation nodeValidation = new NodeValidation();
   private final GraphValidation graphValidation =
       new GraphValidation(documentShape, nodeValidation);
-  private final GraphDiagnostics graphDiagnostics =
-      new GraphDiagnostics(documentShape, nodeValidation, graphValidation);
+  private final GraphDiagnostics graphDiagnostics = new GraphDiagnostics(graphValidation);
 
   /** Drafts may be incomplete; shape and size limits always apply. */
   public void shape(Definition definition) {
@@ -27,9 +26,9 @@ public class Validator {
   }
 
   /**
-   * The structure a scope plan reads: node IDs and kinds, Switch cases, connections and input
-   * names. Labels, expressions, properties, defaults and sources are not checked, so a draft with
-   * such a problem still reports every node's variables.
+   * The structure a scope plan reads: node IDs and kinds, Switch case IDs, connections, and that
+   * inputs have distinct names. Labels, expressions, properties, defaults, sources and identifier
+   * syntax are not checked, so a draft with such a problem still reports every node's variables.
    */
   public void structure(Definition definition) {
     graphStructure.validate(definition);
@@ -68,7 +67,8 @@ public class Validator {
    * call in any node or input source mapping, and each Reference's rule with or without a version.
    * Unlike {@link #dependencies}, an unfinished draft counts in full: a Reference may have chosen
    * its rule before its version, source mappings call rules even while the draft has no Input node,
-   * and a malformed expression calls nothing instead of failing.
+   * and a malformed expression calls nothing instead of failing. A stored row of another model
+   * shape (an unknown node type, a missing list, a source without mappings) is read as it is.
    */
   public static Set<String> calledRuleIds(Definition definition) {
     return NodeValidation.calledRuleIds(definition, Validator::wellFormedFormulaCalls);

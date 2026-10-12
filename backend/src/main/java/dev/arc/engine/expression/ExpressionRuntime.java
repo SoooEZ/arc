@@ -108,8 +108,9 @@ final class ExpressionRuntime {
   }
 
   /**
-   * The graph session bounds each returned Output value. A multi-Output aggregate is not bounded
-   * again as a whole, so a Formula call receives exactly the value a Reference node would store.
+   * The graph session bounds each returned Output value, and a multi-Output aggregate once as a
+   * whole where the called rule builds it, so a Formula call receives exactly the value, or the
+   * failure, a Reference node would store; nothing is bounded again here.
    */
   static Object formula(FormulaCall formula, List<Expr> arguments, Context context) {
     context.tick();
@@ -133,7 +134,7 @@ final class ExpressionRuntime {
   private static boolean compare(BinaryOperator op, Object a, Object b) {
     int cmp;
     if (a instanceof String x && b instanceof String y) cmp = x.compareTo(y);
-    else cmp = number(a).compareTo(number(b));
+    else cmp = operand(a).compareTo(operand(b));
     return switch (op) {
       case LESS -> cmp < 0;
       case LESS_OR_EQUAL -> cmp <= 0;
@@ -142,8 +143,9 @@ final class ExpressionRuntime {
     };
   }
 
+  /** The operands entered bounded; the result is bounded here, as 1E+99 * 1E+99 shows. */
   private static Object arithmetic(BinaryOperator op, Object a, Object b) {
-    BigDecimal x = number(a), y = number(b);
+    BigDecimal x = operand(a), y = operand(b);
     if ((op == BinaryOperator.DIVIDE || op == BinaryOperator.REMAINDER) && y.signum() == 0)
       throw ArcException.invalid("Division by zero");
     try {

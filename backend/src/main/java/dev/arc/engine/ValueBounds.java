@@ -16,11 +16,26 @@ import java.util.Map;
 public final class ValueBounds {
   private ValueBounds() {}
 
-  /** The bounded decimal value of a number; any other value is a recoverable type error. */
+  /**
+   * The bounded decimal value of a number entering ARC (an input, a default, a literal, converted
+   * text or a source value); any other value is a recoverable type error.
+   */
   public static BigDecimal number(Object value) {
+    return (BigDecimal) bounded(decimal(value));
+  }
+
+  /**
+   * The decimal value of a number ARC already holds, such as an operator's operand or an
+   * aggregate's item, converted without the bound check: every number an expression reads entered
+   * through {@link #number} or {@link #bounded} (inputs, defaults, literals, source values and
+   * every operator, function and collection result), and checking it again on each operator cost
+   * more than a compact multiplication. JSON integers inside a collection input arrive as Integer,
+   * Long or BigInteger and are converted here. Any other value is a recoverable type error.
+   */
+  public static BigDecimal decimal(Object value) {
     if (!(value instanceof Number n))
       throw ArcException.invalid("Expected a number, got " + typeOf(value));
-    return (BigDecimal) bounded(decimal(n));
+    return decimalValue(n);
   }
 
   /** The value itself once every number, string, array and object in it is within bounds. */
@@ -30,17 +45,45 @@ public final class ValueBounds {
   }
 
   /**
+   * The size of a value: its elements, as {@link Limits#MAX_VALUE_ELEMENTS} counts them, and the
+   * characters of its text, object keys included. Sums over several bounded values are checked
+   * against a budget of their own, such as a multi-Output result's.
+   */
+  public record Size(long elements, long characters) {}
+
+  public static Size size(Object value) {
+    long[] counts = new long[2];
+    measure(value, counts);
+    return new Size(counts[0], counts[1]);
+  }
+
+  private static void measure(Object value, long[] counts) {
+    counts[0]++;
+    if (value instanceof String s) counts[1] += s.length();
+    if (value instanceof List<?> xs) for (Object x : xs) measure(x, counts);
+    if (value instanceof Map<?, ?> m) {
+      for (var e : m.entrySet()) {
+        measure(e.getKey(), counts);
+        measure(e.getValue(), counts);
+      }
+    }
+  }
+
+  /**
    * A number that an operator or a function computed. BigDecimal never rounds a zero, so a zero
-   * result keeps the combined scale of its operands: {@code amount * (rate / 365) * (1/3) * (1/7)}
-   * is 0E-102 when amount is 0, while every other amount gives an ordinary 34-digit result. Such a
-   * zero keeps the most decimal places a number may have ({@link Limits#MAX_NUMBER_SCALE}) instead
-   * of failing only for a zero input. A zero written with a larger scale is still refused, because
-   * its scale is what the writer chose.
+   * result keeps the combined scale of its operands: {@code amount * (rate / 12)} is 0E-36 when
+   * amount is 0, and {@code amount * (rate / 365) * (1/3) * (1/7)} is 0E-105, while every other
+   * amount gives an ordinary 34-digit result. Such a zero keeps at most the places of that result
+   * ({@link Limits#MAX_COMPUTED_ZERO_SCALE}), so it never fails for a zero input and never prints
+   * as a hundred zeros; a zero within the limit keeps its places, as {@code 0 * 1.50} is 0.00. A
+   * zero written with a larger scale is still accepted up to {@link Limits#MAX_NUMBER_SCALE} and
+   * kept as written, because its scale is what the writer chose.
    */
   public static BigDecimal computed(BigDecimal number) {
-    if (number.signum() != 0 || Math.abs((long) number.scale()) <= Limits.MAX_NUMBER_SCALE)
+    if (number.signum() != 0 || Math.abs((long) number.scale()) <= Limits.MAX_COMPUTED_ZERO_SCALE)
       return number;
-    return BigDecimal.ZERO.setScale(Integer.signum(number.scale()) * Limits.MAX_NUMBER_SCALE);
+    return BigDecimal.ZERO.setScale(
+        Integer.signum(number.scale()) * Limits.MAX_COMPUTED_ZERO_SCALE);
   }
 
   /**
@@ -59,7 +102,7 @@ public final class ValueBounds {
   }
 
   /** The decimal value of any number ARC meets: JSON integers, POI doubles and decimals. */
-  private static BigDecimal decimal(Number value) {
+  private static BigDecimal decimalValue(Number value) {
     if (value instanceof BigDecimal decimal) return decimal;
     if (value instanceof BigInteger integer) return new BigDecimal(integer);
     if (value instanceof Double || value instanceof Float) {
@@ -73,7 +116,7 @@ public final class ValueBounds {
   private static void bound(Object value, int depth, int[] count) {
     if (depth > Limits.MAX_VALUE_DEPTH || ++count[0] > Limits.MAX_VALUE_ELEMENTS)
       throw ArcException.invalid("Value exceeds collection depth or size limit");
-    if (value instanceof Number n && exceedsDecimalLimits(decimal(n)))
+    if (value instanceof Number n && exceedsDecimalLimits(decimalValue(n)))
       throw ArcException.invalid("Number exceeds supported precision or magnitude");
     if (value instanceof String s && s.length() > Limits.MAX_STRING_CHARACTERS)
       throw ArcException.invalid(

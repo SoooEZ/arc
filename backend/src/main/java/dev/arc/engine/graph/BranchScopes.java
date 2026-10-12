@@ -1,13 +1,19 @@
 package dev.arc.engine.graph;
 
-import dev.arc.error.ArcException;
+import dev.arc.engine.graph.GraphPlan.Conflict;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.NodeKind;
 import java.util.*;
 
-/** Infers variables present whenever a node runs, without evaluating predicates. */
+/**
+ * Infers variables present whenever a node runs, without evaluating predicates, and the joins where
+ * independent writes of one variable always meet.
+ */
 final class BranchScopes {
+  /** What one analysis found: each node's guaranteed variables and the conflicts, in node order. */
+  record Analysis(Map<String, Set<String>> available, List<Conflict> conflicts) {}
+
   /**
    * The scopes depend only on the graph, but the size of the decision diagram that computes them
    * depends on the order its tests are numbered, and no single order suits every graph: numbering
@@ -17,25 +23,29 @@ final class BranchScopes {
    * the connections as drawn comes last and keeps every graph that was valid before the other
    * orders were added.
    */
-  Map<String, Set<String>> analyze(Definition definition, GraphTopology topology) {
-    ArcException tooComplex = null;
+  Analysis analyze(Definition definition, GraphTopology topology) {
+    BooleanConditions.TooComplex tooComplex = null;
     for (TargetOrder order : TargetOrder.values()) {
       try {
         return analyze(definition, topology, testOrder(definition, topology, order));
-      } catch (ArcException error) {
+      } catch (BooleanConditions.TooComplex error) {
         tooComplex = error;
       }
     }
     throw tooComplex;
   }
 
-  private static Map<String, Set<String>> analyze(
+  private static Analysis analyze(
       Definition definition, GraphTopology topology, List<Node> testOrder) {
     Map<String, Set<String>> available = new LinkedHashMap<>();
+    var conflicts = new ArrayList<Conflict>();
     BooleanConditions logic = new BooleanConditions();
     Map<String, Integer> activation = new HashMap<>();
     Map<String, Map<String, Integer>> branchGates = new HashMap<>();
-    Map<String, Map<String, Integer>> scopes = new HashMap<>();
+    // Each node's outgoing scope: for every variable, when each writer's value may be present. A
+    // writer replaces every earlier write of its variable, as the execution scope does.
+    Map<String, Map<String, Map<String, Integer>>> scopes = new HashMap<>();
+    var paths = new Paths(topology);
     int variableIndex = 0;
     for (Node node : testOrder) {
       // Each exit but the last has an independent test and is taken only when every earlier test
@@ -54,9 +64,10 @@ final class BranchScopes {
     for (Node node : topology.order()) {
       boolean input = node.kind() == NodeKind.INPUT;
       int active = input ? 1 : 0;
-      Map<String, Integer> scope = new HashMap<>();
+      Map<String, Map<String, Integer>> scope = new HashMap<>();
       if (input) {
-        for (Input parameter : definition.inputs()) scope.put(parameter.name(), 1);
+        for (Input parameter : definition.inputs())
+          scope.put(parameter.name(), writtenBy(node.id(), 1));
       }
       for (Edge edge : topology.incoming(node.id())) {
         int gate = activation.get(edge.source());
@@ -65,25 +76,116 @@ final class BranchScopes {
         Integer exit = branchGates.getOrDefault(edge.source(), Map.of()).get(edge.sourceHandle());
         if (exit != null) gate = logic.and(gate, exit);
         active = logic.or(active, gate);
-        for (var entry : scopes.get(edge.source()).entrySet()) {
-          int present = logic.and(gate, entry.getValue());
-          scope.merge(entry.getKey(), present, logic::or);
+        for (var variable : scopes.get(edge.source()).entrySet()) {
+          var writers = scope.computeIfAbsent(variable.getKey(), name -> new LinkedHashMap<>());
+          for (var write : variable.getValue().entrySet())
+            writers.merge(write.getKey(), logic.and(gate, write.getValue()), logic::or);
         }
       }
       Set<String> guaranteed = new TreeSet<>();
       if (active != 0) {
-        for (var entry : scope.entrySet()) {
-          if (logic.and(active, logic.not(entry.getValue())) == 0) guaranteed.add(entry.getKey());
+        for (var variable : new TreeMap<>(scope).entrySet()) {
+          int present = 0;
+          for (int write : variable.getValue().values()) present = logic.or(present, write);
+          if (logic.and(active, logic.not(present)) == 0) guaranteed.add(variable.getKey());
+          List<String> independent =
+              independentWriters(variable.getValue(), active, logic, paths, topology);
+          if (independent.size() > 1
+              && !metUpstream(
+                  node, variable.getKey(), independent, topology, activation, scopes, logic))
+            conflicts.add(new Conflict(node.id(), variable.getKey(), independent));
         }
       }
       available.put(node.id(), Collections.unmodifiableSet(guaranteed));
       // An unfinished draft may store no result name yet; an empty one is unset as well.
       String result = node.resultName();
-      if (node.storesResult() && result != null) scope.put(result, active);
+      if (node.storesResult() && result != null) scope.put(result, writtenBy(node.id(), active));
       activation.put(node.id(), active);
       scopes.put(node.id(), scope);
     }
-    return Collections.unmodifiableMap(available);
+    return new Analysis(Collections.unmodifiableMap(available), List.copyOf(conflicts));
+  }
+
+  private static Map<String, Integer> writtenBy(String writer, int when) {
+    var writes = new LinkedHashMap<String, Integer>();
+    writes.put(writer, when);
+    return writes;
+  }
+
+  /**
+   * The writers of one variable whose values are all present whenever the node runs and that no
+   * path connects, in execution order; fewer than two when the graph alone does not decide a
+   * conflict. A writer with a path to another always-present writer is left out: the later one
+   * superseded its value when that path ran, which only the run can tell, so it is the later
+   * writers that are known to meet. The check costs operations only where a variable has several
+   * writers, so a graph the analysis accepted with one writer per variable fits as before.
+   */
+  private static List<String> independentWriters(
+      Map<String, Integer> writes,
+      int active,
+      BooleanConditions logic,
+      Paths paths,
+      GraphTopology topology) {
+    if (writes.size() < 2) return List.of();
+    var always = new ArrayList<String>();
+    for (var write : writes.entrySet())
+      if (logic.and(active, logic.not(write.getValue())) == 0) always.add(write.getKey());
+    var independent = new ArrayList<String>();
+    for (String writer : always) {
+      boolean followed = false;
+      for (String other : always)
+        if (!other.equals(writer) && paths.reaches(writer, other)) followed = true;
+      if (!followed) independent.add(writer);
+    }
+    if (independent.size() < 2) return List.of();
+    independent.sort(Comparator.comparingInt(topology::position));
+    return List.copyOf(independent);
+  }
+
+  /**
+   * Whether the writers already always meet at one of the node's parents: the conflict belongs to
+   * the join where the values first meet, which reported it, and not to every node below it.
+   */
+  private static boolean metUpstream(
+      Node node,
+      String variable,
+      List<String> writers,
+      GraphTopology topology,
+      Map<String, Integer> activation,
+      Map<String, Map<String, Map<String, Integer>>> scopes,
+      BooleanConditions logic) {
+    for (Edge edge : topology.incoming(node.id())) {
+      String parent = edge.source();
+      Map<String, Integer> writes = scopes.get(parent).getOrDefault(variable, Map.of());
+      int allPresent = 1;
+      for (String writer : writers)
+        allPresent = logic.and(allPresent, writes.getOrDefault(writer, 0));
+      if (logic.and(activation.get(parent), logic.not(allPresent)) == 0) return true;
+    }
+    return false;
+  }
+
+  /** Whether one node can reach another along the connections, remembered per start node. */
+  private static final class Paths {
+    private final GraphTopology topology;
+    private final Map<String, Set<String>> reachable = new HashMap<>();
+
+    Paths(GraphTopology topology) {
+      this.topology = topology;
+    }
+
+    boolean reaches(String from, String to) {
+      return reachable.computeIfAbsent(from, this::reachableFrom).contains(to);
+    }
+
+    private Set<String> reachableFrom(String start) {
+      var reached = new HashSet<String>();
+      var pending = new ArrayDeque<String>(List.of(start));
+      while (!pending.isEmpty())
+        for (Edge edge : topology.outgoing(pending.pop()))
+          if (reached.add(edge.target())) pending.push(edge.target());
+      return reached;
+    }
   }
 
   /** Which of a handle's targets a test-numbering walk visits first. */

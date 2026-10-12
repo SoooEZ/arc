@@ -70,6 +70,30 @@ class FunctionNamespaceTest {
         .containsExactlyInAnyOrder("ROUND", "round");
   }
 
+  /**
+   * The hint upper-cased any name: {@code foo(1)} suggested {@code $FOO(...)}, which then failed as
+   * unsupported, and {@code customer.name(1)} suggested {@code $CUSTOMER.NAME(...)}. Only a catalog
+   * function earns the hint, as the editor's hover gates it.
+   */
+  @Test
+  void theMissingPrefixHintNamesOnlyCatalogFunctions() {
+    assertThatThrownBy(() -> Expressions.compile("foo(1)"))
+        .hasMessage("foo is not a function (see function catalog)");
+    assertThatThrownBy(() -> Expressions.compile("$IF(true, 1, bar(2))"))
+        .hasMessage("bar is not a function (see function catalog)");
+    assertThatThrownBy(() -> Expressions.compile("customer.name(1)"))
+        .hasMessage("Property paths cannot be called: customer.name");
+    // Catalog names keep the hint whatever their case, dotted Excel names included.
+    assertThatThrownBy(() -> Expressions.compile("Round(1)"))
+        .hasMessage("Function calls require a $ prefix; use $ROUND(...)");
+    assertThatThrownBy(() -> Expressions.compile("error.type(1)"))
+        .hasMessage("Function calls require a $ prefix; use $ERROR.TYPE(...)");
+    assertThatThrownBy(() -> Expressions.compile("map([1], x, x)"))
+        .hasMessage("Function calls require a $ prefix; use $MAP(...)");
+    assertThatThrownBy(() -> Expressions.compile("coalesce(1)"))
+        .hasMessage("Function calls require a $ prefix; use $COALESCE(...)");
+  }
+
   @Test
   void dollarIsReservedForFunctionCallsAndNotVariableOrLocalIdentifiers() {
     for (String expression :

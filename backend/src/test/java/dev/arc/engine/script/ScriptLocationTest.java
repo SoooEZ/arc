@@ -125,6 +125,16 @@ class ScriptLocationTest {
     assertProblem(
         """
         node input INPUT "Input" {
+          next -> out edge "";
+        }
+        node out OUTPUT "Out" { return 1; }
+        """,
+        "Every connection needs a unique ID",
+        2,
+        3);
+    assertProblem(
+        """
+        node input INPUT "Input" {
           next -> out edge "%s";
         }
         node out OUTPUT "Out" { return 1; }

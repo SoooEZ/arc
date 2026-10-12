@@ -111,10 +111,19 @@ final class FunctionCatalog {
       return;
     }
     var metadata = FunctionMetadataRegistry.getFunctionByName(name);
-    if (!EXCEL.contains(name) || metadata == null)
+    if (!isExecutable(name))
       throw ArcException.invalid("Unsupported function: " + name + " (see function catalog)");
     if (count < minimumArguments(name, metadata) || count > metadata.getMaxParams())
       throw ArcException.invalid("Invalid argument count for " + name);
+  }
+
+  /**
+   * Whether a call to the upper-case name can run: an ARC function (lazy, collection and decimal
+   * ones included) or an Excel function POI implements without workbook context.
+   */
+  static boolean isExecutable(String name) {
+    return CUSTOM.containsKey(name)
+        || EXCEL.contains(name) && FunctionMetadataRegistry.getFunctionByName(name) != null;
   }
 
   /** POI's fewest arguments, raised where Excel refuses the shorter call. */

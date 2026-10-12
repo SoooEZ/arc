@@ -75,8 +75,13 @@ final class ArcScriptNodeParser {
   private static final Pattern REFERENCE =
       Pattern.compile("use\\s+" + ID + "(?:\\s+version\\s+([1-9]\\d*))?");
 
-  /** What ends a statement's first word. */
-  private static final Pattern WHITESPACE = Pattern.compile("\\s");
+  /**
+   * A declaration's keyword: its leading letters. The word ended at the first whitespace before, so
+   * {@code when(amount > 1)}, {@code return[1, 2]}, {@code return"x"} and {@code return-1} were
+   * unsupported statements although the expression grammar accepts them and the renderer writes
+   * them back with a space.
+   */
+  private static final Pattern KEYWORD = Pattern.compile("[A-Za-z]+");
 
   /** Node IDs that cannot be confused with the hyphens joining a readable connection ID. */
   private static final Pattern PLAIN_NODE_ID = Pattern.compile("[A-Za-z0-9_]+");
@@ -216,7 +221,8 @@ final class ArcScriptNodeParser {
 
   private void parseDeclaration(Statement statement, ScriptLocations locations) {
     String text = statement.text();
-    String keyword = WHITESPACE.split(text, 2)[0];
+    Matcher word = KEYWORD.matcher(text);
+    String keyword = word.lookingAt() ? word.group() : "";
     if (!keywords.contains(keyword))
       throw error("Unsupported statement for " + kind + ": " + text, statement);
     String value = text.substring(keyword.length()).trim();

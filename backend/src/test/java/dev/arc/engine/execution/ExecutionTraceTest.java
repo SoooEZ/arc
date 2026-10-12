@@ -243,6 +243,8 @@ class ExecutionTraceTest {
       assertThat(written)
           .as("maximum " + maximum)
           .contains("\"trace\":" + new String(steps, UTF_8));
+      // The response's UTF-8 generator appends the retained bytes without decoding them.
+      assertThat(new String(plain.writeValueAsBytes(result), UTF_8)).isEqualTo(written);
       assertThat(result.traceBytes()).isEqualTo(steps.length);
       assertThat(result.traceTruncated()).isEqualTo(maximum == 120);
       // The engine's mapper writes the decimal plain, as the response does (1E+2 → 100).

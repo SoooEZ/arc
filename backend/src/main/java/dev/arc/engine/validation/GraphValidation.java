@@ -11,10 +11,18 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * Executable graph validation: input dependencies, connections, reachability and node scopes.
- * Diagnostics reuse the same steps to collect problems instead of stopping at the first.
+ * The checks of an executable graph, in one order, reported through a sink: validation throws at
+ * the first problem ({@link #compile}) and diagnostics collect every problem ({@link
+ * GraphDiagnostics}), so the problem a publish or {@code /validate} names is the first one that
+ * {@code /diagnostics} lists. The two used to order the same steps by hand and disagreed.
  */
 final class GraphValidation {
+  /**
+   * What a pass produced: whether the draft shape let it run, the scope plan (null for a cyclic or
+   * too complex graph) and the expressions it compiled.
+   */
+  record Pass(boolean shaped, GraphPlan plan, ExpressionCache expressions) {}
+
   private final DefinitionShape documentShape;
   private final NodeValidation nodeValidation;
 
@@ -29,32 +37,64 @@ final class GraphValidation {
    */
   CompiledGraph compile(Definition definition, RuleResolver resolver) {
     try {
-      return validateGraph(definition, resolver);
+      Pass pass = check(definition, resolver, GraphValidation::fail);
+      return new CompiledGraph(definition, pass.plan(), pass.expressions().compiled());
     } catch (ArcException error) {
       throw Problems.onInputNode(error, definition);
     }
   }
 
-  private CompiledGraph validateGraph(Definition definition, RuleResolver resolver) {
-    documentShape.validate(definition);
-    var expressions = new ExpressionCache();
-    var inputReads = checkSourceMappings(definition, expressions, resolver, GraphValidation::fail);
-    checkInputCycles(definition, inputReads, GraphValidation::fail);
-    checkConnections(definition, GraphValidation::fail);
-    var plan = new GraphPlan(definition);
-    checkReachability(definition, plan, GraphValidation::fail);
-    for (Node node : plan.order()) {
-      Set<String> scope = plan.available().get(node.id());
-      nodeValidation.validate(definition, node, scope, resolver, expressions);
+  /**
+   * Runs every check in validation order and reports each problem to {@code problems}; a sink that
+   * throws stops at the first. The order: the draft shape, which stops the pass; the source
+   * mappings; input cycles; connections; the scope plan, whose cycle or complexity is a problem of
+   * its own; reachability; then each node in execution order (document order without a plan) with
+   * its expressions, pin and result name, followed by the joins where its writes always conflict.
+   * Without a scope plan a node skips only its variable check.
+   */
+  Pass check(Definition definition, RuleResolver resolver, Consumer<ArcException> problems) {
+    var violation = documentShape.firstViolation(definition);
+    if (violation.isPresent()) {
+      // Later checks assume a well-formed document.
+      problems.accept(DefinitionShape.located(violation.get(), definition));
+      return new Pass(false, null, null);
     }
-    return new CompiledGraph(definition, plan, expressions.compiled());
+    var expressions = new ExpressionCache();
+    var inputReads = checkSourceMappings(definition, expressions, resolver, problems);
+    checkInputCycles(definition, inputReads, problems);
+    boolean oneInput = checkConnections(definition, problems);
+    GraphPlan plan = scopePlan(definition, problems);
+    if (oneInput && plan != null) checkReachability(definition, plan, problems);
+    List<Node> nodes = plan == null ? definition.nodes() : plan.order();
+    for (Node node : nodes) {
+      Set<String> scope = plan == null ? null : plan.available().get(node.id());
+      try {
+        nodeValidation.validate(definition, node, scope, resolver, expressions);
+      } catch (ArcException error) {
+        problems.accept(error);
+      }
+      if (plan != null)
+        for (GraphPlan.Conflict conflict : plan.conflicts(node.id()))
+          problems.accept(conflictProblem(definition, node, conflict));
+    }
+    return new Pass(true, plan, expressions);
+  }
+
+  /** A cyclic or too complex graph has no scope plan; its nodes still get every other check. */
+  private static GraphPlan scopePlan(Definition definition, Consumer<ArcException> problems) {
+    try {
+      return new GraphPlan(definition);
+    } catch (ArcException error) {
+      problems.accept(error);
+      return null;
+    }
   }
 
   /**
    * Checks every source mapping against the declared inputs and reports each problem at the Input
    * node. Returns, per input, the inputs its valid mappings read.
    */
-  Map<String, Set<String>> checkSourceMappings(
+  private Map<String, Set<String>> checkSourceMappings(
       Definition definition,
       ExpressionCache expressions,
       RuleResolver resolver,
@@ -74,22 +114,6 @@ final class GraphValidation {
       inputReads.put(input.getKey(), reads);
     }
     return inputReads;
-  }
-
-  /**
-   * Structure problems in the order validation finds them: the first input cycle, then every
-   * connection problem and, with a scope plan, every unreachable node, each reported through {@code
-   * problems}. A missing or second Input node stops the check, because the connection and
-   * reachability rules need exactly one.
-   */
-  void checkStructure(
-      Definition definition,
-      Map<String, Set<String>> inputReads,
-      GraphPlan plan,
-      Consumer<ArcException> problems) {
-    checkInputCycles(definition, inputReads, problems);
-    checkConnections(definition, problems);
-    if (plan != null) checkReachability(definition, plan, problems);
   }
 
   /** Reports the first input whose source mappings read it back, like every structure problem. */
@@ -129,10 +153,18 @@ final class GraphValidation {
     return null;
   }
 
-  private void checkConnections(Definition definition, Consumer<ArcException> problems) {
+  /**
+   * Reports every connection problem. A missing or second Input node is reported alone and ends the
+   * check, because the connection and reachability rules need exactly one; the result says whether
+   * the graph has it.
+   */
+  private boolean checkConnections(Definition definition, Consumer<ArcException> problems) {
     var nodeIndex = definition.nodes().stream().collect(Collectors.toMap(Node::id, node -> node));
     List<Node> inputs = definition.nodesOf(NodeKind.INPUT);
-    require(inputs.size() == 1, "A rule must have exactly one Input node");
+    if (inputs.size() != 1) {
+      problems.accept(ArcException.invalid("A rule must have exactly one Input node"));
+      return false;
+    }
     Node input = inputs.getFirst();
     Map<String, List<Edge>> outgoing = new HashMap<>(), incoming = new HashMap<>();
     for (Edge e : definition.edges()) {
@@ -170,6 +202,7 @@ final class GraphValidation {
     for (Edge e : definition.edges())
       if (!connections.add(e.source() + ":" + e.sourceHandle() + ":" + e.target()))
         problems.accept(problem("Duplicate connection", nodeIndex.get(e.source())));
+    return true;
   }
 
   /**
@@ -191,15 +224,41 @@ final class GraphValidation {
                 "Every node must be reachable from Input; connect or remove unused nodes", node));
   }
 
+  /**
+   * Independent writers of one variable always meet at this join, so every execution would fail
+   * there with the runtime's "Conflicting upstream values" ({@link GraphPlan.Conflict}). The
+   * problem is located at the join first, then at each writer.
+   */
+  private static ArcException conflictProblem(
+      Definition definition, Node join, GraphPlan.Conflict conflict) {
+    var writers = new ArrayList<Node>();
+    for (Node node : definition.nodes())
+      if (conflict.writers().contains(node.id())) writers.add(node);
+    writers.sort(Comparator.comparingInt(node -> conflict.writers().indexOf(node.id())));
+    var labels = new ArrayList<String>();
+    for (Node writer : writers) labels.add(writer.label());
+    String named =
+        String.join(", ", labels.subList(0, labels.size() - 1)) + " and " + labels.getLast();
+    ArcException error =
+        ArcException.invalid(
+                "Conflicting upstream values for '"
+                    + conflict.variable()
+                    + "': "
+                    + named
+                    + (labels.size() == 2 ? " both" : " all")
+                    + " set it on every path to "
+                    + join.label()
+                    + "; use distinct result variable names before merging")
+            .atNode(null, null, join.id(), join.label());
+    for (Node writer : writers) error = error.atNode(null, null, writer.id(), writer.label());
+    return error;
+  }
+
   private static void fail(ArcException error) {
     throw error;
   }
 
   private static ArcException problem(String message, Node node) {
     return ArcException.invalid(message).atNode(null, null, node.id(), node.label());
-  }
-
-  private static void require(boolean condition, String message) {
-    if (!condition) throw ArcException.invalid(message);
   }
 }

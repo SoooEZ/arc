@@ -1,72 +1,34 @@
 package dev.arc.engine.validation;
 
 import dev.arc.engine.RuleResolver;
-import dev.arc.engine.graph.GraphPlan;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
-import dev.arc.model.Definition.*;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
- * Collects navigable problems in one pass, even when an incomplete graph has no scope plan. Each
- * check runs once: every expression compiles once and the scope plan is built once.
+ * Collects navigable problems in one pass of {@link GraphValidation#check}, even when an incomplete
+ * graph has no scope plan. Each check runs once: every expression compiles once and the scope plan
+ * is built once.
  */
 final class GraphDiagnostics {
-  private final DefinitionShape documentShape;
-  private final NodeValidation nodeValidation;
   private final GraphValidation graphValidation;
 
-  GraphDiagnostics(
-      DefinitionShape documentShape,
-      NodeValidation nodeValidation,
-      GraphValidation graphValidation) {
-    this.documentShape = documentShape;
-    this.nodeValidation = nodeValidation;
+  GraphDiagnostics(GraphValidation graphValidation) {
     this.graphValidation = graphValidation;
   }
 
   Validator.Diagnosis diagnose(Definition definition, RuleResolver resolver) {
     var problems = new Problems(definition);
-    var violation = documentShape.firstViolation(definition);
-    if (violation.isPresent()) {
-      // Later checks assume a well-formed document.
-      problems.add(DefinitionShape.located(violation.get(), definition));
-      return new Validator.Diagnosis(problems.list(), false, List.of());
-    }
     var pins = new RejectedPins(resolver);
-    var expressions = new ExpressionCache();
-    GraphPlan plan = scopePlan(definition, problems);
-    for (Node node : definition.nodes()) {
-      // Without a scope plan (a cycle, a too complex graph) only the variable check is skipped.
-      Set<String> scope = plan == null ? null : plan.available().get(node.id());
-      try {
-        nodeValidation.validate(definition, node, scope, pins, expressions);
-      } catch (ArcException error) {
-        problems.add(error);
-      }
-    }
-    var inputReads =
-        graphValidation.checkSourceMappings(definition, expressions, pins, problems::add);
-    try {
-      graphValidation.checkStructure(definition, inputReads, plan, problems::add);
-    } catch (ArcException error) {
-      problems.add(error);
-    }
+    GraphValidation.Pass pass = graphValidation.check(definition, pins, problems::add);
+    if (!pass.shaped()) return new Validator.Diagnosis(problems.list(), false, List.of());
     var dependencies =
-        NodeValidation.dependencies(definition, expressions::formulaCalls).stream()
+        NodeValidation.dependencies(definition, pass.expressions()::formulaCalls).stream()
             .filter(dependency -> !pins.rejected(dependency))
             .toList();
     return new Validator.Diagnosis(problems.list(), true, dependencies);
-  }
-
-  /** A cyclic or too complex graph has no scope plan; its nodes still get every other check. */
-  private static GraphPlan scopePlan(Definition definition, Problems problems) {
-    try {
-      return new GraphPlan(definition);
-    } catch (ArcException error) {
-      problems.add(error);
-      return null;
-    }
   }
 
   /**

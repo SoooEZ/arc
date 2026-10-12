@@ -310,4 +310,188 @@ class GraphPlanTest {
         .isInstanceOf(ArcException.class)
         .hasMessage("Branch analysis is too complex; split this graph into reusable rules");
   }
+
+  /**
+   * "Any of `pairs` two-part checks passes" where each check's false exit also leads to the next
+   * check: Input → x_i; x_i.true → y_i; x_i.false → x_{i+1} (the last: reject); y_i.true → approve;
+   * y_i.false → reject. Every check is unconditional, yet a walk that starts at the first one nests
+   * every later check inside it and numbers every x before every y.
+   */
+  private Definition chainedPairs(int pairs) {
+    var nodes = new ArrayList<Node>();
+    var edges = new ArrayList<Edge>();
+    nodes.add(node("input", "INPUT", null, null));
+    nodes.add(node("approve", "OUTPUT", "true", null));
+    nodes.add(node("reject", "OUTPUT", "false", null));
+    for (int pair = 0; pair < pairs; pair++) {
+      String x = "x_%02d".formatted(pair), y = "y_%02d".formatted(pair);
+      String next = pair + 1 < pairs ? "x_%02d".formatted(pair + 1) : "reject";
+      nodes.add(node(x, "CONDITION", "amount > " + pair, null));
+      nodes.add(node(y, "CONDITION", "amount < " + (1000 + pair), null));
+      edges.add(edge("input", x, "next"));
+      edges.add(edge(x, y, "true"));
+      edges.add(edge(x, next, "false"));
+      edges.add(edge(y, "approve", "true"));
+      edges.add(edge(y, "reject", "false"));
+    }
+    return new Definition(1, amount, nodes, edges);
+  }
+
+  /**
+   * The analysis tries its three test orders and reports a graph too complex only when none fits.
+   * The chained pairs fit the fewest-decisions-first order alone, and the ladder with its
+   * confirming checks drawn first fits the most-decisions-first order alone, so a graph holding
+   * both is too complex in every order; it is reported once, after the last order.
+   */
+  @Test
+  void aGraphTooComplexInEveryTestOrderIsReportedAfterTheLastOrder() {
+    var pairs = chainedPairs(20);
+    var ladder = ladder(13, true, i -> "rung_%02d".formatted(i), i -> "confirm_%02d".formatted(i));
+    assertThatCode(() -> new GraphPlan(pairs)).doesNotThrowAnyException();
+    assertThatCode(() -> new GraphPlan(ladder)).doesNotThrowAnyException();
+    var nodes = new ArrayList<>(pairs.nodes());
+    var edges = new ArrayList<>(pairs.edges());
+    for (Node node : ladder.nodes()) if (!node.id().equals("input")) nodes.add(node);
+    edges.addAll(ladder.edges());
+    var both = new Definition(1, amount, nodes, edges);
+    assertThatThrownBy(() -> new GraphPlan(both))
+        .isInstanceOf(ArcException.class)
+        .hasMessage("Branch analysis is too complex; split this graph into reusable rules");
+    assertThatThrownBy(() -> validator.validate(both, noReferences))
+        .hasMessage("Branch analysis is too complex; split this graph into reusable rules");
+  }
+
+  /**
+   * Two writers of one variable whose values both reach a join whenever it runs, with no path
+   * between them, conflict in every execution; the plan says so where the graph alone decides it.
+   * Writers on exclusive branches, sequential updates, and writes linked through a branch that may
+   * be skipped (lesson B8) remain runtime decisions.
+   */
+  @Test
+  void independentWritersThatAlwaysMeetAreThePlanConflicts() {
+    var always =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("a", "FORMULA", "1", "x"),
+                node("b", "FORMULA", "2", "x"),
+                node("out", "OUTPUT", "x", null)),
+            List.of(
+                edge("input", "a", "next"),
+                edge("input", "b", "next"),
+                edge("a", "out", "next"),
+                edge("b", "out", "next")));
+    assertThat(new GraphPlan(always).conflicts("out"))
+        .containsExactly(new GraphPlan.Conflict("out", "x", List.of("a", "b")));
+    assertThat(new GraphPlan(always).available().get("out")).containsExactly("x");
+    // Below the join the conflict is not repeated; it belongs to the join where the values meet.
+    var below =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("a", "FORMULA", "1", "x"),
+                node("b", "FORMULA", "2", "x"),
+                node("join", "FORMULA", "x", "y"),
+                node("out", "OUTPUT", "y", null)),
+            List.of(
+                edge("input", "a", "next"),
+                edge("input", "b", "next"),
+                edge("a", "join", "next"),
+                edge("b", "join", "next"),
+                edge("join", "out", "next")));
+    assertThat(new GraphPlan(below).conflicts("join"))
+        .containsExactly(new GraphPlan.Conflict("join", "x", List.of("a", "b")));
+    assertThat(new GraphPlan(below).conflicts("out")).isEmpty();
+    // A third writer that read a's value supersedes it: the later writers are the ones that meet.
+    var superseded =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("a", "FORMULA", "1", "x"),
+                node("c", "FORMULA", "x + 1", "x"),
+                node("b", "FORMULA", "2", "x"),
+                node("out", "OUTPUT", "x", null)),
+            List.of(
+                edge("input", "a", "next"),
+                edge("input", "b", "next"),
+                edge("a", "c", "next"),
+                edge("c", "out", "next"),
+                edge("b", "out", "next")));
+    assertThat(new GraphPlan(superseded).conflicts("out"))
+        .containsExactly(new GraphPlan.Conflict("out", "x", List.of("b", "c")));
+    for (Definition runtimeDecides : List.of(exclusive(), sequential(), skippable())) {
+      var plan = new GraphPlan(runtimeDecides);
+      for (Node node : runtimeDecides.nodes())
+        assertThat(plan.conflicts(node.id())).as(node.id()).isEmpty();
+    }
+  }
+
+  /** Both branches of a Condition assign x; the join sees exactly one of them. */
+  private static Definition exclusive() {
+    return new Definition(
+        1,
+        List.of(),
+        List.of(
+            node("input", "INPUT", null, null),
+            node("test", "CONDITION", "true", null),
+            node("a", "FORMULA", "10", "x"),
+            node("b", "FORMULA", "20", "x"),
+            node("out", "OUTPUT", "x", null)),
+        List.of(
+            edge("input", "test", "next"),
+            edge("test", "a", "true"),
+            edge("test", "b", "false"),
+            edge("a", "out", "next"),
+            edge("b", "out", "next")));
+  }
+
+  /** b updates a's x after reading it; the join keeps the later value. */
+  private static Definition sequential() {
+    return new Definition(
+        1,
+        List.of(),
+        List.of(
+            node("input", "INPUT", null, null),
+            node("a", "FORMULA", "1", "x"),
+            node("b", "FORMULA", "x + 1", "x"),
+            node("out", "OUTPUT", "x", null)),
+        List.of(
+            edge("input", "a", "next"),
+            edge("a", "b", "next"),
+            edge("a", "out", "next"),
+            edge("b", "out", "next")));
+  }
+
+  /**
+   * The member-pricing shape of lesson B8: member's write of price is linked to base's only through
+   * the branch a non-member skips, so the inputs decide whether the writes conflict.
+   */
+  private static Definition skippable() {
+    return new Definition(
+        1,
+        List.of(
+            new Input("listPrice", "NUMBER", true, null),
+            new Input("isMember", "BOOLEAN", true, null)),
+        List.of(
+            node("input", "INPUT", null, null),
+            node("base", "FORMULA", "listPrice", "price"),
+            node("rateNode", "FORMULA", "0.8", "rate"),
+            node("memberCheck", "CONDITION", "isMember", null),
+            node("member", "FORMULA", "listPrice * rate", "price"),
+            node("out", "OUTPUT", "price", null)),
+        List.of(
+            edge("input", "base", "next"),
+            edge("input", "rateNode", "next"),
+            edge("base", "memberCheck", "next"),
+            edge("memberCheck", "member", "true"),
+            edge("memberCheck", "out", "false"),
+            edge("rateNode", "member", "next"),
+            edge("member", "out", "next")));
+  }
 }

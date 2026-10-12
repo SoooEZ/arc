@@ -124,6 +124,13 @@ public final class Limits {
   /** Absolute decimal scale, so neither {@code 1E-101} nor {@code 1E+101} is accepted. */
   public static final int MAX_NUMBER_SCALE = 100;
 
+  /**
+   * Absolute scale of a zero that an operator or a function computed: the 34 significant digits of
+   * DECIMAL128 ({@code Expressions.MATH}), which bound every nonzero result's places while a zero,
+   * which BigDecimal never rounds, would keep its operands' combined scale.
+   */
+  public static final int MAX_COMPUTED_ZERO_SCALE = 34;
+
   // Execution budgets. Exhausting one is a LIMIT error that no fallback can hide.
 
   /**
@@ -140,6 +147,17 @@ public final class Limits {
 
   /** Operations in one expression evaluation; its collection scopes share this budget. */
   public static final int MAX_EXPRESSION_OPERATIONS = 10_000;
+
+  /**
+   * Elements across every Output value of one multi-Output result (every container, object key and
+   * item, as {@link #MAX_VALUE_ELEMENTS} counts them): ten values' worth, since each Output's value
+   * keeps its own bounds while the aggregate is returned, stored by a Reference and serialized as
+   * one.
+   */
+  public static final int MAX_RESULT_ELEMENTS = 10 * MAX_VALUE_ELEMENTS;
+
+  /** Characters of text across every Output value of one multi-Output result, keys included. */
+  public static final int MAX_RESULT_CHARACTERS = 2_000_000;
 
   private Limits() {}
 

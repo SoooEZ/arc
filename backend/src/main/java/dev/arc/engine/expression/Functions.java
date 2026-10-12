@@ -38,6 +38,11 @@ public final class Functions {
     FunctionCatalog.arity(name, count);
   }
 
+  /** Whether an upper-case name is a function a call can run (ARC's own or an Excel one). */
+  static boolean isFunction(String name) {
+    return FunctionCatalog.isExecutable(name);
+  }
+
   /** Calls with the evaluation's range values, so POI sees each unchanged range converted once. */
   static Object call(String name, List<Object> args, RangeValues ranges) {
     var function = ARC_FUNCTIONS.get(name);
@@ -60,11 +65,11 @@ public final class Functions {
     functions.put("TO_NUMBER", args -> DataFunctions.number(args.getFirst()));
     functions.put("TO_STRING", args -> DataFunctions.text(args.getFirst()));
     functions.put("TO_BOOLEAN", args -> DataFunctions.bool(args.getFirst()));
-    functions.put("ABS", args -> Expressions.number(args.getFirst()).abs());
+    functions.put("ABS", args -> Expressions.operand(args.getFirst()).abs());
     functions.put(
-        "FLOOR", args -> Expressions.number(args.getFirst()).setScale(0, RoundingMode.FLOOR));
+        "FLOOR", args -> Expressions.operand(args.getFirst()).setScale(0, RoundingMode.FLOOR));
     functions.put(
-        "CEIL", args -> Expressions.number(args.getFirst()).setScale(0, RoundingMode.CEILING));
+        "CEIL", args -> Expressions.operand(args.getFirst()).setScale(0, RoundingMode.CEILING));
     functions.put("ROUND", args -> round(args, RoundingMode.HALF_UP));
     functions.put("ROUNDDOWN", args -> round(args, RoundingMode.DOWN));
     functions.put("ROUNDUP", args -> round(args, RoundingMode.UP));
@@ -79,20 +84,20 @@ public final class Functions {
 
   /** The numbers an aggregate receives: its arguments with nested arrays flattened. */
   private static List<BigDecimal> numbers(List<Object> args) {
-    return flatten(args).stream().map(Expressions::number).toList();
+    return flatten(args).stream().map(Expressions::operand).toList();
   }
 
   private static BigDecimal round(List<Object> args, RoundingMode mode) {
     int scale = 0;
     try {
-      if (args.size() > 1) scale = Expressions.number(args.get(1)).intValueExact();
+      if (args.size() > 1) scale = Expressions.operand(args.get(1)).intValueExact();
     } catch (ArithmeticException e) {
       throw ArcException.invalid("Round precision must be an integer");
     }
     if (scale < -MAX_ROUND_DIGITS || scale > MAX_ROUND_DIGITS)
       throw ArcException.invalid(
           "Round precision must be -" + MAX_ROUND_DIGITS + " to " + MAX_ROUND_DIGITS);
-    return Expressions.number(args.getFirst()).setScale(scale, mode);
+    return Expressions.operand(args.getFirst()).setScale(scale, mode);
   }
 
   /**
@@ -140,7 +145,9 @@ public final class Functions {
    * field, and equal numbers name the same one: 1.5 is the field "1.5", never a nested path.
    */
   private static List<String> segments(String function, Object path) {
-    if (path == null || !ValueText.isScalar(path))
+    // A boolean is a scalar with a text form, but no path: a flag passed by mistake read the field
+    // "true" or "false" and answered the fallback without a diagnosis.
+    if (!(path instanceof String) && !(path instanceof Number))
       throw ArcException.invalid(function + " needs a text or number path");
     if (path instanceof String text) return List.of(text.split("\\.", -1));
     return List.of(ValueText.key(path));

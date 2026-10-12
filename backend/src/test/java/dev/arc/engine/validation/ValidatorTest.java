@@ -9,6 +9,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import java.util.*;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 class ValidatorTest {
@@ -61,6 +62,58 @@ class ValidatorTest {
                 edge("calculation", "result", "next")));
     assertThatThrownBy(() -> validator.validate(d, resolver))
         .hasMessageContaining("unavailable on every incoming path: x");
+  }
+
+  /**
+   * Validation, diagnostics and publishing accepted two unconditional, unrelated writers of one
+   * result variable, and every execution of the published version then failed with "Conflicting
+   * upstream values". The graph alone decides this shape, so it is reported at the join, naming the
+   * variable and both writers, with the join's location first.
+   */
+  @Test
+  void independentWritersOfOneVariableFailValidationAtTheJoin() {
+    var d =
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                nodeOf("a", "FORMULA", "List price").expression("1").output("price").build(),
+                nodeOf("b", "FORMULA", "Member price").expression("2").output("price").build(),
+                nodeOf("out", "OUTPUT", "Return").expression("price").build()),
+            List.of(
+                edge("input", "a", "next"),
+                edge("input", "b", "next"),
+                edge("a", "out", "next"),
+                edge("b", "out", "next")));
+    String message =
+        "Conflicting upstream values for 'price': List price and Member price both set it on"
+            + " every path to Return; use distinct result variable names before merging";
+    assertThatThrownBy(() -> validator.validate(d, resolver))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage()).isEqualTo(message);
+              assertThat(error.locations())
+                  .containsExactly(
+                      new ArcException.Location(null, null, "out", "Return"),
+                      new ArcException.Location(null, null, "a", "List price"),
+                      new ArcException.Location(null, null, "b", "Member price"));
+            });
+    assertThat(validator.diagnose(d, resolver).problems())
+        .containsExactly(
+            new Validator.Problem(
+                message,
+                List.of(
+                    new ArcException.Location(null, null, "out", "Return"),
+                    new ArcException.Location(null, null, "a", "List price"),
+                    new ArcException.Location(null, null, "b", "Member price"))));
+    // Distinct names, as the message asks, make the same graph valid.
+    var renamed = new ArrayList<>(d.nodes());
+    renamed.set(2, copyOf(d.nodes().get(2)).output("memberPrice").build());
+    assertThatCode(
+            () -> validator.validate(new Definition(1, d.inputs(), renamed, d.edges()), resolver))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -364,5 +417,50 @@ class ValidatorTest {
         .as("dependencies keep only complete pins, for validation")
         .extracting(Validator.Dependency::ruleId)
         .containsExactly("fee-rule", "lookup", "pricing");
+  }
+
+  /**
+   * A stored row of another model shape, which draft shape would refuse today, is read as it is: an
+   * unknown node type threw, and a missing list or a source without mappings was a 500 in the
+   * deletion check and in a publish's callee hold.
+   */
+  @Test
+  void calledRuleIdsReadStoredRowsOfAnotherShapeAsTheyAre() {
+    assertThat(Validator.calledRuleIds(new Definition(1, null, null, null))).isEmpty();
+    Node laterKind =
+        nodeOf("later", "LOOP", "Later").rule("future-kind", 1).expression("@called:1()").build();
+    var unmapped =
+        new Input(
+            "amount", "NUMBER", true, null, new SourceBinding("rates", 1, null, "/r", "FAIL"));
+    var row = new Definition(1, List.of(unmapped), Arrays.asList(null, laterKind), null);
+    assertThat(Validator.calledRuleIds(row)).containsExactly("future-kind", "called");
+  }
+
+  /**
+   * The 500-character limit shared the leading-slash message, so a long pointer was told to start
+   * with /.
+   */
+  @Test
+  void anOverLongPointerIsRefusedByItsOwnMessage() {
+    Function<String, Definition> withPointer =
+        pointer ->
+            new Definition(
+                1,
+                List.of(
+                    new Input(
+                        "rate",
+                        "NUMBER",
+                        true,
+                        null,
+                        new SourceBinding("rates", 1, Map.of(), pointer, "FAIL"))),
+                List.of(node("input", "INPUT", null, null)),
+                List.of());
+    validator.shape(withPointer.apply("/" + "r".repeat(Limits.MAX_POINTER_CHARACTERS - 1)));
+    assertThatThrownBy(
+            () ->
+                validator.shape(withPointer.apply("/" + "r".repeat(Limits.MAX_POINTER_CHARACTERS))))
+        .hasMessage("JSON pointer exceeds 500 characters");
+    assertThatThrownBy(() -> validator.shape(withPointer.apply("rate")))
+        .hasMessage("Use a JSON pointer starting with /");
   }
 }

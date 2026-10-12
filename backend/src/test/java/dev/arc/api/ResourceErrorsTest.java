@@ -118,6 +118,13 @@ class ResourceErrorsTest {
                 .content("{\"id\":\"control-name\",\"name\":\"\\u0001x\",\"kind\":\"RULE\"}"))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.message").value("Rule name cannot contain control characters"));
+    // A name of no-break spaces alone was stored and shown as a blank title.
+    mvc.perform(
+            post("/api/rules")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\":\"nbsp-name\",\"name\":\"\\u00a0\\u202f\",\"kind\":\"RULE\"}"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.message").value("Rule name must contain 1 to 160 characters"));
     verify(jdbc, never()).update(anyString(), any(Object[].class));
   }
 

@@ -438,6 +438,44 @@ class ArcScriptContractTest {
     assertThat(rebuilt.definition()).isEqualTo(graph);
   }
 
+  /**
+   * A declaration's keyword ended at the first whitespace, so an expression written directly after
+   * it was "Unsupported statement for CONDITION: when(amount > 1)" although the expression grammar
+   * accepts it, the renderer writes a space, and the editor paints {@code when(} as a keyword.
+   */
+  @Test
+  void aDeclarationKeywordMayBeFollowedDirectlyByItsValue() {
+    String source =
+        """
+        inputs { amount: NUMBER required; }
+        node input INPUT "Input" { next -> check; }
+        node check CONDITION "Check" { when(amount > 1); true -> route; false -> list; }
+        node route SWITCH "Route" { select(amount); case one "One" equals 1; case:one -> text; default -> negative; }
+        node list OUTPUT "List" { return[1, 2]; }
+        node text OUTPUT "Text" { return"x"; }
+        node negative OUTPUT "Negative" { return-1; }
+        """;
+    var built = script.build(source);
+    assertThat(built.diagnostics()).isEmpty();
+    String canonical = script.render(built.definition());
+    assertThat(canonical)
+        .contains("  when (amount > 1);")
+        .contains("  select (amount);")
+        .contains("  return [1, 2];")
+        .contains("  return \"x\";")
+        .contains("  return -1;");
+    assertThat(script.build(canonical).definition()).isEqualTo(built.definition());
+    // An unfinished Formula keeps its gap either way: here no result name yet.
+    var unnamed = script.build("node f FORMULA \"F\" { let=(amount + 1); }");
+    assertThat(unnamed.diagnostics()).isEmpty();
+    assertThat(unnamed.definition().nodes().getFirst().expression()).isEqualTo("(amount + 1)");
+    assertThat(unnamed.definition().nodes().getFirst().output()).isNull();
+    // A word that only starts with a keyword is still no statement.
+    assertThat(script.build("node f FORMULA \"F\" { letx = 1; }").diagnostics())
+        .extracting(ArcScript.Diagnostic::message)
+        .containsExactly("Unsupported statement for FORMULA: letx = 1");
+  }
+
   @Test
   void oversizedSourceStillReturnsDiagnosticsWithoutAResult() {
     var built = script.build(" ".repeat(1_048_577));

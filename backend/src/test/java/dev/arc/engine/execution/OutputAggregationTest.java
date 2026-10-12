@@ -244,4 +244,105 @@ class OutputAggregationTest {
               });
     }
   }
+
+  /**
+   * Each Output's value keeps its own bounds, and the aggregate has a budget as a whole (elements
+   * and characters of text, {@code Limits.MAX_RESULT_*}): 99 Outputs of a bounded value could
+   * stream gigabytes, and a parent holding such values from nine References exhausted the heap. The
+   * budget is a limit, located at the Output that passes it, that no fallback hides, and both
+   * callers of the rule see it alike (lesson B19).
+   */
+  @Test
+  void aMultiOutputAggregateHasABudgetAsAWholeAtTheOutputThatPassesIt() {
+    // 15 Outputs (o00 to o14, reached in that order) of 1,000 objects with three fields:
+    // 7,001 elements each, 105,031 in all, so the fifteenth passes the budget.
+    var items = new ArrayList<Object>();
+    for (int index = 0; index < 1000; index++)
+      items.add(Map.of("n", BigDecimal.valueOf(index), "name", "item", "price", BigDecimal.TEN));
+    var tooMany = outputsReturning(15, "items");
+    var fourteen = outputsReturning(14, "items");
+    assertThatCode(() -> engine.execute("child", 1, fourteen, Map.of("items", items), noReferences))
+        .doesNotThrowAnyException();
+    String elements = "Result exceeds 100,000 elements across its Outputs";
+    assertThatThrownBy(
+            () -> engine.execute("child", 1, tooMany, Map.of("items", items), noReferences))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage()).isEqualTo(elements);
+              assertThat(error.kind()).isEqualTo(ArcException.Kind.LIMIT);
+              assertThat(error.locations())
+                  .containsExactly(new ArcException.Location("child", 1, "o14", "O14"));
+            });
+    var children = resolving(tooMany);
+    for (String call : List.of("bundle", "$IFERROR(@child:1(items), -1)")) {
+      var parent =
+          script.parse(
+              "inputs { items: ARRAY required; }"
+                  + " node input INPUT \"Input\" { next -> bundle; }"
+                  + " node bundle REFERENCE \"Bundle\" { use \"child\" version 1;"
+                  + " bind items = items; as bundle; next -> out; }"
+                  + " node out OUTPUT \"Out\" { return "
+                  + call
+                  + "; }");
+      assertThatThrownBy(
+              () -> engine.execute("parent", 1, parent, Map.of("items", items), children))
+          .as(call)
+          .isInstanceOfSatisfying(
+              ArcException.class,
+              error -> {
+                assertThat(error.getMessage()).isEqualTo(elements);
+                assertThat(error.kind()).isEqualTo(ArcException.Kind.LIMIT);
+                assertThat(error.locations())
+                    .extracting(ArcException.Location::nodeId)
+                    .contains("o14");
+              });
+    }
+    // Text counts across the Outputs too: two Outputs of 1,000 texts of 1,000 characters.
+    var text = "t".repeat(1000);
+    var texts = outputsReturning(2, "$MAP(items, item, text)");
+    var oneText = outputsReturning(1, "$MAP(items, item, text)");
+    var inputs = Map.<String, Object>of("items", items, "text", text);
+    assertThatCode(() -> engine.execute("child", 1, oneText, inputs, noReferences))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> engine.execute("child", 1, texts, inputs, noReferences))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.getMessage())
+                  .isEqualTo("Result exceeds 2,000,000 characters of text across its Outputs");
+              assertThat(error.kind()).isEqualTo(ArcException.Kind.LIMIT);
+              assertThat(error.locations())
+                  .containsExactly(new ArcException.Location("child", 1, "o01", "O01"));
+            });
+  }
+
+  /** A rule whose Input fans out to {@code count} Outputs, each returning {@code expression}. */
+  private Definition outputsReturning(int count, String expression) {
+    var source =
+        new StringBuilder(
+            "inputs { items: ARRAY required; text: STRING optional; }"
+                + " node input INPUT \"Input\" {");
+    for (int field = 0; field < count; field++) source.append(" next -> o%02d;".formatted(field));
+    source.append(" }");
+    for (int field = 0; field < count; field++)
+      source.append(
+          " node o%02d OUTPUT \"O%02d\" { return %s; as f%d; }"
+              .formatted(field, field, expression, field));
+    return script.parse(source.toString());
+  }
+
+  private static RuleResolver resolving(Definition child) {
+    return new RuleResolver() {
+      @Override
+      public Definition resolve(String id, int version) {
+        return child;
+      }
+
+      @Override
+      public Definition resolveFormula(String id, int version) {
+        return child;
+      }
+    };
+  }
 }

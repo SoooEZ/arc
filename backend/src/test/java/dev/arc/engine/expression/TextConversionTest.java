@@ -86,6 +86,13 @@ class TextConversionTest {
         .hasMessage("GET needs a text or number path");
     assertThatThrownBy(() -> eval("$PLUCK(items, [\"10\"])"))
         .hasMessage("PLUCK needs a text or number path");
+    // A boolean path read a field named "true" or "false", or answered the fallback silently.
+    assertThatThrownBy(() -> eval("$GET($OBJECT(\"true\", 1), true)"))
+        .hasMessage("GET needs a text or number path");
+    assertThatThrownBy(() -> eval("$GET(byYear, false, \"fallback\")"))
+        .hasMessage("GET needs a text or number path");
+    assertThatThrownBy(() -> eval("$PLUCK(items, true)"))
+        .hasMessage("PLUCK needs a text or number path");
   }
 
   @Test

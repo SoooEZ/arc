@@ -250,6 +250,18 @@ class RuleDefinitionServiceTest {
       // The full draft shape still reports the problem where it is saved or diagnosed.
       assertThat(service.diagnostics(variant.getValue())).as(variant.getKey()).isNotEmpty();
     }
+    // An input named like a reserved word (saved before the word was reserved) is content too:
+    // the scope plan reads the name as text, so every node still reports its variables.
+    var reserved =
+        new Definition(
+            1,
+            List.of(new Input("and", "NUMBER", true, null), inputs.get(1)),
+            valid.nodes(),
+            valid.edges());
+    assertThat(service.variables(reserved)).containsEntry("out", Set.of("and", "items", "total"));
+    assertThat(service.diagnostics(reserved))
+        .extracting(Validator.Problem::message)
+        .containsExactly("Input names must be identifiers (letters, digits, underscores)");
     // Structure problems keep failing, as the API reference states.
     var missingTarget =
         new Definition(

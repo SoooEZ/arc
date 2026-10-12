@@ -78,6 +78,18 @@ class ParametersTest {
         .hasMessageContaining("pointer");
   }
 
+  /** A source value is bounded where it is read, so expressions never meet an unbounded number. */
+  @Test
+  void aSourceValueBeyondTheNumberBoundsIsRefusedAtTheRead() {
+    SourceReader huge = (binding, inputs, deadline) -> new BigDecimal("1E+101");
+    var inputs = List.of(rate("FAIL"), new Input("country", "STRING", true, "US"));
+    assertThatThrownBy(() -> resolve(new Parameters(huge), inputs, Map.of()))
+        .hasMessage("rate: Number exceeds supported precision or magnitude");
+    var withDefault = List.of(rate("DEFAULT"), inputs.get(1));
+    assertThat(resolve(new Parameters(huge), withDefault, Map.of()).get("rate"))
+        .isEqualTo(new BigDecimal("0.01"));
+  }
+
   @Test
   void anOverallDeadlineCannotBeHiddenByTheDefaultFallback() {
     SourceReader expired =

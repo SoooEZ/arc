@@ -284,6 +284,7 @@ final class ExcelFunctionAdapter {
         throw ArcException.invalid("Excel result exceeds array limits");
       if (area.getHeight() == 1 && area.getWidth() == 1)
         return converted(area.getRelativeValue(0, 0), name);
+      // The runtime bounds every function result, these rows included (ExpressionRuntime.function).
       var rows = new ArrayList<Object>();
       for (int y = 0; y < area.getHeight(); y++) {
         var row = new ArrayList<Object>();
@@ -291,7 +292,7 @@ final class ExcelFunctionAdapter {
           row.add(converted(area.getRelativeValue(y, x), name));
         rows.add(row);
       }
-      return Expressions.bounded(rows);
+      return rows;
     }
     throw ArcException.invalid(name + ": result requires workbook context");
   }

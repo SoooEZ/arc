@@ -6,6 +6,26 @@ import java.util.*;
 // Reduced ordered Boolean decision diagrams avoid enumerating every combination
 // of conditions. Each condition is independent: validation never assumes its value.
 final class BooleanConditions {
+  /**
+   * Decision branches one analysis may build, and Boolean operations it may cache. The caps bound
+   * the work of one test order; {@code engine.graph} imports no root contract, so they live here
+   * rather than in {@code Limits}, whose budgets several components enforce or produce.
+   */
+  static final int MAX_BRANCHES = 50_000;
+
+  static final int MAX_OPERATIONS = 200_000;
+
+  /**
+   * The diagram passed {@link #MAX_BRANCHES} branches or {@link #MAX_OPERATIONS} cached operations:
+   * the analysis is too complex in this test order, and {@link BranchScopes} tries its next order
+   * before reporting it. Its own type, so the retry catches nothing else.
+   */
+  static final class TooComplex extends ArcException {
+    TooComplex() {
+      super(422, "Branch analysis is too complex; split this graph into reusable rules");
+    }
+  }
+
   private record Branch(int variable, int low, int high) {}
 
   private record Operation(boolean conjunction, int a, int b) {}
@@ -23,9 +43,7 @@ final class BooleanConditions {
     Branch b = new Branch(variable, low, high);
     Integer found = unique.get(b);
     if (found != null) return found;
-    if (branches.size() >= 50_000)
-      throw ArcException.invalid(
-          "Branch analysis is too complex; split this graph into reusable rules");
+    if (branches.size() >= MAX_BRANCHES) throw new TooComplex();
     int id = branches.size();
     branches.add(b);
     unique.put(b, id);
@@ -65,9 +83,7 @@ final class BooleanConditions {
       if (a == 0) return b;
       if (b == 0) return a;
     }
-    if (cache.size() > 200_000)
-      throw ArcException.invalid(
-          "Branch analysis is too complex; split this graph into reusable rules");
+    if (cache.size() > MAX_OPERATIONS) throw new TooComplex();
     Operation key = new Operation(conjunction, Math.min(a, b), Math.max(a, b));
     Integer found = cache.get(key);
     if (found != null) return found;

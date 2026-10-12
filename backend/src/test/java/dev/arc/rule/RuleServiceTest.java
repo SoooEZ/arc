@@ -289,6 +289,38 @@ class RuleServiceTest {
     verify(repository, never()).delete(anyString());
   }
 
+  /**
+   * A stored row of another model shape (a node type this model does not know, a missing node list,
+   * a source without mappings) is read as it is: the caller scan names the row that pins the rule
+   * and skips the rest instead of answering 500 and blocking the deletion.
+   */
+  @Test
+  void callerScansReadStoredRowsOfAnotherShapeAsTheyAre() {
+    when(repository.lockForDeletion("example")).thenReturn(draft.revision());
+    Node laterKind = nodeOf("later", "LOOP", "Later").rule("example", 2).build();
+    var bare =
+        new Definition(
+            1,
+            List.of(
+                new Input(
+                    "amount",
+                    "NUMBER",
+                    true,
+                    null,
+                    new SourceBinding("rates", 1, null, "/rate", "FAIL"))),
+            null,
+            null);
+    when(repository.definitionsMentioning("example"))
+        .thenReturn(
+            List.of(
+                new StoredDefinition("future", 1, graphWith(laterKind)),
+                new StoredDefinition("bare", null, bare)));
+    assertThatThrownBy(() -> service.delete("example", null))
+        .hasMessage(
+            "Other rules call this rule: future v1. Remove those calls before deleting it.");
+    verify(repository, never()).delete(anyString());
+  }
+
   /** The rules a draft calls are held against deletion before the write and until the commit. */
   @Test
   void savesAndPublicationsHoldTheRulesTheyCallAgainstDeletion() {

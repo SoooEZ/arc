@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.InputTypes;
+import dev.arc.engine.Limits;
 import dev.arc.error.ArcException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -64,6 +65,32 @@ class ExpressionsTest {
     assertThatThrownBy(() -> eval("$round(1, 0.5)")).hasMessageContaining("integer");
     assertThatThrownBy(() -> eval("$max()")).hasMessageContaining("argument count");
     assertThatThrownBy(() -> eval("true + 1")).hasMessageContaining("Expected a number");
+  }
+
+  /**
+   * A bracket, parenthesis or separator missing at the end of an expression named the parser's
+   * end-of-input sentinel: "Expected ')', got '<end>'", shown as written in the inspector.
+   */
+  @Test
+  void anUnclosedBracketOrCallIsAnIncompleteExpressionNamingTheMissingToken() {
+    var samples = new LinkedHashMap<String, String>();
+    samples.put("(amount", "')'");
+    samples.put("(1 + 2", "')'");
+    samples.put("[1", "']'");
+    samples.put("$ROUND(1", "')'");
+    samples.put("@rule-a:1(1", "')'");
+    samples.put("$MAP(items", "','");
+    samples.put("$MAP(items, item", "','");
+    samples.put("$REDUCE([1], item, acc", "','");
+    for (var sample : samples.entrySet())
+      assertThatThrownBy(() -> Expressions.compile(sample.getKey()))
+          .as(sample.getKey())
+          .isInstanceOf(ArcException.class)
+          .hasMessage("Incomplete expression: expected " + sample.getValue());
+    for (String sample : List.of("1 +", "$MAP(items,", "$MAP(items, item,"))
+      assertThatThrownBy(() -> Expressions.compile(sample))
+          .as(sample)
+          .hasMessage("Incomplete expression");
   }
 
   @Test
@@ -191,10 +218,16 @@ class ExpressionsTest {
                       }));
   }
 
+  /**
+   * BigDecimal never rounds a zero, so a zero result kept its operands' combined scale: the same
+   * formula gave 0.00 for amount 1 and a 422 for amount 0, and once that was a bounded zero, {@code
+   * amount * (rate / 12)} answered 0.000000000000000000000000000000000000 (36 places) and every
+   * further step added its operand's places, up to a 102-character zero. A computed zero now keeps
+   * at most the 34 places a nonzero DECIMAL128 result has, so results, traces and $TO_STRING text
+   * stay bounded, while a zero inside the limit keeps its places ($TO_STRING(0 * 1.50) is 0.00).
+   */
   @Test
   void computedZerosKeepTheScaleLimitInsteadOfFailingForAZeroInput() {
-    // BigDecimal never rounds a zero, so a zero result keeps its operands' combined scale: the
-    // same formula gave 0.00 for amount 1 and 422 for amount 0.
     var rate = new BigDecimal("0.05");
     String daily = "amount * (rate / 365) * (1/3) * (1/7)";
     for (int amount : List.of(0, 1))
@@ -205,27 +238,42 @@ class ExpressionsTest {
           .as("amount %d", amount)
           .isEqualTo(new BigDecimal("0.00"));
     var zeroInputs = Map.<String, Object>of("amount", BigDecimal.ZERO, "rate", rate);
+    String zero34 = "0E-" + Limits.MAX_COMPUTED_ZERO_SCALE;
+    assertThat(Expressions.evaluate("amount * (rate / 12)", zeroInputs))
+        .isEqualTo(new BigDecimal(zero34));
+    assertThat(Expressions.evaluate("$TO_STRING(amount * (rate / 12))", zeroInputs))
+        .isEqualTo("0." + "0".repeat(Limits.MAX_COMPUTED_ZERO_SCALE));
+    assertThat(Expressions.evaluate(daily, zeroInputs)).isEqualTo(new BigDecimal(zero34));
     // $IFERROR returned its fallback instead of the zero.
     assertThat(Expressions.evaluate("$IFERROR(" + daily + ", -1)", zeroInputs))
-        .isEqualTo(new BigDecimal("0E-100"));
+        .isEqualTo(new BigDecimal(zero34));
     assertThat(Expressions.evaluate(daily + " > 0", zeroInputs)).isEqualTo(false);
     // Division moves a zero's scale the other way; power and $MUL multiply it; $REDUCE repeats it.
     assertThat(Expressions.evaluate("amount / (1/3) / (1/3) / (1/3) / (1/3)", zeroInputs))
-        .isEqualTo(new BigDecimal("0E+100"));
+        .isEqualTo(new BigDecimal("0E+" + Limits.MAX_COMPUTED_ZERO_SCALE));
     assertThat(Expressions.evaluate("((amount * 0.1) ^ 100) ^ 2", zeroInputs))
-        .isEqualTo(new BigDecimal("0E-100"));
+        .isEqualTo(new BigDecimal(zero34));
     assertThat(Expressions.evaluate("$MUL(amount, 1/3, 1/7, 1/11)", zeroInputs))
-        .isEqualTo(new BigDecimal("0E-100"));
+        .isEqualTo(new BigDecimal(zero34));
     assertThat(
             Expressions.evaluate(
                 "$REDUCE([1/3, 1/7, 1/11, 1/13], r, acc, amount, acc * r)", zeroInputs))
-        .isEqualTo(new BigDecimal("0E-100"));
+        .isEqualTo(new BigDecimal(zero34));
+    // A zero within the limit keeps the places its operands gave it, as published versions print.
+    assertThat(eval("$TO_STRING(0 * 1.50)")).isEqualTo("0.00");
+    assertThat(eval("$TO_STRING(1.5 - 1.5)")).isEqualTo("0.0");
+    assertThat(eval("$TO_STRING($ROUND(0, 2))")).isEqualTo("0.00");
+    // A written zero keeps the scale its writer chose; only computing with it caps the result.
+    assertThat(Expressions.evaluate("z", Map.of("z", new BigDecimal("0E-50"))))
+        .isEqualTo(new BigDecimal("0E-50"));
+    assertThat(Expressions.evaluate("z + 0", Map.of("z", new BigDecimal("0E-50"))))
+        .isEqualTo(new BigDecimal(zero34));
     // The bound still holds: a computed zero never prints more than the scale limit allows.
     assertTimeoutPreemptively(
         Duration.ofSeconds(1),
         () ->
             assertThat(eval("$TO_STRING(((((0.0 ^ 100) ^ 100) ^ 100) ^ 100) ^ 10)"))
-                .isEqualTo("0." + "0".repeat(100)));
+                .isEqualTo("0." + "0".repeat(Limits.MAX_COMPUTED_ZERO_SCALE)));
   }
 
   /**

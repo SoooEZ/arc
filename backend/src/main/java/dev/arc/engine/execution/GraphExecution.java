@@ -327,9 +327,32 @@ final class GraphExecution {
           throw error.atNode(ruleId, version, output.node().id(), output.node().label());
         }
       }
+      // Each value is bounded; the aggregate has a budget as a whole (Limits.MAX_RESULT_*), so a
+      // rule with many Outputs cannot stream gigabytes or fill a parent's scopes through
+      // References,
+      // and both callers of the rule meet the same limit (lesson B19). Located at the Output that
+      // passes it, as the single Output's bound is.
       var result = new LinkedHashMap<String, Object>();
-      outputs.forEach((field, output) -> result.put(field, output.value()));
+      long elements = 1;
+      long characters = 0;
+      for (var entry : outputs.entrySet()) {
+        ReachedOutput output = entry.getValue();
+        var size = Expressions.size(output.value());
+        elements += 1 + size.elements();
+        characters += entry.getKey().length() + size.characters();
+        if (elements > Limits.MAX_RESULT_ELEMENTS)
+          throw resultLimit(Limits.MAX_RESULT_ELEMENTS, "elements", output.node());
+        if (characters > Limits.MAX_RESULT_CHARACTERS)
+          throw resultLimit(Limits.MAX_RESULT_CHARACTERS, "characters of text", output.node());
+        result.put(entry.getKey(), output.value());
+      }
       return result;
+    }
+
+    private ArcException resultLimit(int limit, String unit, Node output) {
+      return ArcException.limit(
+              "Result exceeds " + Limits.format(limit) + " " + unit + " across its Outputs")
+          .atNode(ruleId, version, output.id(), output.label());
     }
   }
 

@@ -222,17 +222,40 @@ final class NodeValidation {
     return List.copyOf(dependencies);
   }
 
-  /** See {@link Validator#calledRuleIds}: every rule the definition names, in node order. */
+  /**
+   * See {@link Validator#calledRuleIds}: every rule the definition names, in node order. A stored
+   * row is read as it is, so a deletion check or a publish never answers 500 for a row of another
+   * model shape: a missing input or node list, a null node, a node of a type this model does not
+   * know (which keeps the pin and the expressions it carries) and a source without mappings call
+   * nothing more. Every expression field is read whatever the node's type, which for a shaped row
+   * is exactly what {@link #expressions} enumerates.
+   */
   static Set<String> calledRuleIds(
       Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
     var ids = new LinkedHashSet<String>();
-    for (Node node : pinningNodes(definition)) if (node.ruleId() != null) ids.add(node.ruleId());
-    var owned = new ArrayList<OwnedExpression>();
-    for (var mappings : sourceMappings(definition).values()) owned.addAll(mappings);
-    for (Node node : definition.nodes()) owned.addAll(expressions(node));
-    for (OwnedExpression expression : owned)
-      for (var call : formulaCalls.apply(expression.source())) ids.add(call.id());
+    List<Node> nodes = definition.nodes() == null ? List.of() : definition.nodes();
+    for (Node node : nodes) if (node != null && node.ruleId() != null) ids.add(node.ruleId());
+    var sources = new ArrayList<String>();
+    if (definition.inputs() != null)
+      for (Input input : definition.inputs())
+        if (input != null && input.source() != null && input.source().bindings() != null)
+          sources.addAll(input.source().bindings().values());
+    for (Node node : nodes) if (node != null) sources.addAll(expressionTexts(node));
+    for (String source : sources) for (var call : formulaCalls.apply(source)) ids.add(call.id());
     return ids;
+  }
+
+  /** Every expression text a node may hold, whatever its type; unset ones are null. */
+  private static List<String> expressionTexts(Node node) {
+    var texts = new ArrayList<String>();
+    texts.add(node.expression());
+    texts.add(node.selector());
+    if (node.cases() != null)
+      for (BranchCase option : node.cases()) if (option != null) texts.add(option.expression());
+    if (node.fields() != null)
+      for (Field field : node.fields()) if (field != null) texts.add(field.expression());
+    if (node.bindings() != null) texts.addAll(node.bindings().values());
+    return texts;
   }
 
   /**

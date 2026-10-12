@@ -43,6 +43,13 @@ final class ExpressionParser {
   /** A Formula call's version: digits without a leading zero. */
   private static final Pattern VERSION = Pattern.compile("[1-9][0-9]*");
 
+  /**
+   * The token after the last one of the source. No source spells it: the tokenizer reads {@code <},
+   * {@code end} and {@code >} as three tokens. It is never shown; a token expected at the end of
+   * the source is an incomplete expression.
+   */
+  static final String END = "<end>";
+
   private final List<String> tokens = new ArrayList<>();
   private final Set<String> variables = new LinkedHashSet<>();
   private final List<FormulaCall> formulaCalls = new ArrayList<>();
@@ -62,7 +69,7 @@ final class ExpressionParser {
         throw ArcException.invalid(
             "Expression exceeds " + Limits.MAX_EXPRESSION_TOKENS + " tokens");
     }
-    tokens.add("<end>");
+    tokens.add(END);
   }
 
   String peek() {
@@ -73,10 +80,22 @@ final class ExpressionParser {
     return tokens.get(index++);
   }
 
+  /** Whether every token of the source has been read. */
+  boolean atEnd() {
+    return peek().equals(END);
+  }
+
   void expect(String token) {
+    if (atEnd()) throw ArcException.invalid("Incomplete expression: expected '" + token + "'");
     if (!peek().equals(token))
       throw ArcException.invalid("Expected '" + token + "', got '" + peek() + "'");
     take();
+  }
+
+  /** The next token as an identifier to check; none at the end of the source. */
+  private String takeName() {
+    if (atEnd()) throw ArcException.invalid("Incomplete expression");
+    return take();
   }
 
   Expr parse(int minimumPriority) {
@@ -109,8 +128,7 @@ final class ExpressionParser {
   }
 
   private Expr atom() {
-    String token = take();
-    if (token.equals("<end>")) throw ArcException.invalid("Incomplete expression");
+    String token = takeName();
     if (token.equals("[")) {
       List<Expr> items = arguments("]");
       return (BoundedExpr)
@@ -127,8 +145,8 @@ final class ExpressionParser {
         case "!" -> context -> !bool(operand.eval(context));
         // Exact: negation adds no digits, and the operand is already bounded. Rounding to
         // DECIMAL128 here made -x lose digits that x kept.
-        case "-" -> context -> number(operand.eval(context)).negate();
-        default -> context -> number(operand.eval(context));
+        case "-" -> context -> operand(operand.eval(context)).negate();
+        default -> context -> operand(operand.eval(context));
       };
     }
     if (token.startsWith("\"") || token.startsWith("'")) {
@@ -170,9 +188,7 @@ final class ExpressionParser {
   }
 
   private Expr functionCall(String token) {
-    if (!token.startsWith("$"))
-      throw ArcException.invalid(
-          "Function calls require a $ prefix; use $" + token.toUpperCase(Locale.ROOT) + "(...)");
+    if (!token.startsWith("$")) throw unprefixedCall(token);
     expect("(");
     String name = token.substring(1).toUpperCase(Locale.ROOT);
     CollectionFunction collection = CollectionFunction.named(name);
@@ -183,6 +199,21 @@ final class ExpressionParser {
     if (ExpressionRuntime.lazyFunctionNames().contains(name))
       return context -> ExpressionRuntime.function(name, arguments, context);
     return (BoundedExpr) context -> ExpressionRuntime.function(name, arguments, context);
+  }
+
+  /**
+   * A name followed by {@code (} without the {@code $} prefix. The hint to add it is given only for
+   * a function the catalog can run, as the editor's hover does: {@code foo(1)} suggested {@code
+   * $FOO(...)}, which then failed as unsupported, and a property path such as {@code
+   * customer.name(1)} suggested {@code $CUSTOMER.NAME(...)}.
+   */
+  private static ArcException unprefixedCall(String token) {
+    String name = token.toUpperCase(Locale.ROOT);
+    if (Functions.isFunction(name))
+      return ArcException.invalid("Function calls require a $ prefix; use $" + name + "(...)");
+    if (token.contains("."))
+      return ArcException.invalid("Property paths cannot be called: " + token);
+    return ArcException.invalid(token + " is not a function (see function catalog)");
   }
 
   private Expr formulaCall(String token) {
@@ -213,14 +244,14 @@ final class ExpressionParser {
   private Expr collectionCall(CollectionFunction function) {
     Expr collection = parse(0);
     expect(",");
-    String local = take();
+    String local = takeName();
     if (!Identifiers.isValid(local))
       throw ArcException.invalid("Collection function needs a local item identifier");
     expect(",");
     String accumulator = null;
     Expr initial = null;
     if (function.bindsAccumulator()) {
-      accumulator = take();
+      accumulator = takeName();
       if (!Identifiers.isValid(accumulator) || local.equals(accumulator))
         throw ArcException.invalid(
             function.name() + " needs distinct item and accumulator identifiers");

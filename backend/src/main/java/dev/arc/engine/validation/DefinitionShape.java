@@ -26,9 +26,11 @@ final class DefinitionShape {
 
   /**
    * Whether content is checked besides structure. The scope plan reads only structure (node IDs and
-   * kinds, Switch cases, connections and input names), so {@code /variables} checks that alone: a
-   * blank label, an oversized expression, an unused property or an invalid default elsewhere in the
-   * draft cannot change any node's scope, and used to blank every inspector instead.
+   * kinds, Switch case IDs, connections, and that inputs have distinct names), so {@code
+   * /variables} checks that alone: a blank label, an oversized expression, an unused property, an
+   * invalid default or an input named like a reserved word elsewhere in the draft cannot change any
+   * node's scope, and used to blank every inspector instead. {@code DefinitionShapeTest} lists
+   * every message on each side; a check added to the wrong side fails it.
    */
   private final boolean contentChecks;
 
@@ -299,9 +301,12 @@ final class DefinitionShape {
     Set<String> edgeIds = new HashSet<>();
     for (Edge edge : edges) {
       var connection = new Connection(edge);
+      // Generated IDs (source-handle-target, or a prefix and ~digest) and stored ones stay valid;
+      // an empty one built from `edge "";`, and the canvas could not offer to delete it.
       require(
           edge != null
               && edge.id() != null
+              && !edge.id().isBlank()
               && edge.id().length() <= Limits.MAX_EDGE_ID_CHARACTERS
               && edgeIds.add(edge.id()),
           connection,

@@ -39,7 +39,7 @@ final class DataFunctions {
 
   static Object number(Object value) {
     if (value == null) return null;
-    if (value instanceof Number) return Expressions.number(value);
+    if (value instanceof Number) return Expressions.operand(value);
     if (value instanceof String text) {
       try {
         return Expressions.number(new BigDecimal(text.trim()));

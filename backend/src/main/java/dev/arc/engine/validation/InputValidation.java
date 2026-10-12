@@ -18,18 +18,19 @@ import java.util.*;
 final class InputValidation {
   /**
    * Part of the draft shape: stops at the first violation, like {@link DefinitionShape}. Without
-   * content checks only the names are checked, which is all the scope plan reads.
+   * content checks only what the scope plan reads is checked: that every input has a name and no
+   * two share one. Identifier syntax, the type, the default and the source are content, so a draft
+   * with an input named like a reserved word still reports every node's variables.
    */
   static void checkSchema(List<Input> inputs, boolean contentChecks) {
     Set<String> names = new HashSet<>();
+    String identifiers = "Input names must be identifiers (letters, digits, underscores)";
     for (Input parameter : inputs) {
       var declaration = new InputDeclaration(parameter);
-      require(
-          parameter != null && Identifiers.isValid(parameter.name()),
-          declaration,
-          "Input names must be identifiers (letters, digits, underscores)");
+      require(parameter != null && parameter.name() != null, declaration, identifiers);
       require(names.add(parameter.name()), declaration, "Duplicate input: " + parameter.name());
       if (!contentChecks) continue;
+      require(Identifiers.isValid(parameter.name()), declaration, identifiers);
       require(
           InputTypes.Type.parse(parameter.type()).isPresent(), declaration, "Unknown input type");
       if (parameter.defaultValue() != null) checkDefault(parameter, declaration);
@@ -66,10 +67,14 @@ final class InputValidation {
     require(
         binding.pointer() == null
             || binding.pointer().isEmpty()
-            || binding.pointer().startsWith("/")
-                && binding.pointer().length() <= Limits.MAX_POINTER_CHARACTERS,
+            || binding.pointer().startsWith("/"),
         source,
         "Use a JSON pointer starting with /");
+    // Its own message: an over-long pointer that starts with / was told to start with /.
+    require(
+        binding.pointer() == null || binding.pointer().length() <= Limits.MAX_POINTER_CHARACTERS,
+        source,
+        "JSON pointer exceeds " + Limits.MAX_POINTER_CHARACTERS + " characters");
     require(
         SourceBinding.OnError.parse(binding.onError()).isPresent(),
         source,

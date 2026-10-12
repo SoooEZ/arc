@@ -128,9 +128,16 @@ class DiagnosticsTest {
             edge("check", "yes", "true"),
             edge("check", "yes", "false"),
             edge("ghost", "yes", "next"));
+    // An empty ID passed: the canvas selected the connection but could not offer to delete it.
+    var empty =
+        List.of(
+            edge("input", "check", "next"),
+            new Edge("", "check", "yes", "true"),
+            edge("check", "yes", "false"));
     assertShapeProblem(nodes, dangling, "Connection refers to a missing node", "check");
     assertShapeProblem(nodes, handle, "Invalid connection handle", "check");
     assertShapeProblem(nodes, duplicate, "Every connection needs a unique ID", "check");
+    assertShapeProblem(nodes, empty, "Every connection needs a unique ID", "check");
     assertShapeProblem(nodes, orphan, "Connection refers to a missing node", "yes");
   }
 
@@ -197,6 +204,89 @@ class DiagnosticsTest {
         .containsExactly(
             "rate source / key: Variables unavailable on every incoming path: missing",
             "Every node must be reachable from Input; connect or remove unused nodes");
+  }
+
+  /**
+   * Validation and diagnostics run one ordered pass, so the problem /validate or a publish names is
+   * the first one /diagnostics lists. Validation checked source mappings before nodes and nodes in
+   * execution order, while diagnostics walked nodes in document order first, so "Show problem" and
+   * the diagnostics list used to disagree.
+   */
+  @Test
+  void validationNamesTheFirstProblemThatDiagnosticsList() {
+    var scenarios = new LinkedHashMap<String, Definition>();
+    // Nodes b and c both have syntax errors; c runs before b.
+    scenarios.put(
+        "syntax errors in two nodes",
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("b", "FORMULA", "1 +", "vb"),
+                node("c", "FORMULA", "2 +", "vc"),
+                node("out", "OUTPUT", "vb", null)),
+            List.of(edge("input", "c", "next"), edge("c", "b", "next"), edge("b", "out", "next"))));
+    var broken = sourced(new SourceBinding("rates", 1, Map.of("key", "missing"), null, "FAIL"));
+    var withCalc = new ArrayList<>(broken.nodes());
+    withCalc.add(node("calc", "FORMULA", "$ROUND(", "x"));
+    var brokenEdges = new ArrayList<>(broken.edges());
+    brokenEdges.add(edge("input", "calc", "next"));
+    scenarios.put(
+        "a bad source mapping and a bad formula",
+        new Definition(1, broken.inputs(), withCalc, brokenEdges));
+    scenarios.put(
+        "a missing connection and an unreachable node",
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("c1", "CONDITION", "true", null),
+                node("out1", "OUTPUT", "1", null),
+                node("out2", "OUTPUT", "2", null)),
+            List.of(edge("input", "c1", "next"), edge("c1", "out1", "true"))));
+    scenarios.put(
+        "a cycle and a syntax error",
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("loop", "FORMULA", "1 +", "x"),
+                node("out", "OUTPUT", "x", null)),
+            List.of(
+                edge("input", "loop", "next"),
+                edge("loop", "loop", "next"),
+                edge("loop", "out", "next"))));
+    scenarios.put(
+        "independent writers and a syntax error below them",
+        new Definition(
+            1,
+            List.of(),
+            List.of(
+                node("input", "INPUT", null, null),
+                node("a", "FORMULA", "1", "x"),
+                node("b", "FORMULA", "2", "x"),
+                node("join", "FORMULA", "x +", "y"),
+                node("out", "OUTPUT", "y", null)),
+            List.of(
+                edge("input", "a", "next"),
+                edge("input", "b", "next"),
+                edge("a", "join", "next"),
+                edge("b", "join", "next"),
+                edge("join", "out", "next"))));
+    for (var scenario : scenarios.entrySet()) {
+      var error =
+          catchThrowableOfType(
+              ArcException.class, () -> validator.validate(scenario.getValue(), noRules));
+      assertThat(error).as(scenario.getKey()).isNotNull();
+      var problems = validator.diagnose(scenario.getValue(), noRules).problems();
+      assertThat(problems).as(scenario.getKey()).hasSizeGreaterThan(1);
+      assertThat(problems.getFirst())
+          .as(scenario.getKey())
+          .isEqualTo(Validator.Problem.from(error));
+    }
   }
 
   @Test

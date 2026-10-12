@@ -81,6 +81,11 @@ public final class Expressions {
       return evaluate(scope, deadline, FormulaCaller.unavailable());
     }
 
+    /**
+     * Evaluates with bounded scope values: inputs, defaults, source values and node results all
+     * enter through a bound (lesson B6), so operators read their operands without checking them
+     * again. The result is bounded here unless the expression bounded it itself.
+     */
     public Object evaluate(
         Map<String, Object> scope, ExecutionDeadline deadline, FormulaCaller formulas) {
       return deadline.within(
@@ -99,8 +104,7 @@ public final class Expressions {
           "Expression exceeds " + Limits.format(Limits.MAX_EXPRESSION_CHARACTERS) + " characters");
     var parser = new ExpressionParser(source.trim());
     Expr expression = parser.parse(0);
-    if (!parser.peek().equals("<end>"))
-      throw ArcException.invalid("Unexpected token: " + parser.peek());
+    if (!parser.atEnd()) throw ArcException.invalid("Unexpected token: " + parser.peek());
     return new Compiled(expression, parser.variables(), parser.formulaCalls());
   }
 
@@ -108,9 +112,21 @@ public final class Expressions {
     return compile(source).evaluate(scope);
   }
 
-  /** The bounded decimal value of a number ({@link ValueBounds#number}). */
+  /**
+   * The bounded decimal value of a number entering an expression ({@link ValueBounds#number}): a
+   * literal or converted text.
+   */
   public static BigDecimal number(Object value) {
     return ValueBounds.number(value);
+  }
+
+  /**
+   * The decimal value of a number an expression already holds ({@link ValueBounds#decimal}): an
+   * operand, a comparison side, a function argument or an aggregate's item, bounded where it
+   * entered (see {@link Compiled#evaluate}).
+   */
+  static BigDecimal operand(Object value) {
+    return ValueBounds.decimal(value);
   }
 
   public static boolean bool(Object value) {
@@ -125,13 +141,20 @@ public final class Expressions {
   }
 
   /**
+   * The elements and text of a bounded value ({@link ValueBounds#size}), for a budget over many.
+   */
+  public static ValueBounds.Size size(Object value) {
+    return ValueBounds.size(value);
+  }
+
+  /**
    * ARC value equality, used by {@code ==}, {@code !=}, {@code $SWITCH}, {@code $CONTAINS} and
    * Switch nodes. Numbers are equal when their decimal values are ({@code 1 == 1.0}), including
    * inside arrays and objects: arrays compare element by element in order and objects compare the
    * same field names. Other values need the same type, so {@code 1} never equals {@code "1"}.
    */
   public static boolean equal(Object a, Object b) {
-    if (a instanceof Number && b instanceof Number) return number(a).compareTo(number(b)) == 0;
+    if (a instanceof Number && b instanceof Number) return operand(a).compareTo(operand(b)) == 0;
     if (a instanceof List<?> left && b instanceof List<?> right) return sameItems(left, right);
     if (a instanceof Map<?, ?> left && b instanceof Map<?, ?> right) return sameFields(left, right);
     return Objects.equals(a, b);

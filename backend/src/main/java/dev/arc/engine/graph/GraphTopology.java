@@ -11,6 +11,7 @@ final class GraphTopology {
   private final Map<String, List<Edge>> incoming = new HashMap<>();
   private final Map<String, List<Edge>> outgoing = new HashMap<>();
   private final List<Node> order;
+  private final Map<String, Integer> positions = new HashMap<>();
 
   GraphTopology(Definition definition) {
     Map<String, Node> nodes = new LinkedHashMap<>();
@@ -39,6 +40,7 @@ final class GraphTopology {
     }
     if (sorted.size() != nodes.size()) throw cycleError(nodes, sorted);
     order = List.copyOf(sorted);
+    for (int index = 0; index < order.size(); index++) positions.put(order.get(index).id(), index);
   }
 
   /**
@@ -69,6 +71,13 @@ final class GraphTopology {
 
   List<Node> order() {
     return order;
+  }
+
+  /** A node's index in the execution order. */
+  int position(String id) {
+    Integer index = positions.get(id);
+    if (index == null) throw new IllegalArgumentException("Unknown node: " + id);
+    return index;
   }
 
   List<Edge> incoming(String id) {
