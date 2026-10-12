@@ -35,6 +35,10 @@ public final class SourceValidator {
     for (Input p : definition.parameters()) {
       if (p == null || !Identifiers.isValid(p.name()) || !names.add(p.name()) || p.source() != null)
         throw ArcException.invalid("Invalid source parameter");
+      // An omitted or null flag read as optional, so a read without the parameter ran (lesson B29).
+      if (p.required() == null)
+        throw ArcException.invalid(
+            "Declare whether source parameter " + p.name() + " is required (true or false)");
       // A misspelled type is unknown, as for a rule input; a known collection type is not scalar.
       var type =
           InputTypes.Type.parse(p.type())

@@ -16,7 +16,7 @@ import dev.arc.model.Definition.Node;
 import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.Rule;
 import dev.arc.model.RuleKind;
-import dev.arc.rule.RuleRepository.StoredDefinition;
+import dev.arc.rule.RuleRepository.Caller;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,7 +39,7 @@ class RuleServiceTest {
   void ruleIdsFollowTheSharedResourceIdPolicy() {
     String longest = "r" + "-1".repeat(39) + "z";
     service.create(new RuleService.Create(longest, "Longest", "", "FORMULA", null));
-    verify(repository).create(eq(longest), eq("Longest"), eq(""), eq("FORMULA"), any());
+    verify(repository).create(eq(longest), eq("Longest"), eq(""), eq("FORMULA"), any(), any());
     for (String id : new String[] {longest + "z", "Rule", "1rule", "rule_id", null}) {
       assertThatThrownBy(
               () -> service.create(new RuleService.Create(id, "Name", "", "FORMULA", null)))
@@ -75,7 +75,8 @@ class RuleServiceTest {
                 assertThat(error.getMessage()).isEqualTo("Unknown rule kind");
               });
     verify(repository, never()).catalog(any(), anyString(), anyBoolean());
-    verify(repository, never()).create(anyString(), anyString(), anyString(), anyString(), any());
+    verify(repository, never())
+        .create(anyString(), anyString(), anyString(), anyString(), any(), any());
     for (RuleKind kind : RuleKind.values()) service.catalog(page, kind.name(), false);
     service.catalog(page, "", true);
     verify(repository).catalog(page, "", true);
@@ -86,7 +87,8 @@ class RuleServiceTest {
             eq("Tree"),
             eq(""),
             eq("DECISION_TREE"),
-            eq(RuleTemplates.blank(RuleKind.DECISION_TREE)));
+            eq(RuleTemplates.blank(RuleKind.DECISION_TREE)),
+            eq(Set.of()));
   }
 
   @Test
@@ -99,8 +101,8 @@ class RuleServiceTest {
         .hasMessageContaining("changed in another editor");
     assertThatThrownBy(() -> service.publish("example", 2))
         .hasMessageContaining("changed in another editor");
-    verify(repository, never()).update(anyString(), anyString(), anyString(), any());
-    verify(repository, never()).publish(any());
+    verify(repository, never()).update(anyString(), anyString(), anyString(), any(), any());
+    verify(repository, never()).publish(any(), any());
     verifyNoInteractions(definitions);
   }
 
@@ -109,28 +111,29 @@ class RuleServiceTest {
     when(repository.lockForPublication("example")).thenReturn(draft);
     doThrow(ArcException.invalid("Missing source mapping"))
         .when(definitions)
-        .validate(draft.draft());
+        .validateForPublication(draft.draft());
     assertThatThrownBy(() -> service.publish("example", 3))
         .hasMessageContaining("Missing source mapping");
-    verify(repository, never()).publish(any());
+    verify(repository, never()).publish(any(), any());
   }
 
   @Test
   void publicationLocksAndValidatesBeforeSnapshotting() {
     when(repository.lockForPublication("example")).thenReturn(draft);
-    when(repository.publish(draft)).thenReturn(draft);
+    when(repository.publish(draft, Set.of())).thenReturn(draft);
     assertThat(service.publish("example", 3)).isSameAs(draft);
     var order = inOrder(repository, definitions);
     order.verify(repository).lockForPublication("example");
-    order.verify(definitions).validate(draft.draft());
-    order.verify(repository).publish(draft);
+    order.verify(definitions).validateForPublication(draft.draft());
+    order.verify(repository).publish(draft, Set.of());
   }
 
   @Test
   void creationNormalizesMetadataAndUsesThePortableTemplate() {
     service.create(new RuleService.Create("valid-id", "  Example  ", null, "FORMULA", null));
     verify(repository)
-        .create(eq("valid-id"), eq("Example"), eq(""), eq("FORMULA"), eq(calculation()));
+        .create(
+            eq("valid-id"), eq("Example"), eq(""), eq("FORMULA"), eq(calculation()), eq(Set.of()));
   }
 
   @Test
@@ -154,8 +157,9 @@ class RuleServiceTest {
             .hasMessageContaining("valid result variable");
       }
     }
-    verify(repository, never()).create(anyString(), anyString(), anyString(), anyString(), any());
-    verify(repository, never()).update(anyString(), anyString(), anyString(), any());
+    verify(repository, never())
+        .create(anyString(), anyString(), anyString(), anyString(), any(), any());
+    verify(repository, never()).update(anyString(), anyString(), anyString(), any(), any());
     verifyNoInteractions(definitions);
   }
 
@@ -164,26 +168,15 @@ class RuleServiceTest {
     return new Definition(1, List.of(), List.of(inputNode("in", "Input"), node), List.of());
   }
 
-  private static Definition returning(String expression) {
-    return graphWith(outputNode("out", "Output", expression));
-  }
-
-  /**
-   * The text search only narrows the candidates: a string, another rule's ID that contains this
-   * one, and an unfinished expression mention the rule without calling it.
-   */
+  /** No stored callee set names the rule: it goes, and its plans are forgotten after the commit. */
   @Test
-  void aRuleThatOnlyMentionsTheDeletedOneDoesNotKeepIt() {
+  void aRuleNoStoredCalleeSetNamesIsDeleted() {
     when(repository.lockForDeletion("example")).thenReturn(draft.revision());
-    when(repository.definitionsMentioning("example"))
-        .thenReturn(
-            List.of(
-                new StoredDefinition("labels", 1, returning("\"example\"")),
-                new StoredDefinition("other", 2, returning("@example-two:1()")),
-                new StoredDefinition("unfinished", null, returning("@example:1("))));
+    when(repository.callersOf("example")).thenReturn(List.of());
     service.delete("example", null);
     var order = inOrder(repository, engine);
     order.verify(repository).lockForDeletion("example");
+    order.verify(repository).callersOf("example");
     order.verify(repository).delete("example");
     order.verify(engine).forget("example");
   }
@@ -191,12 +184,8 @@ class RuleServiceTest {
   @Test
   void aRuleThatOtherRulesCallIsKeptAndEveryCallerIsNamed() {
     when(repository.lockForDeletion("example")).thenReturn(draft.revision());
-    Node reference = nodeOf("tax", "REFERENCE", "Tax").rule("example", 1).output("tax").build();
-    when(repository.definitionsMentioning("example"))
-        .thenReturn(
-            List.of(
-                new StoredDefinition("checkout", null, graphWith(reference)),
-                new StoredDefinition("checkout", 3, returning("@example:1() * 2"))));
+    when(repository.callersOf("example"))
+        .thenReturn(List.of(new Caller("checkout", null), new Caller("checkout", 3)));
     assertThatThrownBy(() -> service.delete("example", null))
         .isInstanceOfSatisfying(
             ArcException.class,
@@ -215,10 +204,9 @@ class RuleServiceTest {
   @Test
   void aLongCallerListNamesTheFirstFiveAndCountsTheRest() {
     when(repository.lockForDeletion("example")).thenReturn(draft.revision());
-    var callers = new ArrayList<StoredDefinition>();
-    for (String id : List.of("a", "b", "c", "d", "e", "f", "g"))
-      callers.add(new StoredDefinition(id, 1, returning("@example:1()")));
-    when(repository.definitionsMentioning("example")).thenReturn(callers);
+    var callers = new ArrayList<Caller>();
+    for (String id : List.of("a", "b", "c", "d", "e", "f", "g")) callers.add(new Caller(id, 1));
+    when(repository.callersOf("example")).thenReturn(callers);
     assertThatThrownBy(() -> service.delete("example", null))
         .hasMessage(
             "Other rules call this rule: a v1, b v1, c v1, d v1, e v1 and 2 more. Remove those"
@@ -249,20 +237,21 @@ class RuleServiceTest {
                       "This rule changed in another editor. Reload it before saving, publishing or"
                           + " deleting.");
             });
-    verify(repository, never()).definitionsMentioning(anyString());
+    verify(repository, never()).callersOf(anyString());
     verify(repository, never()).delete(anyString());
     service.delete("example", 3);
     verify(repository).delete("example");
   }
 
   /**
-   * The caller check counts every rule a stored draft names, not only the complete pins that
-   * validation resolves: a Reference that has chosen its rule but not its version, and source
-   * mappings of a draft without an Input node.
+   * A write stores every rule its draft names, not only the complete pins that validation resolves:
+   * a Reference that has chosen its rule but not its version, and the source mappings of a draft
+   * without an Input node. That set is what a deletion of the named rule reads, so the draft keeps
+   * the rule as it did when the deletion decoded every candidate itself.
    */
   @Test
-  void unfinishedDraftsKeepTheRulesTheyName() {
-    when(repository.lockForDeletion("example")).thenReturn(draft.revision());
+  void unfinishedDraftsStoreTheRulesTheyNameAsCallees() {
+    when(repository.lockForSave(anyString())).thenReturn(3);
     Node unpinned = nodeOf("tax", "REFERENCE", "Tax").rule("example", null).output("tax").build();
     var sourced =
         new Definition(
@@ -277,48 +266,11 @@ class RuleServiceTest {
                         "rates", 1, Map.of("key", "$TO_STRING(@example:1(1))"), "/rate", "FAIL"))),
             List.of(outputNode("out", "Output", "amount")),
             List.of());
-    when(repository.definitionsMentioning("example"))
-        .thenReturn(
-            List.of(
-                new StoredDefinition("checkout", null, graphWith(unpinned)),
-                new StoredDefinition("pricing", null, sourced)));
-    assertThatThrownBy(() -> service.delete("example", null))
-        .hasMessage(
-            "Other rules call this rule: checkout (draft), pricing (draft). Remove those calls"
-                + " before deleting it.");
-    verify(repository, never()).delete(anyString());
-  }
-
-  /**
-   * A stored row of another model shape (a node type this model does not know, a missing node list,
-   * a source without mappings) is read as it is: the caller scan names the row that pins the rule
-   * and skips the rest instead of answering 500 and blocking the deletion.
-   */
-  @Test
-  void callerScansReadStoredRowsOfAnotherShapeAsTheyAre() {
-    when(repository.lockForDeletion("example")).thenReturn(draft.revision());
-    Node laterKind = nodeOf("later", "LOOP", "Later").rule("example", 2).build();
-    var bare =
-        new Definition(
-            1,
-            List.of(
-                new Input(
-                    "amount",
-                    "NUMBER",
-                    true,
-                    null,
-                    new SourceBinding("rates", 1, null, "/rate", "FAIL"))),
-            null,
-            null);
-    when(repository.definitionsMentioning("example"))
-        .thenReturn(
-            List.of(
-                new StoredDefinition("future", 1, graphWith(laterKind)),
-                new StoredDefinition("bare", null, bare)));
-    assertThatThrownBy(() -> service.delete("example", null))
-        .hasMessage(
-            "Other rules call this rule: future v1. Remove those calls before deleting it.");
-    verify(repository, never()).delete(anyString());
+    service.update("checkout", new RuleService.Update("Checkout", "", 3, graphWith(unpinned)));
+    verify(repository).update("checkout", "Checkout", "", graphWith(unpinned), Set.of("example"));
+    service.update("pricing", new RuleService.Update("Pricing", "", 3, sourced));
+    verify(repository).update("pricing", "Pricing", "", sourced, Set.of("example"));
+    verify(repository, times(2)).lockCallees(Set.of("example"));
   }
 
   /** The rules a draft calls are held against deletion before the write and until the commit. */
@@ -330,35 +282,35 @@ class RuleServiceTest {
         new Rule("example", "Example", "", "RULE", calling, 3, null, Instant.EPOCH, Instant.EPOCH);
     when(repository.lockForPublication("example")).thenReturn(callingDraft);
     when(repository.lockForSave("example")).thenReturn(callingDraft.revision());
-    when(repository.publish(callingDraft)).thenReturn(callingDraft);
+    when(repository.publish(callingDraft, Set.of("callee"))).thenReturn(callingDraft);
 
     service.publish("example", 3);
     var publication = inOrder(repository, definitions);
     publication.verify(repository).lockForPublication("example");
     publication.verify(repository).lockCallees(Set.of("callee"));
-    publication.verify(definitions).validate(calling);
-    publication.verify(repository).publish(callingDraft);
+    publication.verify(definitions).validateForPublication(calling);
+    publication.verify(repository).publish(callingDraft, Set.of("callee"));
 
     service.update("example", new RuleService.Update("Example", "", 3, calling));
     var save = inOrder(repository);
     save.verify(repository).lockCallees(Set.of("callee"));
-    save.verify(repository).update("example", "Example", "", calling);
+    save.verify(repository).update("example", "Example", "", calling, Set.of("callee"));
 
     service.create(new RuleService.Create("caller", "Caller", "", "RULE", calling));
     var creation = inOrder(repository);
     creation.verify(repository).lockCallees(Set.of("callee"));
-    creation.verify(repository).create("caller", "Caller", "", "RULE", calling);
+    creation.verify(repository).create("caller", "Caller", "", "RULE", calling, Set.of("callee"));
   }
 
   @Test
   void namesAreStoredTrimmedAndNeverMadeOfControlCharacters() {
     when(repository.lockForSave("example")).thenReturn(draft.revision());
     service.create(new RuleService.Create("padded", "  Padded  ", "", "FORMULA", null));
-    verify(repository).create(eq("padded"), eq("Padded"), eq(""), eq("FORMULA"), any());
+    verify(repository).create(eq("padded"), eq("Padded"), eq(""), eq("FORMULA"), any(), any());
     // Padding no longer counts toward the limit of the stored name.
     String longest = "n".repeat(160);
     service.create(new RuleService.Create("longest", "  " + longest + "  ", "", "FORMULA", null));
-    verify(repository).create(eq("longest"), eq(longest), eq(""), eq("FORMULA"), any());
+    verify(repository).create(eq("longest"), eq(longest), eq(""), eq("FORMULA"), any(), any());
     // "\u0001\u0000" passed as non-blank, was trimmed to "" and stored empty, past the NUL check.
     assertThatThrownBy(
             () ->
@@ -378,9 +330,11 @@ class RuleServiceTest {
     assertThatThrownBy(
             () -> service.update("example", new RuleService.Update("\u0001", "", 3, draft.draft())))
         .hasMessage("Rule name cannot contain control characters");
-    verify(repository, never()).create(eq("control"), anyString(), anyString(), anyString(), any());
-    verify(repository, never()).create(eq("empty"), anyString(), anyString(), anyString(), any());
-    verify(repository, never()).update(anyString(), anyString(), anyString(), any());
+    verify(repository, never())
+        .create(eq("control"), anyString(), anyString(), anyString(), any(), any());
+    verify(repository, never())
+        .create(eq("empty"), anyString(), anyString(), anyString(), any(), any());
+    verify(repository, never()).update(anyString(), anyString(), anyString(), any(), any());
   }
 
   /** A create and a save store the same metadata: a missing description is stored empty. */
@@ -388,9 +342,9 @@ class RuleServiceTest {
   void aMissingDescriptionIsStoredEmptyByCreatesAndSaves() {
     when(repository.lockForSave("example")).thenReturn(draft.revision());
     service.create(new RuleService.Create("fresh", "Fresh", null, "FORMULA", null));
-    verify(repository).create(eq("fresh"), eq("Fresh"), eq(""), eq("FORMULA"), any());
+    verify(repository).create(eq("fresh"), eq("Fresh"), eq(""), eq("FORMULA"), any(), any());
     service.update("example", new RuleService.Update("Example", null, 3, draft.draft()));
-    verify(repository).update(eq("example"), eq("Example"), eq(""), any());
+    verify(repository).update(eq("example"), eq("Example"), eq(""), any(), any());
   }
 
   @Test
@@ -410,7 +364,8 @@ class RuleServiceTest {
             eq("example"),
             eq("Example"),
             eq(""),
-            argThat(d -> d.notes().equals(List.of("first", "second", "padded", "a", "b"))));
+            argThat(d -> d.notes().equals(List.of("first", "second", "padded", "a", "b"))),
+            any());
     // A new rule stores its notes in the same form; only saves normalized them in a mutation run.
     service.create(new RuleService.Create("noted", "Noted", "", "FORMULA", noted));
     verify(repository)
@@ -419,7 +374,8 @@ class RuleServiceTest {
             eq("Noted"),
             eq(""),
             eq("FORMULA"),
-            argThat(d -> d.notes().equals(List.of("first", "second", "padded", "a", "b"))));
+            argThat(d -> d.notes().equals(List.of("first", "second", "padded", "a", "b"))),
+            any());
     // One stored note with 600 line breaks rendered more comments than the code could build.
     var tooMany =
         new Definition(1, base.inputs(), base.nodes(), base.edges(), List.of("x\n".repeat(600)));

@@ -577,6 +577,82 @@ class HttpSourceTest {
     }
   }
 
+  /**
+   * HttpClient resolved the host through the policy on the calling thread before any socket
+   * existed, outside every timeout and the cancellation: a stalled resolver held the evaluation
+   * thread, and the request thread waiting on it, for the OS resolver's retry window, seconds past
+   * both the source timeout and the execution deadline. The lookup now runs on its own thread and
+   * the call waits for it only as long as it has time.
+   */
+  @Test
+  void aStalledDnsLookupEndsAtTheCallTimeoutOrTheExecutionDeadline() throws Exception {
+    var release = new CountDownLatch(1);
+    var stalled =
+        new HttpDestinationPolicy(
+            "",
+            "",
+            host -> {
+              try {
+                release.await();
+              } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+              }
+              throw new UnknownHostException(host);
+            });
+    try (var http = new HttpSource(new ObjectMapper(), stalled)) {
+      long started = System.nanoTime();
+      assertThatThrownBy(() -> fetch(http, config("http://stalled-dns.example/", 100), Map.of()))
+          .isInstanceOf(ArcException.class)
+          .hasMessageStartingWith("HTTP source failed");
+      assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
+          .as("the source timeout bounds the lookup")
+          .isLessThan(1_000);
+      var deadline = ExecutionDeadline.start(100);
+      started = System.nanoTime();
+      assertThatThrownBy(
+              () -> http.fetch(config("http://stalled-dns.example/", 2_000), Map.of(), deadline))
+          .isInstanceOfSatisfying(
+              ArcException.class, error -> assertThat(error.status()).isEqualTo(504))
+          .hasMessage("Rule execution deadline exceeded");
+      assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
+          .as("the execution deadline bounds the lookup")
+          .isLessThan(1_000);
+    } finally {
+      release.countDown();
+    }
+  }
+
+  /**
+   * A provider document is bounded while it is parsed, with the walk's own messages: a 1 MiB body
+   * of empty arrays was built in full (some 350,000 lists, 18 MB) before the walk over it threw at
+   * element 10,001, for every read of the document, fallbacks included.
+   */
+  @Test
+  void oversizedResponsesAreRefusedWithTheValueBoundMessagesWhileParsing() throws Exception {
+    var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    String runsOfEmptyArrays = "[" + ("[" + "[],".repeat(999) + "[]],").repeat(10) + "[]]";
+    server.createContext("/empty-arrays", exchange -> respond(exchange, 200, runsOfEmptyArrays));
+    server.createContext(
+        "/wide", exchange -> respond(exchange, 200, "{\"rows\":[" + "1,".repeat(1_000) + "1]}"));
+    server.createContext(
+        "/long-text",
+        exchange -> respond(exchange, 200, "{\"note\":\"" + "x".repeat(2_001) + "\"}"));
+    server.start();
+    String base = "http://127.0.0.1:" + server.getAddress().getPort();
+    try (var http = new HttpSource(new ObjectMapper(), "", "127.0.0.1")) {
+      for (var oversized :
+          List.of(
+              Map.entry("/empty-arrays", "Value exceeds collection depth or size limit"),
+              Map.entry("/wide", "Array exceeds 1,000 items"),
+              Map.entry("/long-text", "String exceeds 2,000 characters")))
+        assertThatThrownBy(() -> fetch(http, config(base + oversized.getKey(), 5_000), Map.of()))
+            .as(oversized.getKey())
+            .hasMessage(oversized.getValue());
+    } finally {
+      server.stop(0);
+    }
+  }
+
   private static void respond(HttpExchange exchange, int status, String json) throws IOException {
     byte[] body = json.getBytes(StandardCharsets.UTF_8);
     exchange.sendResponseHeaders(status, body.length);

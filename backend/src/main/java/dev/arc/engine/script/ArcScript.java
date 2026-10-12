@@ -42,10 +42,6 @@ public class ArcScript {
     }
   }
 
-  public Definition parse(String source) {
-    return parser.parse(source).definition();
-  }
-
   /**
    * The notes a draft keeps for one note: one per line, each without surrounding whitespace, the
    * only form an ARC Script comment can carry. A build returns notes in this form.

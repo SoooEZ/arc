@@ -1,7 +1,5 @@
 package dev.arc.api;
 
-import static dev.arc.support.GraphFixtures.inputNode;
-import static dev.arc.support.GraphFixtures.outputNode;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -14,11 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
-import dev.arc.model.Definition;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
-import dev.arc.rule.RuleRepository.StoredDefinition;
+import dev.arc.rule.RuleRepository.Caller;
 import dev.arc.rule.RuleService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -69,14 +66,7 @@ class RuleDeletionWebTest {
 
   @Test
   void aCalledRuleIsAConflictWhoseIssuesListEveryCaller() throws Exception {
-    var calling =
-        new Definition(
-            1,
-            List.of(),
-            List.of(inputNode("in", "Input"), outputNode("out", "Output", "@rates:2()")),
-            List.of());
-    when(rules.definitionsMentioning("rates"))
-        .thenReturn(List.of(new StoredDefinition("checkout", 4, calling)));
+    when(rules.callersOf("rates")).thenReturn(List.of(new Caller("checkout", 4)));
     mvc.perform(delete("/api/rules/rates"))
         .andExpect(status().isConflict())
         .andExpect(

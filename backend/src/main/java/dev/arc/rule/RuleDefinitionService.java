@@ -43,9 +43,37 @@ public class RuleDefinitionService {
     this.engine = engine;
   }
 
-  /** The editor's check: pins an execution has compiled are read from its plans. */
+  /**
+   * The editor's check ({@code POST /validate}), outside any transaction: pins an execution or an
+   * earlier editor check has compiled are read from their plans, and the plans compiled for the
+   * pins it reaches are kept ({@link Engine#check}). Every diagnostics request, sent 350 ms after
+   * each semantic edit, read, decoded and compiled every reached pin again before.
+   */
   public void validate(Definition definition) {
-    validate(definition, new MemoizingRuleResolver(engine.cachedFirst(rules)));
+    var check = engine.check(new MemoizingRuleResolver(engine.cachedFirst(rules)));
+    check(definition, check.resolver(), check::prepare);
+  }
+
+  /**
+   * A publication's check, inside its transaction: it reuses cached plans but keeps none of its
+   * own, because it may read versions its transaction has not committed ({@link
+   * Engine#prepareForCheck}, lesson B34).
+   */
+  public void validateForPublication(Definition definition) {
+    var resolver = new MemoizingRuleResolver(engine.cachedFirst(rules));
+    check(
+        definition,
+        resolver,
+        (ruleId, version, callee) -> engine.prepareForCheck(ruleId, version, callee, resolver));
+  }
+
+  /**
+   * A reached pin's version must still compile: one holding a property its kind does not use, or an
+   * unprefixed call, passed every static check and then failed every execution of the parent.
+   */
+  private void check(Definition definition, RuleResolver resolver, CalleeCheck calleesCompile) {
+    validator.validate(definition, resolver);
+    sources.validatePinnedContracts(definition, resolver, calleesCompile);
   }
 
   public ExpressionCheck checkExpression(String source) {
@@ -58,20 +86,6 @@ public class RuleDefinitionService {
     }
   }
 
-  public void validate(Definition definition, RuleResolver resolver) {
-    validator.validate(definition, resolver);
-    sources.validatePinnedContracts(definition, resolver, calleesCompile(resolver));
-  }
-
-  /**
-   * A reached pin's version must still compile: one holding a property its kind does not use, or an
-   * unprefixed call, passed every static check and then failed every execution of the parent. A
-   * plan an execution compiled answers it ({@link Engine#prepareForCheck}).
-   */
-  private CalleeCheck calleesCompile(RuleResolver resolver) {
-    return (ruleId, version, callee) -> engine.prepareForCheck(ruleId, version, callee, resolver);
-  }
-
   /** Scopes depend on the graph's structure alone: invalid structure or a cycle still fails. */
   public Map<String, Set<String>> variables(Definition definition) {
     validator.structure(definition);
@@ -80,16 +94,17 @@ public class RuleDefinitionService {
 
   /**
    * Graph problems, then the first source-contract problem. Pin and syntax problems belong to the
-   * graph checks, so the source-contract check skips the pins they rejected.
+   * graph checks, so the source-contract check skips the pins they rejected. Like {@link
+   * #validate}, it keeps the plans of the pins it reaches.
    */
   public List<Validator.Problem> diagnostics(Definition definition) {
-    var resolver = new MemoizingRuleResolver(engine.cachedFirst(rules));
-    var diagnosis = validator.diagnose(definition, resolver);
+    var check = engine.check(new MemoizingRuleResolver(engine.cachedFirst(rules)));
+    var diagnosis = validator.diagnose(definition, check.resolver());
     var problems = new ArrayList<>(diagnosis.problems());
     if (diagnosis.shaped() && hasOneInputNode(definition)) {
       try {
         sources.validateRemainingPins(
-            definition, resolver, diagnosis.dependencies(), calleesCompile(resolver));
+            definition, check.resolver(), diagnosis.dependencies(), check::prepare);
       } catch (ArcException error) {
         problems.add(Validator.Problem.from(error));
       }

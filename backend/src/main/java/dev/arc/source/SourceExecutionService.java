@@ -105,7 +105,7 @@ public class SourceExecutionService {
           inputs.containsKey(parameter.name())
               ? inputs.get(parameter.name())
               : parameter.defaultValue();
-      if (value == null && parameter.required())
+      if (value == null && parameter.isRequired())
         throw ArcException.invalid("Missing source parameter: " + parameter.name());
       values.put(
           parameter.name(),

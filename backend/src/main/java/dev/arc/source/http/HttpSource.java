@@ -3,6 +3,7 @@ package dev.arc.source.http;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import dev.arc.engine.BoundedJsonParser;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.Limits;
 import dev.arc.engine.ValueBounds;
@@ -11,10 +12,15 @@ import dev.arc.error.ArcException;
 import dev.arc.model.SourceDefinition;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.concurrent.*;
 import org.apache.hc.client5.http.DnsResolver;
@@ -27,6 +33,7 @@ import org.apache.hc.client5.http.impl.io.DefaultHttpClientConnectionOperator;
 import org.apache.hc.client5.http.impl.io.ManagedHttpClientConnectionFactory;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionOperator;
+import org.apache.hc.client5.http.io.ManagedHttpClientConnection;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.client5.http.ssl.TlsSocketStrategy;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -34,7 +41,9 @@ import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.URIScheme;
 import org.apache.hc.core5.http.config.Http1Config;
 import org.apache.hc.core5.http.config.RegistryBuilder;
+import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.http.protocol.HttpContext;
+import org.apache.hc.core5.net.NamedEndpoint;
 import org.apache.hc.core5.net.PercentCodec;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,13 +75,16 @@ public class HttpSource implements AutoCloseable {
   private static final String CALL_ENDS = "dev.arc.source.http.call-ends";
 
   private final ScheduledThreadPoolExecutor cancellations =
-      new ScheduledThreadPoolExecutor(
-          1,
-          r -> {
-            Thread t = new Thread(r, "arc-http-deadlines");
-            t.setDaemon(true);
-            return t;
-          });
+      new ScheduledThreadPoolExecutor(1, daemonThreads("arc-http-deadlines"));
+
+  /**
+   * Host lookups, one thread per lookup in flight: InetAddress.getAllByName cannot be interrupted,
+   * so a lookup the call gave up on keeps its thread until the OS resolver answers, and must not
+   * hold up the next call's lookup.
+   */
+  private final ExecutorService lookups =
+      Executors.newCachedThreadPool(daemonThreads("arc-http-dns"));
+
   private final ObjectReader responses;
   private final HttpDestinationPolicy destinations;
   private final CloseableHttpClient client;
@@ -122,19 +134,22 @@ public class HttpSource implements AutoCloseable {
 
   /**
    * GETs the configured URL with the non-null inputs appended as query parameters. The call is
-   * cancelled at the source timeout or the execution deadline, whichever comes first.
+   * cancelled at the source timeout or the execution deadline, whichever comes first. The
+   * definition's timeout must be set: {@link HttpSourceAdapter} refuses one without it.
    */
   public Object fetch(
       SourceDefinition definition, Map<String, Object> inputs, ExecutionDeadline deadline) {
     deadline.check();
     URI configured = validate(definition);
+    long configuredTimeoutMs =
+        Objects.requireNonNull(definition.timeoutMs(), "HTTP source timeout is not configured");
     try {
       var request = new HttpGet(withQueryParameters(configured, queryParameters(inputs)));
       request.setHeader("Accept", "application/json");
       if (definition.secretHeaders() != null)
         for (var header : definition.secretHeaders().entrySet())
           request.setHeader(header.getKey(), secret(header.getValue()));
-      long timeoutMs = Math.min(definition.timeoutMs(), deadline.remainingMillis());
+      long timeoutMs = Math.min(configuredTimeoutMs, deadline.remainingMillis());
       request.setConfig(requestConfig(timeoutMs));
       var context = HttpClientContext.create();
       context.setAttribute(CALL_ENDS, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs));
@@ -162,7 +177,16 @@ public class HttpSource implements AutoCloseable {
   @PreDestroy
   public void close() throws IOException {
     cancellations.shutdownNow();
+    lookups.shutdownNow();
     client.close();
+  }
+
+  private static ThreadFactory daemonThreads(String name) {
+    return runnable -> {
+      Thread thread = new Thread(runnable, name);
+      thread.setDaemon(true);
+      return thread;
+    };
   }
 
   /**
@@ -234,16 +258,26 @@ public class HttpSource implements AutoCloseable {
         throw abort(
             request, "HTTP source response exceeds " + Limits.formatBytes(MAX_RESPONSE_BYTES));
     }
-    return ValueBounds.bounded(responses.readValue(body));
+    // The value bounds are enforced while the body is parsed, so an oversized document fails at
+    // its first exceeded bound instead of being built in full first; the walk over the built value
+    // remains the arbiter.
+    try (var parser = responses.createParser(body)) {
+      return ValueBounds.bounded(responses.readValue(new BoundedJsonParser(parser)));
+    }
   }
 
   /**
-   * Connections that try a host's next resolved address only while the call has time left.
-   * Cancelling a call closes the socket open at that moment, and HttpClient then tried every other
-   * address with a fresh connect and TLS timeout, so one read lasted addresses x timeoutMs.
+   * Connections whose host lookup and connection attempts stay within the call's time. The lookup
+   * runs through the destination policy on a lookup thread, and the call waits for it only as long
+   * as it has time left: HttpClient resolved the host on the calling thread before any socket
+   * existed, outside every timeout and the cancellation, so a stalled resolver held the evaluation
+   * thread, and the request thread waiting on it, for the OS resolver's whole retry window. The
+   * policy stays the client's own resolver as a second line. Each resolved address is then tried in
+   * turn only while the call has time left: cancelling a call closes the socket open at that
+   * moment, and HttpClient then tried every other address with a fresh connect and TLS timeout, so
+   * one read lasted addresses x timeoutMs.
    */
-  private static final class DeadlineAwareConnections
-      extends PoolingHttpClientConnectionManagerBuilder {
+  private final class DeadlineAwareConnections extends PoolingHttpClientConnectionManagerBuilder {
     @Override
     protected HttpClientConnectionOperator createConnectionOperator(
         SchemePortResolver schemePortResolver,
@@ -256,11 +290,85 @@ public class HttpSource implements AutoCloseable {
               .register(URIScheme.HTTPS.id, tlsSocketStrategy)
               .build()) {
         @Override
+        public void connect(
+            ManagedHttpClientConnection connection,
+            HttpHost endpointHost,
+            NamedEndpoint endpointName,
+            InetSocketAddress localAddress,
+            Timeout connectTimeout,
+            SocketConfig socketConfig,
+            Object attachment,
+            HttpContext context)
+            throws IOException {
+          InetAddress[] addresses =
+              endpointHost.getAddress() != null
+                  ? new InetAddress[] {endpointHost.getAddress()}
+                  : resolveWithin(
+                      endpointHost.getHostName(), remainingNanos(context, connectTimeout));
+          for (int index = 0; index < addresses.length; index++) {
+            // A host that carries its address makes HttpClient skip its own lookup.
+            var resolved =
+                new HttpHost(
+                    endpointHost.getSchemeName(),
+                    addresses[index],
+                    endpointHost.getHostName(),
+                    endpointHost.getPort());
+            try {
+              super.connect(
+                  connection,
+                  resolved,
+                  endpointName,
+                  localAddress,
+                  connectTimeout,
+                  socketConfig,
+                  attachment,
+                  context);
+              return;
+            } catch (IOException failure) {
+              // The next address, as HttpClient's own loop does; the last failure is the call's.
+              if (index == addresses.length - 1) throw failure;
+            }
+          }
+        }
+
+        @Override
         protected void onBeforeSocketConnect(HttpContext context, HttpHost host) {
           if (context.getAttribute(CALL_ENDS) instanceof Long ends && System.nanoTime() - ends >= 0)
             throw new CallTimedOut();
         }
       };
+    }
+  }
+
+  /**
+   * The nanoseconds a call has left, from its context; a context without the mark gets the connect
+   * timeout.
+   */
+  private static long remainingNanos(HttpContext context, Timeout connectTimeout) {
+    if (context.getAttribute(CALL_ENDS) instanceof Long ends) return ends - System.nanoTime();
+    return TimeUnit.MILLISECONDS.toNanos(connectTimeout.toMilliseconds());
+  }
+
+  /**
+   * The host's addresses, checked by the destination policy, from a lookup thread the call waits
+   * for only as long as it has time; a lookup still running afterwards is abandoned.
+   */
+  private InetAddress[] resolveWithin(String host, long remainingNanos) throws IOException {
+    if (remainingNanos <= 0) throw new CallTimedOut();
+    Future<InetAddress[]> lookup = lookups.submit(() -> destinations.resolve(host));
+    try {
+      return lookup.get(remainingNanos, TimeUnit.NANOSECONDS);
+    } catch (TimeoutException late) {
+      lookup.cancel(true);
+      throw new UnknownHostException(host + ": DNS lookup did not answer within the call's time");
+    } catch (ExecutionException failed) {
+      if (failed.getCause() instanceof IOException refused) throw refused;
+      if (failed.getCause() instanceof RuntimeException unexpected) throw unexpected;
+      throw new IOException(failed.getCause());
+    } catch (InterruptedException interrupted) {
+      lookup.cancel(true);
+      Thread.currentThread().interrupt();
+      throw new InterruptedIOException(host + ": DNS lookup interrupted");
     }
   }
 

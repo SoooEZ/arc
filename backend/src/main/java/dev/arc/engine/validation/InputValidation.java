@@ -33,6 +33,12 @@ final class InputValidation {
       require(Identifiers.isValid(parameter.name()), declaration, identifiers);
       require(
           InputTypes.Type.parse(parameter.type()).isPresent(), declaration, "Unknown input type");
+      // An omitted or null flag is a request the mapper cannot refuse itself; read as optional it
+      // skipped the binding and argument checks and the 422 at execution (lesson B29).
+      require(
+          parameter.required() != null,
+          declaration,
+          "Declare whether input " + parameter.name() + " is required (true or false)");
       if (parameter.defaultValue() != null) checkDefault(parameter, declaration);
       if (parameter.source() != null) checkSource(parameter);
     }

@@ -16,6 +16,9 @@ class ArcExceptionTest {
             new Expected(ArcException.notAvailable("bad"), 422, Kind.NOT_AVAILABLE, true),
             new Expected(ArcException.limit("bad"), 422, Kind.LIMIT, false),
             new Expected(ArcException.deadline("bad"), 504, Kind.DEADLINE, false),
+            // Status-only outcomes: the kind stays INVALID, as with the public constructors.
+            new Expected(ArcException.notFound("bad"), 404, Kind.INVALID, true),
+            new Expected(ArcException.conflict("bad"), 409, Kind.INVALID, true),
             new Expected(
                 ArcException.invalid("bad").asDefinitionFailure(), 422, Kind.DEFINITION, false))) {
       var error = expected.error();
@@ -26,6 +29,11 @@ class ArcExceptionTest {
       assertThat(error.issues()).containsExactly("bad");
       assertThat(error.locations()).isEmpty();
     }
+    var listed = ArcException.conflict("two callers", List.of("a v1", "b (draft)"));
+    assertThat(listed.status()).isEqualTo(409);
+    assertThat(listed.kind()).isEqualTo(Kind.INVALID);
+    assertThat(listed.getMessage()).isEqualTo("two callers");
+    assertThat(listed.issues()).containsExactly("a v1", "b (draft)");
   }
 
   @Test

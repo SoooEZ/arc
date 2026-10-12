@@ -7,6 +7,7 @@ import dev.arc.engine.execution.Engine;
 import dev.arc.engine.script.ArcScript;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
+import dev.arc.error.Revisions;
 import dev.arc.model.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,18 +88,25 @@ public class RuleService {
     RuleKind kind =
         RuleKind.parse(request.kind())
             .orElseThrow(() -> ArcException.invalid("Choose " + RuleKind.choices()));
-    Definition draft =
+    StorableDraft draft =
         storableDraft(
             request.definition() == null ? RuleTemplates.blank(kind) : request.definition());
-    return store.create(request.id(), metadata.name(), metadata.description(), kind.name(), draft);
+    return store.create(
+        request.id(),
+        metadata.name(),
+        metadata.description(),
+        kind.name(),
+        draft.definition(),
+        draft.callees());
   }
 
   @Transactional
   public Rule update(String id, Update request) {
     requireRevision(store.lockForSave(id), request.revision());
     Metadata metadata = metadata(request.name(), request.description());
-    Definition draft = storableDraft(request.definition());
-    return store.update(id, metadata.name(), metadata.description(), draft);
+    StorableDraft draft = storableDraft(request.definition());
+    return store.update(
+        id, metadata.name(), metadata.description(), draft.definition(), draft.callees());
   }
 
   /** The name and description a create or a save stores. */
@@ -115,24 +123,26 @@ public class RuleService {
     return new Metadata(trimmed, description == null ? "" : description);
   }
 
+  /** A draft ready to store, with the rules it calls, which the write stores beside it. */
+  private record StorableDraft(Definition definition, Set<String> callees) {}
+
   /**
    * The draft a create or a save stores: its notes in comment form and its shape checked, with the
    * rules it calls held against deletion until the commit.
    */
-  private Definition storableDraft(Definition definition) {
+  private StorableDraft storableDraft(Definition definition) {
     Definition draft = withNormalizedNotes(definition);
     validator.shape(draft);
-    holdCallees(draft);
-    return draft;
+    return new StorableDraft(draft, holdCallees(draft));
   }
 
   @Transactional
   public Rule publish(String id, Integer revision) {
     Rule rule = store.lockForPublication(id);
     requireRevision(rule.revision(), revision);
-    holdCallees(rule.draft());
-    definitions.validate(rule.draft());
-    return store.publish(rule);
+    Set<String> callees = holdCallees(rule.draft());
+    definitions.validateForPublication(rule.draft());
+    return store.publish(rule, callees);
   }
 
   /**
@@ -149,8 +159,7 @@ public class RuleService {
     if (revision != null) requireRevision(current, revision);
     List<String> callers = callersOf(id);
     if (!callers.isEmpty())
-      throw new ArcException(
-          409,
+      throw ArcException.conflict(
           "Other rules call this rule: "
               + named(callers)
               + ". Remove those calls before deleting it.",
@@ -161,23 +170,19 @@ public class RuleService {
 
   /**
    * Holds the rules a definition calls until the commit, so deleting one of them either waits for
-   * this write or, having committed first, is already gone when the write validates.
+   * this write or, having committed first, is already gone when the write validates. The same set
+   * is what the write stores beside the definition, for later deletions to find their callers.
    */
-  private void holdCallees(Definition definition) {
+  private Set<String> holdCallees(Definition definition) {
     Set<String> callees = Validator.calledRuleIds(definition);
     if (!callees.isEmpty()) store.lockCallees(callees);
+    return callees;
   }
 
   /** Each draft ("checkout (draft)") or published version ("checkout v3") that calls the rule. */
   private List<String> callersOf(String id) {
     var callers = new ArrayList<String>();
-    for (var stored : store.definitionsMentioning(id)) {
-      if (!Validator.calledRuleIds(stored.definition()).contains(id)) continue;
-      callers.add(
-          stored.version() == null
-              ? stored.ruleId() + " (draft)"
-              : stored.ruleId() + " v" + stored.version());
-    }
+    for (var caller : store.callersOf(id)) callers.add(caller.describe());
     return callers;
   }
 
@@ -208,15 +213,14 @@ public class RuleService {
   }
 
   /**
-   * A missing revision is a malformed request (422), not a stale one: read as 0 it answered 409
-   * however often the client reloaded. A deletion leaves the check out when it names no revision.
+   * The shared revision policy ({@link Revisions#require}) with a rule's stale message. A deletion
+   * leaves the check out when it names no revision.
    */
   private static void requireRevision(int current, Integer read) {
-    if (read == null) throw ArcException.invalid("Revision is required");
-    if (current != read)
-      throw new ArcException(
-          409,
-          "This rule changed in another editor. Reload it before saving, publishing or deleting.");
+    Revisions.require(
+        current,
+        read,
+        "This rule changed in another editor. Reload it before saving, publishing or deleting.");
   }
 
   /**

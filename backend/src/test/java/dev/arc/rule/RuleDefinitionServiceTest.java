@@ -17,6 +17,7 @@ import dev.arc.model.SourceDefinition;
 import dev.arc.source.SourceBindingValidator;
 import dev.arc.source.SourceRepository;
 import dev.arc.source.SourceVersions;
+import dev.arc.support.Engines;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
@@ -30,52 +31,47 @@ class RuleDefinitionServiceTest {
           validator,
           rules,
           new SourceBindingValidator(new SourceVersions(sources)),
-          new Engine(validator));
+          Engines.engine(validator));
 
-  /**
-   * A static check reuses the plan an execution compiled for a pin, and stores none of its own,
-   * because a check may read versions its transaction has not committed. The sample seed publishes
-   * apply-discount and then order-pricing in one transaction and rolls both back when a sample ID
-   * is taken; the plan its check had cached then ran a version that did not exist, and later the
-   * user's own apply-discount v1.
-   */
-  @Test
-  void staticChecksReuseExecutionPlansAndStoreNone() {
-    var child =
-        new Definition(
-            1,
-            List.of(),
-            List.of(
-                dev.arc.support.GraphFixtures.inputNode("in", "Input"),
-                dev.arc.support.GraphFixtures.outputNode("o", "O", "2")),
-            List.of(new Edge("next", "in", "o", "next")));
-    var parent =
-        new Definition(
-            1,
-            List.of(),
-            List.of(
-                dev.arc.support.GraphFixtures.inputNode("input", "Inputs"),
-                nodeOf("ref", "REFERENCE", "Ref").rule("child", 1).output("r").build(),
-                dev.arc.support.GraphFixtures.outputNode("out", "Out", "r")),
-            List.of(new Edge("a", "input", "ref", "next"), new Edge("b", "ref", "out", "next")));
-    var compiled = new ArrayList<Definition>();
-    var counting =
-        new Validator() {
-          @Override
-          public dev.arc.engine.validation.CompiledGraph compile(
-              Definition definition, dev.arc.engine.RuleResolver resolver) {
-            compiled.add(definition);
-            return super.compile(definition, resolver);
-          }
-        };
-    var engine = new Engine(counting);
-    var checks =
-        new RuleDefinitionService(
-            counting, rules, new SourceBindingValidator(new SourceVersions(sources)), engine);
-    when(rules.resolve("child", 1)).thenReturn(child);
-    checks.validate(parent);
+  private final Definition child =
+      new Definition(
+          1,
+          List.of(),
+          List.of(
+              dev.arc.support.GraphFixtures.inputNode("in", "Input"),
+              dev.arc.support.GraphFixtures.outputNode("o", "O", "2")),
+          List.of(new Edge("next", "in", "o", "next")));
+  private final Definition parent =
+      new Definition(
+          1,
+          List.of(),
+          List.of(
+              dev.arc.support.GraphFixtures.inputNode("input", "Inputs"),
+              nodeOf("ref", "REFERENCE", "Ref").rule("child", 1).output("r").build(),
+              dev.arc.support.GraphFixtures.outputNode("out", "Out", "r")),
+          List.of(new Edge("a", "input", "ref", "next"), new Edge("b", "ref", "out", "next")));
+
+  /** The definitions a validator compiled, to tell a reused plan from a fresh compile. */
+  private final List<Definition> compiled = new ArrayList<>();
+
+  private final Validator counting =
+      new Validator() {
+        @Override
+        public dev.arc.engine.validation.CompiledGraph compile(
+            Definition definition, dev.arc.engine.RuleResolver resolver) {
+          compiled.add(definition);
+          return super.compile(definition, resolver);
+        }
+      };
+  private final Engine countingEngine = Engines.engine(counting);
+  private final RuleDefinitionService checks =
+      new RuleDefinitionService(
+          counting, rules, new SourceBindingValidator(new SourceVersions(sources)), countingEngine);
+
+  /** How often a later execution has to read the child's version: 0 once a plan of it is cached. */
+  private int readsOfChildByAnExecution() {
     var reads = new java.util.concurrent.atomic.AtomicInteger();
-    engine
+    countingEngine
         .session(rules, ExecutionDeadline.start(1000))
         .prepare(
             "child",
@@ -84,9 +80,41 @@ class RuleDefinitionServiceTest {
               reads.incrementAndGet();
               return child;
             });
-    assertThat(reads).as("the check stored no plan").hasValue(1);
-    // The pin an execution compiled is neither compiled nor read from storage again by later
-    // checks: diagnostics read and decoded every reached pin on each request.
+    return reads.get();
+  }
+
+  /**
+   * A publication's check reuses the plan an execution compiled for a pin, and stores none of its
+   * own, because it may read versions its transaction has not committed. The sample seed publishes
+   * apply-discount and then order-pricing in one transaction and rolls both back when a sample ID
+   * is taken; the plan its check had cached then ran a version that did not exist, and later the
+   * user's own apply-discount v1 (lesson B34).
+   */
+  @Test
+  void aPublicationCheckReusesExecutionPlansAndStoresNone() {
+    when(rules.resolve("child", 1)).thenReturn(child);
+    checks.validateForPublication(parent);
+    assertThat(readsOfChildByAnExecution()).as("the check stored no plan").isEqualTo(1);
+    // The pin the execution compiled is neither compiled nor read from storage again.
+    compiled.clear();
+    clearInvocations(rules);
+    for (int request = 0; request < 3; request++) checks.validateForPublication(parent);
+    assertThat(compiled).filteredOn(child::equals).isEmpty();
+    verify(rules, never()).resolve("child", 1);
+  }
+
+  /**
+   * The editor's validate and diagnostics run outside any transaction and read committed versions
+   * only, so they keep the plans of the pins they reach: every diagnostics request, sent 350 ms
+   * after each edit, read, decoded and fully compiled every reached pin again until an execution or
+   * preview had cached it.
+   */
+  @Test
+  void editorChecksKeepThePlansOfThePinsTheyReach() {
+    when(rules.resolve("child", 1)).thenReturn(child);
+    assertThat(checks.diagnostics(parent)).isEmpty();
+    verify(rules, times(1)).resolve("child", 1);
+    assertThat(compiled).filteredOn(child::equals).hasSize(1);
     compiled.clear();
     clearInvocations(rules);
     for (int request = 0; request < 3; request++) {
@@ -95,6 +123,23 @@ class RuleDefinitionServiceTest {
     }
     assertThat(compiled).filteredOn(child::equals).isEmpty();
     verify(rules, never()).resolve("child", 1);
+    assertThat(readsOfChildByAnExecution()).as("an execution runs the check's plan").isZero();
+  }
+
+  /**
+   * A check keeps a plan only while the generation it began in lasts: a version read before a
+   * rule's deletion is never stored after it, so an ID used again never runs the deleted rule's
+   * plan ({@code Engine.forget}, as for executions).
+   */
+  @Test
+  void anEditorCheckThatBeganBeforeADeletionStoresNoPlanAfterIt() {
+    when(rules.resolve("child", 1)).thenReturn(child);
+    var resolver = new dev.arc.engine.MemoizingRuleResolver(countingEngine.cachedFirst(rules));
+    var check = countingEngine.check(resolver);
+    countingEngine.forget("child");
+    check.prepare("child", 1, child);
+    assertThat(readsOfChildByAnExecution()).as("the stale check stored no plan").isEqualTo(1);
+    assertThat(readsOfChildByAnExecution()).as("the execution stored its plan").isZero();
   }
 
   @Test
@@ -276,6 +321,35 @@ class RuleDefinitionServiceTest {
     var cycle = new Definition(1, inputs, valid.nodes(), backEdges);
     assertThatThrownBy(() -> service.variables(cycle))
         .hasMessage("Decision graphs cannot contain cycles");
+  }
+
+  /**
+   * An input whose required flag was left out of the request (or sent as null) is a draft-shape
+   * problem reported on the Input node, for the editor's check and its diagnostics alike; read as
+   * optional, it passed every check and ran the graph with a null amount (lesson B29).
+   */
+  @Test
+  void anInputWithoutARequiredFlagFailsTheShapeCheckOnTheInputNode() {
+    var valid = graph(null, "amount");
+    var undeclared =
+        new Definition(
+            1,
+            List.of(new Input("amount", "NUMBER", null, null, null)),
+            valid.nodes(),
+            valid.edges());
+    var expected =
+        new Validator.Problem(
+            "Declare whether input amount is required (true or false)",
+            List.of(new Location(null, null, "input", "Inputs")));
+    assertThatThrownBy(() -> service.validate(undeclared))
+        .isInstanceOfSatisfying(
+            ArcException.class,
+            error -> {
+              assertThat(error.status()).isEqualTo(422);
+              assertThat(Validator.Problem.from(error)).isEqualTo(expected);
+            });
+    assertThat(service.diagnostics(undeclared)).containsExactly(expected);
+    verifyNoInteractions(sources);
   }
 
   /** A published child whose input reads an HTTP source without mapping its required key. */

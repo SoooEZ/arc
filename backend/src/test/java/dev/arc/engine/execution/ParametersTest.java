@@ -13,6 +13,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.source.JsonPointerExtractor;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.Function;
@@ -208,9 +209,14 @@ class ParametersTest {
               List.of(inputNode("input", "Inputs"), outputNode("out", "Total", "total")),
               List.of(new Edge("input-out", "input", "out", "next")));
       var result =
-          new Engine(new Validator())
-              .execute(
-                  "rule", 1, definition, Map.of(), (id, version) -> null, new Parameters(reader));
+          Engines.execute(
+              new Validator(),
+              "rule",
+              1,
+              definition,
+              Map.of(),
+              (id, version) -> null,
+              new Parameters(reader));
       assertThat(result.result()).isEqualTo(BigDecimal.ONE);
       assertThat(result.sources()).extracting(Parameters.Read::input).isEqualTo(expected);
       var inputTrace = (Map<?, ?>) result.trace().getFirst().value();

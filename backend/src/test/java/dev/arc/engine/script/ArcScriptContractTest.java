@@ -39,7 +39,7 @@ class ArcScriptContractTest {
         }
         node done OUTPUT "Done" { return result; }
         """;
-    var definition = script.parse(source);
+    var definition = ScriptParsing.parse(source);
     String canonical =
         """
         schema 1;

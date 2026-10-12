@@ -44,8 +44,8 @@ final class ExecutionPlans {
     this.published = new BoundedCache<>(maximumEntries, maximumWeight);
   }
 
-  Session session(RuleResolver resolver, ExecutionDeadline deadline, boolean cachePublished) {
-    return new Session(resolver, deadline, cachePublished);
+  Session session(RuleResolver resolver, ExecutionDeadline deadline) {
+    return new Session(resolver, deadline);
   }
 
   private Cached cached(Pin pin) {
@@ -56,6 +56,20 @@ final class ExecutionPlans {
   CompiledGraph planForCheck(String id, int version, Definition definition, RuleResolver resolver) {
     CompiledGraph cached = cachedPlan(id, version);
     return cached != null ? cached : validator.compile(definition, resolver);
+  }
+
+  /**
+   * See {@link Engine#check}: reads the cache, else compiles a detached copy and stores it, unless
+   * a rule was forgotten since the check began ({@code startedIn}, the generation it captured
+   * before its first read).
+   */
+  CompiledGraph planForCommittedCheck(
+      String id, int version, Definition definition, RuleResolver resolver, long startedIn) {
+    CompiledGraph cached = cachedPlan(id, version);
+    if (cached != null) return cached;
+    CompiledGraph plan = validator.compile(definition.detached(), resolver);
+    remember(new Pin(id, version), plan, startedIn);
+    return plan;
   }
 
   /** The plan an execution cached for a published version, or null. */
@@ -73,7 +87,8 @@ final class ExecutionPlans {
     published.removeIf(pin -> pin.id().equals(ruleId));
   }
 
-  private synchronized long currentGeneration() {
+  /** The generation a session or a committed check captures before its first read. */
+  synchronized long currentGeneration() {
     return generation;
   }
 
@@ -97,15 +112,13 @@ final class ExecutionPlans {
   final class Session {
     private final RuleResolver resolver;
     private final ExecutionDeadline deadline;
-    private final boolean cachePublished;
     private final Map<Pin, CompiledGraph> pins = new HashMap<>();
     private final Map<Definition, CompiledGraph> drafts = new IdentityHashMap<>();
     private final long startedIn = currentGeneration();
 
-    private Session(RuleResolver resolver, ExecutionDeadline deadline, boolean cachePublished) {
+    private Session(RuleResolver resolver, ExecutionDeadline deadline) {
       this.resolver = resolver;
       this.deadline = deadline;
-      this.cachePublished = cachePublished;
     }
 
     /**
@@ -118,13 +131,13 @@ final class ExecutionPlans {
       if (version == null) return prepareDraft(definition.get());
       Pin pin = new Pin(id, version);
       CompiledGraph plan = pins.get(pin);
-      if (plan == null && cachePublished) {
+      if (plan == null) {
         Cached entry = cached(pin);
         if (entry != null) plan = entry.plan();
       }
       if (plan == null) {
         plan = compile(definition.get());
-        if (cachePublished) remember(pin, plan, startedIn);
+        remember(pin, plan, startedIn);
       }
       pins.put(pin, plan);
       return plan;
@@ -137,7 +150,7 @@ final class ExecutionPlans {
      * verdicts. A draft (no version) and a failed check are checked again on the next request.
      */
     void verifyOnce(String id, Integer version, Runnable check) {
-      Pin pin = version == null || !cachePublished ? null : new Pin(id, version);
+      Pin pin = version == null ? null : new Pin(id, version);
       Cached entry = pin == null ? null : cached(pin);
       if (entry != null && entry.verified()) return;
       check.run();

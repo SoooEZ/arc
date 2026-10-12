@@ -5,11 +5,17 @@ import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /** Storage port. lock/update/publish/delete are called inside the application transaction. */
 public interface RuleRepository extends RuleResolver {
-  /** A rule's draft ({@code version} null) or one of its published versions. */
-  record StoredDefinition(String ruleId, Integer version, Definition definition) {}
+  /** A rule that calls another: its draft ({@code version} null) or one of its versions. */
+  record Caller(String ruleId, Integer version) {
+    /** "checkout (draft)" or "checkout v3", as a refused deletion names it. */
+    public String describe() {
+      return version == null ? ruleId + " (draft)" : ruleId + " v" + version;
+    }
+  }
 
   /** A published version read together with the {@link RuleKind} name of its rule. */
   record KindedVersion(String kind, Definition definition) {}
@@ -64,13 +70,25 @@ public interface RuleRepository extends RuleResolver {
 
   /**
    * An ID that is already stored, including by a concurrent create, is a 409 conflict. Each write
-   * returns the rule as stored, read by the write itself.
+   * returns the rule as stored, read by the write itself, and stores {@code callees}, the rules the
+   * definition calls ({@code Validator.calledRuleIds}), beside it for {@link #callersOf}.
    */
-  Rule create(String id, String name, String description, String kind, Definition definition);
+  Rule create(
+      String id,
+      String name,
+      String description,
+      String kind,
+      Definition definition,
+      Set<String> callees);
 
-  Rule update(String id, String name, String description, Definition definition);
+  Rule update(
+      String id, String name, String description, Definition definition, Set<String> callees);
 
-  Rule publish(Rule rule);
+  /**
+   * Stores the locked rule's draft as its next version, with {@code callees} as the version's and
+   * the draft's callee set, and returns the rule with the draft as read under the lock.
+   */
+  Rule publish(Rule rule, Set<String> callees);
 
   /** Newest first; missing rules return 404. */
   List<RuleVersion> versions(String id);
@@ -84,11 +102,10 @@ public interface RuleRepository extends RuleResolver {
   KindedVersion versionWithKind(String id, int version);
 
   /**
-   * The drafts and published versions of other rules that may call the rule: every definition with
-   * a Reference pin to the ID or a Formula call {@code @id:version}, and possibly more, for the
-   * caller to check exactly.
+   * The drafts and published versions of other rules that call the rule, by rule ID and then
+   * version with the draft first, from the callee sets their writes stored.
    */
-  List<StoredDefinition> definitionsMentioning(String id);
+  List<Caller> callersOf(String id);
 
   /** Removes the rule with its draft and every published version. */
   void delete(String id);

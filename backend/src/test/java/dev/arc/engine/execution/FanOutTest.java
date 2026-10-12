@@ -10,13 +10,13 @@ import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class FanOutTest {
   final Validator validator = new Validator();
-  final Engine engine = new Engine(validator);
   final RuleResolver noRefs =
       (id, v) -> {
         throw new ArcException(404, "Missing reference");
@@ -32,7 +32,7 @@ class FanOutTest {
   }
 
   Engine.Result run(Definition d, Map<String, Object> inputs) {
-    return engine.execute("test", 1, d, inputs, noRefs);
+    return Engines.execute(validator, "test", 1, d, inputs, noRefs);
   }
 
   static Node namedOutput(String id, String expression, String name) {
@@ -292,7 +292,8 @@ class FanOutTest {
                 node("out", "OUTPUT", "x", null)),
             edge("input", "reuse", "next"),
             edge("reuse", "out", "next"));
-    assertThatThrownBy(() -> engine.execute("preview", null, parent, Map.of(), (id, v) -> child))
+    assertThatThrownBy(
+            () -> Engines.execute(validator, "preview", null, parent, Map.of(), (id, v) -> child))
         .isInstanceOfSatisfying(
             ArcException.class,
             e -> {

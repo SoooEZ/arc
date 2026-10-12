@@ -3,6 +3,7 @@ package dev.arc.source;
 import dev.arc.engine.DisplayNames;
 import dev.arc.engine.Identifiers;
 import dev.arc.error.ArcException;
+import dev.arc.error.Revisions;
 import dev.arc.model.*;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -61,9 +62,8 @@ public class SourceService {
   @Transactional
   public DataSource update(String id, Update request) {
     int current = repository.lock(id);
-    if (request.revision() == null) throw ArcException.invalid("Revision is required");
-    if (current != request.revision())
-      throw new ArcException(409, "Source changed in another editor; reload before saving");
+    Revisions.require(
+        current, request.revision(), "Source changed in another editor; reload before saving");
     String name = DisplayNames.normalize("Source", request.name());
     validator.validate(request.definition());
     return repository.appendVersion(id, name, current, request.definition());

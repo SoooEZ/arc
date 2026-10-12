@@ -9,10 +9,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.SourceReader;
 import dev.arc.engine.script.ArcScript;
+import dev.arc.engine.script.ScriptParsing;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,7 +25,6 @@ import org.junit.jupiter.api.Test;
 class ErrorRecoveryTest {
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
-  private final Engine engine = new Engine(validator);
   private final RuleResolver formulas = formulas(publishedFormulas());
 
   private static Definition graph(List<Input> inputs, String expression) {
@@ -98,7 +99,7 @@ class ErrorRecoveryTest {
   }
 
   private Engine.Result run(Definition parent) {
-    return engine.execute("parent", 1, parent, Map.of(), formulas);
+    return Engines.execute(validator, "parent", 1, parent, Map.of(), formulas);
   }
 
   private static void assertLimit(ThrowingCallable execution, String message) {
@@ -140,7 +141,9 @@ class ErrorRecoveryTest {
             return 1;
           };
       assertLimit(
-          () -> engine.execute("parent", 1, parent, Map.of(), formulas, new Parameters(reader)),
+          () ->
+              Engines.execute(
+                  validator, "parent", 1, parent, Map.of(), formulas, new Parameters(reader)),
           "Execution exceeds 50 source reads");
       assertThat(providerReads).hasValue(50);
     }
@@ -220,7 +223,8 @@ class ErrorRecoveryTest {
                 + " case:one -> out; default -> out; }",
             "f"));
     for (var site : sites.entrySet())
-      assertThatThrownBy(() -> engine.execute("parent", 1, site.getValue(), Map.of(), expired))
+      assertThatThrownBy(
+              () -> Engines.execute(validator, "parent", 1, site.getValue(), Map.of(), expired))
           .as(site.getKey())
           .isInstanceOfSatisfying(
               ArcException.class,
@@ -241,7 +245,9 @@ class ErrorRecoveryTest {
             null,
             new SourceBinding("table", 1, Map.of("key", "@f:1()"), "", "FAIL"));
     assertThatThrownBy(
-            () -> engine.execute("parent", 1, graph(List.of(mapping), "value"), Map.of(), expired))
+            () ->
+                Engines.execute(
+                    validator, "parent", 1, graph(List.of(mapping), "value"), Map.of(), expired))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -253,7 +259,7 @@ class ErrorRecoveryTest {
   }
 
   private Definition callFrom(String actionTemplate, String child) {
-    return script.parse(
+    return ScriptParsing.parse(
         "node in INPUT \"Input\" { next -> action; } "
             + actionTemplate.formatted(child)
             + " node out OUTPUT \"Output\" { return 1; }");
@@ -311,13 +317,14 @@ class ErrorRecoveryTest {
   void bindingFailuresNameTheBindingWhileLimitsKeepTheirMessage() {
     // A failed binding surfaced as the bare "Division by zero" at the Reference node.
     var parent =
-        script.parse(
+        ScriptParsing.parse(
             "inputs { zero: NUMBER required; }\n"
                 + "node in INPUT \"Input\" { next -> reuse; }\n"
                 + "node reuse REFERENCE \"Reuse\" { use \"echo\" version 1; bind amount = 1 / zero;"
                 + " as r; next -> out; }\n"
                 + "node out OUTPUT \"Output\" { return r; }");
-    assertThatThrownBy(() -> engine.execute("parent", 1, parent, Map.of("zero", 0), formulas))
+    assertThatThrownBy(
+            () -> Engines.execute(validator, "parent", 1, parent, Map.of("zero", 0), formulas))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -327,13 +334,13 @@ class ErrorRecoveryTest {
                   .isEqualTo(new ArcException.Location("parent", 1, "reuse", "Reuse"));
             });
     var nested =
-        script.parse(
+        ScriptParsing.parse(
             "node in INPUT \"Input\" { next -> reuse; }\n"
                 + "node reuse REFERENCE \"Reuse\" { use \"echo\" version 1;"
                 + " bind amount = @level-0:1(); as r; next -> out; }\n"
                 + "node out OUTPUT \"Output\" { return r; }");
     assertLimit(
-        () -> engine.execute("parent", 1, nested, Map.of(), formulas),
+        () -> Engines.execute(validator, "parent", 1, nested, Map.of(), formulas),
         "Rule nesting exceeds 16 levels");
   }
 
@@ -397,18 +404,18 @@ class ErrorRecoveryTest {
     var reads = new AtomicInteger();
     assertThatThrownBy(
             () ->
-                new Engine(validator)
-                    .execute(
-                        "root",
-                        1,
-                        root,
-                        Map.of(),
-                        resolver,
-                        new Parameters(
-                            (binding, inputs, deadline) -> {
-                              reads.incrementAndGet();
-                              return 7;
-                            })))
+                Engines.execute(
+                    validator,
+                    "root",
+                    1,
+                    root,
+                    Map.of(),
+                    resolver,
+                    new Parameters(
+                        (binding, inputs, deadline) -> {
+                          reads.incrementAndGet();
+                          return 7;
+                        })))
         .hasMessage("Execution exceeds 1,000 steps");
     assertThat(reads).hasValue(0);
   }

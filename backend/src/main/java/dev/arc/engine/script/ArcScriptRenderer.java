@@ -50,7 +50,7 @@ final class ArcScriptRenderer {
           .append(input.name())
           .append(": ")
           .append(input.type())
-          .append(input.required() ? " required" : " optional");
+          .append(input.isRequired() ? " required" : " optional");
       if (input.defaultValue() != null) out.append(" default ").append(write(input.defaultValue()));
       out.append(";\n");
       if (input.source() != null)

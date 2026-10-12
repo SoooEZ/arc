@@ -113,29 +113,50 @@ public final class ValueBounds {
     return BigDecimal.valueOf(value.longValue());
   }
 
+  /**
+   * The walk over a built value; {@link BoundedJsonParser} applies the same bounds, with the same
+   * messages, while a document is parsed.
+   */
   private static void bound(Object value, int depth, int[] count) {
     if (depth > Limits.MAX_VALUE_DEPTH || ++count[0] > Limits.MAX_VALUE_ELEMENTS)
-      throw ArcException.invalid("Value exceeds collection depth or size limit");
+      throw depthOrSizeExceeded();
     if (value instanceof Number n && exceedsDecimalLimits(decimalValue(n)))
       throw ArcException.invalid("Number exceeds supported precision or magnitude");
     if (value instanceof String s && s.length() > Limits.MAX_STRING_CHARACTERS)
-      throw ArcException.invalid(
-          "String exceeds " + Limits.format(Limits.MAX_STRING_CHARACTERS) + " characters");
+      throw stringTooLong();
     if (value instanceof List<?> xs) {
-      if (xs.size() > Limits.MAX_COLLECTION_ITEMS)
-        throw ArcException.invalid(
-            "Array exceeds " + Limits.format(Limits.MAX_COLLECTION_ITEMS) + " items");
+      if (xs.size() > Limits.MAX_COLLECTION_ITEMS) throw arrayTooLarge();
       for (Object x : xs) bound(x, depth + 1, count);
     }
     if (value instanceof Map<?, ?> m) {
-      if (m.size() > Limits.MAX_COLLECTION_ITEMS)
-        throw ArcException.invalid(
-            "Object exceeds " + Limits.format(Limits.MAX_COLLECTION_ITEMS) + " fields");
+      if (m.size() > Limits.MAX_COLLECTION_ITEMS) throw objectTooLarge();
       for (var e : m.entrySet()) {
         bound(e.getKey(), depth + 1, count);
         bound(e.getValue(), depth + 1, count);
       }
     }
+  }
+
+  /**
+   * More than {@link Limits#MAX_VALUE_DEPTH} nested levels or {@link Limits#MAX_VALUE_ELEMENTS}.
+   */
+  static ArcException depthOrSizeExceeded() {
+    return ArcException.invalid("Value exceeds collection depth or size limit");
+  }
+
+  static ArcException stringTooLong() {
+    return ArcException.invalid(
+        "String exceeds " + Limits.format(Limits.MAX_STRING_CHARACTERS) + " characters");
+  }
+
+  static ArcException arrayTooLarge() {
+    return ArcException.invalid(
+        "Array exceeds " + Limits.format(Limits.MAX_COLLECTION_ITEMS) + " items");
+  }
+
+  static ArcException objectTooLarge() {
+    return ArcException.invalid(
+        "Object exceeds " + Limits.format(Limits.MAX_COLLECTION_ITEMS) + " fields");
   }
 
   /**

@@ -242,13 +242,13 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [inputs]
-              properties:
-                inputs: {type: object, additionalProperties: true}
-                version: {type: integer, minimum: 1, description: Omit for latest published version}
-                trace: {type: boolean, nullable: true, default: true, description: Include a bounded execution trace; null uses the default}
-                timeoutMs: {type: integer, nullable: true, minimum: 100, maximum: 30000, default: 30000, description: Shared execution deadline in milliseconds; null uses the default}
+              allOf:
+                - {$ref: '#/components/schemas/ExecutionOptions'}
+                - type: object
+                  required: [inputs]
+                  properties:
+                    inputs: {type: object, additionalProperties: true}
+                    version: {type: integer, minimum: 1, description: Omit for latest published version}
             example:
               inputs: {orderTotal: 150, customerTier: premium}
               version: 1
@@ -360,13 +360,13 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [definition, inputs]
-              properties:
-                trace: {type: boolean, nullable: true, default: true, description: Include a bounded execution trace; null uses the default}
-                timeoutMs: {type: integer, nullable: true, minimum: 100, maximum: 30000, default: 30000, description: Shared execution deadline in milliseconds; null uses the default}
-                definition: {$ref: '#/components/schemas/Definition'}
-                inputs: {type: object, additionalProperties: true}
+              allOf:
+                - {$ref: '#/components/schemas/ExecutionOptions'}
+                - type: object
+                  required: [definition, inputs]
+                  properties:
+                    definition: {$ref: '#/components/schemas/Definition'}
+                    inputs: {type: object, additionalProperties: true}
       responses:
         '200': {$ref: '#/components/responses/Execution'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
@@ -828,7 +828,7 @@ components:
             properties:
               name: {type: string, pattern: '^[A-Za-z_][A-Za-z_0-9]{0,63}$'}
               type: {type: string, enum: [NUMBER, STRING, BOOLEAN, ARRAY, OBJECT]}
-              required: {type: boolean}
+              required: {type: boolean, description: 'Must be true or false: an omitted or null flag is refused with 422 "Declare whether input <name> is required (true or false)"'}
               defaultValue: {nullable: true}
               source: {$ref: '#/components/schemas/SourceBinding'}
         nodes:
@@ -908,6 +908,12 @@ components:
               target: {type: string}
               sourceHandle: {type: string, pattern: '^(next|true|false|default|case:[A-Za-z0-9_-]{1,64})$'}
 
+    ExecutionOptions:
+      type: object
+      description: The options an execution and a preview share, as flat fields of the request; an unknown field beside them is refused with 400 like any other
+      properties:
+        trace: {type: boolean, nullable: true, default: true, description: Include a bounded execution trace; null uses the default}
+        timeoutMs: {type: integer, nullable: true, minimum: 100, maximum: 30000, default: 30000, description: Shared execution deadline in milliseconds; null uses the default}
     SourceBinding:
       type: object
       nullable: true
@@ -920,9 +926,9 @@ components:
         onError: {type: string, enum: [FAIL, DEFAULT]}
     SourceConfig:
       type: object
-      required: [kind, parameters, timeoutMs]
+      required: [kind, parameters]
       properties:
-        kind: {type: string, enum: [LOOKUP, HTTP]}
+        kind: {type: string, enum: [HTTP, LOOKUP]}
         url: {type: string, maxLength: 2000, description: 'HTTP only: a LOOKUP definition with a non-blank url is refused with 422 "Lookup tables do not use a URL"'}
         parameters:
           type: array
@@ -933,11 +939,11 @@ components:
             properties:
               name: {type: string, pattern: '^[A-Za-z_][A-Za-z_0-9]{0,63}$', description: No whitespace or dollar sign; true/false/null/and/or are reserved regardless of case}
               type: {type: string, enum: [NUMBER, STRING, BOOLEAN]}
-              required: {type: boolean}
+              required: {type: boolean, description: 'Must be true or false: an omitted or null flag is refused with 422 "Declare whether source parameter <name> is required (true or false)"'}
               defaultValue: {nullable: true}
         entries: {type: object, maxProperties: 1000, additionalProperties: true, description: 'LOOKUP only: an HTTP definition with non-empty entries is refused with 422 "HTTP sources do not use lookup entries"'}
         secretHeaders: {type: object, maxProperties: 10, additionalProperties: {type: string}, description: 'Header names mapped to ARC_SECRET_ environment aliases; never raw credentials. HTTP only: LOOKUP definitions omit it or send {}. Names and aliases must not be null.'}
-        timeoutMs: {type: integer, minimum: 100, maximum: 10000}
+        timeoutMs: {type: integer, nullable: true, minimum: 100, maximum: 10000, description: 'HTTP only, and then required: an HTTP definition without it, with null or outside the range is refused with 422 "HTTP timeout must be 100–10,000 ms". LOOKUP definitions do not use it; a value sent for one is stored and returned as sent, and a lookup version stored without one reads back as null.'}
     DataSource:
       type: object
       properties:

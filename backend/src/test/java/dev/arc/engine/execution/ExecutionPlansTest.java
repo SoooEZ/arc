@@ -41,7 +41,7 @@ class ExecutionPlansTest {
   }
 
   private ExecutionPlans.Session session(ExecutionPlans plans) {
-    return plans.session(noReferences, ExecutionDeadline.start(30_000), true);
+    return plans.session(noReferences, ExecutionDeadline.start(30_000));
   }
 
   @Test
@@ -119,6 +119,38 @@ class ExecutionPlansTest {
     var recreated = session(plans).prepare("deleted", 1, () -> graph("4"));
     assertThat(recreated.expressions()).containsOnlyKeys("4");
     assertThat(session(plans).prepare("kept", 1, () -> graph("1"))).isSameAs(kept);
+  }
+
+  /**
+   * A check from outside any transaction keeps the plans it compiles, from detached copies, unless
+   * a rule was forgotten since the check began: its reads may predate that deletion.
+   */
+  @Test
+  void aCommittedCheckKeepsDetachedPlansUnlessARuleWasForgottenSinceItBegan() {
+    var validator = new CountingValidator();
+    var plans = new ExecutionPlans(validator, json);
+    var nodes = new ArrayList<>(graph("1").nodes());
+    Definition original = new Definition(1, List.of(), nodes, graph("1").edges());
+    long began = plans.currentGeneration();
+
+    var kept = plans.planForCommittedCheck("rule", 1, original, noReferences, began);
+    assertThat(plans.cachedPlan("rule", 1)).isSameAs(kept);
+    assertThat(plans.planForCommittedCheck("rule", 1, graph("9"), noReferences, began))
+        .as("a cached plan is reused, not compiled again")
+        .isSameAs(kept);
+    nodes.clear();
+    assertThat(kept.definition().nodes()).hasSize(2);
+    assertThatThrownBy(() -> kept.definition().nodes().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThat(validator.compilations).isEqualTo(1);
+
+    plans.forget("rule");
+    plans.planForCommittedCheck("rule", 1, graph("2"), noReferences, began);
+    assertThat(plans.cachedPlan("rule", 1)).as("read before the deletion").isNull();
+    var recreated =
+        plans.planForCommittedCheck("rule", 1, graph("3"), noReferences, plans.currentGeneration());
+    assertThat(plans.cachedPlan("rule", 1)).isSameAs(recreated);
+    assertThat(recreated.expressions()).containsOnlyKeys("3");
   }
 
   @Test

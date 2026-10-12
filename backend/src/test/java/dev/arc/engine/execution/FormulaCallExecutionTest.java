@@ -11,10 +11,12 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.engine.SourceReader;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.script.ArcScript;
+import dev.arc.engine.script.ScriptParsing;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,8 +25,8 @@ import org.junit.jupiter.api.Test;
 
 class FormulaCallExecutionTest {
   private final Validator validator = new Validator();
+  private final Engine engine = Engines.engine(validator);
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
-  private final Engine engine = new Engine(validator);
 
   private Definition graph(List<Input> inputs, String expression) {
     return new Definition(
@@ -51,7 +53,7 @@ class FormulaCallExecutionTest {
   }
 
   private Engine.Result run(Definition graph, RuleResolver resolver) {
-    return engine.execute("parent", 1, graph, Map.of(), resolver);
+    return Engines.execute(validator, "parent", 1, graph, Map.of(), resolver);
   }
 
   /**
@@ -156,7 +158,7 @@ class FormulaCallExecutionTest {
                 "echo:1",
                 graph(number, "value")));
     var parent =
-        script.parse(
+        ScriptParsing.parse(
             """
         inputs { amount: NUMBER required default 2; }
         node in INPUT "Input" { next -> transform; }
@@ -179,7 +181,7 @@ class FormulaCallExecutionTest {
     assertThat(run(parent, resolver).result()).isEqualTo(new BigDecimal("5"));
     assertThat(script.build(script.render(parent)).definition()).isEqualTo(parent);
     var booleanSwitch =
-        script.parse(
+        ScriptParsing.parse(
             """
         node in INPUT "Input" { next -> choose; }
         node choose SWITCH "Choose" { case "hit" "Hit" when @positive:1(1); case:hit -> out; default -> out; }
@@ -187,7 +189,7 @@ class FormulaCallExecutionTest {
         """);
     assertThat(run(booleanSwitch, resolver).result()).isEqualTo(new BigDecimal("7"));
     var expressionTransform =
-        script.parse(
+        ScriptParsing.parse(
             """
         node in INPUT "Input" { next -> transform; }
         node transform TRANSFORM "Transform" { let total = @increment:1(2); next -> out; }
@@ -216,7 +218,8 @@ class FormulaCallExecutionTest {
           return 8;
         };
     var parent = graph(List.of(), "$IF(false, @sourced:1(), 0) + @sourced:1()");
-    var result = engine.execute("parent", 1, parent, Map.of(), resolver, new Parameters(reader));
+    var result =
+        Engines.execute(validator, "parent", 1, parent, Map.of(), resolver, new Parameters(reader));
     assertThat(result.result()).isEqualTo(new BigDecimal("8"));
     assertThat(fetches).hasValue(1);
     assertThat(result.sources()).hasSize(1);
@@ -242,7 +245,8 @@ class FormulaCallExecutionTest {
                 graph(List.of(), "@recursive:1()")));
     assertThatThrownBy(
             () ->
-                engine.execute(
+                Engines.execute(
+                    validator,
                     "parent",
                     1,
                     graph(
@@ -280,7 +284,7 @@ class FormulaCallExecutionTest {
             "node action SWITCH \"Action\" { select @broken:1(); case \"one\" \"One\" equals 1; case:one -> out; default -> out; }",
             "node action SWITCH \"Action\" { case \"one\" \"One\" when @broken:1(); case:one -> out; default -> out; }")) {
       var parent =
-          script.parse(
+          ScriptParsing.parse(
               "node in INPUT \"Input\" { next -> action; } "
                   + body
                   + " node out OUTPUT \"Output\" { return 1; }");
@@ -300,7 +304,7 @@ class FormulaCallExecutionTest {
   @Test
   void referencesAndFormulaCallsReceiveTheSameNamedAggregate() {
     var child =
-        script.parse(
+        ScriptParsing.parse(
             """
         inputs { amount: NUMBER required default 42; }
         node in INPUT "Input" { next -> total; next -> missing; }
@@ -313,7 +317,7 @@ class FormulaCallExecutionTest {
             "node call REFERENCE \"Call\" { use child version 7; as bundle; next -> out; }",
             "node call FORMULA \"Call\" { let bundle = @child:7(); next -> out; }")) {
       var parent =
-          script.parse(
+          ScriptParsing.parse(
               "node in INPUT \"Input\" { next -> call; } "
                   + call
                   + " node out OUTPUT \"Out\" { return bundle; }");
@@ -340,7 +344,7 @@ class FormulaCallExecutionTest {
   @Test
   void reachedDuplicateOutputFieldsRetainBothChildLocationsAndTheCaller() {
     var child =
-        script.parse(
+        ScriptParsing.parse(
             """
         node in INPUT "Input" { next -> a; next -> b; }
         node a OUTPUT "First" { return null; as total; }
@@ -352,7 +356,7 @@ class FormulaCallExecutionTest {
             "node call REFERENCE \"Call\" { use child version 7; as bundle; next -> out; }",
             "node call FORMULA \"Call\" { let bundle = @child:7(); next -> out; }")) {
       var parent =
-          script.parse(
+          ScriptParsing.parse(
               "node in INPUT \"Input\" { next -> call; } "
                   + call
                   + " node out OUTPUT \"Out\" { return bundle; }");
@@ -431,7 +435,7 @@ class FormulaCallExecutionTest {
           }
         };
     var root =
-        script.parse(
+        ScriptParsing.parse(
             "inputs { amount: NUMBER required; }\n"
                 + "node in INPUT \"Input\" { next -> reuse; }\n"
                 + "node reuse REFERENCE \"Reuse\" { use \"child\" version 1; bind amount = amount;"

@@ -147,4 +147,25 @@ public class ArcException extends RuntimeException {
   public static ArcException deadline(String message) {
     return new ArcException(504, Kind.DEADLINE, message);
   }
+
+  /**
+   * A rule, source or version that does not exist: a 404 whose message is its one issue. Each
+   * resource keeps its own pinned wording ("Rule not found: id", "Source not found").
+   */
+  public static ArcException notFound(String message) {
+    return new ArcException(404, message);
+  }
+
+  /**
+   * A request that the current state of its resource refuses: a stale revision, a taken ID, an
+   * unpublished rule or a rule that other rules call. A 409 whose message is its one issue.
+   */
+  public static ArcException conflict(String message) {
+    return new ArcException(409, message);
+  }
+
+  /** A 409 whose issues list more than the message names, such as every caller of a rule. */
+  public static ArcException conflict(String message, List<String> issues) {
+    return new ArcException(409, message, issues);
+  }
 }

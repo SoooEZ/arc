@@ -6,8 +6,10 @@ import dev.arc.rule.RuleRepository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -16,9 +18,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class JdbcRuleRepository implements RuleRepository {
   /** A search within the ID, the name or the description, a kind, and published rules only. */
+  private static final String[] SEARCHED = {"id", "name", "description"};
+
   private static final String CATALOG_FILTER =
       " WHERE "
-          + CatalogPages.searchWithin("id", "name", "description")
+          + CatalogPages.searchWithin(SEARCHED)
           + " AND (? = '' OR kind = ?) AND (NOT ? OR published_version IS NOT NULL)";
 
   /**
@@ -61,26 +65,31 @@ public class JdbcRuleRepository implements RuleRepository {
       " WHERE rule_id = ? AND (? = '' OR strpos(version::text, ?) > 0)";
 
   /**
-   * A cheap filter that narrows the exact dependency check to the two ways a definition can call a
-   * rule: a Reference pin, found by JSONB containment on any node's {@code ruleId} (with or without
-   * a version), and a Formula call, whose token is {@code @id:version} with no spaces. Rule IDs
-   * contain only lowercase letters, digits and hyphens, which JSON never escapes. Searching the
-   * bare ID matched every stored definition for IDs such as {@code type} or {@code id}, so a delete
-   * decoded them all under the rule's row lock.
+   * The drafts and versions whose stored callee set names the rule, through the GIN indexes of the
+   * {@code callees} columns (migration V5). Each write stores the exact set it holds against
+   * deletion, so no definition is read or decoded here: the prefilter before this, a JSONB
+   * containment OR-ed with a text search of every stored definition, scanned and serialised both
+   * tables under the rule's lock (14.5 s for 2 GB of stored JSON), while saves of its callers and
+   * every other writer of the rule waited.
    */
-  private static final String DEFINITIONS_MENTIONING =
+  private static final String CALLERS =
       """
-      SELECT id AS rule_id, NULL::integer AS version, draft AS definition FROM rules
-      WHERE id <> ?
-        AND (draft @> jsonb_build_object('nodes', jsonb_build_array(jsonb_build_object('ruleId', ?::text)))
-             OR strpos(draft::text, '@' || ? || ':') > 0)
+      SELECT id AS rule_id, NULL::integer AS version FROM rules
+      WHERE id <> ? AND callees @> ARRAY[?::text]
       UNION ALL
-      SELECT rule_id, version, definition FROM rule_versions
-      WHERE rule_id <> ?
-        AND (definition @> jsonb_build_object('nodes', jsonb_build_array(jsonb_build_object('ruleId', ?::text)))
-             OR strpos(definition::text, '@' || ? || ':') > 0)
+      SELECT rule_id, version FROM rule_versions
+      WHERE rule_id <> ? AND callees @> ARRAY[?::text]
       ORDER BY rule_id, version NULLS FIRST
       """;
+
+  private static final RowMapper<Caller> CALLER_MAPPER =
+      (row, index) -> new Caller(row.getString("rule_id"), row.getObject("version", Integer.class));
+
+  /**
+   * The columns of a {@link Rule} without its draft, for a write that leaves the draft as it is.
+   */
+  private static final String METADATA_COLUMNS =
+      "id, name, description, kind, revision, published_version, created_at, updated_at";
 
   private static final RowMapper<RuleSummary> SUMMARY_MAPPER =
       (row, index) ->
@@ -146,7 +155,8 @@ public class JdbcRuleRepository implements RuleRepository {
 
   @Override
   public CatalogPage<RuleSummary> catalog(PageRequest page, String kind, boolean publishedOnly) {
-    String search = page.search();
+    var arguments = new ArrayList<>(CatalogPages.searchArguments(page.search(), SEARCHED));
+    arguments.addAll(List.of(kind, kind, publishedOnly));
     return CatalogPages.read(
         jdbc,
         "SELECT count(*) FROM rules" + CATALOG_FILTER,
@@ -154,11 +164,7 @@ public class JdbcRuleRepository implements RuleRepository {
         SUMMARY_MAPPER,
         page.offset(),
         page.limit(),
-        search,
-        search,
-        kind,
-        kind,
-        publishedOnly);
+        arguments.toArray());
   }
 
   @Override
@@ -265,53 +271,92 @@ public class JdbcRuleRepository implements RuleRepository {
   }
 
   private static ArcException notFound(String id) {
-    return new ArcException(404, "Rule not found: " + id);
+    return ArcException.notFound("Rule not found: " + id);
   }
 
   @Override
   public Rule create(
-      String id, String name, String description, String kind, Definition definition) {
+      String id,
+      String name,
+      String description,
+      String kind,
+      Definition definition,
+      Set<String> callees) {
     StoredText.requireStorable(name, description);
     try {
       return written(
           id,
-          "INSERT INTO rules (id, name, description, kind, draft) VALUES (?, ?, ?, ?, ?::jsonb) RETURNING *",
+          "INSERT INTO rules (id, name, description, kind, draft, callees) VALUES (?, ?, ?, ?, ?::jsonb, ?) RETURNING *",
           id,
           name,
           description,
           kind,
-          json.encodeEditable(definition));
+          json.encodeEditable(definition),
+          textArray(callees));
     } catch (DuplicateKeyException duplicate) {
-      throw new ArcException(409, "This rule ID already exists");
+      throw ArcException.conflict("This rule ID already exists");
     }
   }
 
   @Override
-  public Rule update(String id, String name, String description, Definition definition) {
+  public Rule update(
+      String id, String name, String description, Definition definition, Set<String> callees) {
     StoredText.requireStorable(name, description);
     return written(
         id,
-        "UPDATE rules SET name = ?, description = ?, draft = ?::jsonb, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING *",
+        "UPDATE rules SET name = ?, description = ?, draft = ?::jsonb, callees = ?, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING *",
         name,
         description,
         json.encodeEditable(definition),
+        textArray(callees),
         id);
   }
 
+  /**
+   * The version copies the stored draft column in SQL, so the draft text crosses JDBC once, for the
+   * locked read: encoding the decoded draft again (with a second scan for unstorable text) and
+   * decoding it a third time from the row the update returned moved it three times under the lock.
+   * A stored draft is JSON that passed its save, so the copy stores the same JSONB; a draft saved
+   * under an older record shape is copied as stored, where it was normalised through the current
+   * records before. Neither path applies the editable-size limit, which belongs to saves.
+   */
   @Override
-  public Rule publish(Rule rule) {
+  public Rule publish(Rule rule, Set<String> callees) {
     int version = rule.publishedVersion() == null ? 1 : rule.publishedVersion() + 1;
-    jdbc.update(
-        "INSERT INTO rule_versions (rule_id, version, definition) VALUES (?, ?, ?::jsonb)",
-        rule.id(),
-        version,
-        // A saved draft passed encodeEditable; one saved before that check still publishes.
-        json.encode(rule.draft()));
-    return written(
-        rule.id(),
-        "UPDATE rules SET published_version = ?, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING *",
-        version,
-        rule.id());
+    int inserted =
+        jdbc.update(
+            "INSERT INTO rule_versions (rule_id, version, definition, callees) SELECT id, ?, draft, ? FROM rules WHERE id = ?",
+            version,
+            textArray(callees),
+            rule.id());
+    if (inserted == 0) throw notFound(rule.id());
+    RowMapper<Rule> withLockedDraft =
+        (row, index) ->
+            new Rule(
+                row.getString("id"),
+                row.getString("name"),
+                row.getString("description"),
+                row.getString("kind"),
+                rule.draft(),
+                row.getInt("revision"),
+                row.getObject("published_version", Integer.class),
+                instant(row, "created_at"),
+                instant(row, "updated_at"));
+    var rows =
+        jdbc.query(
+            "UPDATE rules SET published_version = ?, callees = ?, revision = nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING "
+                + METADATA_COLUMNS,
+            withLockedDraft,
+            version,
+            textArray(callees),
+            rule.id());
+    if (rows.isEmpty()) throw notFound(rule.id());
+    return rows.getFirst();
+  }
+
+  /** A {@code text[]} parameter, which the driver binds from a Java array. */
+  private static String[] textArray(Set<String> values) {
+    return values.toArray(String[]::new);
   }
 
   /**
@@ -340,25 +385,13 @@ public class JdbcRuleRepository implements RuleRepository {
             id,
             version);
     if (rows.isEmpty())
-      throw new ArcException(404, "Published rule version not found: " + id + " v" + version);
+      throw ArcException.notFound("Published rule version not found: " + id + " v" + version);
     return rows.getFirst();
   }
 
   @Override
-  public List<StoredDefinition> definitionsMentioning(String id) {
-    return jdbc.query(
-        DEFINITIONS_MENTIONING,
-        (row, index) ->
-            new StoredDefinition(
-                row.getString("rule_id"),
-                row.getObject("version", Integer.class),
-                decode(row.getString("definition"))),
-        id,
-        id,
-        id,
-        id,
-        id,
-        id);
+  public List<Caller> callersOf(String id) {
+    return jdbc.query(CALLERS, CALLER_MAPPER, id, id, id, id);
   }
 
   @Override
@@ -377,7 +410,7 @@ public class JdbcRuleRepository implements RuleRepository {
             id,
             version);
     if (rows.isEmpty())
-      throw new ArcException(404, "Published Formula version not found: " + id + " v" + version);
+      throw ArcException.notFound("Published Formula version not found: " + id + " v" + version);
     return rows.getFirst();
   }
 

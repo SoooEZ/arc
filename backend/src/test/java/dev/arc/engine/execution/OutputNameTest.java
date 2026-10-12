@@ -10,13 +10,13 @@ import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class OutputNameTest {
   private final Validator validator = new Validator();
-  private final Engine engine = new Engine(validator);
   private final RuleResolver noReferences =
       (id, version) -> {
         throw new AssertionError("Unexpected reference");
@@ -35,8 +35,13 @@ class OutputNameTest {
   }
 
   private Engine.Result run(Definition definition) {
-    return engine.execute(
-        "preview", null, definition, Map.of("value", new BigDecimal("42")), noReferences);
+    return Engines.execute(
+        validator,
+        "preview",
+        null,
+        definition,
+        Map.of("value", new BigDecimal("42")),
+        noReferences);
   }
 
   @Test

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.RuleResolver;
-import dev.arc.engine.SourceReader;
 import dev.arc.engine.validation.CompiledGraph;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
@@ -39,10 +38,6 @@ public class Engine {
   private final ObjectMapper json;
   private final int traceMaximumBytes;
 
-  public Engine(Validator validator) {
-    this(validator, new ObjectMapper());
-  }
-
   @Autowired
   public Engine(Validator validator, ObjectMapper json) {
     this(validator, json, 256 * 1024);
@@ -55,15 +50,15 @@ public class Engine {
   }
 
   public Session session(RuleResolver resolver, ExecutionDeadline deadline) {
-    return new Session(resolver, deadline, true);
+    return new Session(resolver, deadline);
   }
 
   /**
-   * The plan of a published version for a static check of a pinned callee (validate, diagnostics,
-   * publish): the plan an execution cached, else one compiled for this check only. A check may read
-   * versions that its transaction has not committed, such as the samples the seed publishes in one
-   * transaction and rolls back when an ID is taken, so only executions fill the cache. A check has
-   * no deadline.
+   * The plan of a published version for a static check of a pinned callee inside a transaction
+   * (publish, the sample seed): the plan an execution or an editor check cached, else one compiled
+   * for this check only. Such a check may read versions that its transaction has not committed,
+   * such as the samples the seed publishes in one transaction and rolls back when an ID is taken,
+   * so it fills no cache (lesson B34). A check has no deadline.
    */
   public CompiledGraph prepareForCheck(
       String id, int version, Definition definition, RuleResolver resolver) {
@@ -71,10 +66,45 @@ public class Engine {
   }
 
   /**
-   * Published definitions for a static check: a plan an execution cached holds the stored
-   * definition of its immutable version, so a reached pin is read and decoded from {@code storage}
-   * only when no plan has it; diagnostics read every reached pin again on each request. Formula
-   * calls still ask storage, which also checks the rule's kind.
+   * A static check outside any transaction, such as the editor's validate and diagnostics: every
+   * version it reads is committed, so the plans it compiles for the pins it reaches are kept, as an
+   * execution's are, and the next check or execution of those pins reads nothing. Create it before
+   * the first pin read: a plan compiled from a version read before a deletion is not stored after
+   * it, as for an execution. {@code resolver} is the check's own, memoized resolver, which {@link
+   * #cachedFirst} should back; it has no deadline.
+   */
+  public Check check(RuleResolver resolver) {
+    return new Check(resolver);
+  }
+
+  /** See {@link #check}. */
+  public final class Check {
+    private final RuleResolver resolver;
+    private final long startedIn;
+
+    private Check(RuleResolver resolver) {
+      this.resolver = resolver;
+      this.startedIn = plans.currentGeneration();
+    }
+
+    public RuleResolver resolver() {
+      return resolver;
+    }
+
+    /**
+     * The plan of a reached pin: the cached one, else one compiled from a detached copy of the
+     * stored definition and kept for later checks and executions.
+     */
+    public CompiledGraph prepare(String id, int version, Definition definition) {
+      return plans.planForCommittedCheck(id, version, definition, resolver, startedIn);
+    }
+  }
+
+  /**
+   * Published definitions for a static check: a plan an execution or an editor check cached holds
+   * the stored definition of its immutable version, so a reached pin is read and decoded from
+   * {@code storage} only when no plan has it. Formula calls still ask storage, which also checks
+   * the rule's kind.
    */
   public RuleResolver cachedFirst(RuleResolver storage) {
     return new RuleResolver() {
@@ -101,10 +131,10 @@ public class Engine {
     private final ExecutionDeadline deadline;
     private final ExecutionPlans.Session prepared;
 
-    private Session(RuleResolver resolver, ExecutionDeadline deadline, boolean cachePublished) {
+    private Session(RuleResolver resolver, ExecutionDeadline deadline) {
       this.resolver = resolver;
       this.deadline = deadline;
-      this.prepared = plans.session(resolver, deadline, cachePublished);
+      this.prepared = plans.session(resolver, deadline);
     }
 
     /**
@@ -146,28 +176,5 @@ public class Engine {
           execution.executedSteps(),
           trace.bytes());
     }
-  }
-
-  public Result execute(
-      String ruleId,
-      Integer version,
-      Definition definition,
-      Map<String, Object> inputs,
-      RuleResolver resolver) {
-    return execute(
-        ruleId, version, definition, inputs, resolver, new Parameters(SourceReader.unavailable()));
-  }
-
-  public Result execute(
-      String ruleId,
-      Integer version,
-      Definition definition,
-      Map<String, Object> inputs,
-      RuleResolver resolver,
-      Parameters parameters) {
-    // Embedded callers may provide changing definitions under the same ID/version.
-    var session =
-        new Session(resolver, ExecutionDeadline.start(ExecutionDeadline.DEFAULT_TIMEOUT_MS), false);
-    return session.execute(ruleId, version, () -> definition, inputs, parameters, true);
   }
 }

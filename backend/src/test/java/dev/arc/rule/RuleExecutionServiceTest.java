@@ -29,10 +29,11 @@ class RuleExecutionServiceTest {
   private final ObjectMapper json = new ObjectMapper();
   private final SourceVersions versions = new SourceVersions(sources);
   private final Engine engine = new Engine(validator, json);
+  private final SourceBindingValidator contracts = spy(new SourceBindingValidator(versions));
   private final RuleExecutionService service =
       new RuleExecutionService(
           rules,
-          new SourceBindingValidator(versions),
+          contracts,
           engine,
           new SourceExecutionService(
               sources, versions, new SourceAdapters(List.of()), new JsonPointerExtractor()));
@@ -116,7 +117,9 @@ class RuleExecutionServiceTest {
   /**
    * A published version, the pins it reaches and their source versions are immutable while it
    * lives, so its source contracts are checked once with its cached plan: every execution read each
-   * reached pin again for the check, although the plans were cached.
+   * reached pin again for the check, although the plans were cached. A preview is checked on every
+   * request, but a pin whose plan is cached is served from the plan: each preview read and decoded
+   * every reached pin from storage although its execution ran the cached plans.
    */
   @Test
   void aCachedPublishedPlanChecksItsSourceContractsOnce() {
@@ -142,9 +145,14 @@ class RuleExecutionServiceTest {
           .isEqualTo(java.math.BigDecimal.valueOf(2));
     verify(rules, times(1)).resolve("parent", 1);
     verify(rules, times(1)).resolve("child", 1);
-    // A preview has no cached plan and is checked every time.
-    service.preview(new Preview(parent, Map.of()));
-    verify(rules, times(2)).resolve("child", 1);
+    verify(contracts, times(1)).validateForExecution(any(), any(), any());
+    // A preview has no cached plan and is checked every time, from the child's cached plan.
+    for (int request = 0; request < 2; request++)
+      assertThat(service.preview(new Preview(parent, Map.of())).execution().result())
+          .isEqualTo(java.math.BigDecimal.valueOf(2));
+    verify(contracts, times(3)).validateForExecution(any(), any(), any());
+    verify(rules, times(1)).resolve("child", 1);
+    verifyNoMoreInteractions(rules);
   }
 
   /**

@@ -6,9 +6,11 @@ import static org.assertj.core.api.Assertions.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.script.ArcScript;
+import dev.arc.engine.script.ScriptParsing;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -16,20 +18,19 @@ import org.junit.jupiter.api.Test;
 class OutputAggregationTest {
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
-  private final Engine engine = new Engine(validator);
   private final RuleResolver noReferences =
       (id, version) -> {
         throw new AssertionError("Unexpected reference");
       };
 
   private Engine.Result run(Definition definition) {
-    return engine.execute("test", 1, definition, Map.of(), noReferences);
+    return Engines.execute(validator, "test", 1, definition, Map.of(), noReferences);
   }
 
   @Test
   void multipleOutputsPreferNamesThenDirectVariablesAndOtherwiseNodeIds() {
     var definition =
-        script.parse(
+        ScriptParsing.parse(
             """
         inputs { amount: NUMBER required default 42; customer: OBJECT required default {"amount": 7}; }
         node input INPUT "Input" { next -> a; next -> b; next -> c; next -> d; next -> e; next -> f; next -> g; }
@@ -85,7 +86,7 @@ class OutputAggregationTest {
   @Test
   void aggregateFieldsKeepExplicitNullArraysAndObjectsWithoutFlattening() {
     var definition =
-        script.parse(
+        ScriptParsing.parse(
             """
         node input INPUT "Input" { next -> a; next -> b; next -> c; }
         node a OUTPUT "Nullable" { return null; as missing; }
@@ -114,7 +115,7 @@ class OutputAggregationTest {
             new String[] {"return amount;", "return amount;"},
             new String[] {"return null; as b;", "return 2;"})) {
       var definition =
-          script.parse(
+          ScriptParsing.parse(
               "inputs { amount: NUMBER required default 42; } node input INPUT \"Input\" { next -> a; next -> b; } node a OUTPUT \"First\" { "
                   + declarations[0]
                   + " } node b OUTPUT \"Second\" { "
@@ -139,7 +140,7 @@ class OutputAggregationTest {
   @Test
   void mutuallyExclusiveOutputsCanShareANameAndOneReachedOutputKeepsItsWrapper() {
     var definition =
-        script.parse(
+        ScriptParsing.parse(
             """
         inputs { enabled: BOOLEAN required; }
         node input INPUT "Input" { next -> condition; }
@@ -149,9 +150,11 @@ class OutputAggregationTest {
         """);
     validator.validate(definition, noReferences);
     assertThat(
-            engine.execute("test", 1, definition, Map.of("enabled", true), noReferences).result())
+            Engines.execute(validator, "test", 1, definition, Map.of("enabled", true), noReferences)
+                .result())
         .isEqualTo(Map.of("total", new BigDecimal("42")));
-    var result = engine.execute("test", 1, definition, Map.of("enabled", false), noReferences);
+    var result =
+        Engines.execute(validator, "test", 1, definition, Map.of("enabled", false), noReferences);
     assertThat(result.result()).isEqualTo(Collections.singletonMap("total", null));
     assertThat(result.trace())
         .extracting(Engine.Step::nodeId)
@@ -164,7 +167,7 @@ class OutputAggregationTest {
     for (int depth = 0; depth < 8; depth++) value = "[" + value + "]";
     String body = "node deep OUTPUT \"Deep\" { return " + value + "; as nested; }";
     var multiple =
-        script.parse(
+        ScriptParsing.parse(
             "node input INPUT \"Input\" { next -> deep; next -> other; } "
                 + body
                 + " node other OUTPUT \"Other\" { return null; }");
@@ -176,7 +179,7 @@ class OutputAggregationTest {
         .extracting(Engine.Step::value)
         .containsExactly(
             Collections.singletonMap("nested", ((Map<?, ?>) result.result()).get("nested")));
-    var single = script.parse("node input INPUT \"Input\" { next -> deep; } " + body);
+    var single = ScriptParsing.parse("node input INPUT \"Input\" { next -> deep; } " + body);
     assertThatThrownBy(() -> run(single))
         .isInstanceOfSatisfying(
             ArcException.class,
@@ -186,7 +189,7 @@ class OutputAggregationTest {
                   .containsExactly(new ArcException.Location("test", 1, "deep", "Deep"));
             });
     var unbounded =
-        script.parse(
+        ScriptParsing.parse(
             "node input INPUT \"Input\" { next -> deep; next -> other; } "
                 + body.replace(value, "[" + value + "]")
                 + " node other OUTPUT \"Other\" { return null; }");
@@ -206,7 +209,7 @@ class OutputAggregationTest {
     for (int field = 0; field <= 10; field++)
       child.append(
           " node o%d OUTPUT \"O%d\" { return items; as f%d; }".formatted(field, field, field));
-    var callee = script.parse(child.toString());
+    var callee = ScriptParsing.parse(child.toString());
     var children =
         new RuleResolver() {
           @Override
@@ -224,7 +227,7 @@ class OutputAggregationTest {
       items.add(Map.of("n", BigDecimal.valueOf(index), "name", "item", "price", BigDecimal.TEN));
     for (String root : List.of("bundle", "$IF(true, bundle, null)", "@child:1(items)")) {
       var parent =
-          script.parse(
+          ScriptParsing.parse(
               "inputs { items: ARRAY required; }"
                   + " node input INPUT \"Input\" { next -> bundle; }"
                   + " node bundle REFERENCE \"Bundle\" { use \"child\" version 1;"
@@ -233,7 +236,8 @@ class OutputAggregationTest {
                   + root
                   + "; }");
       assertThatThrownBy(
-              () -> engine.execute("parent", 1, parent, Map.of("items", items), children))
+              () ->
+                  Engines.execute(validator, "parent", 1, parent, Map.of("items", items), children))
           .as(root)
           .isInstanceOfSatisfying(
               ArcException.class,
@@ -261,11 +265,16 @@ class OutputAggregationTest {
       items.add(Map.of("n", BigDecimal.valueOf(index), "name", "item", "price", BigDecimal.TEN));
     var tooMany = outputsReturning(15, "items");
     var fourteen = outputsReturning(14, "items");
-    assertThatCode(() -> engine.execute("child", 1, fourteen, Map.of("items", items), noReferences))
+    assertThatCode(
+            () ->
+                Engines.execute(
+                    validator, "child", 1, fourteen, Map.of("items", items), noReferences))
         .doesNotThrowAnyException();
     String elements = "Result exceeds 100,000 elements across its Outputs";
     assertThatThrownBy(
-            () -> engine.execute("child", 1, tooMany, Map.of("items", items), noReferences))
+            () ->
+                Engines.execute(
+                    validator, "child", 1, tooMany, Map.of("items", items), noReferences))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -277,7 +286,7 @@ class OutputAggregationTest {
     var children = resolving(tooMany);
     for (String call : List.of("bundle", "$IFERROR(@child:1(items), -1)")) {
       var parent =
-          script.parse(
+          ScriptParsing.parse(
               "inputs { items: ARRAY required; }"
                   + " node input INPUT \"Input\" { next -> bundle; }"
                   + " node bundle REFERENCE \"Bundle\" { use \"child\" version 1;"
@@ -286,7 +295,8 @@ class OutputAggregationTest {
                   + call
                   + "; }");
       assertThatThrownBy(
-              () -> engine.execute("parent", 1, parent, Map.of("items", items), children))
+              () ->
+                  Engines.execute(validator, "parent", 1, parent, Map.of("items", items), children))
           .as(call)
           .isInstanceOfSatisfying(
               ArcException.class,
@@ -303,9 +313,9 @@ class OutputAggregationTest {
     var texts = outputsReturning(2, "$MAP(items, item, text)");
     var oneText = outputsReturning(1, "$MAP(items, item, text)");
     var inputs = Map.<String, Object>of("items", items, "text", text);
-    assertThatCode(() -> engine.execute("child", 1, oneText, inputs, noReferences))
+    assertThatCode(() -> Engines.execute(validator, "child", 1, oneText, inputs, noReferences))
         .doesNotThrowAnyException();
-    assertThatThrownBy(() -> engine.execute("child", 1, texts, inputs, noReferences))
+    assertThatThrownBy(() -> Engines.execute(validator, "child", 1, texts, inputs, noReferences))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -329,7 +339,7 @@ class OutputAggregationTest {
       source.append(
           " node o%02d OUTPUT \"O%02d\" { return %s; as f%d; }"
               .formatted(field, field, expression, field));
-    return script.parse(source.toString());
+    return ScriptParsing.parse(source.toString());
   }
 
   private static RuleResolver resolving(Definition child) {

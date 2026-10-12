@@ -458,10 +458,14 @@ try:
             publication = executor.submit(publish_caller)
             delete_status, _ = deletion.result()
             publish_status, publish_text = publication.result()
-        caller_published = publish_status == 200
-        assert not (delete_status == 204 and caller_published), (delete_status, publish_status, publish_text[:200])
-        if caller_published:
-            assert delete_status == 409
+        # Either the deletion committed first and the publication failed on the missing callee, or
+        # the save and publication went first and the deletion was refused; every other pair,
+        # such as a publication that failed for its own reasons behind a 409, is a regression.
+        assert (delete_status, publish_status) in {(204, 404), (409, 200)}, (delete_status, publish_status, publish_text[:200])
+        if delete_status == 204:
+            assert "Published Formula version not found" in publish_text, publish_text[:200]
+            assert request("GET", "/api/rules/" + racing_caller["id"])["publishedVersion"] is None
+        else:
             assert execute(racing_caller["id"], {"amount": 100}, 1)["result"] == 90
         delete(racing_caller["id"])
         if delete_status == 204:

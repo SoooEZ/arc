@@ -168,7 +168,38 @@ class DefinitionTest {
     assertThat(detached.secretHeaders()).containsEntry("X-Key", null);
     assertThatThrownBy(() -> ((List<?>) detached.entries().get("US")).clear())
         .isInstanceOf(UnsupportedOperationException.class);
-    assertThat(new SourceDefinition("HTTP", "u", null, null, null, 0).detached())
-        .isEqualTo(new SourceDefinition("HTTP", "u", null, null, null, 0));
+    assertThat(new SourceDefinition("HTTP", "u", null, null, null, null).detached())
+        .isEqualTo(new SourceDefinition("HTTP", "u", null, null, null, null));
+  }
+
+  /**
+   * A parameter default is copied like a rule input's: the list was shared with the caller, unlike
+   * every other collection of a detached source, which only stayed harmless because validation
+   * admits scalar defaults alone.
+   */
+  @Test
+  void aDetachedSourceDefinitionFreezesItsParameterDefaults() {
+    var regions = new ArrayList<Object>(List.of("US"));
+    var parameter = new Input("region", "ARRAY", false, regions);
+    var source = new SourceDefinition("LOOKUP", null, List.of(parameter), Map.of(), null, null);
+
+    var detached = source.detached();
+
+    assertThat(detached).isEqualTo(source);
+    regions.add("GB");
+    Object frozen = detached.parameters().getFirst().defaultValue();
+    assertThat(frozen).isEqualTo(List.of("US"));
+    assertThatThrownBy(() -> ((List<?>) frozen).clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  /** An undeclared flag is a shape problem; until it is reported, nothing reads it as required. */
+  @Test
+  void anUndeclaredRequiredFlagNeverCountsAsRequired() {
+    var undeclared = new Input("amount", "NUMBER", null, null, null);
+    assertThat(undeclared.required()).isNull();
+    assertThat(undeclared.isRequired()).isFalse();
+    assertThat(undeclared.needsCallerValue()).isFalse();
+    assertThat(new Input("amount", "NUMBER", true, null).isRequired()).isTrue();
   }
 }

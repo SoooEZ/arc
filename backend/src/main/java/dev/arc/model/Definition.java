@@ -77,10 +77,20 @@ public record Definition(
     }
   }
 
+  /**
+   * A declared input. {@code required} is boxed so that a request which omits the flag, or sends
+   * null, is seen by the draft-shape check and refused, instead of being read as optional (lesson
+   * B29); every reader treats only an explicit {@code true} as required.
+   */
   public record Input(
-      String name, String type, boolean required, Object defaultValue, SourceBinding source) {
+      String name, String type, Boolean required, Object defaultValue, SourceBinding source) {
     public Input(String name, String type, boolean required, Object defaultValue) {
       this(name, type, required, defaultValue, null);
+    }
+
+    /** Whether the input was declared required; an undeclared flag never counts as required. */
+    public boolean isRequired() {
+      return Boolean.TRUE.equals(required);
     }
 
     /**
@@ -89,7 +99,7 @@ public record Definition(
      * are all checked against this one rule.
      */
     public boolean needsCallerValue() {
-      return required && defaultValue == null && source == null;
+      return isRequired() && defaultValue == null && source == null;
     }
 
     Input detached() {

@@ -4,11 +4,12 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.RuleResolver;
-import dev.arc.engine.execution.Engine;
 import dev.arc.engine.script.ArcScript;
+import dev.arc.engine.script.ScriptParsing;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,6 @@ import org.junit.jupiter.api.Test;
 class FormulaCallParityTest {
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
-  private final Engine engine = new Engine(validator);
 
   private RuleResolver publishing(Definition child) {
     return new RuleResolver() {
@@ -35,11 +35,11 @@ class FormulaCallParityTest {
   }
 
   private Object run(Definition parent, Definition child, Map<String, Object> inputs) {
-    return engine.execute("parent", 1, parent, inputs, publishing(child)).result();
+    return Engines.execute(validator, "parent", 1, parent, inputs, publishing(child)).result();
   }
 
   private Definition referenceParent(String inputs, String bindings, String result) {
-    return script.parse(
+    return ScriptParsing.parse(
         inputs
             + " node input INPUT \"Input\" { next -> bundle; }"
             + " node bundle REFERENCE \"Bundle\" { use \"child\" version 1; "
@@ -51,7 +51,7 @@ class FormulaCallParityTest {
   }
 
   private Definition callingParent(String inputs, String result) {
-    return script.parse(
+    return ScriptParsing.parse(
         inputs
             + " node input INPUT \"Input\" { next -> out; }"
             + " node out OUTPUT \"Out\" { return "
@@ -65,7 +65,7 @@ class FormulaCallParityTest {
     String nested = "1";
     for (int depth = 0; depth < 8; depth++) nested = "[" + nested + "]";
     var child =
-        script.parse(
+        ScriptParsing.parse(
             "node input INPUT \"Input\" { next -> deep; next -> other; }"
                 + " node deep OUTPUT \"Deep\" { return "
                 + nested
@@ -97,7 +97,7 @@ class FormulaCallParityTest {
     for (int i = 0; i < 1000; i++) items.add(BigDecimal.valueOf(i));
     var inputs = Map.<String, Object>of("items", items);
     String declared = "inputs { items: ARRAY required; }";
-    Definition published = script.parse(child.toString());
+    Definition published = ScriptParsing.parse(child.toString());
     Object viaReference =
         run(
             referenceParent(declared, "bind items = items;", "$COUNT(bundle.f10)"),

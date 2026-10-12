@@ -12,8 +12,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class JdbcSourceRepository implements SourceRepository {
   /** A search matches within the ID or the name, as a rule search does. */
-  private static final String CATALOG_FILTER =
-      " WHERE " + CatalogPages.searchWithin("s.id", "s.name");
+  private static final String[] SEARCHED = {"s.id", "s.name"};
+
+  private static final String CATALOG_FILTER = " WHERE " + CatalogPages.searchWithin(SEARCHED);
 
   /** Chooses the page first, so only the returned sources read their current configuration. */
   private static final String CATALOG_PAGE =
@@ -85,8 +86,7 @@ public class JdbcSourceRepository implements SourceRepository {
         SUMMARY_MAPPER,
         offset,
         limit,
-        search,
-        search);
+        CatalogPages.searchArguments(search, SEARCHED).toArray());
   }
 
   @Override
@@ -111,7 +111,7 @@ public class JdbcSourceRepository implements SourceRepository {
     var rows = db.query(VERSION_ROWS + " WHERE s.id = ? AND v.version = ?", mapper, id, version);
     if (rows.isEmpty()) {
       requireSource(id);
-      throw new ArcException(404, "Data source version not found: " + id + " v" + version);
+      throw ArcException.notFound("Data source version not found: " + id + " v" + version);
     }
     return rows.getFirst();
   }
@@ -138,7 +138,7 @@ public class JdbcSourceRepository implements SourceRepository {
     try {
       db.update("INSERT INTO data_sources(id,name) VALUES (?,?)", id, name);
     } catch (DuplicateKeyException duplicate) {
-      throw new ArcException(409, "This source ID already exists");
+      throw ArcException.conflict("This source ID already exists");
     }
     db.update(
         "INSERT INTO data_source_versions(source_id,version,definition) VALUES (?,1,?::jsonb)",
@@ -184,6 +184,6 @@ public class JdbcSourceRepository implements SourceRepository {
   }
 
   private static ArcException sourceNotFound() {
-    return new ArcException(404, "Source not found");
+    return ArcException.notFound("Source not found");
   }
 }

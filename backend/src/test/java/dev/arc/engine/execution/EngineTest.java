@@ -8,20 +8,20 @@ import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class EngineTest {
   private final Validator validator = new Validator();
-  private final Engine engine = new Engine(validator);
   private final RuleResolver noRefs =
       (id, version) -> {
         throw new ArcException(404, "Missing reference");
       };
 
   private Engine.Result run(Definition d, Map<String, Object> inputs) {
-    return engine.execute("test", 1, d, inputs, noRefs);
+    return Engines.execute(validator, "test", 1, d, inputs, noRefs);
   }
 
   @Test
@@ -94,7 +94,8 @@ class EngineTest {
                 node("result", "OUTPUT", "value + 1", null)),
             List.of(edge("input", "reuse", "next"), edge("reuse", "result", "next")));
     var result =
-        engine.execute(
+        Engines.execute(
+            validator,
             "parent",
             1,
             d,
@@ -143,7 +144,7 @@ class EngineTest {
                     .build(),
                 node("result", "OUTPUT", "value", null)),
             List.of(edge("input", "reuse", "next"), edge("reuse", "result", "next")));
-    assertThatThrownBy(() -> engine.execute("test", 1, d, Map.of(), (id, v) -> d))
+    assertThatThrownBy(() -> Engines.execute(validator, "test", 1, d, Map.of(), (id, v) -> d))
         .hasMessageContaining("Circular rule reference");
   }
 

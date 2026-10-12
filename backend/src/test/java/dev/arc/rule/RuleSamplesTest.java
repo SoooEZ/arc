@@ -10,6 +10,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Rule;
 import dev.arc.model.RuleKind;
 import java.time.Instant;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
@@ -40,22 +41,32 @@ class RuleSamplesTest {
   @Test
   void aNewWorkspaceReceivesThePublishedExamples() {
     when(store.claimSampleSeeding()).thenReturn(true);
-    when(store.create(anyString(), anyString(), anyString(), anyString(), any()))
+    when(store.create(anyString(), anyString(), anyString(), anyString(), any(), any()))
         .thenAnswer(RuleSamplesTest::created);
     samples.run(null);
     verify(store, never()).list();
     verify(transactions).commit(any());
     for (String id : new String[] {"apply-discount", "order-pricing", "free-shipping"})
       verify(service).publish(id, 1);
-    verify(store).create(eq("apply-discount"), anyString(), anyString(), eq("FORMULA"), any());
-    verify(store).create(eq("order-pricing"), anyString(), anyString(), eq("DECISION_TREE"), any());
+    verify(store)
+        .create(eq("apply-discount"), anyString(), anyString(), eq("FORMULA"), any(), eq(Set.of()));
+    // The pricing sample calls the discount formula; the stored set is what a deletion reads.
+    verify(store)
+        .create(
+            eq("order-pricing"),
+            anyString(),
+            anyString(),
+            eq("DECISION_TREE"),
+            any(),
+            eq(Set.of("apply-discount")));
     verify(store)
         .create(
             eq("free-shipping"),
             anyString(),
             anyString(),
             eq("RULE"),
-            eq(RuleTemplates.blank(RuleKind.RULE)));
+            eq(RuleTemplates.blank(RuleKind.RULE)),
+            eq(Set.of()));
   }
 
   /**
@@ -66,9 +77,9 @@ class RuleSamplesTest {
   @Test
   void aTakenSampleIdRollsBackOnlyTheSamples() {
     when(store.claimSampleSeeding()).thenReturn(true);
-    when(store.create(anyString(), anyString(), anyString(), anyString(), any()))
+    when(store.create(anyString(), anyString(), anyString(), anyString(), any(), any()))
         .thenAnswer(RuleSamplesTest::created);
-    when(store.create(eq("order-pricing"), anyString(), anyString(), anyString(), any()))
+    when(store.create(eq("order-pricing"), anyString(), anyString(), anyString(), any(), any()))
         .thenThrow(new ArcException(409, "This rule ID already exists"));
 
     assertThatCode(() -> samples.run(null)).doesNotThrowAnyException();
@@ -80,7 +91,7 @@ class RuleSamplesTest {
     verify(transactions).rollback(any());
     verify(transactions, never()).commit(any());
     verify(store, never())
-        .create(eq("free-shipping"), anyString(), anyString(), anyString(), any());
+        .create(eq("free-shipping"), anyString(), anyString(), anyString(), any(), any());
   }
 
   private static Rule created(InvocationOnMock call) {

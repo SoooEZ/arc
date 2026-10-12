@@ -8,10 +8,12 @@ import dev.arc.engine.ExecutionDeadline;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.graph.GraphPlan;
 import dev.arc.engine.script.ArcScript;
+import dev.arc.engine.script.ScriptParsing;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -20,14 +22,13 @@ class ValueSwitchTest {
   private final ObjectMapper json = new ObjectMapper();
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(json, validator);
-  private final Engine engine = new Engine(validator);
   private final RuleResolver noRefs =
       (id, version) -> {
         throw new AssertionError("Unexpected reference");
       };
 
   private Definition choice() {
-    return script.parse(
+    return ScriptParsing.parse(
         """
         inputs { data: OBJECT required; }
         node input INPUT "Input" { next -> choose; }
@@ -62,8 +63,13 @@ class ValueSwitchTest {
   }
 
   private Engine.Result run(Definition definition, Object value) {
-    return engine.execute(
-        "test", 1, definition, Map.of("data", Collections.singletonMap("value", value)), noRefs);
+    return Engines.execute(
+        validator,
+        "test",
+        1,
+        definition,
+        Map.of("data", Collections.singletonMap("value", value)),
+        noRefs);
   }
 
   @Test
@@ -86,7 +92,7 @@ class ValueSwitchTest {
 
   @Test
   void evaluatesSelectorOnceAndSkipsLaterCasesAfterAMatch() {
-    var graph = script.parse(script.render(choice()).replace("equals 0;", "equals 1 / 0;"));
+    var graph = ScriptParsing.parse(script.render(choice()).replace("equals 0;", "equals 1 / 0;"));
     assertThat(run(graph, false).result()).isEqualTo("boolean");
     assertThatThrownBy(() -> run(graph, true))
         .hasMessageContaining("Case Number: Division by zero");
@@ -99,7 +105,8 @@ class ValueSwitchTest {
             return super.get(key);
           }
         };
-    assertThat(engine.execute("test", 1, choice(), Map.of("data", data), noRefs).result())
+    assertThat(
+            Engines.execute(validator, "test", 1, choice(), Map.of("data", data), noRefs).result())
         .isEqualTo("string");
     assertThat(reads[0]).isEqualTo(1);
   }
@@ -117,7 +124,8 @@ class ValueSwitchTest {
               });
     for (String expression : List.of("null", "[1]", "$OBJECT()")) {
       var graph =
-          script.parse(script.render(choice()).replace("equals 0;", "equals " + expression + ";"));
+          ScriptParsing.parse(
+              script.render(choice()).replace("equals 0;", "equals " + expression + ";"));
       assertThat(run(graph, false).result()).isEqualTo("boolean");
       assertThatThrownBy(() -> run(graph, true))
           .isInstanceOfSatisfying(
@@ -133,7 +141,8 @@ class ValueSwitchTest {
   @Test
   void selectorParticipatesInScopeValidationAndCyclicGraphSyntaxDiagnostics() {
     var missing =
-        script.parse(script.render(choice()).replace("select data.value;", "select missing;"));
+        ScriptParsing.parse(
+            script.render(choice()).replace("select data.value;", "select missing;"));
     assertThat(validator.diagnose(missing, noRefs).problems())
         .anySatisfy(
             problem -> {
@@ -163,7 +172,7 @@ class ValueSwitchTest {
     var graph = choice();
     String canonical = script.render(graph);
     assertThat(canonical).contains("select data.value;", "equals false;").doesNotContain(" when ");
-    assertThat(script.parse(canonical)).isEqualTo(graph);
+    assertThat(ScriptParsing.parse(canonical)).isEqualTo(graph);
     assertThat(json.readValue(json.writeValueAsString(graph), Definition.class)).isEqualTo(graph);
     var rebuilt = script.buildNode(graph, "choose", script.renderNode(graph, "choose"));
     assertThat(rebuilt.diagnostics()).isEmpty();
@@ -172,22 +181,18 @@ class ValueSwitchTest {
     assertThat(rebuilt.definition().inputs()).isEqualTo(graph.inputs());
     var plans = new ExecutionPlans(validator, json);
     var first =
-        plans
-            .session(noRefs, ExecutionDeadline.start(30_000), true)
-            .prepare("test", 1, () -> graph);
+        plans.session(noRefs, ExecutionDeadline.start(30_000)).prepare("test", 1, () -> graph);
     assertThat(first.definition().nodes().get(1).selector()).isEqualTo("data.value");
     assertThat(first.expression("data.value").evaluate(Map.of("data", Map.of("value", false))))
         .isEqualTo(false);
     assertThat(
-            plans
-                .session(noRefs, ExecutionDeadline.start(30_000), true)
-                .prepare("test", 1, () -> graph))
+            plans.session(noRefs, ExecutionDeadline.start(30_000)).prepare("test", 1, () -> graph))
         .isSameAs(first);
     String casesFirst =
         canonical
             .replace("  select data.value;\n", "")
             .replace("  default ->", "  select data.value;\n  default ->");
-    assertThat(script.parse(casesFirst)).isEqualTo(graph);
+    assertThat(ScriptParsing.parse(casesFirst)).isEqualTo(graph);
   }
 
   @Test
@@ -230,7 +235,7 @@ class ValueSwitchTest {
   @Test
   void aStoredSwitchThatStillSetsAnExpressionFailsAtTheSwitch() throws Exception {
     var graph =
-        script.parse(
+        ScriptParsing.parse(
             """
             inputs { amount: NUMBER required; }
             node input INPUT "Input" { next -> choose; }
@@ -249,7 +254,8 @@ class ValueSwitchTest {
     var legacy = json.treeToValue(stored, Definition.class);
     assertThatThrownBy(
             () ->
-                engine.execute("legacy", 1, legacy, Map.of("amount", new BigDecimal("50")), noRefs))
+                Engines.execute(
+                    validator, "legacy", 1, legacy, Map.of("amount", new BigDecimal("50")), noRefs))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {

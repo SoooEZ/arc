@@ -4,6 +4,7 @@ import static dev.arc.model.NodeKind.*;
 import static dev.arc.rule.RuleTemplates.edge;
 import static dev.arc.rule.RuleTemplates.node;
 
+import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
@@ -11,6 +12,7 @@ import dev.arc.model.Handles;
 import dev.arc.model.RuleKind;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -99,7 +101,8 @@ public class RuleSamples implements ApplicationRunner {
             "Apply discount",
             "A reusable formula for percentage discounts, rounded to two decimal places.",
             RuleKind.FORMULA.name(),
-            discount);
+            discount,
+            Validator.calledRuleIds(discount));
     service.publish(formula.id(), formula.revision());
     Definition pricing =
         new Definition(
@@ -143,7 +146,8 @@ public class RuleSamples implements ApplicationRunner {
             "Order pricing",
             "Reward premium customers and larger orders with the right discount.",
             RuleKind.DECISION_TREE.name(),
-            pricing);
+            pricing,
+            Validator.calledRuleIds(pricing));
     service.publish(tree.id(), tree.revision());
     var eligibility =
         store.create(
@@ -151,7 +155,8 @@ public class RuleSamples implements ApplicationRunner {
             "Free shipping",
             "Check whether an order qualifies for complimentary shipping.",
             RuleKind.RULE.name(),
-            RuleTemplates.blank(RuleKind.RULE));
+            RuleTemplates.blank(RuleKind.RULE),
+            Set.of());
     service.publish(eligibility.id(), eligibility.revision());
   }
 }

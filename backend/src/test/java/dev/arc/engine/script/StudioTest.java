@@ -6,11 +6,11 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.RuleResolver;
-import dev.arc.engine.execution.Engine;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.expression.Functions;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition.*;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -26,20 +26,22 @@ class StudioTest {
       assertThat(build.definition().inputs()).isEqualTo(before.inputs());
       assertThat(build.definition().nodes()).isEqualTo(before.nodes());
       assertThat(build.definition().edges()).containsExactlyInAnyOrderElementsOf(before.edges());
-      var engine = new Engine(new Validator());
+      var validator = new Validator();
       RuleResolver noRefs =
           (id, v) -> {
             throw new AssertionError("Unexpected reference");
           };
-      assertThat(engine.execute("before", 1, before, Map.of(), noRefs).result())
-          .isEqualTo(engine.execute("after", 1, build.definition(), Map.of(), noRefs).result());
+      assertThat(Engines.execute(validator, "before", 1, before, Map.of(), noRefs).result())
+          .isEqualTo(
+              Engines.execute(validator, "after", 1, build.definition(), Map.of(), noRefs)
+                  .result());
     }
   }
 
   @Test
   void commentsArraysSourceBindingsAndReferencesRoundTrip() {
     var definition =
-        script.parse(
+        ScriptParsing.parse(
             """
 // a documented module
 schema 1;

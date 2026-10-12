@@ -96,7 +96,7 @@ public final class Parameters {
       // was checked once more here, a second walk of a large value.
       else if (parameter.source() != null) value = read(parameter);
       else value = checked(parameter, parameter.defaultValue());
-      if (value == null && parameter.required())
+      if (value == null && parameter.isRequired())
         throw ArcException.invalid("Missing required input: " + name);
       resolved.put(name, value);
       resolving.remove(name);
@@ -134,7 +134,7 @@ public final class Parameters {
       try {
         // A value that arrives after the deadline is never used, whichever reader returned it.
         value = deadline.within(() -> sources.read(source, argumentValues, deadline));
-        if (value == null && parameter.required())
+        if (value == null && parameter.isRequired())
           throw ArcException.invalid("Source returned null for required input");
         value = checked(parameter, value);
       } catch (ArcException error) {

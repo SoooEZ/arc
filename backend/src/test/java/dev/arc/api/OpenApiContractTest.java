@@ -3,8 +3,15 @@ package dev.arc.api;
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.model.Definition;
 import dev.arc.model.Handles;
+import dev.arc.model.NodeKind;
+import dev.arc.model.RuleKind;
+import dev.arc.source.SourceAdapter;
+import dev.arc.source.http.HttpSource;
+import dev.arc.source.http.HttpSourceAdapter;
+import dev.arc.source.lookup.LookupSourceAdapter;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
@@ -12,16 +19,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.core.type.filter.AssignableTypeFilter;
 import org.springframework.web.bind.annotation.*;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * docs/openapi.yaml describes the served API: every controller mapping, every node property and
- * every trace branch. Clients generated from the specification otherwise drop or reject them.
+ * docs/openapi.yaml describes the served API: exactly the controller mappings, every node property,
+ * every trace branch and the server's kind vocabularies. Clients generated from the specification
+ * otherwise drop or reject them.
  */
 class OpenApiContractTest {
   private static final Path SPECIFICATION = Path.of("..", "docs", "openapi.yaml");
@@ -40,8 +50,16 @@ class OpenApiContractTest {
     }
   }
 
+  /** The keys of a path item that are operations; a path item also lists its parameters. */
+  private static final Set<String> HTTP_VERBS =
+      Set.of("get", "put", "post", "delete", "options", "head", "patch", "trace");
+
+  /**
+   * Documented and served operations are the same set: a served operation the specification lacks
+   * is invisible to generated clients, and a documented one the server lacks would be called.
+   */
   @Test
-  void everyControllerMappingHasItsPathAndMethodInTheSpecification() throws Exception {
+  void theSpecificationListsExactlyTheServedPathsAndMethods() throws Exception {
     var scanner = new ClassPathScanningCandidateComponentProvider(false);
     scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
     var served = new TreeSet<String>();
@@ -55,11 +73,11 @@ class OpenApiContractTest {
     var documented = new TreeSet<String>();
     section(spec, "paths")
         .forEach(
-            (path, operations) -> {
-              for (Object verb : ((Map<?, ?>) operations).keySet())
-                documented.add(verb + " " + path);
+            (path, item) -> {
+              for (Object key : ((Map<?, ?>) item).keySet())
+                if (HTTP_VERBS.contains(key)) documented.add(key + " " + path);
             });
-    assertThat(documented).containsAll(served);
+    assertThat(documented).isEqualTo(served);
   }
 
   /** "post /rules/{id}/publish" for each request mapping of a controller method. */
@@ -73,7 +91,80 @@ class OpenApiContractTest {
     if (put != null) for (String path : put.value()) mappings.add("put " + path);
     DeleteMapping delete = method.getAnnotation(DeleteMapping.class);
     if (delete != null) for (String path : delete.value()) mappings.add("delete " + path);
+    PatchMapping patch = method.getAnnotation(PatchMapping.class);
+    if (patch != null) for (String path : patch.value()) mappings.add("patch " + path);
+    RequestMapping generic = method.getAnnotation(RequestMapping.class);
+    if (generic != null)
+      for (RequestMethod verb : generic.method())
+        for (String path : generic.value())
+          mappings.add(verb.name().toLowerCase(Locale.ROOT) + " " + path);
     return mappings;
+  }
+
+  /**
+   * The kind vocabularies the specification spells, node types, rule kinds and source kinds, are
+   * the server's own: {@link NodeKind}, {@link RuleKind} and the registered source adapters, in
+   * their order. A generated client would otherwise refuse a kind the server accepts, or offer one
+   * it does not, and the source kinds were listed in two orders.
+   */
+  @Test
+  void theKindEnumsAreTheServersVocabularies() throws Exception {
+    List<String> nodeKinds = Arrays.stream(NodeKind.values()).map(Enum::name).toList();
+    List<String> ruleKinds = Arrays.stream(RuleKind.values()).map(Enum::name).toList();
+    List<String> sourceKinds = registeredSourceKinds();
+    var enums = new LinkedHashMap<String, List<String>>();
+    collectEnums("", spec, enums);
+    var vocabularies = new LinkedHashMap<List<String>, Integer>();
+    enums.forEach(
+        (path, values) -> {
+          List<String> expected =
+              values.contains("INPUT")
+                  ? nodeKinds
+                  : values.contains("DECISION_TREE")
+                      ? ruleKinds
+                      : values.contains("HTTP") || values.contains("LOOKUP") ? sourceKinds : null;
+          if (expected == null) return;
+          assertThat(values).as(path).isEqualTo(expected);
+          vocabularies.merge(expected, 1, Integer::sum);
+        });
+    assertThat(vocabularies.getOrDefault(nodeKinds, 0)).as("node type enums").isEqualTo(1);
+    assertThat(vocabularies.getOrDefault(ruleKinds, 0)).as("rule kind enums").isGreaterThan(1);
+    assertThat(vocabularies.getOrDefault(sourceKinds, 0)).as("source kind enums").isEqualTo(2);
+  }
+
+  /** Every string enum of the specification by its path. */
+  private static void collectEnums(String path, Object node, Map<String, List<String>> enums) {
+    if (node instanceof Map<?, ?> map) {
+      if (map.get("enum") instanceof List<?> values
+          && !values.isEmpty()
+          && values.stream().allMatch(String.class::isInstance))
+        enums.put(path, values.stream().map(String.class::cast).toList());
+      map.forEach((key, value) -> collectEnums(path + "/" + key, value, enums));
+    } else if (node instanceof List<?> items) {
+      for (int index = 0; index < items.size(); index++)
+        collectEnums(path + "[" + index + "]", items.get(index), enums);
+    }
+  }
+
+  /**
+   * The kinds of the registered adapters, in the order the registry's own message lists them. The
+   * adapters are built by hand from the classes the scan finds, so a new adapter fails here until
+   * it is added, with its kind, to the specification.
+   */
+  private static List<String> registeredSourceKinds() throws Exception {
+    var scanner = new ClassPathScanningCandidateComponentProvider(false);
+    scanner.addIncludeFilter(new AssignableTypeFilter(SourceAdapter.class));
+    var registered = new TreeSet<String>();
+    for (var candidate : scanner.findCandidateComponents("dev.arc.source"))
+      registered.add(candidate.getBeanClassName());
+    assertThat(registered)
+        .containsExactly(HttpSourceAdapter.class.getName(), LookupSourceAdapter.class.getName());
+    try (var http = new HttpSource(new ObjectMapper(), "", "")) {
+      return Stream.of(new HttpSourceAdapter(http), new LookupSourceAdapter())
+          .map(SourceAdapter::kind)
+          .sorted()
+          .toList();
+    }
   }
 
   @Test

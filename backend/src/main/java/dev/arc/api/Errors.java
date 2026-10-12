@@ -13,6 +13,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 @RestControllerAdvice
 public class Errors {
@@ -53,7 +54,11 @@ public class Errors {
 
   /**
    * Spring's own errors keep the headers their status calls for: Allow on a 405, and Accept on a
-   * 415 or 406.
+   * 415 or 406. A client that closed its connection while the response was being written (Tomcat's
+   * ClientAbortException on the next socket write, routine for a traced execution that spans
+   * several writes) gets nothing: there is no socket to answer on, and Spring consults its own
+   * disconnected-client check only after this handler ran, so it logged a routine abort as an ERROR
+   * with a stack trace and then failed a second write of a 500 into the dead socket.
    */
   @ExceptionHandler(Exception.class)
   ResponseEntity<ErrorBody> unexpected(Exception e) {
@@ -62,6 +67,11 @@ public class Errors {
           ErrorBody.outsideGraph(
               error.getStatusCode().value(), error.getBody().getDetail(), List.of()),
           error.getHeaders());
+    if (DisconnectedClientHelper.isClientDisconnectedException(e)) {
+      LOG.debug("Client disconnected before the response was complete", e);
+      // null marks the request handled without writing a body.
+      return null;
+    }
     LOG.error("Unhandled request error", e);
     return response(ErrorBody.outsideGraph(500, "An unexpected server error occurred", List.of()));
   }

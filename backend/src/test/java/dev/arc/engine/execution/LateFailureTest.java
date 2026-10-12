@@ -11,6 +11,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.SourceBinding;
+import dev.arc.support.Engines;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,7 +24,7 @@ import org.junit.jupiter.api.Test;
  * error, while a Formula node or an Output answered 422.
  */
 class LateFailureTest {
-  private final Engine engine = new Engine(new Validator());
+  private final Engine engine = Engines.engine(new Validator());
   private final RuleResolver noRules =
       (id, version) -> {
         throw new IllegalStateException("no references");

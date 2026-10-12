@@ -40,17 +40,25 @@ public final class HttpSourceAdapter implements SourceAdapter {
   @Override
   public void validate(SourceDefinition definition) {
     http.validate(definition);
-    if (definition.timeoutMs() < MIN_TIMEOUT_MS || definition.timeoutMs() > MAX_TIMEOUT_MS)
-      throw ArcException.invalid(
-          "HTTP timeout must be " + MIN_TIMEOUT_MS + "–" + Limits.format(MAX_TIMEOUT_MS) + " ms");
+    requireTimeout(definition);
   }
 
+  /** A read checks the timeout like a save, so the transport never sees a missing one. */
   @Override
   public Object fetch(
       String id,
       SourceDefinition definition,
       Map<String, Object> inputs,
       ExecutionDeadline deadline) {
+    requireTimeout(definition);
     return http.fetch(definition, inputs, deadline);
+  }
+
+  /** An HTTP source needs its timeout: omitted, null or out of range is refused (lesson B29). */
+  private static void requireTimeout(SourceDefinition definition) {
+    Integer timeoutMs = definition.timeoutMs();
+    if (timeoutMs == null || timeoutMs < MIN_TIMEOUT_MS || timeoutMs > MAX_TIMEOUT_MS)
+      throw ArcException.invalid(
+          "HTTP timeout must be " + MIN_TIMEOUT_MS + "–" + Limits.format(MAX_TIMEOUT_MS) + " ms");
   }
 }

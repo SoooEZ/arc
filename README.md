@@ -358,7 +358,7 @@ python3 scripts/studio_smoke.py
 python3 scripts/web_smoke.py
 ```
 
-Browser and API tests create identifiable `e2e-formula-*` and `smoke-*` rules. Run them against a disposable Compose project when you want to keep your own workspace clean:
+The API tests create `smoke-*` and `studio-smoke-*` rules and sources, each named in their final summary, and the browser specs create rules and sources whose IDs are a prefix and a run stamp (`<prefix>-<stamp>`, from `uniqueId` in `frontend/tests/helpers/api.ts`); most are left behind, and sources cannot be deleted. Run them against a disposable Compose project when you want to keep your own workspace clean:
 
 ```sh
 COMPOSE_PROJECT_NAME=arc-test ARC_WEB_PORT=3081 ARC_API_PORT=8081 docker compose up -d --build --wait

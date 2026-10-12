@@ -52,6 +52,14 @@ class RequestJsonWebTest {
     send("/api/rules/pricing/execute", "{\"inputs\":{},\"verison\":2}")
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("Request contains an unknown field: verison"));
+    // The execution options stay flat fields of each request: Jackson's unwrapping deserializer
+    // would accept any unknown top-level field in silence.
+    send("/api/preview", definitionWith("").replaceFirst("\\{", "{\"maxSteps\":3,"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("Request contains an unknown field: maxSteps"));
+    send("/api/rules/pricing/execute", "{\"inputs\":{},\"trace\":false,\"timeout\":5}")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("Request contains an unknown field: timeout"));
     verify(execution, never()).preview(any());
     verify(execution, never()).execute(anyString(), any());
   }

@@ -35,7 +35,7 @@ class NodeEditorTest {
   @Test
   void aRepeatedConnectionIdIsReportedAtTheFragmentStatementWhereverTheOtherIs() {
     Definition graph =
-        script.parse(
+        ScriptParsing.parse(
             """
             inputs { amount: NUMBER required; }
             node input INPUT "Input" { next -> calc edge "first"; }
@@ -61,7 +61,7 @@ class NodeEditorTest {
   @Test
   void editsOneNodePreservingEverythingElse() {
     Definition d =
-        script.parse(
+        ScriptParsing.parse(
             """
             // preserve this note
             inputs { amount: NUMBER required default 10; }
@@ -84,7 +84,7 @@ class NodeEditorTest {
     // The fragment's edges take the replaced edges' place, so a no-op build echoes the graph's
     // order.
     var branching =
-        script.parse(
+        ScriptParsing.parse(
             """
             node input INPUT "Input" { next -> a; }
             node a CONDITION "A" { when true; true -> b; false -> c; }
@@ -114,7 +114,7 @@ class NodeEditorTest {
   @Test
   void inputNodeIncludesParametersAndSourceMappings() {
     var d =
-        script.parse(
+        ScriptParsing.parse(
             """
 inputs {
   country: STRING required default "US";
@@ -241,11 +241,11 @@ node out OUTPUT "Output" { return rate; }
   @Test
   void diagnosticsAttributeNestedBindingExpressionsToTheirOwner() {
     var child =
-        script.parse(
+        ScriptParsing.parse(
             "inputs { x: NUMBER required; } node in INPUT \"In\" { next -> out; } node out OUTPUT"
                 + " \"Out\" { return x; }");
     var d =
-        script.parse(
+        ScriptParsing.parse(
             "node input INPUT \"Input\" { next -> reuse; } node reuse REFERENCE \"Reuse\" { use"
                 + " \"child\" version 1; bind x = unknown; as result; next -> out; } node out"
                 + " OUTPUT \"Out\" { return result; }");
@@ -258,7 +258,7 @@ node out OUTPUT "Output" { return rate; }
   @Test
   void fragmentCommentsAreRefusedVisiblyAndAMissingPositionKeepsTheNodesPlace() {
     Definition d =
-        script.parse(
+        ScriptParsing.parse(
             "node input INPUT \"Input\" { next -> calc; }\n"
                 + "node calc FORMULA \"Calc\" at (700, 500) { let total = 1; next -> out; }\n"
                 + "node out OUTPUT \"Output\" { return total; }");

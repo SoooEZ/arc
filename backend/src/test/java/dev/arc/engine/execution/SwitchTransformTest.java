@@ -8,10 +8,12 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
 import dev.arc.engine.script.ArcScript;
+import dev.arc.engine.script.ScriptParsing;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.support.Engines;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -19,14 +21,13 @@ import org.junit.jupiter.api.Test;
 class SwitchTransformTest {
   private final Validator validator = new Validator();
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
-  private final Engine engine = new Engine(validator);
   private final RuleResolver noRefs =
       (id, version) -> {
         throw new AssertionError("Unexpected reference");
       };
 
   private Definition choice() {
-    return script.parse(
+    return ScriptParsing.parse(
         """
         inputs { amount: NUMBER required; }
         node input INPUT "Input" { next -> choose; }
@@ -45,7 +46,7 @@ class SwitchTransformTest {
   }
 
   private Engine.Result run(Definition definition, Map<String, Object> inputs) {
-    return engine.execute("test", 1, definition, inputs, noRefs);
+    return Engines.execute(validator, "test", 1, definition, inputs, noRefs);
   }
 
   @Test
@@ -64,7 +65,7 @@ class SwitchTransformTest {
   @Test
   void caseOrderIsPriorityAndLaterExpressionsAreNotEvaluated() {
     String source = script.render(choice());
-    var shortCircuit = script.parse(source.replace("amount >= 50", "1 / 0 > 1"));
+    var shortCircuit = ScriptParsing.parse(source.replace("amount >= 50", "1 / 0 > 1"));
     assertThat(run(shortCircuit, Map.of("amount", 100)).result()).isEqualTo(new BigDecimal("80.0"));
     assertThatThrownBy(() -> run(shortCircuit, Map.of("amount", 20)))
         .isInstanceOfSatisfying(
@@ -73,7 +74,7 @@ class SwitchTransformTest {
               assertThat(e.getMessage()).contains("Case Standard", "Division by zero");
               assertThat(e.locations().getFirst().nodeId()).isEqualTo("choose");
             });
-    var wrongType = script.parse(source.replace("amount >= 100", "amount"));
+    var wrongType = ScriptParsing.parse(source.replace("amount >= 100", "amount"));
     assertThatThrownBy(() -> run(wrongType, Map.of("amount", 100)))
         .hasMessageContaining("Case Premium: Expected a boolean");
     var nodes =
@@ -94,7 +95,7 @@ class SwitchTransformTest {
   @Test
   void selectedCaseCanFanOutAndJoinWithoutWaitingForOtherCases() {
     var graph =
-        script.parse(
+        ScriptParsing.parse(
             """
         node input INPUT "Input" { next -> choose; }
         node choose SWITCH "Choose" {
@@ -113,7 +114,8 @@ class SwitchTransformTest {
         .contains("answer")
         .doesNotContain("a", "b");
     var missing =
-        script.parse(script.render(choice()).replace("let price = amount;", "let other = amount;"));
+        ScriptParsing.parse(
+            script.render(choice()).replace("let price = amount;", "let other = amount;"));
     assertThatThrownBy(() -> run(missing, Map.of("amount", 100)))
         .hasMessageContaining("unavailable");
   }
@@ -121,16 +123,16 @@ class SwitchTransformTest {
   @Test
   void completeSwitchRequiresEveryCaseDefaultAndStableUniqueIds() {
     var source = script.render(choice());
-    var missing = script.parse(source.replaceAll("(?m)^  default ->.*\\n", ""));
+    var missing = ScriptParsing.parse(source.replaceAll("(?m)^  default ->.*\\n", ""));
     assertThatThrownBy(() -> validator.validate(missing, noRefs)).hasMessageContaining("default");
-    var stale = script.parse(source.replace("case:VIP ->", "case:missing ->"));
+    var stale = ScriptParsing.parse(source.replace("case:VIP ->", "case:missing ->"));
     assertThatThrownBy(() -> validator.validate(stale, noRefs)).hasMessageContaining("connect");
     assertThat(script.build(source.replace("case \"standard\"", "case \"VIP\"")).diagnostics())
         .isNotEmpty();
   }
 
   private Definition transformation() {
-    return script.parse(
+    return ScriptParsing.parse(
         """
         inputs { customer: OBJECT required; items: ARRAY required; }
         node input INPUT "Input" { next -> normalize; }
@@ -174,7 +176,7 @@ class SwitchTransformTest {
   @Test
   void wholeTransformExpressionsReturnArraysAndWorkAsReusableRules() {
     var graph =
-        script.parse(
+        ScriptParsing.parse(
             """
         inputs { values: ARRAY required; }
         node input INPUT "Input" { next -> convert; }
@@ -184,13 +186,13 @@ class SwitchTransformTest {
     assertThat(run(graph, Map.of("values", List.of("1.25", "2"))).result())
         .isEqualTo(List.of(new BigDecimal("1.25"), new BigDecimal("2")));
     var parent =
-        script.parse(
+        ScriptParsing.parse(
             """
         node input INPUT "Input" { next -> reuse; }
         node reuse REFERENCE "Normalize values" { use "normalizer" version 1; bind values = ["1.25", "2"]; as items; next -> out; }
         node out OUTPUT "Output" { return $SUM(items); }
         """);
-    assertThat(engine.execute("parent", 1, parent, Map.of(), (id, v) -> graph).result())
+    assertThat(Engines.execute(validator, "parent", 1, parent, Map.of(), (id, v) -> graph).result())
         .isEqualTo(new BigDecimal("3.25"));
   }
 
@@ -226,14 +228,15 @@ class SwitchTransformTest {
   void transformFieldsCannotReadSiblingsAndDiagnosticsLocateBadCasesAndMappings() {
     var source =
         script.render(transformation()).replace("$TO_NUMBER(customer.amount)", "displayName");
-    var graph = script.parse(source);
+    var graph = ScriptParsing.parse(source);
     assertThat(validator.diagnose(graph, noRefs).problems())
         .anySatisfy(
             problem -> {
               assertThat(problem.message()).contains("Field amount", "displayName");
               assertThat(problem.locations().getFirst().nodeId()).isEqualTo("normalize");
             });
-    var invalid = script.parse(script.render(choice()).replace("amount >= 50", "missing >= 50"));
+    var invalid =
+        ScriptParsing.parse(script.render(choice()).replace("amount >= 50", "missing >= 50"));
     assertThat(validator.diagnose(invalid, noRefs).problems())
         .anySatisfy(
             problem -> {
