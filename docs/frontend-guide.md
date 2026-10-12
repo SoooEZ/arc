@@ -62,20 +62,23 @@ flowchart TB
   editor --> canvas["editor/canvas"] & inspector["editor/inspector"]
   editor -->|"TestPanel"| execution
   editor -->|"CodeStudio（懒加载）"| studio
+  editor -->|"表达式对话框 · 节点代码"| language
   execution -.->|"仅类型"| editor
   inspector -->|"ValueBinding 等"| expressions
   inspector -->|"SourceBindingEditor"| sources
   sources -->|"ValueBinding"| expressions
-  expressions -->|"Monaco 与补全"| studio
-  execution -->|"arcLanguage · useArcEditor"| studio
+  expressions -->|"Monaco 与补全"| language
+  execution -->|"arcLanguage · useArcEditor"| language
+  studio -->|"Monaco、库、补全"| language
   inspector -->|"pinnedVersions"| caches
   sources -->|"pinnedVersions"| caches
-  studio -->|"pinnedVersions · pinnedReads"| caches
-  studio["studio<br/>Monaco、ARC 语言支持、函数目录、Formula 元数据"]
+  language -->|"pinnedVersions · pinnedReads"| caches
+  studio["studio<br/>Code studio 页面：编辑器、库、大纲、问题栏、规则 JSON"]
+  language["language<br/>Monaco、ARC 语言支持、函数目录、Formula 元数据"]
   caches["app/pinnedVersions<br/>全页固定读取缓存"]
 ```
 
-箭头 A → B 表示 A import B，虚线表示只 import 类型；canvas 反过来 import editor 的也只有类型，library 不 import 其他功能。各功能还会 import `app/routing.ts`（生成路径）和 `app/navigationGuards.ts`（离开前确认），图里不画。已发布版本的全页缓存在 `app/`，因为检查器、数据源和 Code studio 都要用，放在任何一个功能里都会让另外两个依赖它。`features/studio` 的名字来自 Code studio，但大部分是共享设施：检查器和数据源绑定里的表达式输入、测试面板的 JSON 编辑器都在用。只属于代码视图的是 `CodeStudio.tsx`、`StudioLibrary.tsx`、`StudioOutline.tsx`、`StudioProblems.tsx` 和 `scriptOutline.ts`。
+箭头 A → B 表示 A import B，虚线表示只 import 类型；canvas 反过来 import editor 的也只有类型，library 不 import 其他功能。各功能还会 import `app/routing.ts`（生成路径）和 `app/navigationGuards.ts`（离开前确认），图里不画。已发布版本的全页缓存在 `app/`，因为检查器、数据源和 Code studio 都要用，放在任何一个功能里都会让另外两个依赖它。同样的道理，Monaco 和 ARC 语言支持在 `features/language/`：检查器和数据源绑定里的表达式输入、测试面板的 JSON 编辑器、节点代码对话框和 Code studio 都在用（2026-10-11 之前它们放在 `features/studio` 里）。只属于代码视图的是 `features/studio/` 的 `CodeStudio.tsx`、`RuleJsonView.tsx`、`StudioLibrary.tsx`、`StudioOutline.tsx`、`StudioProblems.tsx`、`definitionJson.ts` 和 `scriptOutline.ts`。
 
 每条箭头具体 import 的文件：
 
@@ -84,18 +87,21 @@ flowchart TB
 | editor | editor/canvas | GraphCanvas.tsx、useGraphCanvas.ts、useGraphCommands.ts、useGraphFocus.ts |
 | editor | editor/inspector | Inspector.tsx、NodeForm.tsx、NodeIdentity.tsx |
 | editor | execution | TestPanel.tsx、useExecutionRequest.ts、useInputBuffer.ts、useExecutionOptions.ts |
-| editor | studio | CodeStudio.tsx（懒加载）、useArcEditor.ts、useArcLanguageSupport.ts、useFormulaSupport.ts、useFunctionCatalog.ts、FunctionLibrary.tsx、ExpressionColorKey.tsx |
+| editor | studio | CodeStudio.tsx（懒加载） |
+| editor | language | useArcEditor.ts、useArcLanguageSupport.ts、useFormulaSupport.ts、useFunctionCatalog.ts、FunctionLibrary.tsx、ExpressionColorKey.tsx、arcLanguage.ts |
 | editor/canvas | editor | 仅类型：useRuleDocument.ts、editorCapabilities.ts、useGraphProblems.ts |
 | editor/inspector | expressions | ValueBinding.tsx、ExpressionField.tsx、ExpressionDialogButton.tsx、UndeclaredBindings.tsx、useEditingPin.ts |
 | editor/inspector | sources | SourceBindingEditor.tsx |
 | editor/inspector | app | pinnedVersions.ts |
 | execution | editor | 仅类型：types.ts、usePreviewExecution.ts |
-| execution | studio | arcLanguage.ts、useArcEditor.ts |
-| expressions | studio | useArcEditor.ts、useArcLanguageSupport.ts、useFormulaSupport.ts、useFunctionCatalog.ts、FunctionLibrary.tsx、ExpressionColorKey.tsx |
+| execution | language | arcLanguage.ts、jsonLanguage.ts、useArcEditor.ts |
+| expressions | language | useArcEditor.ts、useArcLanguageSupport.ts、useFormulaSupport.ts、useFunctionCatalog.ts、useLibraryInsertion.ts、arcLanguage.ts、FunctionLibrary.tsx、ExpressionColorKey.tsx |
+| studio | language | arcLanguage.ts、jsonLanguage.ts、useArcEditor.ts、useArcLanguageSupport.ts、arcCompletion.ts、useFunctionCatalog.ts、useFormulaSupport.ts、useLibraryInsertion.ts、snippets.ts、FunctionLibrary.tsx、ExpressionColorKey.tsx |
 | sources | expressions | ValueBinding.tsx、UndeclaredBindings.tsx |
 | sources | app | pinnedVersions.ts |
-| studio | app | pinnedVersions.ts、pinnedReads.ts |
-| App.tsx | studio、app | formulaMetadata.ts、pinnedVersions.ts（删除规则后清掉缓存） |
+| language | app | pinnedVersions.ts、pinnedReads.ts |
+| library | app | RecoverableBoundary.tsx（每张规则卡片自己的错误边界） |
+| App.tsx | language、library、app | formulaMetadata.ts、previewCache.ts、pinnedVersions.ts（删除规则后清掉缓存） |
 
 ## 界面上的组件
 
@@ -165,7 +171,7 @@ flowchart TB
 ### 代码视图
 
 - **入口**：`#/studio/<id>` 还是同一个 Editor 会话，只是 mode 变成 `"code"`；[`Editor`](../frontend/src/features/editor/Editor.tsx) 懒加载 [`CodeStudio`](../frontend/src/features/studio/CodeStudio.tsx) 和 Monaco。前端不解析 ARC Script，渲染和解析都在后端。文件栏的 Code / JSON 切换可以改看规则的 JSON：就是前后端交换、数据库存储的那份草稿，只读，由前端本地格式化，不调用后端。
-- **先读**：[`useRuleDocument`](../frontend/src/features/editor/useRuleDocument.ts) 里进入代码视图时的渲染 effect 和 [`buildCode`](../frontend/src/features/editor/useRuleDocument.ts) → [`CodeStudio`](../frontend/src/features/studio/CodeStudio.tsx) → [`adoptSource`](../frontend/src/features/studio/useArcEditor.ts)（Monaco 跟随文档，保留光标和撤销）→ [`useArcLanguageSupport`](../frontend/src/features/studio/useArcLanguageSupport.ts)（补全、悬停、语义着色）。
+- **先读**：[`useRuleDocument`](../frontend/src/features/editor/useRuleDocument.ts) 里进入代码视图时的渲染 effect 和 [`buildCode`](../frontend/src/features/editor/useRuleDocument.ts) → [`CodeStudio`](../frontend/src/features/studio/CodeStudio.tsx) → [`adoptSource`](../frontend/src/features/language/useArcEditor.ts)（Monaco 跟随文档，保留光标和撤销）→ [`useArcLanguageSupport`](../frontend/src/features/language/useArcLanguageSupport.ts)（补全、悬停、语义着色）。
 - **状态**：JSON 视图只是 `CodeStudio` 的界面状态，代码编辑器在切过去时保持挂载（隐藏），光标和撤销历史都在。文本在 `DocumentState.source`；`sourceDirty` 表示改过但还没构建，这时保存、测试、切回画布之前都会先构建。Monaco 是非受控的，规范化后的文本用 `adoptSource` 只替换变化的部分。
 - **接口**：`POST /api/studio/render`（草稿 → 文本）、`POST /api/studio/build`（文本 → 草稿和诊断）、`GET /api/functions`、`GET /api/rule-summaries` 和 `GET /api/rules/{id}/versions/{v}`（Reuse 面板和 `@` 公式）。
 - **测试**：[studio.spec.ts](../frontend/tests/studio.spec.ts)、[studio-outline.spec.ts](../frontend/tests/studio-outline.spec.ts)、[studio-reuse.spec.ts](../frontend/tests/studio-reuse.spec.ts)、[studio-refactor.spec.ts](../frontend/tests/studio-refactor.spec.ts)、[formula-calls.spec.ts](../frontend/tests/formula-calls.spec.ts)、[formula-completion.spec.ts](../frontend/tests/formula-completion.spec.ts)、[editor-language-context.spec.ts](../frontend/tests/editor-language-context.spec.ts)、[expression-colors.spec.ts](../frontend/tests/expression-colors.spec.ts)、[function-namespace.spec.ts](../frontend/tests/function-namespace.spec.ts)，单元测试 [studio-snippets.spec.ts](../frontend/tests/unit/studio-snippets.spec.ts)、[studio-outline.spec.ts](../frontend/tests/unit/studio-outline.spec.ts)、[formula-metadata.spec.ts](../frontend/tests/unit/formula-metadata.spec.ts)、[expression-symbols.spec.ts](../frontend/tests/unit/expression-symbols.spec.ts)。
@@ -317,7 +323,7 @@ flowchart TB
 3. `source/rendered` 只在 `source` 仍为 `null`、草稿还是同一个对象时写入（[`documentReducer`](../frontend/src/features/editor/documentState.ts)），晚到的响应不会盖掉新的编辑。
 4. [`editSource`](../frontend/src/features/editor/useRuleDocument.ts)：打字派发 `source/changed`，`sourceDirty` 变成 true。
 5. [`buildCode`](../frontend/src/features/editor/useRuleDocument.ts)：Build 按钮、⌘/Ctrl+Enter，或保存、测试、切回画布之前，请求 `POST /api/studio/build`。请求期间文本又被改过，就放弃这次结果。
-6. `source/built` 用构建出的 definition 替换草稿；Monaco 用 [`adoptSource`](../frontend/src/features/studio/useArcEditor.ts) 只替换变化的部分，光标和撤销历史都在。
+6. `source/built` 用构建出的 definition 替换草稿；Monaco 用 [`adoptSource`](../frontend/src/features/language/useArcEditor.ts) 只替换变化的部分，光标和撤销历史都在。
 7. 回到画布后，任何编辑都会把 `source` 清成 `null`，下次进入代码视图重新渲染。
 
 ### 运行测试并高亮路径
@@ -389,7 +395,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 2. [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) 和 [nodePorts.ts](../frontend/src/domain/nodePorts.ts)：七种节点各有什么出口、存不存结果、允许哪些属性，出口句柄怎么生成。
 3. [graph.ts](../frontend/src/domain/graph.ts)：所有图变更都是纯函数，createGraphNode、patchGraphNode、connectGraphNodes、removeGraphNode，还有两个图键。对照 [graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts) 看用法。
 4. [documentState.ts](../frontend/src/features/editor/documentState.ts)：reducer 和 9 个 action，文件很短。配合 [document.spec.ts](../frontend/tests/unit/document.spec.ts) 一起读，测试名就是行为说明。
-5. [useRuleDocument.ts](../frontend/src/features/editor/useRuleDocument.ts)：`edit`、`runTask`、`action`、`buildCode`、视图切换；同时看 [editorCapabilities.ts](../frontend/src/features/editor/editorCapabilities.ts)。
+5. [useRuleDocument.ts](../frontend/src/features/editor/useRuleDocument.ts)：`edit`、`runTask`（来自 [commandRunner.ts](../frontend/src/features/editor/commandRunner.ts)）、`action`、`buildCode`、视图切换；同时看 [editorCapabilities.ts](../frontend/src/features/editor/editorCapabilities.ts)。
 6. [Editor.tsx](../frontend/src/features/editor/Editor.tsx)：看上面这些 hook 怎么组装成一个页面，文档、选择、画布、检查器、测试面板、对话框。
 7. 画布：[useGraphCanvas.ts](../frontend/src/features/editor/canvas/useGraphCanvas.ts) → [flowElements.ts](../frontend/src/features/editor/canvas/flowElements.ts) → [GraphNode.tsx](../frontend/src/features/editor/canvas/GraphNode.tsx) → [useGraphCommands.ts](../frontend/src/features/editor/canvas/useGraphCommands.ts)。连线避障（[edgeRouting.ts](../frontend/src/features/editor/canvas/edgeRouting.ts)）比较独立，可以最后读。
 8. 检查器：[Inspector.tsx](../frontend/src/features/editor/inspector/Inspector.tsx) → [NodeForm.tsx](../frontend/src/features/editor/inspector/NodeForm.tsx) → [FormulaFields.tsx](../frontend/src/features/editor/inspector/FormulaFields.tsx) → [ValueBinding.tsx](../frontend/src/features/expressions/ValueBinding.tsx)。
@@ -455,8 +461,8 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
 | [libraryOrder.ts](../frontend/src/features/library/libraryOrder.ts) | 卡片按 updatedAt 的时间先后排序（比较时刻，不比较文本） | [library-order.spec.ts](../frontend/tests/unit/library-order.spec.ts) |
-| [LibraryPage.tsx](../frontend/src/features/library/LibraryPage.tsx) | 规则库页：统计、类型筛选、搜索、卡片网格、分页、空状态 |  |
-| [previewCache.ts](../frontend/src/features/library/previewCache.ts) | 按规则化身 + revision 缓存卡片预览用的完整规则，最多 40 条 | [library-previews.spec.ts](../frontend/tests/unit/library-previews.spec.ts) |
+| [LibraryPage.tsx](../frontend/src/features/library/LibraryPage.tsx) | 规则库页：统计、类型筛选、搜索、卡片网格、分页、空状态；每张卡片套自己的 RecoverableBoundary，一张渲染失败不影响整页 |  |
+| [previewCache.ts](../frontend/src/features/library/previewCache.ts) | 按规则化身 + revision 缓存卡片预览用的完整规则，最多 40 条，先进先出；删除规则时 forgetPreview 清掉它的条目 | [library-previews.spec.ts](../frontend/tests/unit/library-previews.spec.ts) |
 | [previewLayout.ts](../frontend/src/features/library/previewLayout.ts) | 规则库缩略图：按拓扑分层算节点坐标和连线，容忍环和悬空连线 | [rule-preview.spec.ts](../frontend/tests/unit/rule-preview.spec.ts) |
 | [RuleCard.tsx](../frontend/src/features/library/RuleCard.tsx) | 规则卡片：读取完整规则画缩略图（有缓存和重试），点击打开画布；memo 组件，搜索框打字时不重新渲染 |  |
 | [RulePreview.tsx](../frontend/src/features/library/RulePreview.tsx) | 用 SVG 画草稿的分层缩略图，并显示无效连线数 |  |
@@ -472,7 +478,9 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [exportDefinition.ts](../frontend/src/features/editor/exportDefinition.ts) | 把 Definition 序列化成 JSON 文件并下载 |  |
 | [LazyNodeDialog.tsx](../frontend/src/features/editor/LazyNodeDialog.tsx) | 懒加载节点对话框的外壳：加载中可取消、失败可关闭，都会释放检查器锁 |  |
 | [NodeEditDialog.tsx](../frontend/src/features/editor/NodeEditDialog.tsx) | 节点编辑对话框：在草稿副本上用 NodeForm 编辑，Apply 时合并回图 |  |
-| [NodeExpressionDialog.tsx](../frontend/src/features/editor/NodeExpressionDialog.tsx) | 节点代码对话框：用 Monaco 编辑单个节点的 ARC Script，Apply 时构建并替换 |  |
+| [commandRunner.ts](../frontend/src/features/editor/commandRunner.ts) | 纯函数的命令锁：同一时间只跑一个命令，`run` 返回命令是否真的执行了，会话关闭后什么都不跑 | [rule-deletion.spec.ts](../frontend/tests/unit/rule-deletion.spec.ts) |
+| [NodeExpressionDialog.tsx](../frontend/src/features/editor/NodeExpressionDialog.tsx) | 节点代码对话框：用 Monaco 编辑单个节点的 ARC Script，Apply 时构建并替换（`applying` 是对话框自己的进行中标志，readOnly 已含文档的命令锁） |  |
+| [ruleDeletion.ts](../frontend/src/features/editor/ruleDeletion.ts) | 删除规则命令：被命令锁拒绝时返回 `deletionDeclined`，成功后通知工作区并离开，409 带回调用方列表 | [rule-deletion.spec.ts](../frontend/tests/unit/rule-deletion.spec.ts) |
 | [nodeFormDraft.ts](../frontend/src/features/editor/nodeFormDraft.ts) | 把节点表单的修改三方合并回最新草稿，有冲突就返回 null | [node-form.spec.ts](../frontend/tests/unit/node-form.spec.ts) |
 | [nodeSelection.ts](../frontend/src/features/editor/nodeSelection.ts) | 纯函数：默认选中的节点，以及按当前草稿推导选中的节点和连线 | [document.spec.ts](../frontend/tests/unit/document.spec.ts) |
 | [ReferenceDialog.tsx](../frontend/src/features/editor/ReferenceDialog.tsx) | 被引用规则查看器：栈式浏览，内嵌只读 Editor，可返回或全部关闭 |  |
@@ -483,7 +491,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [useNodeExpressionDraft.ts](../frontend/src/features/editor/useNodeExpressionDraft.ts) | 节点代码缓冲：渲染、防抖检查、Apply 时构建、离开前确认 |  |
 | [useNodeSelection.ts](../frontend/src/features/editor/useNodeSelection.ts) | 选中状态的唯一所有者：按草稿推导节点和连线，默认值无效时拒绝切换 |  |
 | [usePreviewExecution.ts](../frontend/src/features/editor/usePreviewExecution.ts) | 测试会话：面板开关、输入缓冲、选项，按语义键请求 /preview |  |
-| [useRuleDocument.ts](../frontend/src/features/editor/useRuleDocument.ts) | 文档核心：编辑门控、命令锁，保存、校验、发布、构建、排版、删除，视图切换 |  |
+| [useRuleDocument.ts](../frontend/src/features/editor/useRuleDocument.ts) | 文档核心：编辑门控，保存、校验、发布、构建、排版、删除，视图切换；命令锁来自 commandRunner.ts，删除来自 ruleDeletion.ts |  |
 | [VersionHistory.tsx](../frontend/src/features/editor/VersionHistory.tsx) | 已发布版本列表：分页显示，点击打开只读版本 |  |
 
 ### `features/editor/canvas/`：画布
@@ -499,10 +507,10 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [GraphNode.tsx](../frontend/src/features/editor/canvas/GraphNode.tsx) | 节点卡片：图标、类型、名称、摘要、错误标记、代码按钮和连接句柄 |  |
 | [GraphOutline.tsx](../frontend/src/features/editor/canvas/GraphOutline.tsx) | 节点大纲：按文档顺序列出节点，点击后聚焦 |  |
 | [GraphToolbar.tsx](../frontend/src/features/editor/canvas/GraphToolbar.tsx) | 画布工具栏：大纲、排版、导出、校验、添加节点菜单 |  |
-| [RoutedEdge.tsx](../frontend/src/features/editor/canvas/RoutedEdge.tsx) | 自定义连线：读取路由上下文、缓存路线、报告被挡住的连线；拖拽连线时的预览线 |  |
+| [RoutedEdge.tsx](../frontend/src/features/editor/canvas/RoutedEdge.tsx) | 自定义连线：读取路由上下文、缓存路线（在 effect 里写缓存，不在渲染期间写 ref）、报告被挡住的连线；拖拽连线时的预览线 |  |
 | [useGraphCanvas.ts](../frontend/src/features/editor/canvas/useGraphCanvas.ts) | 画布状态：尺寸测量、拖拽与连线处理、路由上下文、测试路径高亮 |  |
 | [useGraphCommands.ts](../frontend/src/features/editor/canvas/useGraphCommands.ts) | 图命令：修改、添加、删除节点，排版（懒加载 ELK），都经过 edit 门控 |  |
-| [useGraphFocus.ts](../frontend/src/features/editor/canvas/useGraphFocus.ts) | 聚焦节点：视口居中；深链接和测试结果的跳转等节点测量完再执行 |  |
+| [useGraphFocus.ts](../frontend/src/features/editor/canvas/useGraphFocus.ts) | 聚焦节点：视口居中；深链接和测试结果的跳转等节点测量完、而且图视图真的在屏幕上（`shownView`，不是路由）再执行 |  |
 
 ### `features/editor/inspector/`：检查器
 
@@ -512,7 +520,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [FormulaFields.tsx](../frontend/src/features/editor/inspector/FormulaFields.tsx) | Formula 节点：一个表达式字段 |  |
 | [IdentifierField.tsx](../frontend/src/features/editor/inspector/IdentifierField.tsx) | 标识符输入框：拒绝非法输入并提示命名规则 |  |
 | [InputDefaultValue.tsx](../frontend/src/features/editor/inspector/InputDefaultValue.tsx) | 按参数类型选默认值控件（JSON、布尔、数字、文本） |  |
-| [InputFields.tsx](../frontend/src/features/editor/inspector/InputFields.tsx) | Input 节点：参数卡片列表和“添加参数” |  |
+| [InputFields.tsx](../frontend/src/features/editor/inspector/InputFields.tsx) | Input 节点：参数卡片列表和“添加参数”；卡片是 memo 组件，回调按行身份固定，在一张卡片里打字不重绘其他卡片 |  |
 | [InputParameterCard.tsx](../frontend/src/features/editor/inspector/InputParameterCard.tsx) | 单个参数卡片：必填、名称、类型、默认值、数据源绑定 |  |
 | [Inspector.tsx](../frontend/src/features/editor/inspector/Inspector.tsx) | 右侧检查器：节点名、错误、代码和删除按钮、NodeForm、页脚 |  |
 | [InspectorProblems.tsx](../frontend/src/features/editor/inspector/InspectorProblems.tsx) | 节点错误图标：悬停显示提示，点击弹出列表 |  |
@@ -522,7 +530,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [NumericDefaultField.tsx](../frontend/src/features/editor/inspector/NumericDefaultField.tsx) | 数字默认值的文本缓冲：解析精确小数并报告是否有效 |  |
 | [OutputFields.tsx](../frontend/src/features/editor/inspector/OutputFields.tsx) | Output 节点：用一个分节包住 OutputValueFields |  |
 | [OutputValueFields.tsx](../frontend/src/features/editor/inspector/OutputValueFields.tsx) | 返回值绑定、输出名，以及返回结构的预览 |  |
-| [ReferenceFields.tsx](../frontend/src/features/editor/inspector/ReferenceFields.tsx) | Reference 节点：选已发布规则和固定版本，绑定它的参数 |  |
+| [ReferenceFields.tsx](../frontend/src/features/editor/inspector/ReferenceFields.tsx) | Reference 节点：选已发布规则和固定版本，绑定它的参数（参数卡片同样 memo，经 updateGraphNode 改草稿） |  |
 | [ResultFields.tsx](../frontend/src/features/editor/inspector/ResultFields.tsx) | 存结果的节点的结果变量名 |  |
 | [StringDefaultField.tsx](../frontend/src/features/editor/inspector/StringDefaultField.tsx) | STRING 默认值的文本缓冲：按服务器的长度和可存储文本规则校验，无效文本留在字段里 |  |
 | [SwitchDefaultReturn.tsx](../frontend/src/features/editor/inspector/SwitchDefaultReturn.tsx) | Switch 的 Default 出口：编辑它专属的 Output，或添加默认返回 |  |
@@ -567,6 +575,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [sourceCatalog.ts](../frontend/src/features/sources/sourceCatalog.ts) | 把本次会话保存的数据源合进目录页，直到目录刷新确认 | [source-catalog.spec.ts](../frontend/tests/unit/source-catalog.spec.ts) |
 | [SourceConfigurationFields.tsx](../frontend/src/features/sources/SourceConfigurationFields.tsx) | 按提供者渲染连接、参数、负载字段 |  |
 | [SourceDetail.tsx](../frontend/src/features/sources/SourceDetail.tsx) | 当前打开的数据源：ID、名称、提供者、版本，配置、保存、测试 |  |
+| [httpSourcePolicy.ts](../frontend/src/features/sources/httpSourcePolicy.ts) | 镜像服务器的 HTTP 数据源策略：超时范围和提示、URL 长度、httpUrlProblem（按 java.net.URI 的规则读主机名） | [http-source-policy.spec.ts](../frontend/tests/unit/http-source-policy.spec.ts) |
 | [sourceDocument.ts](../frontend/src/features/sources/sourceDocument.ts) | 数据源文档的纯状态和 reducer：脏检查、保存和测试的请求守卫、历史版本 | [source-document.spec.ts](../frontend/tests/unit/source-document.spec.ts)、[source-providers.spec.ts](../frontend/tests/unit/source-providers.spec.ts)、[sources.spec.ts](../frontend/tests/unit/sources.spec.ts) |
 | [SourceList.tsx](../frontend/src/features/sources/SourceList.tsx) | 可搜索、可分页的数据源列表 |  |
 | [SourceManagerDialog.tsx](../frontend/src/features/sources/SourceManagerDialog.tsx) | 规则编辑器里的数据源管理对话框：自带控制器，关闭前确认 |  |
@@ -585,37 +594,45 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [ConstantValueField.tsx](../frontend/src/features/expressions/ConstantValueField.tsx) | 按常量类型编辑字面量（字符串自动加引号），存回表达式文本 |  |
 | [ExpressionDialog.tsx](../frontend/src/features/expressions/ExpressionDialog.tsx) | 表达式对话框：Monaco 加函数库，防抖调用 /studio/expression/check，通过后才能 Apply |  |
 | [ExpressionDialogButton.tsx](../frontend/src/features/expressions/ExpressionDialogButton.tsx) | “Open in Editor”按钮：懒加载表达式对话框，Apply 后写回 |  |
-| [ExpressionField.tsx](../frontend/src/features/expressions/ExpressionField.tsx) | 检查器里的表达式输入：可用变量、懒加载的行内编辑器、对话框按钮 |  |
+| [ExpressionField.tsx](../frontend/src/features/expressions/ExpressionField.tsx) | 检查器里的表达式输入：可用变量、懒加载的行内编辑器（行滚到视口附近才挂载 Monaco，之前显示纯文本占位）、对话框按钮 |  |
 | [InlineExpressionEditor.tsx](../frontend/src/features/expressions/InlineExpressionEditor.tsx) | 紧凑的单行 Monaco 表达式编辑器，聚焦后才加载函数目录 |  |
 | [UndeclaredBindings.tsx](../frontend/src/features/expressions/UndeclaredBindings.tsx) | 提示固定版本里没有声明的参数映射，可以一键移除 |  |
 | [useEditingPin.ts](../frontend/src/features/expressions/useEditingPin.ts) | 记住用户正在用的编辑方式；值被外部改掉时重新推断 |  |
 | [ValueBinding.tsx](../frontend/src/features/expressions/ValueBinding.tsx) | 值来源选择：上游变量、常量、表达式或默认，按类型过滤变量 |  |
 
-### `features/studio/`：Monaco、ARC 语言支持和代码视图
+### `features/language/`：Monaco 和 ARC 语言支持
+
+这些文件是所有编辑器共用的设施，2026-10-11 从 `features/studio` 移出来。
 
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
-| [arcCompletion.ts](../frontend/src/features/studio/arcCompletion.ts) | 补全辅助：是否在字符串或注释里、取光标处的词、插入片段、刷新已打开的建议 |  |
-| [arcLanguage.ts](../frontend/src/features/studio/arcLanguage.ts) | 注册 arc 语言（Monarch 词法、括号和缩进规则）、worker 和 arc-light 主题 |  |
-| [CodeStudio.tsx](../frontend/src/features/studio/CodeStudio.tsx) | ARC Script 视图：挂载 Monaco，用 adoptSource 接收规范化文本，组合库、大纲、问题栏和快捷键；Code / JSON 切换显示只读的规则 JSON |  |
-| [cssColor.ts](../frontend/src/features/studio/cssColor.ts) | 把 CSS token 颜色转成 Monaco 能用的 #rrggbb | [css-color.spec.ts](../frontend/tests/unit/css-color.spec.ts) |
+| [arcCompletion.ts](../frontend/src/features/language/arcCompletion.ts) | 补全辅助：是否在字符串或注释里（读 model 的 token 缓存，不重新分词）、取光标处的词、插入片段、刷新已打开的建议 |  |
+| [arcLanguage.ts](../frontend/src/features/language/arcLanguage.ts) | 注册 arc 语言（Monarch 词法、括号和缩进规则）、worker 和 arc-light 主题；按名字加载 ARC 用到的 Monaco 功能，而不是全部 64 个 |  |
+| [cssColor.ts](../frontend/src/features/language/cssColor.ts) | 把 CSS token 颜色转成 Monaco 能用的 #rrggbb | [css-color.spec.ts](../frontend/tests/unit/css-color.spec.ts) |
+| [ExpressionColorKey.tsx](../frontend/src/features/language/ExpressionColorKey.tsx) | 符号颜色图例：$函数、@公式、输入、节点结果 |  |
+| [formulaCalls.ts](../frontend/src/features/language/formulaCalls.ts) | 生成 @id:version 调用名、签名、参数说明，以及带默认值或占位参数的片段 | [formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts) |
+| [formulaMetadata.ts](../frontend/src/features/language/formulaMetadata.ts) | 已发布 Formula 的输入元数据，建在 PinnedReads 上：规则身份只合并同时发出的读取、不保留；元数据按规则化身（createdAt）缓存，每次取用都换上当前名称 | [formula-metadata.spec.ts](../frontend/tests/unit/formula-metadata.spec.ts) |
+| [FunctionLibrary.tsx](../frontend/src/features/language/FunctionLibrary.tsx) | $函数目录（搜索、分类、仅供参考），可切到 @已发布公式，点击插入；memo 组件，代码区打字时不重新渲染 |  |
+| [PublishedFormulaLibrary.tsx](../frontend/src/features/language/PublishedFormulaLibrary.tsx) | 滚动分页搜索已发布的 Formula，点击插入固定版本的调用 |  |
+| [jsonLanguage.ts](../frontend/src/features/language/jsonLanguage.ts) | 注册 JSON 的 Monaco 着色语言（arc-json），测试面板的输入和代码视图的规则 JSON 共用 |  |
+| [snippets.ts](../frontend/src/features/language/snippets.ts) | Monaco 片段转义、Reuse 用的 Reference 节点片段、模块片段表 | [execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts)、[studio-snippets.spec.ts](../frontend/tests/unit/studio-snippets.spec.ts) |
+| [useArcEditor.ts](../frontend/src/features/language/useArcEditor.ts) | 各种 Monaco 编辑器的预设选项、诊断转 markers；adoptSource 做最小的可撤销替换；revealPosition 是代码视图和 JSON 视图共用的定位 |  |
+| [useArcLanguageSupport.ts](../frontend/src/features/language/useArcLanguageSupport.ts) | 按 model 注册语义着色、$函数和变量补全、悬停；作用域变化时重新着色 |  |
+| [useFormulaSupport.ts](../frontend/src/features/language/useFormulaSupport.ts) | @公式的补全和悬停（停止输入后才搜索，可取消；版本超过 int 上限时不发请求），以及插入公式调用 |  |
+| [useFunctionCatalog.ts](../frontend/src/features/language/useFunctionCatalog.ts) | 每次页面加载只请求一次 GET /functions，失败后下次再试 | [function-catalog.spec.ts](../frontend/tests/unit/function-catalog.spec.ts) |
+| [useLibraryInsertion.ts](../frontend/src/features/language/useLibraryInsertion.ts) | 库卡片插入：新选择中止旧读取，忽略连击，维护忙碌和错误状态 | [pending-commands.spec.ts](../frontend/tests/unit/pending-commands.spec.ts) |
+
+### `features/studio/`：Code studio 页面
+
+| 文件 | 职责 | 单元测试 |
+| --- | --- | --- |
+| [CodeStudio.tsx](../frontend/src/features/studio/CodeStudio.tsx) | ARC Script 视图：挂载 Monaco，用 adoptSource 接收规范化文本，组合库、大纲、问题栏和快捷键；Code / JSON 切换；问题栏在两种视图下都显示，从 JSON 视图点问题先切回代码再定位 |  |
 | [definitionJson.ts](../frontend/src/features/studio/definitionJson.ts) | 代码视图里的规则 JSON：按存储格式缩进两格（保留数字的每一位），以及大纲跳转时找节点在 JSON 里的位置 | [definition-json.spec.ts](../frontend/tests/unit/definition-json.spec.ts) |
-| [ExpressionColorKey.tsx](../frontend/src/features/studio/ExpressionColorKey.tsx) | 符号颜色图例：$函数、@公式、输入、节点结果 |  |
-| [formulaCalls.ts](../frontend/src/features/studio/formulaCalls.ts) | 生成 @id:version 调用名、签名、参数说明，以及带默认值或占位参数的片段 | [formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts) |
-| [formulaMetadata.ts](../frontend/src/features/studio/formulaMetadata.ts) | 已发布 Formula 的输入元数据，建在 PinnedReads 上：规则身份只合并同时发出的读取、不保留；元数据按规则化身（createdAt）缓存，每次取用都换上当前名称 | [formula-metadata.spec.ts](../frontend/tests/unit/formula-metadata.spec.ts) |
-| [FunctionLibrary.tsx](../frontend/src/features/studio/FunctionLibrary.tsx) | $函数目录（搜索、分类、仅供参考），可切到 @已发布公式，点击插入；memo 组件，代码区打字时不重新渲染 |  |
-| [PublishedFormulaLibrary.tsx](../frontend/src/features/studio/PublishedFormulaLibrary.tsx) | 滚动分页搜索已发布的 Formula，点击插入固定版本的调用 |  |
-| [jsonLanguage.ts](../frontend/src/features/studio/jsonLanguage.ts) | 注册 JSON 的 Monaco 着色语言（arc-json），测试面板的输入和代码视图的规则 JSON 共用 |  |
+| [RuleJsonView.tsx](../frontend/src/features/studio/RuleJsonView.tsx) | 只读的规则 JSON 编辑器：用 defaultValue 挂载，之后的 JSON 通过 adoptSource 写入（光标不跳），revealNode 按节点定位 |  |
 | [scriptOutline.ts](../frontend/src/features/studio/scriptOutline.ts) | 在 Script 文本里找 node 声明的位置，跳过注释、字符串和节点体 | [studio-outline.spec.ts](../frontend/tests/unit/studio-outline.spec.ts) |
-| [snippets.ts](../frontend/src/features/studio/snippets.ts) | Monaco 片段转义、Reuse 用的 Reference 节点片段、模块片段表 | [execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts)、[studio-snippets.spec.ts](../frontend/tests/unit/studio-snippets.spec.ts) |
-| [StudioLibrary.tsx](../frontend/src/features/studio/StudioLibrary.tsx) | Code studio 左栏：functions、modules、reuse 三个面板 |  |
+| [StudioLibrary.tsx](../frontend/src/features/studio/StudioLibrary.tsx) | Code studio 左栏：functions、modules、reuse 三个面板；reuse 里当前规则自己的卡片禁用并标注 this rule，分页数和卡片数一致 |  |
 | [StudioOutline.tsx](../frontend/src/features/studio/StudioOutline.tsx) | Code studio 右栏大纲：列出已构建图的节点，点击跳到声明处 |  |
 | [StudioProblems.tsx](../frontend/src/features/studio/StudioProblems.tsx) | 构建诊断列表（点击定位到行列）和快捷键提示 |  |
-| [useArcEditor.ts](../frontend/src/features/studio/useArcEditor.ts) | 各种 Monaco 编辑器的预设选项、诊断转 markers；adoptSource 做最小的可撤销替换 |  |
-| [useArcLanguageSupport.ts](../frontend/src/features/studio/useArcLanguageSupport.ts) | 按 model 注册语义着色、$函数和变量补全、悬停；作用域变化时重新着色 |  |
-| [useFormulaSupport.ts](../frontend/src/features/studio/useFormulaSupport.ts) | @公式的补全和悬停（停止输入后才搜索，可取消），以及插入公式调用 |  |
-| [useFunctionCatalog.ts](../frontend/src/features/studio/useFunctionCatalog.ts) | 每次页面加载只请求一次 GET /functions，失败后下次再试 | [function-catalog.spec.ts](../frontend/tests/unit/function-catalog.spec.ts) |
-| [useLibraryInsertion.ts](../frontend/src/features/studio/useLibraryInsertion.ts) | 库卡片插入：新选择中止旧读取，忽略连击，维护忙碌和错误状态 |  |
 
 ### `hooks/`：共享 hook
 
@@ -628,6 +645,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [usePagedSearch.ts](../frontend/src/hooks/usePagedSearch.ts) | 防抖搜索 + 分页：停止输入后查询才生效，searching 表示结果还属于旧查询 |  |
 | [useParsedTextBuffer.ts](../frontend/src/hooks/useParsedTextBuffer.ts) | “文本归用户、值归草稿”的输入缓冲：边输边解析，只有外部新值才覆盖文本 |  |
 | [useRefusedEdit.ts](../frontend/src/hooks/useRefusedEdit.ts) | “拒绝并说明”：记住被拒绝时的值，拦截含空白、$、@ 的粘贴 |  |
+| [useViewportEntry.ts](../frontend/src/hooks/useViewportEntry.ts) | 元素是否已进入最近的滚动容器视口（IntersectionObserver，200px 余量，进入过就一直算进入）；行内表达式编辑器用它决定何时挂载 Monaco |  |
 
 ### `components/`：通用控件
 
@@ -655,7 +673,8 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [inputDefaults.ts](../frontend/src/domain/inputDefaults.ts) | 按服务器的类型检查和数值上限校验参数默认值 | [input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts) |
 | [inputTypes.ts](../frontend/src/domain/inputTypes.ts) | 五种输入类型的描述表、菜单顺序，以及不区分大小写的类型名解析 | [input-types.spec.ts](../frontend/tests/unit/input-types.spec.ts) |
 | [json.ts](../frontend/src/domain/json.ts) | 无损 JSON 编解码：double 保不住的数字存成 DecimalNumber，按原文写回 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[json.spec.ts](../frontend/tests/unit/json.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts)、[source-buffers.spec.ts](../frontend/tests/unit/source-buffers.spec.ts) |
-| [limits.ts](../frontend/src/domain/limits.ts) | 后端 Limits.java 的镜像：节点、连线、参数等上限，以及“还能不能再加”；规则名称/描述的校验（只含全角空格等 Unicode 空白的名称同样拒绝） | [limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
+| [formulaReferences.ts](../frontend/src/domain/formulaReferences.ts) | `@id:version` 引用的唯一语法出处：由 resourceIds 的 ID 语法和服务器的版本语法组成，版本上限是 int；expressionSymbols、arcLanguage、useFormulaSupport、formulaCalls 和路由都从这里读 | [formula-references.spec.ts](../frontend/tests/unit/formula-references.spec.ts) |
+| [limits.ts](../frontend/src/domain/limits.ts) | 后端 Limits.java 的镜像：节点、连线、参数、$OBJECT 字段数、JSON 指针长度等上限，以及“还能不能再加”；规则名称/描述的校验（只含不换行空格或全角空格等 Unicode 空白的名称同样拒绝）；JSON 指针字段的规则（sourcePointerProblem） | [limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
 | [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) | 七种节点的描述表：出口、是否存结果、能否被连入、允许的属性、新建默认值、卡片摘要；`entryInputNode` 找服务器当作入口的 Input 节点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [nodePorts.ts](../frontend/src/domain/nodePorts.ts) | 连接句柄的唯一出处：按节点类型算出口端口（ID、标签、位置、兜底）和卡片宽度 | [branches.spec.ts](../frontend/tests/unit/branches.spec.ts)、[document.spec.ts](../frontend/tests/unit/document.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [numericDefaults.ts](../frontend/src/domain/numericDefaults.ts) | 解析 NUMBER 默认值并保留写法的位数；超出服务器精度就拒绝 | [input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts) |

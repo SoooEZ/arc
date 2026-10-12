@@ -22,7 +22,7 @@ Both execute and preview accept optional `trace` and `timeoutMs` fields:
 
 `trace` defaults to `true`. Its serialized JSON array is bounded to 256 KiB and retains a prefix of complete steps. Responses add `traceEnabled`, `traceTruncated`, `executedSteps`, and `traceBytes`. A truncated trace does not truncate the final result or weaken the shared 1,000-step execution limit. When disabled, the trace is empty and `traceTruncated` is false. The editor and API playground expose the switch, indicate truncation, and reflect the options in their cURL examples. Graph highlights cover only retained trace steps.
 
-`timeoutMs` defaults to 30,000 and accepts integers from 100 through 30,000. One deadline is shared by preparation, nested rules, expression evaluation and source reads; HTTP reads are capped by both the source timeout and the remaining execution time. Deadline exhaustion returns `504` and cannot be converted into a source fallback. Execution checks are cooperative at processing boundaries; this is not an infrastructure timeout for database drivers, JVM pauses or response transmission.
+`timeoutMs` defaults to 30,000 and accepts integers from 100 through 30,000. One deadline is shared by preparation, nested rules, expression evaluation and source reads; HTTP reads, their host lookup included, are capped by both the source timeout and the remaining execution time. Deadline exhaustion returns `504` and cannot be converted into a source fallback. Execution checks are cooperative at processing boundaries; this is not an infrastructure timeout for database drivers, JVM pauses or response transmission.
 
 Responses add `timing: {preparationMicros, executionMicros, totalMicros}`. Preparation includes root-version lookup and static checks; execution includes parameter reads and graph evaluation. Server timing ends before HTTP response serialization/transfer. Existing `durationMicros` retains engine timing. The UI separately measures the browser request round trip, including response download and JSON parsing; it is not sent as a server response field.
 
@@ -118,7 +118,7 @@ Revisions come from one sequence for all rules, so they advance but are not cons
 | `409` | Duplicate rule or source ID (`This rule ID already exists`, `This source ID already exists`), stale revision, execution of an unpublished rule, or deletion of a rule that other rules call |
 | `413` | Request body larger than 1 MiB, for any method or path |
 | `415` | Body media type the endpoint does not read, multipart included; the `Accept` header lists the supported ones |
-| `422` | Invalid graph, expression, input, or calculation; exhausted execution limit (steps, nesting, source reads, expression operations); text containing the NUL character (U+0000) or an unpaired UTF-16 surrogate, which storage cannot hold as written |
+| `422` | Invalid graph, expression, input, or calculation; exhausted execution limit (steps, nesting, source reads, expression operations, a multi-Output result past its budget); text containing the NUL character (U+0000) or an unpaired UTF-16 surrogate, which storage cannot hold as written |
 | `500` | Unexpected internal error (details are logged, not exposed) |
 | `504` | Execution deadline exhausted, including across nested rules and source reads |
 
@@ -127,6 +127,44 @@ The current release has no batch endpoint, run-history storage, or authenticatio
 ## Code studio and external parameters
 
 See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults. Entries appear in read order: an input's source dependencies are read first, in declaration order.
+
+## Behavior changes from the 2026-10-11 full review
+
+These changes shipped with [the 2026-10-11 full review](reviews/2026-10-11-full-review.md). Graph JSON, stored versions and pins are unchanged. Results listed here changed because the earlier behavior was a defect or because a limit was missing; one validation rule now refuses a graph shape whose every execution failed.
+
+**Requests and storage**
+
+- A rule input or source parameter without `required`, or with `"required": null`, is refused with `422` "Declare whether input amount is required (true or false)" or "Declare whether source parameter key is required (true or false)". It was stored as optional, so a Reference node or Formula call no longer had to bind it and an execution ran with `null` instead of the documented "Missing required input". An HTTP source without `timeoutMs` is refused with the existing "HTTP timeout must be 100–10,000 ms" (it was stored as 0 and refused with the same text, so only an omitted or null value is new); a LOOKUP source created without one stores and returns `timeoutMs: null` (it was 0).
+- Deleting a rule reads the rules each draft and version calls from the sets stored beside them (the `callees` columns of migration V5) instead of scanning and serializing every stored definition inside the deletion's transaction (14.5 s at 2 GB of stored JSON, while every caller's save waited). Every create, save and publish stores the set it holds against deletion, so the two cannot disagree. Rows written before the migration carry a backfilled superset until their next save or publish: a rule that such a draft names only inside an expression's string literal is reported as a caller until that draft is saved again; versions keep their set.
+- `POST /rules/{id}/publish` copies the stored draft into the version in SQL and returns the draft as read under the lock. A draft stored by an older record shape is copied as stored instead of being normalized through the current records; both are read leniently.
+- `/validate` and `/diagnostics` keep the compiled plans of the committed pinned versions they reach, so a draft that calls published rules is no longer recompiled with them on every editor check; publishing and the sample seed, which run inside a transaction, still store nothing. A draft preview resolves its pins through the same plan cache instead of reading and decoding each pinned version per request.
+- Catalog searches match with a plain `strpos` per field instead of a per-row subquery; results are unchanged.
+- A client that closes its connection while a response is streaming no longer produces an ERROR log entry with a stack trace and a second `500` write; nothing changes on the wire.
+- A rule or source name made only of no-break spaces (U+00A0, U+2007, U+202F), alone or with other spaces, is refused with `422` "Rule name must contain 1 to 160 characters" or "Source name must contain 1 to 160 characters", as names of other Unicode spaces already were.
+- The specification lists exactly the served operations (a documented path that is no longer served fails the contract test too), its node-type, rule-kind and source-kind enums are checked against the server's vocabularies, and `trace`/`timeoutMs` are one `ExecutionOptions` schema composed into the execute and preview bodies. Nothing changes on the wire.
+
+**Calculations and limits**
+
+- A multi-Output result is bounded as a whole: more than 100,000 elements or 2,000,000 characters of text across the reached Outputs fails with `422` "Result exceeds 100,000 elements across its Outputs" or "Result exceeds 2,000,000 characters of text across its Outputs", located at the Output that passes the budget and, in a parent, at the calling Reference or Formula node; `$IFERROR` and the other fallbacks do not catch it, and a Reference and a direct `@id:version` call meet the same limit. Nothing bounded the aggregate before: within the per-value limits one request could stream gigabytes, and a parent holding such values from nine References exhausted the heap.
+- A zero computed by an operator or a function keeps at most 34 decimal places, the precision of every other result, instead of 100: `amount * (rate / 12)` with `amount` 0 answers `0.0000000000000000000000000000000000` (34 places) instead of 36, and a chain of multiplications no longer grows to a 102-character zero. Zeros within 34 places are unchanged, so `$TO_STRING(0 * 1.50)` is still `0.00`.
+- `$GET` and `$PLUCK` refuse a boolean path with `422` "GET needs a text or number path" ("PLUCK needs a text or number path"); a flag passed by mistake read a field named `true` or `false`, or answered the fallback, without a diagnosis.
+- Operators no longer check their operands' bounds again: every number is bounded where it enters (inputs, defaults, literals, source values and every result), and a 1,000-item `$SUM($MAP(…))` spent a third of its time on those repeated checks. Results are unchanged.
+- An HTTP source whose host name does not resolve within the source timeout or the execution deadline fails there (`422` "HTTP source failed…" or `504`) instead of holding the request, and the evaluation thread, until the operating system's resolver gives up.
+- An HTTP source response is bounded while it is parsed, with the same four messages, instead of being parsed in full (up to 350,000 objects and 23 MB for 1 MiB of JSON) before the check. Where a document exceeds several bounds, the first met while streaming is reported.
+
+**Validation, diagnostics and expressions**
+
+- Validation, `/diagnostics` and publishing refuse a graph in which two writers of one result variable both run on every path to a join and neither reads the other's value: `422` "Conflicting upstream values for 'price': List price and Member price both set it on every path to Return; use distinct result variable names before merging", located at the join and at each writer. Every execution of such a version failed with "Conflicting upstream values" before. A stored version of that shape now fails at compile with this message, and a parent that pins it fails validation, diagnostics and publishing at its Reference node, as for any pinned version that no longer compiles; its executions behave as before. Writers linked only through a branch that may be skipped depend on the inputs and remain a runtime check.
+- `/diagnostics` lists the problems of the whole graph (source mappings, input cycles, connections, a cycle, reachability) before node problems, and node problems in execution order; the first entry is the problem `/validate` and a publish name, which could differ before.
+- `POST /variables` no longer fails for a draft whose input name is not an identifier; a missing or duplicate name still fails, and the draft's diagnostics still report the name.
+- An expression missing a closing bracket or separator at its end reports "Incomplete expression: expected ')'" (or `']'`, `','`) instead of "Expected ')', got '<end>'". The hint "Function calls require a $ prefix; use $NAME(...)" is given only for a name the catalog can run; another name reports "NAME is not a function (see function catalog)", and a dotted name "Property paths cannot be called: customer.name".
+- An empty or blank connection ID is refused with `422` "Every connection needs a unique ID"; it was accepted, rendered as `edge "";`, and its selection hid the Delete connection button in the editor.
+- A JSON pointer longer than 500 characters is refused with `422` "JSON pointer exceeds 500 characters" instead of "Use a JSON pointer starting with /".
+
+**ARC Script**
+
+- A declaration's value may follow its keyword without a space: `when(amount > 1);`, `return[1, 2];`, `return"x";`, `return-1;`, `select(tier);` and `let=(amount + 1);` build like their spaced forms; canonical code keeps the space.
+- `edge "";` is reported at its statement as "Every connection needs a unique ID".
 
 ## Behavior changes from the 2026-10-01 final review
 

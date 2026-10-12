@@ -264,6 +264,33 @@ Preview and the published API playground offer **Include execution trace** and *
 
 Results display browser request time and server preparation/execution times separately. The server timeout defaults to 30 seconds and is shared across nested rules and source reads; deadline exhaustion returns `504`, including when a source has a default fallback. A shorter per-source timeout still follows that source's configured failure policy.
 
+## Behavior changes from the 2026-10-11 full review
+
+These editor changes shipped with [the 2026-10-11 full review](reviews/2026-10-11-full-review.md). Changes to API results, error messages, validation and ARC Script are listed in [the API reference](api.md#behavior-changes-from-the-2026-10-11-full-review).
+
+**Graph and inspector**
+
+- A `?node=` link reached by Back or Forward, or pasted, while the code view has unbuilt edits centres the node once the build has shown the graph; it used to select the node off screen and fit the whole graph.
+- A Switch with many cases or a Transform with many fields opens faster: inline expression editors appear as their rows scroll into view, and a row shows its expression as plain text until then. Typing in one Input parameter card or one Reference parameter mapping no longer renders the other cards again (50 inputs cost 84 ms per keystroke).
+- Applying unchanged node code of a Transform whose last field was removed, or of an API-created Switch or Reference without cases or mappings, no longer marks the saved rule unsaved or resets the Test panel.
+- A source binding written without a JSON pointer, in ARC Script or by an API client, shows an editable pointer field, and saving stores an empty pointer. The field explains a pointer without a leading `/` and refuses more than 500 characters, instead of a save answering "Use a JSON pointer starting with /".
+- Create rule, Rule settings and the source name field refuse a name made only of no-break spaces, as the server now does.
+- A rule card the library cannot render, such as a kind this build does not know, shows its own error and the rest of the library stays usable. The Sources page shows a fallback icon for an unknown provider kind and refuses to open such a source with a message in the list instead of going blank.
+
+**Code studio**
+
+- Build problems are listed under the JSON view too, and clicking one opens the code at that line; a build from the JSON view showed only the first problem in the alert. The JSON view keeps its caret and scroll position through a build or save; it jumped to line 1.
+- The Reuse pane shows the rule being edited as a disabled card marked "this rule", counted by its pager; the card was dropped while the pager counted it, so a page could be empty.
+- A value may follow its keyword directly: `when(amount > 1);`, `return[1, 2];`, `select(tier);` build like their spaced forms.
+- Hovering a Formula call whose version is above 2,147,483,647 sends no request; it sent one the server refused.
+- The editor loads the Monaco features it uses instead of all of them, so its chunk is 10% smaller (3,439 kB, 876 kB compressed, from 3,829 kB); completion, hover and colours are unchanged.
+
+**Data sources**
+
+- The lookup entries field is a plain textarea, so a keystroke in any field of a large table no longer lays out the whole table again (up to 50 ms at 260 KB).
+- The URL field refuses the hosts the server refuses, with "Use an HTTP(S) URL without credentials or fragment.": an underscore (`http://my_host/`), a trailing hyphen, an empty label, a last label that starts with a digit, a port that is not a number in range, or a malformed IPv6 literal. Such URLs reached the server and came back as a generic error. A host with raw non-ASCII characters shows the same message; the percent-encoding hint stays for paths.
+- An HTTP source whose host does not resolve in time fails at the source timeout or the execution deadline instead of holding the request.
+
 ## Behavior changes from the 2026-10-01 final review
 
 These editor changes shipped with [the 2026-10-01 final review](reviews/2026-10-01-final-review.md). Changes to API results, error messages and ARC Script are listed in [the API reference](api.md#behavior-changes-from-the-2026-10-01-final-review).
