@@ -4,7 +4,7 @@ import {
   referenceSnippet,
   reuseNodeId,
   snippetStringLiteral,
-} from "../../src/features/studio/snippets";
+} from "../../src/features/language/snippets";
 import type { Definition } from "../../src/types";
 
 /** Backend DefinitionShape: node IDs match [A-Za-z0-9_-]{1,80}. */

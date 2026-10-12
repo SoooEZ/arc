@@ -17,7 +17,7 @@ import { useChunkLoadFailed } from "./app/chunkLoadFailures";
 import { useAsyncResource } from "./hooks/useAsyncResource";
 import { ruleApi } from "./api/rules";
 import { sameRule } from "./domain/ruleIdentity";
-import { formulaMetadata } from "./features/studio/formulaMetadata";
+import { formulaMetadata } from "./features/language/formulaMetadata";
 import { pinnedRuleVersions } from "./app/pinnedVersions";
 import type { Rule, RuleSummary } from "./types";
 

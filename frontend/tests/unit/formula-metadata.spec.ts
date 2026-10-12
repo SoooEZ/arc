@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   FormulaMetadata,
   type FormulaReads,
-} from "../../src/features/studio/formulaMetadata";
+} from "../../src/features/language/formulaMetadata";
 import type { Definition, RuleSummary } from "../../src/types";
 
 const created = "2026-09-27T00:00:00Z";

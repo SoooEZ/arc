@@ -11,17 +11,17 @@ import {
 import {
   useArcLanguageSupport,
   insertSnippet,
-} from "../studio/useArcLanguageSupport";
-import FunctionLibrary from "../studio/FunctionLibrary";
-import ExpressionColorKey from "../studio/ExpressionColorKey";
+} from "../language/useArcLanguageSupport";
+import FunctionLibrary from "../language/FunctionLibrary";
+import ExpressionColorKey from "../language/ExpressionColorKey";
 import {
   nodeCodeOptions,
   useArcEditor,
   useEditorOptions,
-} from "../studio/useArcEditor";
-import { useFunctionCatalog } from "../studio/useFunctionCatalog";
-import { arcScriptLanguage } from "../studio/arcLanguage";
-import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
+} from "../language/useArcEditor";
+import { useFunctionCatalog } from "../language/useFunctionCatalog";
+import { arcScriptLanguage } from "../language/arcLanguage";
+import { formulaSuggestionProblem } from "../language/useFormulaSupport";
 import { useNodeExpressionDraft } from "./useNodeExpressionDraft";
 import { nodeKinds } from "../../domain/nodeKinds";
 import type { Definition, RuleNode } from "../../types";

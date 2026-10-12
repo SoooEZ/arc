@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { quoteText } from "../../src/domain/expressions";
 import { placeholderLiteral } from "../../src/domain/placeholderLiterals";
-import { formulaSnippet } from "../../src/features/studio/formulaCalls";
+import { formulaSnippet } from "../../src/features/language/formulaCalls";
 import {
   escapeSnippetText,
   referenceSnippet,
-} from "../../src/features/studio/snippets";
+} from "../../src/features/language/snippets";
 import type { Definition, Input, InputType } from "../../src/types";
 
 const inputTypes: InputType[] = [

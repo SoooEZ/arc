@@ -14,17 +14,17 @@ import {
   expressionDialogOptions,
   useArcEditor,
   useEditorOptions,
-} from "../studio/useArcEditor";
-import FunctionLibrary from "../studio/FunctionLibrary";
-import ExpressionColorKey from "../studio/ExpressionColorKey";
+} from "../language/useArcEditor";
+import FunctionLibrary from "../language/FunctionLibrary";
+import ExpressionColorKey from "../language/ExpressionColorKey";
 import {
   useArcLanguageSupport,
   insertSnippet,
-} from "../studio/useArcLanguageSupport";
-import { useFunctionCatalog } from "../studio/useFunctionCatalog";
-import { insertsOnClick } from "../studio/useLibraryInsertion";
-import { arcExpressionLanguage } from "../studio/arcLanguage";
-import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
+} from "../language/useArcLanguageSupport";
+import { useFunctionCatalog } from "../language/useFunctionCatalog";
+import { insertsOnClick } from "../language/useLibraryInsertion";
+import { arcExpressionLanguage } from "../language/arcLanguage";
+import { formulaSuggestionProblem } from "../language/useFormulaSupport";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { useStagedDialogEdits } from "../../app/navigationGuards";
 import { studioApi } from "../../api/studio";

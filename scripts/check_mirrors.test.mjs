@@ -339,7 +339,7 @@ test("the ARC Script keywords the editor colors are the parser's", () => {
   assert.ok(words.size >= 20, "the parser's grammar words were found");
   // arcLanguage.ts: the keyword list, plus true and false, which the script
   // reads as handles and an expression as literals; null is a literal only.
-  const language = read("frontend/src/features/studio/arcLanguage.ts");
+  const language = read("frontend/src/features/language/arcLanguage.ts");
   const list = (name) => {
     const match = new RegExp(`${name}: \\[([^\\]]*)\\]`).exec(language);
     assert.ok(match, `arcLanguage.ts lists ${name}`);

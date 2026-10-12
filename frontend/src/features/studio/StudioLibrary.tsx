@@ -3,12 +3,15 @@ import { Alert, TextField } from "@mui/material";
 import { Braces, GitBranch, Puzzle } from "lucide-react";
 import { usePagedSearch } from "../../hooks/usePagedSearch";
 import CatalogPagination from "../../components/CatalogPagination";
-import FunctionLibrary from "./FunctionLibrary";
+import FunctionLibrary from "../language/FunctionLibrary";
 import { ruleApi } from "../../api/rules";
 import type { Definition, FunctionEntry, RuleSummary } from "../../types";
-import { modules, referenceSnippet, reuseNodeId } from "./snippets";
-import { insertsOnClick, useLibraryInsertion } from "./useLibraryInsertion";
-import { formulaSuggestionProblem } from "./useFormulaSupport";
+import { modules, referenceSnippet, reuseNodeId } from "../language/snippets";
+import {
+  insertsOnClick,
+  useLibraryInsertion,
+} from "../language/useLibraryInsertion";
+import { formulaSuggestionProblem } from "../language/useFormulaSupport";
 import { uniqueName } from "../../domain/ids";
 import { variableNames } from "../../domain/variables";
 import { scriptVariableNames } from "../../domain/expressionSymbols";

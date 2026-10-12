@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { renderHook } from "../helpers/hookHost";
 import { useExecutionRequest } from "../../src/features/execution/useExecutionRequest";
-import { useLibraryInsertion } from "../../src/features/studio/useLibraryInsertion";
+import { useLibraryInsertion } from "../../src/features/language/useLibraryInsertion";
 import type { Execution } from "../../src/types";
 
 /**

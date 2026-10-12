@@ -4,7 +4,7 @@ import {
   formulaSnippet,
   formulaSignature,
   type FormulaEntry,
-} from "../../src/features/studio/formulaCalls";
+} from "../../src/features/language/formulaCalls";
 import { expressionSymbols } from "../../src/domain/expressionSymbols";
 import { parseJson } from "../../src/domain/json";
 import type { Input } from "../../src/types";

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
-import { monaco } from "../studio/arcLanguage";
-import { jsonLanguage } from "../studio/jsonLanguage";
-import { jsonInputOptions, useEditorOptions } from "../studio/useArcEditor";
+import { monaco } from "../language/arcLanguage";
+import { jsonLanguage } from "../language/jsonLanguage";
+import { jsonInputOptions, useEditorOptions } from "../language/useArcEditor";
 
 export default function InputJsonEditor({
   value,

@@ -1,8 +1,8 @@
 import { useEffect, useImperativeHandle, useMemo, type Ref } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import type { Definition } from "../../types";
-import type { monaco } from "./arcLanguage";
-import { jsonLanguage } from "./jsonLanguage";
+import type { monaco } from "../language/arcLanguage";
+import { jsonLanguage } from "../language/jsonLanguage";
 import { definitionJson, nodeJsonOffset } from "./definitionJson";
 import {
   adoptSource,
@@ -10,7 +10,7 @@ import {
   revealPosition,
   useArcEditor,
   useEditorOptions,
-} from "./useArcEditor";
+} from "../language/useArcEditor";
 
 /** What the outline asks of the JSON view. */
 export interface RuleJsonViewHandle {

@@ -4,15 +4,15 @@ import {
   inlineExpressionEditorOptions,
   useArcEditor,
   useEditorOptions,
-} from "../studio/useArcEditor";
+} from "../language/useArcEditor";
 import {
   completionWord,
   isStringOrComment,
   useArcLanguageSupport,
-} from "../studio/useArcLanguageSupport";
-import { useFunctionCatalog } from "../studio/useFunctionCatalog";
-import { arcExpressionLanguage } from "../studio/arcLanguage";
-import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
+} from "../language/useArcLanguageSupport";
+import { useFunctionCatalog } from "../language/useFunctionCatalog";
+import { arcExpressionLanguage } from "../language/arcLanguage";
+import { formulaSuggestionProblem } from "../language/useFormulaSupport";
 import type { VariableOption } from "../../domain/variables";
 
 /** Help under the editor; a failed suggestion source explains the missing completions. */

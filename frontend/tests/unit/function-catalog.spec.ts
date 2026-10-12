@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loadFunctionCatalog } from "../../src/features/studio/useFunctionCatalog";
+import { loadFunctionCatalog } from "../../src/features/language/useFunctionCatalog";
 
 const catalog = [
   {

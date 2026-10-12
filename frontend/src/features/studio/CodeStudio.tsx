@@ -2,21 +2,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { Button, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { Check, Code2 } from "lucide-react";
-import { arcScriptLanguage, monaco } from "./arcLanguage";
+import { arcScriptLanguage, monaco } from "../language/arcLanguage";
 import type { Definition, Diagnostic, Rule } from "../../types";
-import { useFunctionCatalog } from "./useFunctionCatalog";
-import { useArcLanguageSupport, insertSnippet } from "./useArcLanguageSupport";
-import { captureEditorState, unchangedSince } from "./arcCompletion";
+import { useFunctionCatalog } from "../language/useFunctionCatalog";
+import {
+  useArcLanguageSupport,
+  insertSnippet,
+} from "../language/useArcLanguageSupport";
+import { captureEditorState, unchangedSince } from "../language/arcCompletion";
 import {
   adoptSource,
   codeStudioOptions,
   useArcEditor,
   useEditorOptions,
-} from "./useArcEditor";
+} from "../language/useArcEditor";
 import StudioLibrary from "./StudioLibrary";
 import StudioOutline from "./StudioOutline";
 import StudioProblems from "./StudioProblems";
-import ExpressionColorKey from "./ExpressionColorKey";
+import ExpressionColorKey from "../language/ExpressionColorKey";
 import RuleJsonView, { type RuleJsonViewHandle } from "./RuleJsonView";
 import { nodeDeclarationOffset } from "./scriptOutline";
 

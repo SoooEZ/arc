@@ -8,7 +8,7 @@ import {
   tryParseExecutionInputs,
 } from "../../src/domain/executionInputs";
 import { DecimalNumber, stringifyJson } from "../../src/domain/json";
-import { referenceSnippet } from "../../src/features/studio/snippets";
+import { referenceSnippet } from "../../src/features/language/snippets";
 import {
   defaultExecutionOptions,
   executionTimeoutChoicesMs,

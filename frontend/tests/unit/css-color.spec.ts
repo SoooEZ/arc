@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { parseCssColor } from "../../src/features/studio/cssColor";
+import { parseCssColor } from "../../src/features/language/cssColor";
 
 test("a token color reaches Monaco as #rrggbb whatever its CSS spelling", () => {
   // The studio threw on a 3-digit token and never opened.
