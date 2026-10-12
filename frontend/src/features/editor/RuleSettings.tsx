@@ -12,7 +12,7 @@ import { useStagedDialogEdits } from "../../app/navigationGuards";
 import { ruleMetadataProblem } from "../../domain/limits";
 import { ruleKinds } from "../../domain/ruleKinds";
 import type { Rule } from "../../types";
-import type { DeletionRefusal } from "./useRuleDocument";
+import type { DeletionRefusal } from "./ruleDeletion";
 export default function RuleSettings({
   rule,
   readOnly,

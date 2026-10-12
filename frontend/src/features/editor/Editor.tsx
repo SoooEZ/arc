@@ -7,7 +7,7 @@ import { isCurrentGraphLocation, semanticGraphKey } from "../../domain/graph";
 import { entryInputNode } from "../../domain/nodeKinds";
 import {
   applyNodeFragment,
-  withNodePositions,
+  editableDraft,
 } from "../../domain/definitionEchoes";
 import Inspector from "./inspector/Inspector";
 import TestPanel from "../execution/TestPanel";
@@ -178,6 +178,7 @@ function EditorContent({
     requestedVersion,
     requestedNode,
     mode,
+    shownView: view,
     unavailable: versionUnavailable,
     measurements,
     selectNode,
@@ -399,7 +400,7 @@ function EditorContent({
                 applyNodeFragment(
                   current,
                   activeDialog.node.id,
-                  withNodePositions(built),
+                  editableDraft(built),
                 ),
               )
             }

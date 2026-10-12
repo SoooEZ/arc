@@ -1,43 +1,60 @@
+import { useCallback } from "react";
 import type { Definition, Input } from "../../../types";
-import { newInputParameter } from "../../../domain/graph";
+import { newInputParameter, updateGraphInputs } from "../../../domain/graph";
 import { canAddInput } from "../../../domain/limits";
 import { useRowIdentities } from "./useRowIdentities";
 
-/** Row identity belongs to the editing session, never to the persisted input schema. */
+/**
+ * Row identity belongs to the editing session, never to the persisted input
+ * schema. The callbacks take a row's identity and read the parameters from
+ * the live draft, so they keep their own identity and a memoized card renders
+ * for its own edits alone (lesson F39).
+ */
 export function useInputParameterRows(
   inputs: Input[],
   onDefinitionChange: (update: (definition: Definition) => Definition) => void,
 ) {
-  const { identity, carry } = useRowIdentities<Input>("input-row");
-  const change = (index: number, patch: Partial<Input>) => {
-    onDefinitionChange((definition) => ({
-      ...definition,
-      inputs: definition.inputs.map((input, currentIndex) =>
-        index === currentIndex ? carry(input, { ...input, ...patch }) : input,
+  const rows = useRowIdentities<Input>("input-row");
+  const change = useCallback(
+    (id: string, patch: Partial<Input>) =>
+      onDefinitionChange((definition) =>
+        updateGraphInputs(definition, (current) =>
+          current.map((input) =>
+            rows.identity(input) === id
+              ? rows.carry(input, { ...input, ...patch })
+              : input,
+          ),
+        ),
       ),
-    }));
-  };
-  const remove = (index: number) => {
-    onDefinitionChange((definition) => ({
-      ...definition,
-      inputs: definition.inputs.filter(
-        (_, currentIndex) => currentIndex !== index,
+    [onDefinitionChange, rows],
+  );
+  const remove = useCallback(
+    (id: string) =>
+      onDefinitionChange((definition) =>
+        updateGraphInputs(definition, (current) =>
+          current.filter((input) => rows.identity(input) !== id),
+        ),
       ),
-    }));
-  };
+    [onDefinitionChange, rows],
+  );
   // The entry point checks the same limit the button shows; a full draft is left unchanged.
-  const add = () => {
-    onDefinitionChange((definition) =>
-      canAddInput(definition)
-        ? {
-            ...definition,
-            inputs: [...definition.inputs, newInputParameter(definition)],
-          }
-        : definition,
-    );
-  };
+  const add = useCallback(
+    () =>
+      onDefinitionChange((definition) =>
+        updateGraphInputs(definition, (current) =>
+          canAddInput(definition)
+            ? [...current, newInputParameter(definition)]
+            : current,
+        ),
+      ),
+    [onDefinitionChange],
+  );
   return {
-    rows: inputs.map((input, index) => ({ input, index, id: identity(input) })),
+    rows: inputs.map((input, index) => ({
+      input,
+      index,
+      id: rows.identity(input),
+    })),
     change,
     remove,
     add,

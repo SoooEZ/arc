@@ -48,19 +48,25 @@ export default memo(function RoutedEdge(props: EdgeProps) {
     labelBgBorderRadius,
   } = props;
   // While a card is dragged, only the edges the moved card can affect are
-  // routed again; the drag's end routes every edge once more.
+  // routed again; the drag's end routes every edge once more. The entry is
+  // committed with the render that used it: a render React discards (or
+  // repeats in StrictMode) leaves the cache as it was.
   const cache = useRef<CachedRoute | undefined>(undefined);
-  const route = useMemo(() => {
-    const cached = routeWithCache(
-      cache.current,
-      { x: sourceX, y: sourceY, nodeId: source, side: "bottom" },
-      { x: targetX, y: targetY, nodeId: target, side: "top" },
-      nodes,
-      moved,
-    );
+  const cached = useMemo(
+    () =>
+      routeWithCache(
+        cache.current,
+        { x: sourceX, y: sourceY, nodeId: source, side: "bottom" },
+        { x: targetX, y: targetY, nodeId: target, side: "top" },
+        nodes,
+        moved,
+      ),
+    [source, target, sourceX, sourceY, targetX, targetY, nodes, moved],
+  );
+  useEffect(() => {
     cache.current = cached;
-    return cached.route;
-  }, [source, target, sourceX, sourceY, targetX, targetY, nodes, moved]);
+  }, [cached]);
+  const route = cached.route;
   const blocked = !route;
   useEffect(() => {
     reportBlocked(id, blocked);

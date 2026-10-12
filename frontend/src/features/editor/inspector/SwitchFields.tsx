@@ -9,7 +9,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { memo, useCallback } from "react";
 import { shortId } from "../../../domain/ids";
 import { MAX_SWITCH_CASES } from "../../../domain/limits";
-import { patchGraphNode } from "../../../domain/graph";
+import { updateGraphNode } from "../../../domain/graph";
 import {
   withCaseChanged,
   withCaseMoved,
@@ -36,14 +36,14 @@ export default function SwitchFields(props: NodeFieldsProps) {
   // keystroke in one case re-renders that row alone.
   const updateCases = useCallback(
     (update: (cases: readonly Case[]) => readonly Case[]) =>
-      onDefinitionChange((definition: Definition) => {
-        const current = definition.nodes.find((n) => n.id === nodeId);
-        if (!current) return definition;
-        const cases = current.cases ?? [];
-        const next = update(cases);
-        if (next === cases) return definition;
-        return patchGraphNode(definition, nodeId, { cases: [...next] });
-      }),
+      onDefinitionChange((definition: Definition) =>
+        updateGraphNode(definition, nodeId, (current) => {
+          const cases = current.cases ?? [];
+          const next = update(cases);
+          // withCaseMoved returns the same cases at either end: nothing to patch.
+          return next === cases ? {} : { cases: [...next] };
+        }),
+      ),
     [onDefinitionChange, nodeId],
   );
   const updateCase = useCallback(

@@ -138,7 +138,12 @@ export interface SourceBinding {
   id: string;
   version: number;
   bindings: Record<string, string>;
-  pointer: string;
+  /**
+   * The JSON pointer into the source's result; "" reads the whole result. An
+   * API draft or a `source` statement may omit it, and the server stores and
+   * echoes it as null: the editor reads such a binding as "" (`editableDraft`).
+   */
+  pointer: string | null;
   onError: "FAIL" | "DEFAULT";
 }
 export interface SourceConfig {

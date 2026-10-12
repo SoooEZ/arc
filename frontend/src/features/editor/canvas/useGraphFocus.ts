@@ -3,6 +3,7 @@ import { useReactFlow } from "@xyflow/react";
 import type { Definition } from "../../../types";
 import type { FlowNode } from "./GraphNode";
 import { cardCenter, type NodeSizes } from "./graphGeometry";
+import type { EditorView } from "../editorCapabilities";
 import { rulePath } from "../../../app/routing";
 
 interface Options {
@@ -10,7 +11,10 @@ interface Options {
   ruleId: string;
   requestedVersion: number | null;
   requestedNode?: string | null;
-  mode: "graph" | "code";
+  /** The view the route requests. */
+  mode: EditorView;
+  /** The view on screen: the graph route still shows the code while an arrival build runs. */
+  shownView: EditorView;
   unavailable: boolean;
   measurements: NodeSizes;
   selectNode: (id: string) => boolean;
@@ -25,6 +29,7 @@ export function useGraphFocus({
   requestedVersion,
   requestedNode,
   mode,
+  shownView,
   unavailable,
   measurements,
   selectNode,
@@ -80,9 +85,14 @@ export function useGraphFocus({
       setRequestedFocus(null);
   }, [unavailable, requestedFocus, pendingFocus]);
 
+  // The focus waits for the canvas on screen, not for the graph route: the
+  // measurements outlive the canvas, and a ?node= arrival (Back, a pasted
+  // link) while unbuilt code keeps the code view would otherwise be spent on
+  // React Flow's reset store, so the canvas mounting after the arrival build
+  // fitted the whole graph with the node selected off screen.
   useEffect(() => {
     if (
-      mode !== "graph" ||
+      shownView !== "graph" ||
       unavailable ||
       !pendingFocus ||
       !measurements.has(pendingFocus)
@@ -93,7 +103,7 @@ export function useGraphFocus({
       setRequestedFocus(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [mode, unavailable, pendingFocus, measurements, focusNode]);
+  }, [shownView, unavailable, pendingFocus, measurements, focusNode]);
 
   // A canvas that mounts with a focus pending skips its initial fit (lesson F8):
   // the fit and the focus would otherwise race, whatever the frame order.

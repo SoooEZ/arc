@@ -19,12 +19,12 @@ import type { VariableOption } from "../../domain/variables";
 function helpText(
   formulaError: string,
   catalogError: string,
-  helperText: string | undefined,
+  helperText: string,
 ): string {
   if (formulaError) return formulaSuggestionProblem(formulaError);
   if (catalogError)
     return "Function suggestions unavailable. Reopen this node to retry.";
-  return helperText || "ARC expression · Tab completes suggestions or indents.";
+  return helperText;
 }
 
 /** The caller owns the expression, including incomplete syntax while typing. */
@@ -41,7 +41,8 @@ export default function InlineExpressionEditor({
   variables: VariableOption[];
   readOnly: boolean;
   onChange: (value: string) => void;
-  helperText?: string;
+  /** The help under the editor (ExpressionField supplies the default). */
+  helperText: string;
 }) {
   const { editor, model, onMount } = useArcEditor();
   const options = useEditorOptions(

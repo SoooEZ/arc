@@ -54,11 +54,16 @@ export function useNodeVariables(
   // The same options keep the previous array, so memoized rows see one prop.
   const previous = useRef<VariableOption[]>([]);
   const variables = nodeVariables(definition, nodeId, scopes);
-  if (!sameOptions(previous.current, variables)) previous.current = variables;
+  if (!sameVariableOptions(previous.current, variables))
+    previous.current = variables;
   return { variables: previous.current, known: !loading && !error };
 }
 
-function sameOptions(left: VariableOption[], right: VariableOption[]): boolean {
+/** Whether two option lists show the same names, types and labels, in order. */
+export function sameVariableOptions(
+  left: VariableOption[],
+  right: VariableOption[],
+): boolean {
   if (left.length !== right.length) return false;
   for (let index = 0; index < left.length; index++) {
     const a = left[index];

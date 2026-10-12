@@ -11,7 +11,7 @@ import {
   renderCounts,
   resetRenderCounts,
 } from "./helpers/renderProbe";
-import { createRule, uniqueId } from "./helpers/api";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
 /** A chain of `count` nodes: Input, Formulas, one Output. */
 function chain(count: number): Definition {
@@ -64,11 +64,29 @@ async function create(
   return id;
 }
 
-/** Waits until `count` inline editors are mounted and no more mount for a while. */
-async function settledEditors(page: Page, count: number) {
+/**
+ * Puts the caret at the end of a text field. An End key with the caret
+ * already there is not consumed by the field: Chromium scrolls the inspector
+ * to its bottom instead, which would mount the rows there.
+ */
+async function caretToEnd(field: Locator) {
+  await field.evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
+/** Waits until no more inline editors mount for a while and returns how many did. */
+async function settledEditors(page: Page): Promise<number> {
   const editors = page.locator(".inline-expression-editor .monaco-editor");
-  await expect(editors).toHaveCount(count);
-  await page.waitForTimeout(300);
+  await expect.poll(() => editors.count()).toBeGreaterThan(0);
+  let count = await editors.count();
+  for (;;) {
+    await page.waitForTimeout(300);
+    const next = await editors.count();
+    if (next === count) return next;
+    count = next;
+  }
 }
 
 /** The element's box once the viewport animation has stopped moving it. */
@@ -227,10 +245,13 @@ test("typing into one Transform field or Switch case leaves the other rows alone
   const fieldName = page.getByLabel("Field 1 name", { exact: true });
   await expect(page.getByLabel("Field 40 name", { exact: true })).toBeVisible();
   await fieldName.click();
-  await page.keyboard.press("End");
+  await caretToEnd(fieldName);
   // The rows' inline editors finish mounting Monaco on their own schedule.
-  // Field 1 binds the variable `amount`; the 39 others hold expressions.
-  await settledEditors(page, 39);
+  // Field 1 binds the variable `amount`; the 39 others hold expressions, but
+  // only the rows on screen mount an editor: all 39 created in one effect
+  // flush blocked the inspector and fanned every completion out 39 times.
+  const mounted = await settledEditors(page);
+  expect(mounted).toBeLessThan(39);
   await resetRenderCounts(page);
   await page.keyboard.type("0123456789", { delay: 60 });
   await expect(fieldName).toHaveValue("field_10123456789");
@@ -238,15 +259,167 @@ test("typing into one Transform field or Switch case leaves the other rows alone
   // Every keystroke re-rendered all 40 rows (1,240 sibling-row renders and
   // 1,209 Monaco host renders for 10 keys); now none of the other rows.
   expect(counts.otherRowRenders).toBe(0);
+  // Scrolling to the last field mounts its editor in place of the placeholder.
+  const last = page.locator(".node-mapping-card").last();
+  await expect(last.locator(".inline-expression-placeholder")).toHaveCount(1);
+  await page
+    .getByLabel("Field 40 name", { exact: true })
+    .scrollIntoViewIfNeeded();
+  await expect(last.locator(".monaco-editor")).toBeVisible();
+  await expect(last.locator(".inline-expression-placeholder")).toHaveCount(0);
   await page.locator('.react-flow__node[data-id="choose"] .graph-node').click();
   const caseLabel = page.getByLabel("Case 1 label", { exact: true });
   await expect(page.getByLabel("Case 20 label", { exact: true })).toBeVisible();
   await caseLabel.click();
-  await page.keyboard.press("End");
-  await settledEditors(page, 20);
+  await caretToEnd(caseLabel);
+  expect(await settledEditors(page)).toBeLessThan(20);
   await resetRenderCounts(page);
   await page.keyboard.type("0123456789", { delay: 60 });
   await expect(caseLabel).toHaveValue("Case 10123456789");
   counts = await renderCounts(page);
+  expect(counts.otherRowRenders).toBe(0);
+});
+
+// Every parameter card rendered on each keystroke in any card and on each drag
+// frame of another node (850 card renders for 10 keys at 50 inputs, about 84 ms
+// a keystroke); the cards now take row-identity callbacks and are memoized.
+test("typing an input parameter's name or dragging another card leaves the other parameter cards alone", async ({
+  page,
+  request,
+}) => {
+  const inputs = Array.from({ length: 50 }, (_, index) => ({
+    name: `input_${index + 1}`,
+    type: "NUMBER" as const,
+    required: true,
+    defaultValue: null,
+  }));
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs,
+    nodes: [
+      { id: "input", type: "INPUT", label: "Inputs", position: { x: 0, y: 0 } },
+      {
+        id: "out",
+        type: "OUTPUT",
+        label: "Result",
+        expression: "input_1",
+        position: { x: 0, y: 340 },
+      },
+    ],
+    edges: [{ id: "a", source: "input", target: "out", sourceHandle: "next" }],
+  };
+  const id = await create(request, "render-cost", definition);
+  await openGraph(page, id, "input", 2);
+  const names = page.getByLabel("Parameter name", { exact: true });
+  await expect(names).toHaveCount(50);
+  const first = names.first();
+  await first.click();
+  await page.keyboard.press("End");
+  await resetRenderCounts(page);
+  await page.keyboard.type("0123456789", { delay: 60 });
+  await expect(first).toHaveValue("input_10123456789");
+  let counts = await renderCounts(page);
+  expect(counts.commits).toBeGreaterThan(0);
+  expect(counts.otherRowRenders).toBe(0);
+  // A drag of the Output card edits the draft on every frame.
+  const card = page.locator('.react-flow__node[data-id="out"]');
+  const box = await settledBox(page, card);
+  await page.mouse.move(box.x + box.width / 2, box.y + 12);
+  await page.mouse.down();
+  await resetRenderCounts(page);
+  for (let step = 1; step <= 20; step++)
+    await page.mouse.move(
+      box.x + box.width / 2 + step * 4,
+      box.y + 12 + step * 3,
+    );
+  await page.mouse.up();
+  expect((await card.boundingBox())!.x).toBeGreaterThan(box.x + 60);
+  counts = await renderCounts(page);
+  expect(counts.commits).toBeGreaterThan(0);
+  expect(counts.otherRowRenders).toBe(0);
+});
+
+test("typing a Reference parameter mapping leaves the other parameter cards alone", async ({
+  page,
+  request,
+}) => {
+  const parameters = Array.from({ length: 20 }, (_, index) => ({
+    name: `p${index + 1}`,
+    type: "NUMBER" as const,
+    required: true,
+    defaultValue: null,
+  }));
+  const child = await createRule(request, {
+    id: uniqueId("render-cost-child"),
+    kind: "FORMULA",
+    definition: {
+      schemaVersion: 1,
+      inputs: parameters,
+      nodes: [
+        {
+          id: "input",
+          type: "INPUT",
+          label: "Inputs",
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: "out",
+          type: "OUTPUT",
+          label: "Result",
+          expression: "p1",
+          position: { x: 0, y: 200 },
+        },
+      ],
+      edges: [
+        { id: "a", source: "input", target: "out", sourceHandle: "next" },
+      ],
+    },
+  });
+  await publishRule(request, child);
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [
+      { name: "amount", type: "NUMBER", required: true, defaultValue: 1 },
+    ],
+    nodes: [
+      { id: "input", type: "INPUT", label: "Inputs", position: { x: 0, y: 0 } },
+      {
+        id: "reuse",
+        type: "REFERENCE",
+        label: "Reuse",
+        ruleId: child.id,
+        version: 1,
+        bindings: Object.fromEntries(parameters.map(({ name }) => [name, "1"])),
+        output: "reused",
+        position: { x: 0, y: 170 },
+      },
+      {
+        id: "out",
+        type: "OUTPUT",
+        label: "Result",
+        expression: "reused",
+        position: { x: 0, y: 340 },
+      },
+    ],
+    edges: [
+      { id: "a", source: "input", target: "reuse", sourceHandle: "next" },
+      { id: "b", source: "reuse", target: "out", sourceHandle: "next" },
+    ],
+  };
+  const id = await create(request, "render-cost", definition);
+  await openGraph(page, id, "reuse", 3);
+  await expect(
+    page.getByRole("group", { name: "Parameter p20", exact: true }),
+  ).toBeVisible();
+  const first = page
+    .getByRole("group", { name: "Parameter p1", exact: true })
+    .getByLabel("p1 *", { exact: true });
+  await first.click();
+  await page.keyboard.press("End");
+  await resetRenderCounts(page);
+  await page.keyboard.type("2345", { delay: 60 });
+  await expect(first).toHaveValue("12345");
+  const counts = await renderCounts(page);
+  expect(counts.commits).toBeGreaterThan(0);
   expect(counts.otherRowRenders).toBe(0);
 });

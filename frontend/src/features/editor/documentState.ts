@@ -1,9 +1,6 @@
 import type { Definition, Diagnostic, Rule } from "../../types";
 import { ruleSnapshot, type DefinitionChange } from "../../domain/graph";
-import {
-  sameDefinition,
-  withNodePositions,
-} from "../../domain/definitionEchoes";
+import { editableDraft, sameDefinition } from "../../domain/definitionEchoes";
 
 export interface DocumentState {
   rule: Rule;
@@ -13,7 +10,7 @@ export interface DocumentState {
   diagnostics: Diagnostic[];
 }
 export function initialDocument(rule: Rule): DocumentState {
-  const opened = { ...rule, draft: withNodePositions(rule.draft) };
+  const opened = { ...rule, draft: editableDraft(rule.draft) };
   return {
     rule: opened,
     baseline: ruleSnapshot(opened),
@@ -65,7 +62,7 @@ export function documentReducer(
     case "version/loaded":
       return {
         ...state,
-        rule: { ...state.rule, draft: withNodePositions(action.definition) },
+        rule: { ...state.rule, draft: editableDraft(action.definition) },
       };
     case "rule/metadata":
       return { ...state, rule: { ...state.rule, ...action.patch } };
@@ -88,7 +85,7 @@ export function documentReducer(
       if (state.source !== action.before) return state;
       return {
         ...state,
-        rule: { ...state.rule, draft: withNodePositions(action.definition) },
+        rule: { ...state.rule, draft: editableDraft(action.definition) },
         source: action.source,
         sourceDirty: false,
         diagnostics: [],
@@ -114,9 +111,10 @@ function acknowledgeSave(
 ): DocumentState {
   const edited = ruleSnapshot(state.rule) !== ruleSnapshot(submitted);
   const localDraft = edited ? submitted.draft : state.rule.draft;
-  // The server writes coordinates as 400.0; compared as numbers, the echo of an
-  // unchanged draft is the local draft (see withNodePositions).
-  const echoed = withNodePositions(response.draft);
+  // The server writes coordinates as 400.0 and an omitted pointer as null;
+  // read as the editor reads them, the echo of an unchanged draft is the local
+  // draft (see editableDraft).
+  const echoed = editableDraft(response.draft);
   const saved: Rule = {
     ...response,
     draft: sameDefinition(localDraft, echoed) ? localDraft : echoed,

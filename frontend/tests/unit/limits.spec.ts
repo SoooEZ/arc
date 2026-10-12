@@ -1,14 +1,18 @@
 import { expect, test } from "@playwright/test";
 import {
+  acceptsPointerEdit,
   canAddEdge,
   canAddInput,
   canAddNode,
+  displayNameProblem,
   MAX_DESCRIPTION_CHARACTERS,
   MAX_EDGES,
   MAX_INPUTS,
   MAX_NAME_CHARACTERS,
   MAX_NODES,
+  MAX_POINTER_CHARACTERS,
   ruleMetadataProblem,
+  sourcePointerProblem,
 } from "../../src/domain/limits";
 import { canAddSwitchDefaultReturn } from "../../src/domain/switchBranches";
 import { connectGraphNodes, connectionAllowed } from "../../src/domain/graph";
@@ -94,17 +98,35 @@ test("rule metadata problems repeat the server's messages at its boundaries", ()
     field: "name",
     message: "Rule name must contain 1 to 160 characters",
   });
-  // The server trims with Java's String.trim: a no-break space is a name.
-  expect(ruleMetadataProblem({ name: "\u00a0", description: "" })).toBeNull();
-  // The server refuses a name made only of Java whitespace (String.isBlank), such as the
-  // full-width space a Chinese input method types, though String.trim keeps it.
-  for (const blank of ["\u3000", "\u2003\u2003", " \u2028 ", " \u205f"])
-    expect(ruleMetadataProblem({ name: blank, description: "" })).toEqual({
+  // The server refuses a name made only of Unicode spaces, though String.trim
+  // keeps them: the full-width space a Chinese input method types, and the
+  // no-break spaces (U+00A0, U+2007, U+202F) that String.isBlank alone kept,
+  // which were stored and shown as a blank title (DisplayNames checks every
+  // code point for whitespace or a space character).
+  for (const blank of [
+    "\u3000",
+    "\u2003\u2003",
+    " \u2028 ",
+    " \u205f",
+    "\u00a0",
+    "\u2007\u202f",
+    " \u00a0\u3000 ",
+  ])
+    expect(
+      ruleMetadataProblem({ name: blank, description: "" }),
+      blank,
+    ).toEqual({
       field: "name",
       message: `Rule name must contain 1 to ${MAX_NAME_CHARACTERS} characters`,
     });
+  expect(displayNameProblem("Source", "\u00a0")).toBe(
+    "Source name must contain 1 to 160 characters",
+  );
   expect(
     ruleMetadataProblem({ name: "\u3000Tax", description: "" }),
+  ).toBeNull();
+  expect(
+    ruleMetadataProblem({ name: "\u00a0Tax\u00a0", description: "" }),
   ).toBeNull();
   // The server refuses what storage cannot hold first, then any control
   // character (DisplayNames): a pasted tab came back as a generic 422.
@@ -148,4 +170,25 @@ test("rule metadata problems repeat the server's messages at its boundaries", ()
     field: "description",
     message: "Description exceeds 2,000 characters",
   });
+});
+
+// The server folded the 500-character pointer limit into its leading-"/"
+// check, so an over-long pointer that starts with "/" came back from a save as
+// "Use a JSON pointer starting with /"; the field now names both rules.
+test("the JSON pointer field mirrors the server's pointer rules and refuses only growth past the limit", () => {
+  expect(sourcePointerProblem("")).toBeNull();
+  expect(sourcePointerProblem("/data/rate")).toBeNull();
+  expect(sourcePointerProblem("data/rate")).toBe(
+    "Use a JSON pointer starting with /",
+  );
+  const longest = "/" + "a".repeat(MAX_POINTER_CHARACTERS - 1);
+  expect(sourcePointerProblem(longest)).toBeNull();
+  expect(sourcePointerProblem(longest + "a")).toBe(
+    "JSON pointer exceeds 500 characters",
+  );
+  // A stored over-long pointer can still be shortened (lesson F28).
+  expect(acceptsPointerEdit(longest, longest + "a")).toBe(false);
+  expect(acceptsPointerEdit(longest + "ab", longest + "a")).toBe(true);
+  expect(acceptsPointerEdit("", "data")).toBe(true);
+  expect(acceptsPointerEdit("", longest)).toBe(true);
 });

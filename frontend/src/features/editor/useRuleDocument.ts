@@ -8,21 +8,15 @@ import {
 } from "react";
 import { ruleApi } from "../../api/rules";
 import { studioApi } from "../../api/studio";
-import {
-  ApiError,
-  errorDetails,
-  errorMessage,
-  type GraphProblem,
-} from "../../api/errors";
+import { ApiError, errorMessage, type GraphProblem } from "../../api/errors";
 import { useNavigationGuard } from "../../app/navigationGuards";
-import { leavesRuleDocument, pagePath, rulePath } from "../../app/routing";
+import { leavesRuleDocument, rulePath } from "../../app/routing";
 import type { Definition, Rule } from "../../types";
 import { ruleSnapshot, type DefinitionChange } from "../../domain/graph";
-import { withNodePositions } from "../../domain/definitionEchoes";
+import { editableDraft } from "../../domain/definitionEchoes";
 import { documentReducer, initialDocument } from "./documentState";
 import {
   acceptsEdits,
-  commandsIdle,
   editorCapabilities,
   invalidDefaultMessage,
   pendingWriteWarning,
@@ -30,6 +24,8 @@ import {
   type EditorTask,
   type EditorView,
 } from "./editorCapabilities";
+import { createCommandRunner } from "./commandRunner";
+import { deleteRuleCommand } from "./ruleDeletion";
 
 interface Options {
   initial: Rule;
@@ -57,12 +53,6 @@ export type DraftLayout = (draft: Definition) => Promise<Definition>;
 
 /** The code's own diagnostics refused the build, as opposed to the build request failing. */
 class CodeBuildFailure extends Error {}
-
-/** Why the server kept a rule: its message and, for a refused deletion, every caller. */
-export interface DeletionRefusal {
-  message: string;
-  callers: string[];
-}
 
 /**
  * The open rule document and its command gate. Controls read `capabilities`;
@@ -100,8 +90,6 @@ export function useRuleDocument({
   >({});
   const hasInvalidDefaults = Object.values(invalidDefaults).some(Boolean);
   const [busy, setBusy] = useState<EditorTask | "">("");
-  // The command holding the lock now; `busy` shows it from the next render.
-  const runningTask = useRef<EditorTask | "">("");
   const [error, setError] = useState("");
   const [versionLoad, setVersionLoad] = useState<VersionLoad>({
     status: requestedVersion ? "loading" : "ready",
@@ -160,31 +148,25 @@ export function useRuleDocument({
     },
     [reportCommandProblem],
   );
-  const runTask = useCallback(
-    async (
-      name: EditorTask,
-      task: (signal: AbortSignal) => Promise<unknown>,
-    ) => {
-      const signal = session.current?.signal;
-      const idle = commandsIdle({
-        task: runningTask.current,
-        versionReady: !versionUnavailable,
-      });
-      if (!signal || signal.aborted || !idle) return;
-      runningTask.current = name;
-      setBusy(name);
-      setError("");
-      try {
-        await task(signal);
-      } catch (failure) {
-        if (!signal.aborted) fail(failure);
-      } finally {
-        runningTask.current = "";
-        if (!signal.aborted) setBusy("");
-      }
-    },
-    [fail, versionUnavailable],
+  // The command lock (commandRunner) reads the latest version state and
+  // failure reporter through a ref, so the runner keeps its identity for the
+  // session: `busy` shows the running command from the next render.
+  const runnerHost = useRef({ versionUnavailable, fail });
+  runnerHost.current = { versionUnavailable, fail };
+  const [runner] = useState(() =>
+    createCommandRunner({
+      session: () => session.current?.signal,
+      versionReady: () => !runnerHost.current.versionUnavailable,
+      started: (name) => {
+        setBusy(name);
+        setError("");
+      },
+      failed: (failure) => runnerHost.current.fail(failure),
+      finished: () => setBusy(""),
+    }),
   );
+  /** Runs a command under the document lock; resolves to whether it ran. */
+  const runTask = runner.run;
   useEffect(() => {
     if (!requestedVersion) return;
     const controller = new AbortController();
@@ -210,10 +192,10 @@ export function useRuleDocument({
     () =>
       acceptsEdits({
         readOnly,
-        task: runningTask.current,
+        task: runner.running(),
         versionReady: !versionUnavailable,
       }),
-    [readOnly, versionUnavailable],
+    [readOnly, runner, versionUnavailable],
   );
   /** Applies a graph edit unless the document refuses edits now; reports whether it did. */
   const edit = useCallback(
@@ -266,7 +248,7 @@ export function useRuleDocument({
     // The draft the document stores and the one a save submits are one object:
     // the raw echo (coordinates as written, 300.0) made every code-view save
     // look edited meanwhile, so it stayed dirty and kept an untrimmed name.
-    const built = withNodePositions(result.definition);
+    const built = editableDraft(result.definition);
     dispatch({
       type: "source/built",
       before: source,
@@ -284,7 +266,7 @@ export function useRuleDocument({
     if (mode !== "code" || !hasInvalidDefaults) return;
     setError(invalidDefaultMessage("changing views"));
     redirect(rulePath({ ruleId: rule.id, version: requestedVersion }));
-  }, [mode, hasInvalidDefaults, redirect, rule.id]);
+  }, [mode, hasInvalidDefaults, redirect, rule.id, requestedVersion]);
   // The code view shows the draft rendered as ARC Script.
   useEffect(() => {
     if (
@@ -317,7 +299,6 @@ export function useRuleDocument({
     ruleId: rule.id,
     requestedVersion,
     redirect,
-    runTask,
   });
   current.current = {
     source,
@@ -326,7 +307,6 @@ export function useRuleDocument({
     ruleId: rule.id,
     requestedVersion,
     redirect,
-    runTask,
   };
   // The buffer whose arrival build its diagnostics refused, with the message:
   // arriving again with the same text returns to the code and shows why,
@@ -367,7 +347,7 @@ export function useRuleDocument({
       returnToCode();
       return;
     }
-    void latest.runTask("switch", async (signal) => {
+    void runTask("switch", async (signal) => {
       try {
         await latest.buildCode();
       } catch (failure) {
@@ -382,11 +362,11 @@ export function useRuleDocument({
         throw failure;
       }
     });
-  }, [mode, busy]);
+  }, [mode, busy, runTask]);
   // The header toggle leaves the shown view, which is the route's view except
   // while unbuilt code or an invalid default keeps the other one on screen.
-  const switchView = () =>
-    runTask("switch", async (signal) => {
+  const switchView = async () => {
+    await runTask("switch", async (signal) => {
       if (hasInvalidDefaults)
         throw new Error(invalidDefaultMessage("changing views"));
       if (view === "code") await buildCode();
@@ -399,16 +379,17 @@ export function useRuleDocument({
         }),
       );
     });
+  };
   const acknowledge = (submitted: Rule, response: Rule) => {
     dispatch({ type: "rule/saved", submitted, rule: response });
     onSaved(response);
   };
   // Every step checks the editor session: after the user leaves (and confirms
   // discarding the draft), no further write may start and nothing is reported.
-  const action = (type: "save" | "validate" | "publish") => {
+  const action = async (type: "save" | "validate" | "publish") => {
     // Commands are also called by keyboard actions, outside the hidden toolbar.
-    if (readOnly && type !== "validate") return Promise.resolve();
-    return runTask(type, async (signal) => {
+    if (readOnly && type !== "validate") return;
+    await runTask(type, async (signal) => {
       const candidate = { ...rule, draft: await buildCode() };
       signal.throwIfAborted();
       if (type === "save") {
@@ -443,21 +424,22 @@ export function useRuleDocument({
       );
     });
   };
-  const build = () =>
-    runTask("build", async (signal) => {
+  const build = async () => {
+    await runTask("build", async (signal) => {
       const draft = await buildCode();
       signal.throwIfAborted();
       await studioApi.validate(draft, { signal });
       signal.throwIfAborted();
       notify("Code built. Graph is valid.");
     });
+  };
   /**
    * Arrange holds the lock only until the layout is applied, and applies it
    * only to the draft it started from. `onArranged` may then request a
    * viewport fit, which nothing waits for (lesson F8).
    */
-  const arrange = (layout: DraftLayout, onArranged: () => void) =>
-    runTask("layout", async (signal) => {
+  const arrange = async (layout: DraftLayout, onArranged: () => void) => {
+    await runTask("layout", async (signal) => {
       if (readOnly) return;
       const before = rule.draft;
       const definition = await layout(before);
@@ -465,54 +447,37 @@ export function useRuleDocument({
       dispatch({ type: "graph/arranged", before, definition });
       onArranged();
     });
+  };
   /**
    * Opens the Test panel once pending code is built, since preview runs the
    * graph. Closing runs nothing, so it never builds: unbuildable code kept the
    * panel open, and buildable code was committed to the graph as a side effect.
    */
-  const toggleTest = (preview: {
+  const toggleTest = async (preview: {
     open: boolean;
     close: () => void;
     show: () => void;
   }) => {
     if (preview.open) {
       preview.close();
-      return Promise.resolve();
+      return;
     }
-    return runTask("test", async () => {
+    await runTask("test", async () => {
       await buildCode();
       preview.show();
     });
   };
-  /**
-   * Deletes the rule and leaves for the library. Unsaved changes go with the
-   * rule, so leaving does not ask about them. Resolves to why the server kept
-   * the rule, or null. A deletion cannot be recalled once sent, so it outlives
-   * the editor session: the request carries no session signal, and its outcome
-   * is reported through the workspace even after the user has left.
-   */
-  const deleteRule = async (): Promise<DeletionRefusal | null> => {
-    let refusal: DeletionRefusal | null = null;
-    await runTask("delete", async (signal) => {
-      try {
-        await ruleApi.delete(rule.id, rule.revision);
-      } catch (failure) {
-        refusal = {
-          message: errorMessage(failure),
-          callers: errorDetails(failure),
-        };
-        if (signal.aborted)
-          notify(`Rule ${rule.id} was not deleted: ${refusal.message}`);
-        return;
-      }
-      onDeleted?.(rule.id);
-      notify(`Rule ${rule.id} deleted`);
-      if (signal.aborted) return;
-      onDirty(false);
-      navigate(pagePath("library"));
+  /** Deletes the rule and leaves for the library; resolves to why it was kept, or null (ruleDeletion). */
+  const deleteRule = () =>
+    deleteRuleCommand({
+      rule,
+      runner,
+      remove: ruleApi.delete,
+      onDeleted,
+      notify,
+      onDirty,
+      navigate,
     });
-    return refusal;
-  };
   return {
     rule,
     source,

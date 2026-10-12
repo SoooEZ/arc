@@ -13,6 +13,32 @@ import {
 } from "./helpers/renderProbe";
 import { createRule, publishRule, uniqueId } from "./helpers/api";
 
+/**
+ * Scrolls the inspector through every row and back to the top, so that every
+ * inline editor mounts: an editor mounts as its row comes into view and stays
+ * mounted afterwards.
+ */
+async function mountEveryInlineEditor(page: Page, count: number) {
+  await page.locator(".inspector-scroll").evaluate(async (element) => {
+    const frames = () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+    for (
+      let top = 0;
+      top <= element.scrollHeight;
+      top += element.clientHeight
+    ) {
+      element.scrollTop = top;
+      await frames();
+    }
+    element.scrollTop = 0;
+  });
+  await expect(
+    page.locator(".inline-expression-editor .monaco-editor"),
+  ).toHaveCount(count);
+}
+
 async function create(
   request: APIRequestContext,
   expression = "hello.a == 1",
@@ -409,9 +435,7 @@ test("typing beside twenty inline editors hands Monaco no new options object", a
   await page.goto(`/#/rules/${id}?node=choose`);
   const label = page.getByLabel("Case 1 label", { exact: true });
   await expect(label).toHaveValue("Case 1");
-  await expect(
-    page.getByLabel("Case 20 condition", { exact: true }),
-  ).toBeVisible();
+  await mountEveryInlineEditor(page, 20);
   await label.click();
   await page.keyboard.press("End");
   await resetRenderCounts(page);

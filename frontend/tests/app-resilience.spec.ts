@@ -135,23 +135,12 @@ test("a rule editor chunk that fails to load leaves the workspace usable", async
 test("a page that throws while rendering shows a recoverable error and navigation still works", async ({
   page,
 }) => {
-  // A rule kind this client does not know, e.g. from a newer server.
-  const unknownKind = {
-    id: "unknown-kind",
-    name: "Unknown kind",
-    description: "",
-    kind: "SPREADSHEET",
-    revision: 1,
-    publishedVersion: null,
-    createdAt: "2026-09-27T00:00:00Z",
-    updatedAt: "2026-09-27T00:00:00Z",
-    nodeCount: 0,
-    inputCount: 0,
-    referenceCount: 0,
-  };
+  // Any render error inside a page: here a catalog answer without a total,
+  // which the library's stats cannot print. (A rule kind the library does not
+  // know fails its own card alone; see library-overview.spec.ts.)
   await page.route("**/api/rule-summaries?*", (route) =>
     route.fulfill({
-      json: { items: [unknownKind], total: 1, offset: 0, limit: 20 },
+      json: { items: [], total: null, offset: 0, limit: 20 },
     }),
   );
   const uncaught: string[] = [];

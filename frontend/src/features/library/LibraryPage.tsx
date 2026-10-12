@@ -18,6 +18,7 @@ import {
 import type { Kind, RuleSummary } from "../../types";
 import { kinds, ruleKinds } from "../../domain/ruleKinds";
 import type { useRuleLibrary } from "../../app/useRuleLibrary";
+import { RecoverableBoundary } from "../../app/RecoverableBoundary";
 import CatalogPagination from "../../components/CatalogPagination";
 import RuleCard from "./RuleCard";
 import { newestFirst } from "./libraryOrder";
@@ -186,7 +187,15 @@ export default function Library({
       )}
       <div className="rule-grid">
         {newestFirst(rules).map((rule) => (
-          <RuleCard key={rule.id} rule={rule} onOpen={onOpen} />
+          // A card indexes its rule's kind and node kinds, which a bundle older
+          // than the server may not know: such a card fails alone, not the page.
+          <RecoverableBoundary
+            key={rule.id}
+            title="This rule card stopped working"
+            resetKey={`${rule.id}:${rule.revision}`}
+          >
+            <RuleCard rule={rule} onOpen={onOpen} />
+          </RecoverableBoundary>
         ))}
         {!library.loading && !library.loadError && !rules.length && (
           <EmptyLibrary

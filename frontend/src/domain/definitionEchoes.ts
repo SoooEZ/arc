@@ -1,5 +1,6 @@
-import type { Definition, RuleNode } from "../types";
+import type { Definition, Input, RuleNode } from "../types";
 import { decimalKey, isDecimalNumber, isJsonObject } from "./json";
+import { nodeKinds } from "./nodeKinds";
 
 /*
  * How a definition comes back from the server: a save response, a build echo
@@ -22,7 +23,11 @@ export function sameDefinition(left: Definition, right: Definition): boolean {
 /**
  * `inValue` is true below an input's defaultValue: the server echoes a
  * record's unset field as null, but a null inside a value is part of it, so
- * {"a": null} and {} are different defaults.
+ * {"a": null} and {} are different defaults. An empty list or map of a record
+ * field is unset as well: a Transform saved with `fields: []` comes back from
+ * a node build as `fields: null`, a Switch's `cases: null` as `[]` and a
+ * Reference's `bindings: null` as `{}`, and both spellings evaluate alike. A
+ * default of `[]` or `{}` is a value, so it never equals no default.
  */
 function canonicalJson(value: unknown, inValue = false): string {
   if (Array.isArray(value))
@@ -38,11 +43,18 @@ function canonicalJson(value: unknown, inValue = false): string {
   const fields: string[] = [];
   for (const key of Object.keys(value).sort()) {
     const field = value[key];
+    const valueBelow = inValue || key === "defaultValue";
     if (field === undefined || (field === null && !inValue)) continue;
-    const json = canonicalJson(field, inValue || key === "defaultValue");
+    if (!valueBelow && isEmptyCollection(field)) continue;
+    const json = canonicalJson(field, valueBelow);
     fields.push(`${JSON.stringify(key)}:${json}`);
   }
   return `{${fields.join(",")}}`;
+}
+
+function isEmptyCollection(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  return isJsonObject(value) && Object.keys(value).length === 0;
 }
 
 const sameJson = (left: unknown, right: unknown) =>
@@ -77,7 +89,8 @@ export function applyNodeFragment(
     built.edges.filter((edge) => edge.source === nodeId),
   );
   const inputs =
-    localNode.type === "INPUT" && !sameJson(current.inputs, built.inputs)
+    nodeKinds[localNode.type].ownsInputs &&
+    !sameJson(current.inputs, built.inputs)
       ? built.inputs
       : current.inputs;
   if (
@@ -123,6 +136,17 @@ function withOutgoingEdges(
 }
 
 /**
+ * A draft as the editor holds it: every node has a numeric position and every
+ * source binding a pointer string. Every draft passes here on its way into
+ * the editor (open, version load, build, node fragment, adopted save
+ * response); one that needs nothing comes back as the same object, so the
+ * echo of an unchanged draft still compares equal to the local draft.
+ */
+export function editableDraft(definition: Definition): Definition {
+  return withSourcePointers(withNodePositions(definition));
+}
+
+/**
  * Every node gets a numeric position when a draft enters the editor: API
  * clients may omit positions, which the server accepts, so a node without one
  * is placed at the origin, and coordinates that arrived as DecimalNumber
@@ -139,6 +163,25 @@ export function withNodePositions(definition: Definition): Definition {
       hasNumericPosition(node)
         ? node
         : { ...node, position: numericPosition(node.position) },
+    ),
+  };
+}
+
+/**
+ * API clients and `source` statements may omit a binding's pointer, which the
+ * server stores and echoes as null. The pointer field is a controlled text
+ * input, and null and "" both read the whole result, so the editor holds "".
+ */
+function withSourcePointers(definition: Definition): Definition {
+  const unset = (input: Input) =>
+    input.source != null && input.source.pointer == null;
+  if (!definition.inputs.some(unset)) return definition;
+  return {
+    ...definition,
+    inputs: definition.inputs.map((input) =>
+      unset(input) && input.source
+        ? { ...input, source: { ...input.source, pointer: "" } }
+        : input,
     ),
   };
 }

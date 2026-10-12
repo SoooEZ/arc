@@ -23,6 +23,7 @@ import { useFunctionCatalog } from "../studio/useFunctionCatalog";
 import { arcScriptLanguage } from "../studio/arcLanguage";
 import { formulaSuggestionProblem } from "../studio/useFormulaSupport";
 import { useNodeExpressionDraft } from "./useNodeExpressionDraft";
+import { nodeKinds } from "../../domain/nodeKinds";
 import type { Definition, RuleNode } from "../../types";
 
 export default function NodeExpressionDialog({
@@ -41,7 +42,7 @@ export default function NodeExpressionDialog({
   onClose: () => void;
   onProblems: (messages: string[]) => void;
 }) {
-  const { source, changeSource, dismiss, diagnostics, error, busy, apply } =
+  const { source, changeSource, dismiss, diagnostics, error, applying, apply } =
     useNodeExpressionDraft({
       definition,
       nodeId: node.id,
@@ -64,13 +65,14 @@ export default function NodeExpressionDialog({
   const insert = (snippet: string) => {
     if (!readOnly) insertSnippet(editor.current, snippet);
   };
-  // Applying locks the buffer until the build answers.
-  const locked = readOnly || busy;
+  // Applying locks the buffer until the build answers. `readOnly` already
+  // folds in the document's command lock (capabilities); this is the dialog's own.
+  const locked = readOnly || applying;
   const options = useEditorOptions(nodeCodeOptions, locked, "Node code editor");
   return (
     <Dialog
       open
-      onClose={busy ? undefined : dismiss}
+      onClose={applying ? undefined : dismiss}
       maxWidth="lg"
       fullWidth
       aria-labelledby="node-expression-title"
@@ -83,7 +85,7 @@ export default function NodeExpressionDialog({
         <p className="muted-copy">
           Edit this node’s expressions, parameter mappings, result and
           connections. Keep its ID and type.{" "}
-          {node.type === "INPUT" &&
+          {nodeKinds[node.type].ownsInputs &&
             "Input parameters and source mappings are included."}
         </p>
         <ExpressionColorKey />
@@ -121,13 +123,13 @@ export default function NodeExpressionDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={busy}>
+        <Button onClick={onClose} disabled={applying}>
           {readOnly ? "Close" : "Cancel"}
         </Button>
         {!readOnly && (
           <Button
             variant="contained"
-            disabled={busy || source === null || !!diagnostics.length}
+            disabled={applying || source === null || !!diagnostics.length}
             onClick={() => void apply()}
           >
             Apply to graph

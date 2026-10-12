@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import type { Definition, Rule } from "../../src/types";
+import type {
+  BranchCase,
+  Definition,
+  Rule,
+  TransformField,
+} from "../../src/types";
 import {
   documentReducer,
   initialDocument,
@@ -12,6 +17,8 @@ import {
   removeGraphNode,
   ruleSnapshot,
   semanticGraphKey,
+  updateGraphInputs,
+  updateGraphNode,
 } from "../../src/domain/graph";
 import {
   availableVariables,
@@ -21,6 +28,7 @@ import {
 } from "../../src/domain/variables";
 import {
   applyNodeFragment,
+  editableDraft,
   sameDefinition,
   withNodePositions,
 } from "../../src/domain/definitionEchoes";
@@ -642,6 +650,174 @@ test("a null inside a value is part of it, unlike a record's unset field", () =>
       nodes: [{ ...unset.nodes[0], expression: null, selector: null }],
     }),
   ).toBe(true);
+});
+
+// A Transform whose last field was removed is saved with fields: []; the node
+// build echoes it as null (a Switch's cases: null comes back as [], a
+// Reference's bindings: null as {}). Applying unchanged node code replaced the
+// node, dirtied the saved document and reset the preview identity.
+test("an empty list or map of a record field equals its null echo, but a default of [] is a value", () => {
+  const base = rule().draft;
+  const withNode = (node: Definition["nodes"][number]): Definition => ({
+    ...base,
+    nodes: [...base.nodes, node],
+  });
+  const transform = (fields: TransformField[] | null) =>
+    withNode({
+      id: "shape",
+      type: "TRANSFORM",
+      label: "Shape",
+      fields,
+      output: "shaped",
+      position: { x: 0, y: 300 },
+    });
+  const local = transform([]);
+  expect(sameDefinition(local, transform(null))).toBe(true);
+  expect(applyNodeFragment(local, "shape", transform(null))).toBe(local);
+  const start = {
+    ...initialDocument({ ...rule(), draft: local }),
+    source: "code",
+  };
+  const applied = documentReducer(start, {
+    type: "graph/change",
+    change: (current) => applyNodeFragment(current, "shape", transform(null)),
+  });
+  expect(applied).toBe(start);
+  expect(ruleSnapshot(applied.rule)).toBe(applied.baseline);
+  // A field is a change; so is a different empty collection below a value.
+  expect(
+    sameDefinition(local, transform([{ name: "a", expression: "1" }])),
+  ).toBe(false);
+  const choose = (cases: BranchCase[] | null) =>
+    withNode({
+      id: "choose",
+      type: "SWITCH",
+      label: "Choose",
+      cases,
+      position: { x: 0, y: 300 },
+    });
+  expect(sameDefinition(choose(null), choose([]))).toBe(true);
+  const reuse = (bindings: Record<string, string> | null) =>
+    withNode({
+      id: "reuse",
+      type: "REFERENCE",
+      label: "Reuse",
+      ruleId: "child",
+      version: 1,
+      bindings,
+      output: "child_result",
+      position: { x: 0, y: 300 },
+    });
+  expect(sameDefinition(reuse(null), reuse({}))).toBe(true);
+  expect(sameDefinition(reuse({ a: "1" }), reuse({}))).toBe(false);
+  const withDefault = (defaultValue: unknown): Definition => ({
+    ...base,
+    inputs: [{ name: "payload", type: "ARRAY", required: false, defaultValue }],
+  });
+  expect(sameDefinition(withDefault([]), withDefault(null))).toBe(false);
+  expect(sameDefinition(withDefault({}), withDefault(null))).toBe(false);
+  expect(sameDefinition(withDefault({ a: [] }), withDefault({ a: null }))).toBe(
+    false,
+  );
+  expect(sameDefinition(withDefault({ a: {} }), withDefault({ a: [] }))).toBe(
+    false,
+  );
+});
+
+// A value-equal edit (a double click on Remove, an expression cleared to "")
+// allocated a new draft: the reducer dropped the code buffer and diagnostics
+// and every derived identity was computed again, as for a real keystroke.
+test("a patch that changes nothing returns the draft itself, so the document keeps its state", () => {
+  const start = initialDocument(rule());
+  const draft = start.rule.draft;
+  expect(patchGraphNode(draft, "missing", { label: "Gone" })).toBe(draft);
+  expect(patchGraphNode(draft, "left", {})).toBe(draft);
+  expect(
+    patchGraphNode(draft, "left", {
+      expression: "amount * 0.8",
+      label: "First calculation",
+    }),
+  ).toBe(draft);
+  // A key set to undefined clears a value; one already absent is unchanged.
+  expect(patchGraphNode(draft, "left", { ruleId: undefined })).toBe(draft);
+  expect(
+    patchGraphNode(draft, "left", { output: undefined }).nodes[1].output,
+  ).toBeUndefined();
+  expect(updateGraphNode(draft, "missing", () => ({ label: "Gone" }))).toBe(
+    draft,
+  );
+  expect(
+    updateGraphNode(draft, "left", (node) => ({ output: node.output })),
+  ).toBe(draft);
+  expect(
+    updateGraphNode(draft, "left", () => ({ expression: "1" })).nodes[1]
+      .expression,
+  ).toBe("1");
+  expect(updateGraphInputs(draft, (inputs) => inputs)).toBe(draft);
+  expect(
+    updateGraphInputs(draft, (inputs) => [...inputs, inputs[0]]).inputs,
+  ).toHaveLength(2);
+  const withCode = documentReducer(start, {
+    type: "source/rendered",
+    before: draft,
+    source: "rule example {}",
+  });
+  const unchanged = documentReducer(withCode, {
+    type: "graph/change",
+    change: (current) =>
+      patchGraphNode(current, "left", { expression: "amount * 0.8" }),
+  });
+  expect(unchanged).toBe(withCode);
+  expect(unchanged.source).toBe("rule example {}");
+});
+
+// A `source` statement or an API draft without a pointer builds, saves and
+// loads with pointer null, which reached the JSON pointer field as value={null}:
+// React warned and left the input uncontrolled until the first keystroke.
+test("a source binding without a pointer enters the editor as an empty pointer", () => {
+  const bound = (pointer: string | null): Definition => ({
+    ...rule().draft,
+    inputs: [
+      {
+        name: "rate",
+        type: "NUMBER",
+        required: false,
+        defaultValue: 1,
+        source: {
+          id: "country-tax",
+          version: 1,
+          bindings: {},
+          pointer,
+          onError: "FAIL",
+        },
+      },
+    ],
+  });
+  expect(editableDraft(bound(null)).inputs[0].source?.pointer).toBe("");
+  const placed = bound("/rate");
+  expect(editableDraft(placed)).toBe(placed);
+  // Opening, building and acknowledging a save all read it so: the document
+  // opens clean, and an echo with null keeps the local draft (lesson F1).
+  const start = initialDocument({ ...rule(), draft: bound(null) });
+  expect(start.rule.draft.inputs[0].source?.pointer).toBe("");
+  expect(ruleSnapshot(start.rule)).toBe(start.baseline);
+  const built = documentReducer(
+    { ...start, source: "code", sourceDirty: true },
+    {
+      type: "source/built",
+      before: "code",
+      definition: bound(null),
+      source: "code",
+    },
+  );
+  expect(built.rule.draft.inputs[0].source?.pointer).toBe("");
+  const saved = documentReducer(start, {
+    type: "rule/saved",
+    submitted: start.rule,
+    rule: { ...start.rule, revision: 2, draft: bound(null) },
+  });
+  expect(saved.rule.draft).toBe(start.rule.draft);
+  expect(ruleSnapshot(saved.rule)).toBe(saved.baseline);
 });
 
 test("declared variables list a name assigned by several nodes once, with every producer", () => {

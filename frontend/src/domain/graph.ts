@@ -36,7 +36,9 @@ export function scopeGraphKey(definition: Definition): string {
     node.id,
     node.type,
     nodeKinds[node.type].storesResult ? (node.output ?? null) : null,
-    node.type === "SWITCH" ? (node.cases ?? []).map((c) => c.id) : null,
+    nodeKinds[node.type].exits === "cases"
+      ? (node.cases ?? []).map((c) => c.id)
+      : null,
   ]);
   const edges = definition.edges.map((edge) => [
     edge.source,
@@ -77,16 +79,22 @@ export function isCurrentGraphLocation(
   if (!location.ruleId || isPreviewRoot(location)) return true;
   return location.ruleId === shown.ruleId && location.version === shown.version;
 }
+/**
+ * The draft with one node's fields patched. The draft itself comes back when
+ * the node is not in it or every patched field already holds its value, so a
+ * no-op edit changes no identity: the reducer keeps its state, the code buffer
+ * and diagnostics stay, and nothing derived from the draft is computed again.
+ */
 export function patchGraphNode(
   definition: Definition,
   id: string,
   patch: Partial<RuleNode>,
 ): Definition {
   const updated = definition.nodes.find((node) => node.id === id);
-  const validHandles =
-    updated && patch.cases
-      ? new Set(sourcePorts({ ...updated, ...patch }).map((port) => port.id))
-      : null;
+  if (!updated || unchangedBy(updated, patch)) return definition;
+  const validHandles = patch.cases
+    ? new Set(sourcePorts({ ...updated, ...patch }).map((port) => port.id))
+    : null;
   return {
     ...definition,
     nodes: definition.nodes.map((node) =>
@@ -98,6 +106,37 @@ export function patchGraphNode(
         )
       : definition.edges,
   };
+}
+
+/** Whether every field of `patch` already holds that value on `node` (a key set to undefined clears it). */
+function unchangedBy(node: RuleNode, patch: Partial<RuleNode>): boolean {
+  for (const key of Object.keys(patch) as (keyof RuleNode)[])
+    if (!Object.is(node[key], patch[key])) return false;
+  return true;
+}
+
+/**
+ * The draft with one node patched from the node as the draft holds it now.
+ * Row callbacks use it instead of closing over a rendered node, so they keep
+ * their identity and memoized rows render for their own edits alone (lesson
+ * F39); a node that left the draft leaves it unchanged.
+ */
+export function updateGraphNode(
+  definition: Definition,
+  id: string,
+  update: (node: RuleNode) => Partial<RuleNode>,
+): Definition {
+  const node = definition.nodes.find((candidate) => candidate.id === id);
+  return node ? patchGraphNode(definition, id, update(node)) : definition;
+}
+
+/** The draft with its input parameters replaced; the draft itself when `update` keeps the list. */
+export function updateGraphInputs(
+  definition: Definition,
+  update: (inputs: Input[]) => Input[],
+): Definition {
+  const inputs = update(definition.inputs);
+  return inputs === definition.inputs ? definition : { ...definition, inputs };
 }
 /**
  * The graph's entry Input stays: the first Input in document order, as the

@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Rule, RuleNode, RuleSummary } from "../src/types";
-import { createRule, deleteRule, uniqueId } from "./helpers/api";
+import {
+  createRule,
+  deleteRule,
+  inputToOutput,
+  uniqueId,
+  uniqueStamp,
+} from "./helpers/api";
 import {
   installRenderProbe,
   renderCounts,
@@ -428,4 +434,56 @@ test("typing a library search leaves the shown cards and their previews alone", 
   expect(counts.ruleCardRenders).toBe(0);
   expect(counts.commits).toBeGreaterThanOrEqual(6);
   await expect(page.locator(".rule-preview-svg")).toHaveCount(2);
+});
+
+// Cards index the rule kind and node kinds into exhaustive tables straight
+// from the catalog JSON; a kind this bundle has no table for threw during
+// render and the page-wide boundary blanked the whole library.
+test("a rule of a kind this bundle does not know breaks only its own card", async ({
+  page,
+  request,
+}) => {
+  const stamp = uniqueStamp();
+  const known = await createRule(request, {
+    id: `lib-known-${stamp}`,
+    kind: "FORMULA",
+    definition: inputToOutput,
+  });
+  const unknown = await createRule(request, {
+    id: `lib-unknown-${stamp}`,
+    kind: "FORMULA",
+    definition: inputToOutput,
+  });
+  // A server deployed after this bundle may list a kind it has no table for.
+  await page.route(/\/api\/rule-summaries\?/, async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as {
+      items: { id: string; kind: string }[];
+    };
+    for (const item of body.items)
+      if (item.id === unknown.id) item.kind = "MYSTERY";
+    await route.fulfill({ response, json: body });
+  });
+  await page.goto("/#/library");
+  await page.getByLabel("Search rules").fill(stamp);
+  await expect(
+    page.getByRole("heading", { name: known.name, exact: true }),
+  ).toBeVisible();
+  const failed = page
+    .getByRole("alert")
+    .filter({ hasText: "This rule card stopped working" });
+  await expect(failed).toHaveCount(1);
+  await expect(
+    page.getByRole("heading", { name: unknown.name, exact: true }),
+  ).toHaveCount(0);
+  // The page and the other card keep working.
+  await expect(
+    page.getByRole("heading", { name: "Rule library", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: `Open graph: ${known.name}`, exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/rules/${known.id}`));
+  await deleteRule(request, known.id);
+  await deleteRule(request, unknown.id);
 });

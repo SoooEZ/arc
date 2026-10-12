@@ -69,6 +69,12 @@ export interface NodeKind {
   removable: boolean | "extra";
   /** Other nodes may connect into it. */
   acceptsIncoming: boolean;
+  /**
+   * Its node carries the definition's input parameters: its form edits them,
+   * its node code declares them, and a fragment build replaces them (the
+   * server's replaceNode for the Input node).
+   */
+  ownsInputs: boolean;
   exits: NodeExits;
   /**
    * The optional properties its nodes may set, as on the server
@@ -111,6 +117,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     addable: false,
     removable: "extra",
     acceptsIncoming: false,
+    ownsInputs: true,
     exits: "next",
     properties: [],
     minimapColor: neutralMinimap,
@@ -126,6 +133,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     addable: true,
     removable: true,
     acceptsIncoming: true,
+    ownsInputs: false,
     exits: "next",
     properties: ["expression", "output"],
     minimapColor: neutralMinimap,
@@ -140,6 +148,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     addable: true,
     removable: true,
     acceptsIncoming: true,
+    ownsInputs: false,
     exits: "true-false",
     properties: ["expression"],
     minimapColor: "#e8d8b2",
@@ -154,6 +163,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     addable: true,
     removable: true,
     acceptsIncoming: true,
+    ownsInputs: false,
     exits: "cases",
     properties: ["selector", "cases"],
     minimapColor: neutralMinimap,
@@ -173,6 +183,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     addable: true,
     removable: true,
     acceptsIncoming: true,
+    ownsInputs: false,
     exits: "next",
     properties: ["fields", "expression", "output"],
     minimapColor: neutralMinimap,
@@ -190,6 +201,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     addable: true,
     removable: true,
     acceptsIncoming: true,
+    ownsInputs: false,
     exits: "next",
     properties: ["rule", "bindings", "output"],
     minimapColor: neutralMinimap,
@@ -205,6 +217,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     addable: true,
     removable: true,
     acceptsIncoming: true,
+    ownsInputs: false,
     exits: "none",
     properties: ["expression", "outputName"],
     minimapColor: neutralMinimap,

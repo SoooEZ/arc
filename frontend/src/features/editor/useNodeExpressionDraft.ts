@@ -29,7 +29,8 @@ export function useNodeExpressionDraft({
   // change while the dialog is open, such as a finishing Arrange, would
   // otherwise be overwritten by the stale text on Apply.
   const [edited, setEdited] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Apply is in flight: the dialog's own lock, apart from the document's commands.
+  const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState("");
   const [applyDiagnostics, setApplyDiagnostics] = useState<Diagnostic[]>([]);
   const active = useRef<AbortController | null>(null);
@@ -97,7 +98,7 @@ export function useNodeExpressionDraft({
     if (readOnly || source === null || active.current) return;
     const controller = new AbortController();
     active.current = controller;
-    setBusy(true);
+    setApplying(true);
     setApplyError("");
     try {
       const built = await studioApi.buildNode(definition, nodeId, source, {
@@ -110,7 +111,7 @@ export function useNodeExpressionDraft({
       if (!controller.signal.aborted) setApplyError(errorMessage(failure));
     } finally {
       active.current = null;
-      if (!controller.signal.aborted) setBusy(false);
+      if (!controller.signal.aborted) setApplying(false);
     }
   };
   return {
@@ -118,7 +119,7 @@ export function useNodeExpressionDraft({
     changeSource,
     dismiss,
     diagnostics,
-    busy,
+    applying,
     apply,
     error: applyError || rendered.error || checked.error || messages.join("\n"),
   };

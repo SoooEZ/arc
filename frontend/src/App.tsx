@@ -2,6 +2,7 @@ import { lazy, useCallback, useState, type ReactNode } from "react";
 import { Alert, Button, CircularProgress, Snackbar } from "@mui/material";
 import WorkspaceHeader from "./app/WorkspaceHeader";
 import Library from "./features/library/LibraryPage";
+import { forgetPreview } from "./features/library/previewCache";
 import ApiPage from "./features/execution/ApiPage";
 import SourcesPage from "./features/sources/SourcesPage";
 import Sidebar from "./app/Sidebar";
@@ -113,13 +114,14 @@ export default function App() {
     notify,
   });
   /**
-   * Nothing keeps offering a deleted rule: saved copy, library page, Code studio
-   * target or Formula metadata. A deletion outlives its editor, so this may run
-   * after another rule was saved.
+   * Nothing keeps offering a deleted rule: saved copy, library page, its card
+   * previews, Code studio target or Formula metadata. A deletion outlives its
+   * editor, so this may run after another rule was saved.
    */
   const forgetDeletedRule = (id: string) => {
     setSavedRule((saved) => (saved?.id === id ? null : saved));
     library.markChanged();
+    forgetPreview(id);
     codeStudio.forget(id);
     formulaMetadata.forget(id);
     pinnedRuleVersions.forget(id);

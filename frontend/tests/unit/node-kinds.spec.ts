@@ -175,6 +175,13 @@ test("nothing connects into a kind without an incoming handle", () => {
   ).toBe(definition);
 });
 
+test("only the Input node owns the definition's input parameters", () => {
+  // Its form edits them, its node code declares them and a fragment build
+  // replaces them; every other kind's fragment leaves the parameters alone.
+  for (const type of nodeTypes)
+    expect(nodeKinds[type].ownsInputs, type).toBe(type === "INPUT");
+});
+
 test("only Conditions stand out on the minimap", () => {
   for (const type of nodeTypes)
     expect(nodeKinds[type].minimapColor, type).toBe(

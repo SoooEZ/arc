@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import ExpressionField from "../../expressions/ExpressionField";
 import ExpressionDialogButton from "../../expressions/ExpressionDialogButton";
 import ValueBinding from "../../expressions/ValueBinding";
-import { patchGraphNode } from "../../../domain/graph";
+import { updateGraphNode } from "../../../domain/graph";
 import { MAX_TRANSFORM_FIELDS } from "../../../domain/limits";
 import {
   fieldsAsObjectExpression,
@@ -38,13 +38,11 @@ export default function TransformFields({
   // instead of closing over this render's array, so rows can be memoized.
   const updateFields = useCallback(
     (update: FieldsUpdate) =>
-      onDefinitionChange((definition: Definition) => {
-        const current = definition.nodes.find((n) => n.id === nodeId);
-        if (!current) return definition;
-        return patchGraphNode(definition, nodeId, {
+      onDefinitionChange((definition: Definition) =>
+        updateGraphNode(definition, nodeId, (current) => ({
           fields: update(current.fields ?? []),
-        });
-      }),
+        })),
+      ),
     [onDefinitionChange, nodeId],
   );
   const replaceField = useCallback(

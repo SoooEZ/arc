@@ -29,3 +29,15 @@ export function rememberPreview(rule: PreviewIdentity, preview: Rule): void {
     previews.delete(oldest);
   }
 }
+
+/**
+ * Drops every preview of a rule deleted in this page. Its entries could never
+ * be served again (a rule created again under the ID is another incarnation),
+ * but they held the cache's places until they aged out.
+ */
+export function forgetPreview(id: string): void {
+  // IDs are slugs, so the "@" of the incarnation key ends the ID.
+  const prefix = `${id}@`;
+  for (const key of [...previews.keys()])
+    if (key.startsWith(prefix)) previews.delete(key);
+}

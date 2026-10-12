@@ -1,14 +1,21 @@
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import PagedAutocomplete from "../../../components/PagedAutocomplete";
 import { Alert, IconButton, Tooltip } from "@mui/material";
 import { ExternalLink } from "lucide-react";
-import type { RuleSummary, Version, VersionSummary } from "../../../types";
+import type {
+  Input,
+  RuleSummary,
+  Version,
+  VersionSummary,
+} from "../../../types";
 import ValueBinding from "../../expressions/ValueBinding";
 import { ruleApi } from "../../../api/rules";
 import { readRuleVersion } from "../../../app/pinnedVersions";
 import { useAsyncResource } from "../../../hooks/useAsyncResource";
+import { updateGraphNode } from "../../../domain/graph";
 import { stringifyJson } from "../../../domain/json";
 import { ownValue } from "../../../domain/records";
+import type { VariableOption } from "../../../domain/variables";
 import {
   undeclaredBindings,
   withBinding,
@@ -28,9 +35,22 @@ export default function ReferenceFields({
   patch,
   variables,
   scopeKnown,
+  onDefinitionChange,
   onOpenReference,
 }: NodeFieldsProps) {
   const { ruleId, version } = node;
+  const nodeId = node.id;
+  // One stable updater for every parameter card: it reads the node's current
+  // mappings from the draft, so the memoized cards keep their callback.
+  const bind = useCallback(
+    (name: string, value: string | undefined) =>
+      onDefinitionChange((definition) =>
+        updateGraphNode(definition, nodeId, (current) => ({
+          bindings: withBinding(current.bindings, name, value),
+        })),
+      ),
+    [onDefinitionChange, nodeId],
+  );
   // The picker's own summary is fresh; any other pin reads its rule's summary,
   // so a renamed rule shows its current name without its graph being read.
   const [chosenRule, setChosenRule] = useState<RuleChoice | null>(null);
@@ -174,38 +194,15 @@ export default function ReferenceFields({
             Pass a variable, a value, or an expression into each input.
           </p>
           {child.definition.inputs.map((input) => (
-            <div
-              className="input-schema-card reference-parameter-card"
-              role="group"
-              aria-label={`Parameter ${input.name}`}
+            <ReferenceParameterCard
               key={`${node.id}:${node.ruleId}:${node.version}:${input.name}`}
-            >
-              <div className="reference-parameter-heading">
-                <strong>{input.name}</strong>
-                <span>{input.required ? "Required" : "Optional"}</span>
-              </div>
-              <div className="reference-parameter-type">
-                Type: <code>{input.type.toLowerCase()}</code>
-              </div>
-              <ValueBinding
-                label={`${input.name}${input.required ? " *" : ""}`}
-                type={input.type}
-                value={ownValue(node.bindings, input.name)}
-                variables={variables}
-                scopeKnown={scopeKnown}
-                disabled={readOnly}
-                helperText={
-                  input.defaultValue != null
-                    ? `Default: ${stringifyJson(input.defaultValue)}`
-                    : undefined
-                }
-                onChange={(value) =>
-                  patch({
-                    bindings: withBinding(node.bindings, input.name, value),
-                  })
-                }
-              />
-            </div>
+              input={input}
+              value={ownValue(node.bindings, input.name)}
+              variables={variables}
+              scopeKnown={scopeKnown}
+              readOnly={readOnly}
+              onBind={bind}
+            />
           ))}
           <UndeclaredBindings
             names={undeclared}
@@ -220,3 +217,54 @@ export default function ReferenceFields({
     </>
   );
 }
+
+/**
+ * One parameter of the pinned version. Memoized with a stable binding
+ * callback: a keystroke in one mapping renders that card alone (lesson F39).
+ */
+const ReferenceParameterCard = memo(function ReferenceParameterCard({
+  input,
+  value,
+  variables,
+  scopeKnown,
+  readOnly,
+  onBind,
+}: {
+  input: Input;
+  /** The node's mapping for this parameter, or none. */
+  value: string | undefined;
+  variables: VariableOption[];
+  scopeKnown: boolean;
+  readOnly: boolean;
+  onBind: (name: string, value: string | undefined) => void;
+}) {
+  return (
+    <div
+      className="input-schema-card reference-parameter-card"
+      role="group"
+      aria-label={`Parameter ${input.name}`}
+    >
+      <div className="reference-parameter-heading">
+        <strong>{input.name}</strong>
+        <span>{input.required ? "Required" : "Optional"}</span>
+      </div>
+      <div className="reference-parameter-type">
+        Type: <code>{input.type.toLowerCase()}</code>
+      </div>
+      <ValueBinding
+        label={`${input.name}${input.required ? " *" : ""}`}
+        type={input.type}
+        value={value}
+        variables={variables}
+        scopeKnown={scopeKnown}
+        disabled={readOnly}
+        helperText={
+          input.defaultValue != null
+            ? `Default: ${stringifyJson(input.defaultValue)}`
+            : undefined
+        }
+        onChange={(next) => onBind(input.name, next)}
+      />
+    </div>
+  );
+});

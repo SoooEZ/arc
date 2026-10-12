@@ -7,7 +7,13 @@ import CatalogPagination from "../../components/CatalogPagination";
 import PagedVersionSelect from "../../components/PagedVersionSelect";
 import { LazyBoundary } from "../../components/LazyBoundary";
 import { errorMessage } from "../../api/errors";
+import {
+  acceptsPointerEdit,
+  pointerLengthProblem,
+  sourcePointerProblem,
+} from "../../domain/limits";
 import { ownValue } from "../../domain/records";
+import { useRefusedEdit } from "../../hooks/useRefusedEdit";
 import {
   Alert,
   Button,
@@ -45,6 +51,15 @@ export default function SourceBindingEditor({
   readOnly: boolean;
 }) {
   const source = input.source;
+  // The editor reads an omitted pointer as "" (editableDraft); a binding
+  // built elsewhere still gets a controlled field.
+  const pointer = source?.pointer ?? "";
+  // The server's pointer rules, shown under the field (lesson F34); a pointer
+  // grown beyond the limit is refused and explained (lesson F28).
+  const pointerEdit = useRefusedEdit(pointer);
+  const pointerProblem = pointerEdit.refused
+    ? pointerLengthProblem
+    : sourcePointerProblem(pointer);
   const [managerOpen, setManagerOpen] = useState(false);
   const [catalogRevision, setCatalogRevision] = useState(0);
   // The mutable version list loads once the Source version control opens, as
@@ -199,10 +214,19 @@ export default function SourceBindingEditor({
           <TextField
             label="JSON pointer"
             placeholder="/data/rate"
-            helperText="Blank uses the whole result"
-            value={source.pointer}
+            helperText={pointerProblem ?? "Blank uses the whole result"}
+            error={!!pointerProblem}
+            value={pointer}
             disabled={readOnly}
-            onChange={(e) => onChange({ ...source, pointer: e.target.value })}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (!acceptsPointerEdit(pointer, next)) {
+                pointerEdit.refuse();
+                return;
+              }
+              pointerEdit.clear();
+              onChange({ ...source, pointer: next });
+            }}
           />
           <TextField
             select

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { Rule } from "../../src/types";
 import {
   cachedPreview,
+  forgetPreview,
   rememberPreview,
 } from "../../src/features/library/previewCache";
 import { lastPageOffset } from "../../src/hooks/usePagedResource";
@@ -37,6 +38,26 @@ test("card previews are reused per rule revision and stay bounded", () => {
   expect(cachedPreview(first)).toBeUndefined();
   expect(cachedPreview(rule("preview-cache-39", 1))).toBeDefined();
   expect(cachedPreview(rule("preview-cache-0", 1))).toBeDefined();
+});
+
+test("deleting a rule forgets its previews and no other rule's", () => {
+  const deleted = rule("preview-forget", 1);
+  const later = rule("preview-forget", 2);
+  const other = rule("preview-forget-other", 1);
+  rememberPreview(deleted, deleted);
+  rememberPreview(later, later);
+  rememberPreview(other, other);
+  forgetPreview("preview-forget");
+  expect(cachedPreview(deleted)).toBeUndefined();
+  expect(cachedPreview(later)).toBeUndefined();
+  // "preview-forget-other" shares the prefix but not the ID.
+  expect(cachedPreview(other)).toBe(other);
+  // Forgotten entries no longer hold the cache's places.
+  for (let index = 0; index < 39; index++) {
+    const filler = rule(`preview-forget-${index}`, 1);
+    rememberPreview(filler, filler);
+  }
+  expect(cachedPreview(other)).toBe(other);
 });
 
 test("a page offset past the end moves to the last page", () => {

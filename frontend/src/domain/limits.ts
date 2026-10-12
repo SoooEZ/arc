@@ -52,6 +52,8 @@ export const MAX_VALUE_DEPTH = 8;
 export const MAX_NUMBER_PRECISION = 100;
 /** Decimal places a number may carry, either way. */
 export const MAX_NUMBER_SCALE = 100;
+/** UTF-16 units of a source binding's JSON pointer. */
+export const MAX_POINTER_CHARACTERS = 500;
 
 /** Whether one more node fits the draft. */
 export function canAddNode(definition: Pick<Definition, "nodes">): boolean {
@@ -80,6 +82,16 @@ export interface RuleMetadataProblem {
 }
 
 /**
+ * The server refuses a name made only of whitespace or space characters
+ * (DisplayNames checks every code point for Character.isWhitespace or
+ * Character.isSpaceChar). String.isBlank alone kept a name of no-break spaces
+ * (U+00A0, U+2007, U+202F), which was stored and shown as a blank title.
+ * Object keys keep `isBlankAsServer`, the server's String.isBlank there.
+ */
+const blankDisplayName = (text: string) =>
+  isBlankAsServer(text.replace(/[   ]/g, " "));
+
+/**
  * Why the server would refuse a rule's or a source's name, with its message,
  * or null (DisplayNames.normalize): text storage cannot hold, a control
  * character such as a pasted tab, or not 1 to 160 characters once trimmed as
@@ -94,9 +106,37 @@ export function displayNameProblem(
   if (/[\u0000-\u001f\u007f-\u009f]/.test(name))
     return `${resource} name cannot contain control characters`;
   const trimmed = trimAsServer(name);
-  if (isBlankAsServer(trimmed) || trimmed.length > MAX_NAME_CHARACTERS)
+  if (blankDisplayName(trimmed) || trimmed.length > MAX_NAME_CHARACTERS)
     return `${resource} name must contain 1 to ${MAX_NAME_CHARACTERS} characters`;
   return null;
+}
+
+/** The server's refusal of an over-long JSON pointer (InputValidation.checkSource). */
+export const pointerLengthProblem = `JSON pointer exceeds ${MAX_POINTER_CHARACTERS} characters`;
+
+/**
+ * Why the server would refuse a source binding's JSON pointer, with its
+ * message, or null (InputValidation.checkSource): blank reads the whole
+ * result; otherwise the pointer starts with "/" and holds at most 500
+ * characters. A pointer that starts with "/" but is longer used to come back
+ * from a save as "Use a JSON pointer starting with /".
+ */
+export function sourcePointerProblem(pointer: string): string | null {
+  if (pointer === "") return null;
+  if (!pointer.startsWith("/")) return "Use a JSON pointer starting with /";
+  if (pointer.length > MAX_POINTER_CHARACTERS) return pointerLengthProblem;
+  return null;
+}
+
+/**
+ * Whether the pointer field takes an edit: only growth beyond the limit is
+ * refused (lesson F28), so a stored over-long pointer can still be shortened,
+ * and a pointer without its leading "/" is shown as a problem, not refused.
+ */
+export function acceptsPointerEdit(previous: string, next: string): boolean {
+  return (
+    next.length <= MAX_POINTER_CHARACTERS || next.length <= previous.length
+  );
 }
 
 /**

@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import {
   FormControlLabel,
   IconButton,
@@ -18,7 +19,12 @@ import IdentifierField from "./IdentifierField";
 import SourceBindingEditor from "../../sources/SourceBindingEditor";
 import InputDefaultValue from "./InputDefaultValue";
 
-export default function InputParameterCard({
+/**
+ * One parameter. Memoized with row-identity callbacks: a keystroke in one
+ * card, or a drag frame of another node, renders that card alone (lesson F39).
+ */
+export default memo(function InputParameterCard({
+  rowId,
   input,
   index,
   readOnly,
@@ -27,14 +33,27 @@ export default function InputParameterCard({
   onRemove,
   onValidity,
 }: {
+  /** The row's UI-only identity, which the callbacks take back. */
+  rowId: string;
   input: Input;
   index: number;
   readOnly: boolean;
+  /** The input variables a source binding may map; none while the card has no source. */
   variables: VariableOption[];
-  onChange: (patch: Partial<Input>) => void;
-  onRemove: () => void;
-  onValidity: (valid: boolean) => void;
+  onChange: (rowId: string, patch: Partial<Input>) => void;
+  onRemove: (rowId: string) => void;
+  onValidity: (rowId: string, valid: boolean) => void;
 }) {
+  const change = (patch: Partial<Input>) => onChange(rowId, patch);
+  // A parameter cannot be mapped into its own source read.
+  const choices = useMemo(
+    () =>
+      variables.filter(
+        (variable) =>
+          variable.name !== input.name && variable.type !== "RESULT",
+      ),
+    [variables, input.name],
+  );
   return (
     <div className="input-schema-card">
       <div className="input-card-title">
@@ -46,7 +65,7 @@ export default function InputParameterCard({
               size="small"
               checked={input.required}
               disabled={readOnly}
-              onChange={(_, required) => onChange({ required })}
+              onChange={(_, required) => change({ required })}
             />
           }
           label={input.required ? "Required" : "Optional"}
@@ -57,7 +76,7 @@ export default function InputParameterCard({
               size="small"
               aria-label={`Remove ${input.name}`}
               disabled={readOnly}
-              onClick={onRemove}
+              onClick={() => onRemove(rowId)}
             >
               <Trash2 size={13} />
             </IconButton>
@@ -68,7 +87,7 @@ export default function InputParameterCard({
         label="Parameter name"
         value={input.name}
         disabled={readOnly}
-        onChange={(name) => onChange({ name })}
+        onChange={(name) => change({ name })}
       />
       <TextField
         select
@@ -77,7 +96,7 @@ export default function InputParameterCard({
         disabled={readOnly}
         onChange={(event) => {
           const type = inputTypeOf(event.target.value);
-          if (type) onChange({ type, defaultValue: null });
+          if (type) change({ type, defaultValue: null });
         }}
       >
         {inputTypes.map((type) => (
@@ -90,15 +109,15 @@ export default function InputParameterCard({
         key={input.type}
         input={input}
         disabled={readOnly}
-        onValidity={onValidity}
-        onChange={(defaultValue) => onChange({ defaultValue })}
+        onValidity={(valid) => onValidity(rowId, valid)}
+        onChange={(defaultValue) => change({ defaultValue })}
       />
       <SourceBindingEditor
         input={input}
-        variables={variables}
+        variables={choices}
         readOnly={readOnly}
-        onChange={(source) => onChange({ source })}
+        onChange={(source) => change({ source })}
       />
     </div>
   );
-}
+});

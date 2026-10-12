@@ -477,6 +477,74 @@ test("a problem jump from the studio centers a far node however the canvas was m
     .toMatch(/^matrix\(1, 0, 0, 1, /);
 });
 
+test("a node link reached by Back while the code is unbuilt centers the node once the graph shows", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("editor-back-focus");
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      node("input", "INPUT"),
+      node("near", "FORMULA", "1", "x", 300, 180),
+      node("far", "OUTPUT", "x", undefined, 3000, 2400),
+    ],
+    edges: [edge("input", "near"), edge("near", "far")],
+  };
+  await createRule(request, {
+    id,
+    name: "Back focus",
+    kind: "FORMULA",
+    definition,
+  });
+  // The link's first arrival focuses the node and measures every card.
+  await page.goto(`/#/rules/${id}?node=far`);
+  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
+    /selected/,
+  );
+  await page.getByRole("button", { name: "Code editor", exact: true }).click();
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await expect(code).toBeVisible();
+  // Monaco binds "go to document end" per platform (Cmd+Down on macOS).
+  const mac = (await page.evaluate(() => navigator.platform)).startsWith("Mac");
+  await code.focus();
+  await page.keyboard.press(mac ? "Meta+ArrowDown" : "Control+End");
+  await page.keyboard.type("\n// unbuilt", { delay: 20 });
+  await expect(page.locator(".studio-filebar")).toContainText("● edited");
+  // Back returns to the link while the code is unbuilt: the graph route
+  // builds first and shows the code meanwhile. The focus used to be spent on
+  // the unmounted canvas, so the canvas mounting after the build fitted the
+  // whole graph with "far" selected off screen.
+  await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(new RegExp(`/rules/${id}\\?node=far`));
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
+  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
+    /selected/,
+  );
+  const centered = async () => {
+    const flow = await page.locator(".react-flow").boundingBox();
+    const card = await page
+      .locator('.react-flow__node[data-id="far"]')
+      .boundingBox();
+    if (!flow || !card) return false;
+    const dx = card.x + card.width / 2 - (flow.x + flow.width / 2);
+    const dy = card.y + card.height / 2 - (flow.y + flow.height / 2);
+    return Math.abs(dx) < 3 && Math.abs(dy) < 3;
+  };
+  await expect.poll(centered, { timeout: 5000 }).toBe(true);
+  await expect
+    .poll(() =>
+      page
+        .locator(".react-flow__viewport")
+        .evaluate((viewport) => getComputedStyle(viewport).transform),
+    )
+    .toMatch(/^matrix\(1, 0, 0, 1, /);
+});
+
 test("a deep link to a node the rule does not have shows the whole graph", async ({
   page,
   request,

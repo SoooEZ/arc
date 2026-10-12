@@ -12,7 +12,11 @@ export interface RenderCounts {
   optionsChanges: number;
   /** Cards (`.react-flow__node`) under which a component rendered, summed over commits. */
   cardRenders: number;
-  /** `.node-mapping-card` and `[data-testid^="switch-case-"]` rows with a render that do not hold the focus. */
+  /**
+   * Rows with a render that do not hold the focus: Transform fields
+   * (`.node-mapping-card`), Switch cases (`[data-testid^="switch-case-"]`)
+   * and input or Reference parameter cards (`.input-schema-card`).
+   */
   otherRowRenders: number;
   /** Renders of GraphCanvas (props carry `canvas` and `onAddNode`). */
   canvasRenders: number;
@@ -124,7 +128,7 @@ export async function installRenderProbe(page: Page) {
         // The row being typed into holds the focus; every other row is "other".
         const row = closest(
           host,
-          '.node-mapping-card, [data-testid^="switch-case-"]',
+          '.node-mapping-card, [data-testid^="switch-case-"], .input-schema-card',
         );
         if (row && !row.contains(document.activeElement)) rows.add(row);
       }

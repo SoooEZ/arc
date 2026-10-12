@@ -1,9 +1,12 @@
 import type { Definition, RuleNode } from "../../types";
+import { stringifyJson } from "../../domain/json";
+import { nodeKinds } from "../../domain/nodeKinds";
 import { sourcePorts } from "../../domain/nodePorts";
 
 const nodeFields = ({ position: _position, ...fields }: RuleNode) => fields;
+/** Snapshots of one local draft lineage; the lossless codec keeps every DecimalNumber digit. */
 const sameValue = (left: unknown, right: unknown) =>
-  JSON.stringify(left) === JSON.stringify(right);
+  stringifyJson(left) === stringifyJson(right);
 
 function mergeItems<T extends { id: string }>(
   current: T[],
@@ -60,7 +63,8 @@ export function applyNodeFormDraft(
   )
     return null;
   const changedInputs =
-    originalNode.type === "INPUT" && !sameValue(before.inputs, edited.inputs);
+    nodeKinds[originalNode.type].ownsInputs &&
+    !sameValue(before.inputs, edited.inputs);
   if (changedInputs && !sameValue(before.inputs, current.inputs)) return null;
   const nodes = mergeItems(
     current.nodes,
