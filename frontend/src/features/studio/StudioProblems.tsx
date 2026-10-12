@@ -1,12 +1,17 @@
 import type { Diagnostic } from "../../types";
 
+/**
+ * The code's build problems, each a jump to its line, under the code and the
+ * JSON alike: a build started from the JSON view reports here too.
+ */
 export default function StudioProblems({
   diagnostics,
-  readOnly,
+  hint,
   onSelect,
 }: {
   diagnostics: Diagnostic[];
-  readOnly: boolean;
+  /** What the shown editor offers while the code has no problems. */
+  hint: string;
   onSelect: (line: number, column: number) => void;
 }) {
   return (
@@ -26,13 +31,7 @@ export default function StudioProblems({
           Ln {diagnostic.line}:{diagnostic.column} · {diagnostic.message}
         </button>
       ))}
-      {!diagnostics.length && (
-        <span>
-          {readOnly
-            ? "Read-only · ⌘/Ctrl Enter to validate"
-            : "Tab to indent · ⌘/Ctrl Enter to build · ⌘/Ctrl S to save · comments use //"}
-        </span>
-      )}
+      {!diagnostics.length && <span>{hint}</span>}
     </div>
   );
 }

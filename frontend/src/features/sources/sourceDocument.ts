@@ -1,7 +1,12 @@
 import type { DataSource, SourceConfig } from "../../types";
 import { stringifyJson } from "../../domain/json";
-import { displayNameProblem, formatLimit } from "../../domain/limits";
+import { displayNameProblem } from "../../domain/limits";
 import { isResourceId, resourceIdGuidance } from "../../domain/resourceIds";
+import {
+  httpTimeoutGuidance,
+  httpUrlProblem,
+  parseHttpTimeout,
+} from "./httpSourcePolicy";
 import {
   providerParameterTemplate,
   sourceBuffers,
@@ -38,24 +43,6 @@ export interface SourceDocument {
 export function sourceVersionLabel(version: number, dirty: boolean): string {
   if (!version) return "Unsaved";
   return dirty ? `v${version} · edited` : `v${version}`;
-}
-
-/**
- * The server accepts whole milliseconds in this range (HttpSourceAdapter);
- * scripts/check_mirrors.test.mjs compares it with the server's constants.
- */
-const httpTimeoutLimits = { min: 100, max: 10_000 };
-export const httpTimeoutGuidance = `Enter whole milliseconds from ${httpTimeoutLimits.min} to ${formatLimit(httpTimeoutLimits.max)}.`;
-
-/** The timeout in `text`, or null when the server would reject it. */
-export function parseHttpTimeout(text: string): number | null {
-  const trimmed = text.trim();
-  if (!/^\d+$/.test(trimmed)) return null;
-  const milliseconds = Number(trimmed);
-  return milliseconds >= httpTimeoutLimits.min &&
-    milliseconds <= httpTimeoutLimits.max
-    ? milliseconds
-    : null;
 }
 
 function sourceSnapshot({
@@ -139,40 +126,6 @@ export function canRunSourceTest(
     !saving &&
     document.testing === null
   );
-}
-
-/** The longest URL the server accepts (HttpDestinationPolicy). */
-const MAX_URL_CHARACTERS = 2_000;
-/** What java.net.URI refuses unescaped, which the server reads as no URL at all. */
-const unescapedInUri = /[\s"<>\\^`{|}\u0000-\u001f\u007f]|%(?![0-9a-f]{2})/i;
-
-/**
- * Why the server would refuse an HTTP URL, in its order and with its words, or
- * null (HttpDestinationPolicy). The host allowlist and the address checks need
- * the server's configuration and stay there.
- */
-export function httpUrlProblem(url: string): string | null {
-  if (unescapedInUri.test(url)) return "Provide an absolute HTTP(S) URL.";
-  // Text without a scheme parses as a relative URL, which the next check names.
-  const parts = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)/i.exec(url);
-  const scheme = parts?.[1] ?? "";
-  const authority = parts?.[2] ?? "";
-  // The port goes; an IPv6 literal keeps its brackets.
-  const host = authority.replace(/:\d*$/, "");
-  if (
-    !/^https?$/i.test(scheme) ||
-    host === "" ||
-    authority.includes("@") ||
-    url.includes("#") ||
-    url.length > MAX_URL_CHARACTERS
-  )
-    return "Use an HTTP(S) URL without credentials or fragment.";
-  if (/[^\x00-\x7f]/.test(url))
-    return "Percent-encode non-ASCII characters as UTF-8 (Zürich → Z%C3%BCrich).";
-  const port = /:(\d+)$/.exec(authority)?.[1];
-  if (port !== undefined && (Number(port) < 1 || Number(port) > 65535))
-    return "Use a port from 1 to 65535.";
-  return null;
 }
 
 /** Why the Save command refuses the draft, or null. The server rejects the same values. */

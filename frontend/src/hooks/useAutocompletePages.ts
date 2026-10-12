@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "../api/errors";
 import type { Page } from "../types";
 import { typeaheadDelayMs } from "./useDebouncedValue";
+import { catalogPageSize } from "./usePagedResource";
 
 interface Pages<T> {
   key: string;
@@ -56,7 +57,7 @@ export function useAutocompletePages<T>(
         const page = await session.load(
           session.query,
           offset,
-          20,
+          catalogPageSize,
           controller.signal,
         );
         if (

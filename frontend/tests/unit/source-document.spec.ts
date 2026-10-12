@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 import type { DataSource, SourceConfig } from "../../src/types";
 import { createSourceDraft } from "../../src/features/sources/model";
+import { parseHttpTimeout } from "../../src/features/sources/httpSourcePolicy";
 import {
   canRunSourceTest,
   displayedConfiguration,
   openSource,
-  parseHttpTimeout,
   sourceDocumentReducer,
   sourceIsDirty,
   sourceSaveProblem,

@@ -10,6 +10,24 @@ export function editorLines(input: Locator) {
   return editorSurface(input).locator(".view-lines");
 }
 
+/**
+ * The text of the line holding the caret: the rendered line at the offset of
+ * Monaco's current-line highlight (the editor exposes no position otherwise).
+ */
+export function caretLineText(input: Locator): Promise<string> {
+  return editorSurface(input).evaluate((surface) => {
+    const highlight = surface.querySelector(
+      ".view-overlays .current-line",
+    )?.parentElement;
+    if (!highlight) return "";
+    const top = highlight.style.top;
+    const line = [...surface.querySelectorAll<HTMLElement>(".view-line")].find(
+      (element) => element.style.top === top,
+    );
+    return (line?.textContent ?? "").replace(/ /g, " ");
+  });
+}
+
 /** Exercise Monaco through its keyboard input; its textarea is not the document. */
 export async function setEditorText(
   page: Page,

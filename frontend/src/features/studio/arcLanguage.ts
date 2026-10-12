@@ -1,9 +1,50 @@
 import { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/editor/editor.api";
-import "monaco-editor/features/register.all";
-// Monaco's all-features entry registers viewport tokens, but not document tokens.
+// The editor features ARC uses, and the default-on behaviours of a code
+// editor; Monaco's all-features entry bundled every contribution (the diff
+// editor, inline completions, code actions, rename, …) into the editor chunk.
+import "monaco-editor/features/bracketMatching/register";
+import "monaco-editor/features/caretOperations/register";
+import "monaco-editor/features/clipboard/register";
+import "monaco-editor/features/codeEditor/register";
+import "monaco-editor/features/codicon/register";
+import "monaco-editor/features/comment/register";
+import "monaco-editor/features/contextmenu/register";
+import "monaco-editor/features/cursorUndo/register";
+import "monaco-editor/features/dnd/register";
+import "monaco-editor/features/find/register";
+import "monaco-editor/features/folding/register";
+import "monaco-editor/features/fontZoom/register";
+import "monaco-editor/features/gotoError/register";
+import "monaco-editor/features/gotoLine/register";
+import "monaco-editor/features/hover/register";
+import "monaco-editor/features/indentation/register";
+import "monaco-editor/features/iPadShowKeyboard/register";
+import "monaco-editor/features/lineSelection/register";
+import "monaco-editor/features/linesOperations/register";
+import "monaco-editor/features/links/register";
+import "monaco-editor/features/longLinesHelper/register";
+import "monaco-editor/features/multicursor/register";
+import "monaco-editor/features/quickCommand/register";
+import "monaco-editor/features/readOnlyMessage/register";
+import "monaco-editor/features/sectionHeaders/register";
+import "monaco-editor/features/semanticTokens/register";
+import "monaco-editor/features/smartSelect/register";
+import "monaco-editor/features/snippet/register";
+import "monaco-editor/features/stickyScroll/register";
+import "monaco-editor/features/toggleTabFocusMode/register";
+import "monaco-editor/features/unicodeHighlighter/register";
+import "monaco-editor/features/unusualLineTerminators/register";
+import "monaco-editor/features/wordHighlighter/register";
+import "monaco-editor/features/wordOperations/register";
+import "monaco-editor/features/wordPartOperations/register";
+// The suggest feature entry registers only inline suggestions; the completion
+// list, its Tab/Enter commands and triggerSuggest live in the controller.
+import "monaco-editor/editor/contrib/suggest/browser/suggestController";
+// The semantic tokens feature registers viewport tokens, but not document tokens.
 import "monaco-editor/editor/contrib/semanticTokens/browser/documentSemanticTokens";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
+import { formulaReferenceSyntax } from "../../domain/formulaReferences";
 import { inputTypes } from "../../domain/inputTypes";
 import { parseCssColor } from "./cssColor";
 import { nodeTypes } from "../../domain/nodeKinds";
@@ -39,7 +80,11 @@ export const arcExpressionLanguage = "arc-expression";
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco });
 const expressionConfiguration: monaco.languages.LanguageConfiguration = {
-  wordPattern: /@[a-z][a-z0-9-]*(?::[1-9]\d*)?|\$?[A-Za-z_][\w.]*/g,
+  // A Formula reference or a name/dotted path is one word, as the lexers read it.
+  wordPattern: new RegExp(
+    `${formulaReferenceSyntax}|\\$?[A-Za-z_][\\w.]*`,
+    "g",
+  ),
   brackets: [
     ["{", "}"],
     ["(", ")"],
@@ -88,7 +133,7 @@ const expressionTokens: monaco.languages.IMonarchLanguage = {
     root: [
       [/"/, "string", "@doubleQuotedString"],
       [/'/, "string", "@singleQuotedString"],
-      [/@[a-z][a-z0-9-]*(?::[1-9]\d*)?/, "formula"],
+      [new RegExp(formulaReferenceSyntax), "formula"],
       [/\$[A-Za-z_][\w.]*/, "function"],
       // A declared type follows the colon of `name: TYPE`; an identifier named
       // like a type elsewhere keeps its own color.

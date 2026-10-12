@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { Button, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { Check, Code2 } from "lucide-react";
@@ -17,9 +17,8 @@ import StudioLibrary from "./StudioLibrary";
 import StudioOutline from "./StudioOutline";
 import StudioProblems from "./StudioProblems";
 import ExpressionColorKey from "./ExpressionColorKey";
+import RuleJsonView, { type RuleJsonViewHandle } from "./RuleJsonView";
 import { nodeDeclarationOffset } from "./scriptOutline";
-import { jsonLanguage } from "./jsonLanguage";
-import { definitionJson, nodeJsonOffset } from "./definitionJson";
 
 /** What the editor shows: ARC code to edit, or the rule's JSON as stored. */
 type Shown = "code" | "json";
@@ -58,14 +57,9 @@ export default function CodeStudio({
     readOnly,
     "ARC code editor",
   );
-  // The JSON is only shown; the graph and the code stay the ways to edit.
-  const jsonOptions = useEditorOptions(codeStudioOptions, true, "Rule JSON");
   const [shown, setShown] = useState<Shown>("code");
-  const jsonEditor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const json = useMemo(
-    () => (shown === "json" ? definitionJson(definition) : ""),
-    [shown, definition],
-  );
+  const showsJson = shown === "json";
+  const jsonView = useRef<RuleJsonViewHandle>(null);
   const { data: functions, error: catalogError } = useFunctionCatalog();
   const latest = useRef({ onBuild, onSave, readOnly, shown });
   latest.current = { onBuild, onSave, readOnly, shown };
@@ -141,22 +135,10 @@ export default function CodeStudio({
     onMount(instance);
     addCommands(instance);
   };
-  const mountJson = (instance: monaco.editor.IStandaloneCodeEditor) => {
-    jsonEditor.current = instance;
-    addCommands(instance);
-  };
   const selectNode = useCallback(
     (nodeId: string) => {
       if (latest.current.shown === "json") {
-        const instance = jsonEditor.current;
-        const text = instance?.getModel();
-        if (!instance || !text) return;
-        const offset = nodeJsonOffset(text.getValue(), nodeId);
-        if (offset === null) return;
-        const declaration = text.getPositionAt(offset);
-        instance.revealLineInCenter(declaration.lineNumber);
-        instance.setPosition(declaration);
-        instance.focus();
+        jsonView.current?.revealNode(nodeId);
         return;
       }
       const model = editor.current?.getModel();
@@ -168,6 +150,30 @@ export default function CodeStudio({
     },
     [editor, reveal],
   );
+  // A problem is in the code: chosen from the JSON view, the code shows first
+  // and the caret moves once the editor is on screen again.
+  const [requestedProblem, setRequestedProblem] = useState<{
+    line: number;
+    column: number;
+  } | null>(null);
+  const selectProblem = useCallback(
+    (line: number, column: number) => {
+      if (latest.current.shown === "code") {
+        reveal(line, column);
+        return;
+      }
+      setShown("code");
+      setRequestedProblem({ line, column });
+    },
+    [reveal],
+  );
+  useEffect(() => {
+    if (showsJson || !requestedProblem) return;
+    // Hidden, the editor measured 0×0; measure the shown pane before centering.
+    editor.current?.layout();
+    reveal(requestedProblem.line, requestedProblem.column);
+    setRequestedProblem(null);
+  }, [showsJson, requestedProblem, editor, reveal]);
 
   return (
     <div className="code-studio">
@@ -178,7 +184,7 @@ export default function CodeStudio({
         functions={functions}
         catalogError={catalogError}
         formulaError={formulaError}
-        readOnly={readOnly || shown === "json"}
+        readOnly={readOnly || showsJson}
         onInsert={insert}
         onBeginInsert={beginInsert}
         onInsertFormula={insertFormula}
@@ -187,7 +193,7 @@ export default function CodeStudio({
         <div className="studio-filebar">
           <span>
             <Code2 size={16} />
-            {rule.id}.{shown === "json" ? "json" : "arc"}{" "}
+            {rule.id}.{showsJson ? "json" : "arc"}{" "}
             <small>{fileStatus(shown, pending)}</small>
           </span>
           <div>
@@ -212,9 +218,9 @@ export default function CodeStudio({
             </Button>
           </div>
         </div>
-        {shown === "code" && <ExpressionColorKey />}
+        {!showsJson && <ExpressionColorKey />}
         <MonacoEditor
-          wrapperProps={shown === "json" ? hiddenEditor : undefined}
+          wrapperProps={showsJson ? hiddenEditor : undefined}
           language={arcScriptLanguage}
           theme="arc-light"
           defaultValue={source}
@@ -225,21 +231,18 @@ export default function CodeStudio({
           onMount={mount}
           options={options}
         />
-        {shown === "json" ? (
-          <MonacoEditor
-            language={jsonLanguage}
-            theme="arc-light"
-            value={json}
-            onMount={mountJson}
-            options={jsonOptions}
-          />
-        ) : (
-          <StudioProblems
-            diagnostics={diagnostics}
-            readOnly={readOnly}
-            onSelect={reveal}
+        {showsJson && (
+          <RuleJsonView
+            ref={jsonView}
+            definition={definition}
+            onMount={addCommands}
           />
         )}
+        <StudioProblems
+          diagnostics={diagnostics}
+          hint={editorHint(shown, readOnly)}
+          onSelect={selectProblem}
+        />
       </div>
       <StudioOutline definition={definition} onSelect={selectNode} />
     </div>
@@ -253,4 +256,12 @@ export default function CodeStudio({
 function fileStatus(shown: Shown, pending: boolean): string {
   if (shown === "code") return pending ? "● edited" : "✓ graph synced";
   return pending ? "● edited · build to update" : "read-only";
+}
+
+/** What the shown editor offers, under it, while the code has no problems. */
+function editorHint(shown: Shown, readOnly: boolean): string {
+  if (readOnly) return "Read-only · ⌘/Ctrl Enter to validate";
+  if (shown === "json")
+    return "Rule JSON as stored · ⌘/Ctrl Enter to build · ⌘/Ctrl S to save";
+  return "Tab to indent · ⌘/Ctrl Enter to build · ⌘/Ctrl S to save · comments use //";
 }

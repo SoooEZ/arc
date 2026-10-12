@@ -21,6 +21,12 @@ export function lastPageOffset(total: number, limit: number): number {
   return total > 0 ? Math.floor((total - 1) / limit) * limit : 0;
 }
 
+/**
+ * Items per page, for every catalog pager and picker: the client's choice,
+ * sent as the request's limit (the server caps a page at 100).
+ */
+export const catalogPageSize = 20;
+
 /** One bounded page; changing a search or owner immediately resets the offset. */
 export function usePagedResource<T>(
   key: string,
@@ -32,7 +38,7 @@ export function usePagedResource<T>(
   // adjust-state-while-rendering pattern); the derivation covers the render the reset lands in.
   if (position.key !== key) setPosition({ key, offset: 0 });
   const offset = position.key === key ? position.offset : 0;
-  const limit = 20;
+  const limit = catalogPageSize;
   const emptyPage: Page<T> = { items: [], total: 0, offset, limit };
   const resource = useAsyncResource(
     JSON.stringify([key, offset, refresh]),

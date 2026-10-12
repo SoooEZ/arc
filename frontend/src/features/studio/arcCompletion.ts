@@ -1,28 +1,40 @@
 import { monaco } from "./arcLanguage";
 
-/** Trigger characters also fire inside strings, independently of quickSuggestions. */
+/** The parts of a model's token cache used here (not in Monaco's public typings). */
+interface TokenizedModel {
+  readonly tokenization: {
+    /** Tokenizes the lines up to `lineNumber` that the background tokenizer has not reached. */
+    forceTokenization(lineNumber: number): void;
+    getLineTokens(lineNumber: number): {
+      findTokenIndexAtOffset(offset: number): number;
+      /** 0 other, 1 comment, 2 string, 3 regular expression. */
+      getStandardTokenType(tokenIndex: number): number;
+    };
+  };
+}
+const commentTokenType = 1;
+const stringTokenType = 2;
+
+/**
+ * Trigger characters also fire inside strings, independently of
+ * quickSuggestions. The model's token cache answers from the language's
+ * lexical state carried line by line, so a quote opened on an earlier line
+ * counts (lesson F11); tokenizing the document prefix again for every request
+ * cost milliseconds per keystroke on a long script.
+ */
 export function isStringOrComment(
   model: monaco.editor.ITextModel,
   position: monaco.Position,
 ) {
-  // Tokenizing a line alone loses an opening quote from an earlier line.
-  // Carry the language's lexical state through the current document prefix.
-  const prefix = model.getValueInRange({
-    startLineNumber: 1,
-    startColumn: 1,
-    endLineNumber: position.lineNumber,
-    endColumn: model.getLineMaxColumn(position.lineNumber),
-  });
-  const tokens = monaco.editor.tokenize(prefix, model.getLanguageId())[
-    position.lineNumber - 1
-  ];
-  // Hover can target the first character of a continued string line.
-  let token = tokens?.[0];
-  for (const entry of tokens ?? []) {
-    if (entry.offset >= position.column - 1) break;
-    token = entry;
-  }
-  return token?.type.startsWith("string") || token?.type.startsWith("comment");
+  const { tokenization } = model as unknown as TokenizedModel;
+  tokenization.forceTokenization(position.lineNumber);
+  const tokens = tokenization.getLineTokens(position.lineNumber);
+  // The token of the character before the cursor; hover can target the first
+  // character of a continued string line, where the line's first token decides.
+  const type = tokens.getStandardTokenType(
+    tokens.findTokenIndexAtOffset(Math.max(position.column - 2, 0)),
+  );
+  return type === stringTokenType || type === commentTokenType;
 }
 
 /** Include the namespace marker even before the function name is entered. */

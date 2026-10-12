@@ -202,25 +202,3 @@
   color: #657869;
   font-size: var(--text-xl);
 }
-@media (max-width: 760px) {
-  .source-manager-dialog .MuiDialog-paper {
-    width: calc(100% - 24px);
-    max-width: none;
-    margin: 12px;
-    height: calc(100dvh - 24px);
-    max-height: calc(100dvh - 24px);
-  }
-  .source-manager-dialog .sources-layout {
-    grid-template-columns: 1fr;
-  }
-  .source-manager-dialog .source-form-grid {
-    grid-template-columns: 1fr;
-  }
-  .source-manager-dialog .source-detail-heading {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .source-manager-dialog .source-detail-heading > .MuiButton-root {
-    align-self: flex-start;
-  }
-}

@@ -151,26 +151,29 @@ export default function StudioLibrary({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          {catalog.data.items
-            .filter((rule) => rule.publishedVersion && rule.id !== ruleId)
-            .map((rule) => (
-              <button
-                key={rule.id}
-                className="snippet-card"
-                disabled={readOnly || insertion.busy === rule.id}
-                onClick={(event) => reuse(event, rule)}
-              >
-                <GitBranch size={17} />
-                <span>
-                  {rule.name}
-                  <small>
-                    v{rule.publishedVersion} · {rule.kind.toLowerCase()}
-                    {insertion.busy === rule.id ? " · loading…" : ""}
-                  </small>
-                </span>
-                <span>+</span>
-              </button>
-            ))}
+          {/* Every card of the page stays, so the pager's counts and the cards
+              agree; the rule being edited is shown and cannot be inserted. */}
+          {catalog.data.items.map((rule) => (
+            <button
+              key={rule.id}
+              className="snippet-card"
+              disabled={
+                readOnly || rule.id === ruleId || insertion.busy === rule.id
+              }
+              onClick={(event) => reuse(event, rule)}
+            >
+              <GitBranch size={17} />
+              <span>
+                {rule.name}
+                <small>
+                  v{rule.publishedVersion} · {rule.kind.toLowerCase()}
+                  {rule.id === ruleId ? " · this rule" : ""}
+                  {insertion.busy === rule.id ? " · loading…" : ""}
+                </small>
+              </span>
+              <span>+</span>
+            </button>
+          ))}
           <CatalogPagination
             label="Reusable rules"
             {...paginationProps(catalog)}

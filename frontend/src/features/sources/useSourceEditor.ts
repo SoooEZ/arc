@@ -24,6 +24,7 @@ import {
   rememberSavedSource,
   type SavedSource,
 } from "./sourceCatalog";
+import { isSourceKind } from "./sourceProviders";
 
 // Leaving unmounts the editor: unsaved edits are lost and a pending save's result is never shown.
 /** The one wording for discarding source edits: leaving, closing the manager, selecting another source. */
@@ -135,6 +136,14 @@ export function useSourceEditor({
         !controller.signal.aborted &&
         currentSelection === selection.current
       ) {
+        // The provider tables are exhaustive for this build's kinds: a kind a
+        // newer server stores would throw in every form, and unmount the page.
+        if (!isSourceKind(loaded.definition.kind)) {
+          setListError(
+            `${loaded.name} uses a provider this editor does not know: ${loaded.definition.kind}.`,
+          );
+          return;
+        }
         const saved = completedSelectionSave();
         dispatch({
           type: "select",

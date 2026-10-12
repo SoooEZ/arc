@@ -1,5 +1,6 @@
 package dev.arc.engine.expression;
 
+import dev.arc.engine.Limits;
 import dev.arc.engine.expression.Functions.Entry;
 import java.util.*;
 
@@ -39,7 +40,7 @@ final class BuiltinFunctionCatalog {
         specs,
         "OBJECT",
         0,
-        100,
+        2 * Limits.MAX_OBJECT_FIELDS,
         "Data transformation",
         "OBJECT(\"key\", value, ...)",
         "Builds an object from key/value pairs, including nested objects and arrays. Keys must be unique; $OBJECT() returns an empty object.",

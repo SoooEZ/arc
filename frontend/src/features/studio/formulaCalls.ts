@@ -1,6 +1,10 @@
 import type { Input } from "../../types";
 import { exceedsTokenLimit, quoteText } from "../../domain/expressions";
-import { MAX_FIELD_NAME_CHARACTERS } from "../../domain/limits";
+import { formulaReference } from "../../domain/formulaReferences";
+import {
+  MAX_FIELD_NAME_CHARACTERS,
+  MAX_OBJECT_FIELDS,
+} from "../../domain/limits";
 import { isBlankAsServer } from "../../domain/serverText";
 import {
   isDecimalNumber,
@@ -18,7 +22,7 @@ export interface FormulaEntry {
 }
 
 export function formulaCallName(formula: Pick<FormulaEntry, "id" | "version">) {
-  return `@${formula.id}:${formula.version}`;
+  return formulaReference(formula.id, formula.version);
 }
 
 /** The ARC expression that rebuilds a JSON default value, e.g. {"a": [1]} -> $OBJECT("a", [1]). */
@@ -38,12 +42,10 @@ function valueExpression(value: unknown): string {
   return "null";
 }
 
-/** $OBJECT takes up to 100 arguments: 50 key/value pairs (BuiltinFunctionCatalog). */
-const MAX_OBJECT_FIELDS = 50;
-
 /**
- * Whether every object in a default can be rebuilt with $OBJECT: at most 50
- * fields, each named by text of 1 to 160 characters that is not blank.
+ * Whether every object in a default can be rebuilt with $OBJECT: at most
+ * MAX_OBJECT_FIELDS fields, each named by text of 1 to 160 characters that is
+ * not blank.
  */
 function objectsFit(value: unknown): boolean {
   if (Array.isArray(value)) return value.every(objectsFit);

@@ -56,6 +56,9 @@ public final class Limits {
   /** Object keys that a rule creates: Transform field names and {@code $OBJECT} keys. */
   public static final int MAX_FIELD_NAME_CHARACTERS = 160;
 
+  /** Key/value pairs of one {@code $OBJECT} call; the catalog admits twice as many arguments. */
+  public static final int MAX_OBJECT_FIELDS = 50;
+
   /** Parameters of one data source. */
   public static final int MAX_SOURCE_PARAMETERS = 20;
 

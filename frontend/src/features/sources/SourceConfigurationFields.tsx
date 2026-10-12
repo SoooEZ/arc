@@ -6,7 +6,7 @@ import {
   httpTimeoutGuidance,
   httpUrlProblem,
   parseHttpTimeout,
-} from "./sourceDocument";
+} from "./httpSourcePolicy";
 import { sourceProviders, type SourceKind } from "./sourceProviders";
 import { identifierGuidance } from "../../domain/identifiers";
 
@@ -81,18 +81,26 @@ function HttpPayload({ buffers, disabled, onBuffer }: SectionProps) {
   );
 }
 
+/**
+ * The table is a native textarea: MUI's autosizing one laid out the whole
+ * table text again on every render of the form, a lag per keystroke on a
+ * large table, while sources.css pins the field's height anyway.
+ */
 function LookupPayload({ buffers, disabled, onBuffer }: SectionProps) {
   return (
     <TextField
       label="Lookup entries · JSON object"
       multiline
-      minRows={8}
-      maxRows={20}
+      rows={8}
       value={buffers.entries}
       disabled={disabled}
       onChange={(event) => onBuffer("entries", event.target.value)}
       helperText='Map keys to values or records. Example: {"US":{"rate":0.07}}'
-      slotProps={{ input: { className: "json-input" } }}
+      slotProps={{
+        input: { className: "json-input", inputComponent: "textarea" },
+        // A textarea has no type attribute; MUI would pass the field's "text".
+        htmlInput: { type: undefined },
+      }}
     />
   );
 }

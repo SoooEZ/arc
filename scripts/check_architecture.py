@@ -61,7 +61,7 @@ IMPORT = re.compile(r"^import\s+(?:static\s+)?([\w.*]+);", re.M)
 
 PURE_FRONTEND = {
     "domain/": ("types", "domain/"),
-    "app/routing.ts": (),
+    "app/routing.ts": ("domain/",),
     "app/pinnedReads.ts": (),
     "features/editor/documentState.ts": ("types", "domain/"),
     "features/editor/editorCapabilities.ts": (),
@@ -72,7 +72,8 @@ PURE_FRONTEND = {
     "features/library/libraryOrder.ts": ("types",),
     "features/sources/sourceProviders.ts": ("types", "domain/"),
     "features/sources/model.ts": ("types", "domain/", "features/sources/sourceProviders"),
-    "features/sources/sourceDocument.ts": ("types", "domain/", "features/sources/model", "features/sources/sourceProviders"),
+    "features/sources/httpSourcePolicy.ts": ("domain/",),
+    "features/sources/sourceDocument.ts": ("types", "domain/", "features/sources/httpSourcePolicy", "features/sources/model", "features/sources/sourceProviders"),
     "features/sources/sourceBindings.ts": ("types", "domain/"),
     "features/sources/sourceCatalog.ts": ("types",),
     "features/execution/publishedSelection.ts": ("types", "domain/"),

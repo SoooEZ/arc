@@ -35,11 +35,13 @@ test("routes are a discriminated page with rule details only on rule pages", () 
 });
 
 // Number() also read 0x10 as version 16, 1e1 as 10, and 1.5 and -2 as
-// versions no rule has; only the form rulePath writes names a version.
+// versions no rule has; only the form rulePath writes names a version, within
+// the server's int (the path variable that serves a version).
 test("a version is read only in the form a link writes it", () => {
   for (const [text, version] of [
     ["7", 7],
     ["123456789", 123456789],
+    ["2147483647", 2147483647],
     ["0x10", null],
     ["1e1", null],
     ["1.5", null],
@@ -47,7 +49,8 @@ test("a version is read only in the form a link writes it", () => {
     ["0", null],
     ["07", null],
     [" 7", null],
-    ["1234567890", null],
+    ["2147483648", null],
+    ["99999999999999999999", null],
   ] as const)
     expect(
       parseRoute(`/rules/tax?version=${encodeURIComponent(text)}`),

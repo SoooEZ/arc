@@ -240,3 +240,27 @@ test("the Reuse search waits for a pause in typing and keeps its cards until the
     .toBe(1);
   expect(searches.length).toBeLessThan(suffix.length);
 });
+
+// The pane dropped the edited rule from its cards but paged the server's
+// totals: once published, searching its own name showed "1–1 of 1" over no
+// cards, and a page could end with no cards at all.
+test("the Reuse pane shows the edited rule's own card disabled, counted by its pager", async ({
+  page,
+  request,
+}) => {
+  const suffix = uniqueStamp();
+  const parent = `reuse-self-${suffix}`;
+  const name = `Reuse self ${suffix}`;
+  await createRule(request, parent, name, true);
+  await page.goto(`/#/studio/${parent}`);
+  await expect(page.locator(".monaco-editor")).toBeVisible();
+  await page.getByRole("button", { name: "reuse", exact: true }).click();
+  await page.getByLabel("Find reusable rule").fill(name);
+  const card = page.getByRole("button", {
+    name: `${name} v1 · formula · this rule +`,
+    exact: true,
+  });
+  await expect(card).toBeVisible();
+  await expect(card).toBeDisabled();
+  await expect(page.getByText("1–1 of 1", { exact: true })).toBeVisible();
+});

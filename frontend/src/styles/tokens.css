@@ -42,6 +42,9 @@
   --color-api-muted: #77876f;
   --color-studio-border: #e4eae6;
   --color-studio-border-strong: #dde5df;
+  /* Editor sub-panels: mapping cards, the node code layout and the
+     referenced-rule navigation share one border. */
+  --color-panel-border: #e1e8e2;
 
   /* Symbol roles in expressions: the Monaco theme (arcLanguage.ts reads these
      when it defines arc-light), the color key and the Available variables list. */

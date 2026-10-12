@@ -9,6 +9,7 @@ import { monaco } from "./arcLanguage";
 import type { RuleSummary } from "../../types";
 import type { VariableOption } from "../../domain/variables";
 import { expressionSymbols } from "../../domain/expressionSymbols";
+import { parseFormulaReference } from "../../domain/formulaReferences";
 import { errorMessage } from "../../api/errors";
 import { typeaheadDelayMs } from "../../hooks/useDebouncedValue";
 import {
@@ -220,12 +221,13 @@ export function useFormulaSupport(
         const text = model
           .getValue()
           .slice(symbol.offset, symbol.offset + symbol.length);
-        const call = /^@([a-z][a-z0-9-]*):([1-9]\d*)$/.exec(text);
+        // A version past the server's int names no version: no read for it.
+        const call = parseFormulaReference(text);
         if (!call) return null;
         const before = model.getVersionId();
         try {
           const entry = await load(token, (signal) =>
-            formulaMetadata.load(call[1], Number(call[2]), signal),
+            formulaMetadata.load(call.id, call.version, signal),
           );
           if (
             token.isCancellationRequested ||
@@ -303,6 +305,10 @@ export function useFormulaSupport(
             latestVariables.current.map((variable) => variable.name),
           ),
         );
+      } catch (failure) {
+        // A read this hook aborted (a newer choice, the caller's signal, the
+        // unmount) is no failure to report; the library shows the rest.
+        if (!controller.signal.aborted) throw failure;
       } finally {
         pending.current.delete(controller);
         signal?.removeEventListener("abort", cancel);

@@ -189,21 +189,9 @@ test("only Conditions stand out on the minimap", () => {
     );
 });
 
+// The per-kind properties table is compared with the server's
+// NodeKind.declaredProperties() by scripts/check_mirrors.test.mjs.
 test("a node's unused properties are the ones it sets but its kind does not use, as on the server", () => {
-  // The server's NodeKind.properties() lists the same properties per kind.
-  expect(
-    Object.fromEntries(
-      nodeTypes.map((type) => [type, nodeKinds[type].properties]),
-    ),
-  ).toEqual({
-    INPUT: [],
-    FORMULA: ["expression", "output"],
-    CONDITION: ["expression"],
-    SWITCH: ["selector", "cases"],
-    TRANSFORM: ["fields", "expression", "output"],
-    REFERENCE: ["rule", "bindings", "output"],
-    OUTPUT: ["expression", "outputName"],
-  });
   const formula: RuleNode = {
     id: "calc",
     type: "FORMULA",

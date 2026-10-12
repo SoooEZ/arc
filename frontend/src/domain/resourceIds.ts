@@ -1,8 +1,13 @@
 import { MAX_RESOURCE_ID_CHARACTERS } from "./limits";
 
-const resourceId = new RegExp(
-  `^[a-z][a-z0-9-]{0,${MAX_RESOURCE_ID_CHARACTERS - 1}}$`,
-);
+/**
+ * The ID's grammar as a regular-expression source, the server's
+ * `Identifiers.RESOURCE_ID`: a lowercase letter, then lowercase letters, digits
+ * and hyphens, within the length limit. Formula references compose it.
+ */
+export const resourceIdSyntax = `[a-z][a-z0-9-]{0,${MAX_RESOURCE_ID_CHARACTERS - 1}}`;
+
+const resourceId = new RegExp(`^${resourceIdSyntax}$`);
 
 export const resourceIdGuidance = `Use lowercase letters, digits and hyphens; start with a letter. No spaces, $ or @. Maximum ${MAX_RESOURCE_ID_CHARACTERS} characters.`;
 

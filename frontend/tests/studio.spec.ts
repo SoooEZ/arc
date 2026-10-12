@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import { editorLines, setEditorText } from "./helpers/editor";
-import { createRule, publishRule, uniqueId } from "./helpers/api";
+import { caretLineText, editorLines, setEditorText } from "./helpers/editor";
+import {
+  createRule,
+  inputToOutput,
+  publishRule,
+  uniqueId,
+} from "./helpers/api";
 import {
   installRenderProbe,
   renderCounts,
@@ -675,6 +680,9 @@ test("the code view shows the rule's JSON on request, and the code keeps its edi
   await expect(page.getByText("All changes saved")).toBeVisible();
   await expect(filebar).toContainText("read-only");
   await expect(filebar).not.toContainText("build to update");
+  // The build changed the JSON; the caret stays where the outline put it
+  // (the new text reached the read-only editor as setValue: line 1, column 1).
+  await expect.poll(() => caretLineText(json)).toContain('"id": "out"');
   // The comment built into the graph's notes, the JSON's last field.
   await page.keyboard.press(documentEnd);
   await expect(editorLines(json)).toContainText('"unbuilt"');
@@ -688,4 +696,53 @@ test("the code view shows the rule's JSON on request, and the code keeps its edi
   await code.focus();
   await page.keyboard.press(mac ? "Meta+ArrowUp" : "Control+Home");
   await expect(editorLines(code)).toContainText("// unbuilt");
+});
+
+// The JSON view replaced the problems list: a failed Ctrl/Cmd+Enter from it
+// reported only the first message in the alert, with no list, no Ln:Col jump
+// and the markers in a hidden editor.
+test("a failed build from the JSON view lists its problems, and a problem jumps to the code", async ({
+  page,
+  request,
+}) => {
+  const id = uniqueId("studio-json-problems");
+  await createRule(request, {
+    id,
+    name: `JSON problems ${id}`,
+    kind: "FORMULA",
+    definition: inputToOutput,
+  });
+  await page.goto(`/#/studio/${id}`);
+  const code = page.getByRole("textbox", {
+    name: "ARC code editor",
+    exact: true,
+  });
+  await expect(editorLines(code)).toContainText("return amount;");
+  const mac = (await page.evaluate(() => navigator.platform)).startsWith("Mac");
+  await code.focus();
+  await page.keyboard.press(mac ? "Meta+ArrowDown" : "Control+End");
+  await page.keyboard.insertText(
+    '\nnode broken FORMULA "Broken" { let x = (1; }',
+  );
+  await expect(editorLines(code)).toContainText("let x = (1;");
+
+  await page.getByRole("button", { name: "JSON", exact: true }).click();
+  const json = page.getByRole("textbox", { name: "Rule JSON", exact: true });
+  await expect(editorLines(json)).toContainText('"schemaVersion": 1');
+  await json.focus();
+  await page.keyboard.press("ControlOrMeta+Enter");
+  const problems = page.locator(".studio-problems");
+  await expect(problems).toContainText("1 build problem");
+  const problem = problems.getByRole("button", { name: /^Ln \d+:\d+ · / });
+  await expect(problem).toBeVisible();
+  // The JSON stays: it still shows the last build, and says so.
+  await expect(json).toBeVisible();
+  const filebar = page.locator(".studio-filebar");
+  await expect(filebar).toContainText("build to update");
+
+  await problem.click();
+  await expect(code).toBeVisible();
+  await expect(json).toBeHidden();
+  await expect(filebar).toContainText(`${id}.arc`);
+  await expect.poll(() => caretLineText(code)).toContain("let x = (1;");
 });

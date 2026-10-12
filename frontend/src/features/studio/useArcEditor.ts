@@ -133,12 +133,23 @@ export function useArcEditor(diagnostics = noDiagnostics, owner = "arc") {
   );
 
   const reveal = useCallback((lineNumber: number, column = 1) => {
-    editor.current?.revealLineInCenter(lineNumber);
-    editor.current?.setPosition({ lineNumber, column });
-    editor.current?.focus();
+    if (editor.current) revealPosition(editor.current, { lineNumber, column });
   }, []);
 
   return { editor, model, onMount, reveal };
+}
+
+/**
+ * Scrolls `position` into the middle of the editor, puts the caret on it and
+ * focuses the editor: how the outline, the problems and the JSON view jump.
+ */
+export function revealPosition(
+  editor: monaco.editor.IStandaloneCodeEditor,
+  position: monaco.IPosition,
+) {
+  editor.revealLineInCenter(position.lineNumber);
+  editor.setPosition(position);
+  editor.focus();
 }
 
 /**

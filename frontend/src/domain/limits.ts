@@ -40,6 +40,8 @@ export const MAX_EXPRESSION_TOKENS = 256;
 export const MAX_EXPRESSION_CHARACTERS = 2_000;
 /** Characters in a Transform field name or an $OBJECT key. */
 export const MAX_FIELD_NAME_CHARACTERS = 160;
+/** Key/value pairs of one $OBJECT call (BuiltinFunctionCatalog admits twice as many arguments). */
+export const MAX_OBJECT_FIELDS = 50;
 /** UTF-16 units of one text value (ValueBounds). */
 export const MAX_STRING_CHARACTERS = 2_000;
 /** Items of one array, or fields of one object (ValueBounds). */

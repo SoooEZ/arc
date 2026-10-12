@@ -1,8 +1,13 @@
 import { Alert, Button, CircularProgress, TextField } from "@mui/material";
-import { Database, Globe2, type LucideIcon } from "lucide-react";
+import {
+  CircleQuestionMark,
+  Database,
+  Globe2,
+  type LucideIcon,
+} from "lucide-react";
 import CatalogPagination from "../../components/CatalogPagination";
 import type { SourceSummary } from "../../types";
-import type { SourceKind } from "./sourceProviders";
+import { isSourceKind, type SourceKind } from "./sourceProviders";
 import type { SourceEditor } from "./useSourceEditor";
 
 // Exhaustive: a new provider fails to compile until it has a list icon.
@@ -74,7 +79,12 @@ export default function SourceList({
   );
 }
 
-function ProviderIcon({ kind }: { kind: SourceKind }) {
-  const Icon = providerIcons[kind];
+/**
+ * The kind comes from the server's response: one this build does not know
+ * (a newer server) keeps its card, with its name and ID, instead of
+ * unmounting the whole page.
+ */
+function ProviderIcon({ kind }: { kind: string }) {
+  const Icon = isSourceKind(kind) ? providerIcons[kind] : CircleQuestionMark;
   return <Icon size={19} />;
 }

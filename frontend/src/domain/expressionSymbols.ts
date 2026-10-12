@@ -1,4 +1,5 @@
 import type { VariableOption } from "./variables";
+import { formulaReferenceSyntax } from "./formulaReferences";
 import { inputTypeOf } from "./inputTypes";
 import { isNodeType, storesResult } from "./nodeKinds";
 
@@ -21,13 +22,19 @@ interface LocalScope {
   end: number;
 }
 // ARC property paths also allow numeric segments, such as items.0.price.
-const identifier =
-  /^(?:@[a-z][a-z0-9-]*(?::[1-9]\d*)?|\$?[A-Za-z_][A-Za-z_0-9.]*)$/;
+const identifier = new RegExp(
+  `^(?:${formulaReferenceSyntax}|\\$?[A-Za-z_][A-Za-z_0-9.]*)$`,
+);
 const localIdentifier = /^[A-Za-z_][A-Za-z_0-9]*$/;
 const collections = new Set(["MAP", "FILTER", "ALL", "ANY", "REDUCE"]);
 
-const expressionToken =
-  /"(?:[^"\\]|\\[\s\S])*(?:"|$)|'(?:[^'\\]|\\[\s\S])*(?:'|$)|@[a-z][a-z0-9-]*(?::[1-9]\d*)?|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|\$?[A-Za-z_][A-Za-z_0-9.]*|[^\s]/g;
+// A string, a Formula reference, a number, a name or dotted path, else one character.
+const expressionToken = new RegExp(
+  String.raw`"(?:[^"\\]|\\[\s\S])*(?:"|$)|'(?:[^'\\]|\\[\s\S])*(?:'|$)|` +
+    formulaReferenceSyntax +
+    String.raw`|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|\$?[A-Za-z_][A-Za-z_0-9.]*|[^\s]`,
+  "g",
+);
 const scriptToken = new RegExp(
   String.raw`\/\/[^\r\n]*|` + expressionToken.source,
   "g",

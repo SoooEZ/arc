@@ -935,3 +935,55 @@ test("a failed catalog read offers Retry without a close button, while document 
   await saveAlert.getByRole("button", { name: "Close" }).click();
   await expect(saveAlert).toHaveCount(0);
 });
+
+// A provider kind this build does not know (a newer server) unmounted the
+// whole Sources page: the list indexed its icon table with it, and the open
+// source its provider table.
+test("a source of an unknown provider kind keeps the page and the other sources usable", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  const feed = {
+    id: "ftp-feed",
+    name: "FTP feed",
+    version: 1,
+    definition: { kind: "FTP", parameters: [], timeoutMs: 3000 },
+  };
+  const listed = summaries([first, second]);
+  await page.route("**/api/source-summaries?*", (route) =>
+    route.fulfill({
+      json: {
+        ...listed,
+        items: [
+          ...listed.items,
+          { id: feed.id, name: feed.name, version: 1, kind: "FTP" },
+        ],
+        total: listed.total + 1,
+      },
+    }),
+  );
+  await page.route("**/api/sources/ftp-feed/versions/*", (route) =>
+    route.fulfill({ json: feed }),
+  );
+  await page.goto("/#/sources");
+  await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
+  const card = page
+    .locator(".source-list > button")
+    .filter({ hasText: "FTP feed" });
+  await expect(card).toContainText("ftp-feed · v1");
+  await card.click();
+  await expect(
+    page.getByRole("alert").filter({
+      hasText: "FTP feed uses a provider this editor does not know: FTP",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Select or create a data source.")).toBeVisible();
+  await page
+    .locator(".source-list > button")
+    .filter({ hasText: "Source B" })
+    .click();
+  await expect(page.getByLabel("Source ID")).toHaveValue("source-b");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "does not know" }),
+  ).toHaveCount(0);
+});
