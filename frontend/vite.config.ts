@@ -1,7 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const apiTarget = `http://localhost:${process.env.ARC_API_PORT || "8080"}`;
+// The API behind /api and /actuator: the native backend's port by default, or the api service
+// inside the Docker development stack (compose.dev.yaml).
+const apiTarget =
+  process.env.ARC_API_PROXY_TARGET ||
+  `http://localhost:${process.env.ARC_API_PORT || "8080"}`;
 
 export default defineConfig({
   plugins: [react()],

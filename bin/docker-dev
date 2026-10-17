@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat <<'HELP'
+Usage: bin/docker-dev
+
+Run the Compose stack in development mode and keep it current while you edit. Ctrl+C stops it.
+The web service is the Vite dev server: frontend edits reach the browser within seconds.
+A backend edit rebuilds the API image without the tests and the formatting check, then replaces
+the container; a failed build leaves the previous API running.
+Same project, ports (ARC_WEB_PORT, ARC_API_PORT) and database volume as docker compose up.
+Requires Docker Compose 5 or later. Back to the normal images: docker compose up -d --build --wait
+HELP
+  exit 0
+fi
+
+if [[ $# -gt 0 ]]; then
+  printf '%s\n' 'Usage: bin/docker-dev (or bin/docker-dev --help)' >&2
+  exit 1
+fi
+
+# The interactive menu's detach and watch toggles would stop applying edits to running containers.
+exec docker compose -f compose.yaml -f compose.dev.yaml up --build --watch --menu=false

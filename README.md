@@ -4,7 +4,7 @@
 
 The first release implements **R & C**: build formulas, conditions, and decision trees; publish stable versions; execute them from any application with typed inputs and an optional, bounded execution trace.
 
-Choose [Docker Compose](#run-with-docker-compose) to run the whole stack in containers, or [local development without Docker](#run-without-docker-local-development) to run PostgreSQL, Java, and React directly. After local setup, **`bin/dev` starts the frontend and backend together with Foreman**. Run the setup commands from the repository root unless a step says otherwise.
+Choose [Docker Compose](#run-with-docker-compose) to run the whole stack in containers (**`bin/docker-dev`** adds [live reload](#live-reload-while-developing)), or [local development without Docker](#run-without-docker-local-development) to run PostgreSQL, Java, and React directly. After local setup, **`bin/dev` starts the frontend and backend together with Foreman**. Run the setup commands from the repository root unless a step says otherwise.
 
 ## Run with Docker Compose
 
@@ -39,6 +39,24 @@ docker compose up -d --build --wait
 ```
 
 Normal shutdown preserves saved rules and published versions. `docker compose down -v` also deletes the project's database volume; use it only when you intend to reset that data. Database initialization variables apply when the volume is first created; changing `.env` alone does not change credentials in an existing database.
+
+### Live reload while developing
+
+`bin/docker-dev` runs the same Compose project in development mode and keeps it current while you edit. It stays in the foreground with the combined logs; **Ctrl+C** stops the stack.
+
+```sh
+bin/docker-dev
+```
+
+Open [http://localhost:3080](http://localhost:3080) as before: the ports, `.env` settings and database volume are those of the normal stack, whose `api` and `web` containers this mode replaces until you switch back. While it runs:
+
+- **Frontend:** the web service runs the Vite dev server instead of nginx. Edits to `frontend/src`, `frontend/public`, `index.html` and `vite.config.ts` are synced into the container and reach the browser within seconds.
+- **Backend:** an edit under `backend/`, test sources excepted, rebuilds the API image without the tests and the formatting check, then replaces the API container; the new code usually answers within ten seconds of the save. A build that fails prints the compiler error and leaves the previous API running.
+- **Dependencies:** a change to `frontend/package.json` or `package-lock.json` rebuilds the web image; `pom.xml` is part of the backend rebuild.
+
+To return to the normal images, stop with Ctrl+C and run `docker compose up -d --build --wait`. Edits stop reaching the containers when the command exits; run `bin/docker-dev` again to resume. Development mode needs Docker Compose 5 or later for [Compose Watch](https://docs.docker.com/compose/how-tos/file-watch/) with `initial_sync`; [compose.dev.yaml](compose.dev.yaml) holds the overrides.
+
+Every backend rebuild starts a new API, which applies a new Flyway migration to the Docker database at once, and an applied migration must not change afterwards. Develop schema changes in a separate project, for example `COMPOSE_PROJECT_NAME=arc-dev ARC_WEB_PORT=3082 ARC_API_PORT=8082 bin/docker-dev`, and remove it with `COMPOSE_PROJECT_NAME=arc-dev docker compose down -v`. While development mode runs, port 3080 serves Vite, not nginx: check web-server behavior (`scripts/web_smoke.py`, cache headers, gzip) against the normal stack or a disposable project.
 
 ## Run without Docker (local development)
 

@@ -1,0 +1,65 @@
+# Development mode, started by bin/docker-dev:
+#   docker compose -f compose.yaml -f compose.dev.yaml up --build --watch
+# Same project, ports and database volume as compose.yaml. The web service runs the Vite dev server,
+# which Compose Watch keeps in sync with the frontend sources; a backend change rebuilds the API.
+services:
+  api:
+    build:
+      args:
+        # Every backend save rebuilds the image, so the tests and the formatting check are left to
+        # `mvn verify` and CI.
+        SKIP_CHECKS: "true"
+    # Not the plain project tag, which stays the fully checked image of compose.yaml.
+    image: ${COMPOSE_PROJECT_NAME:-arc}-api-dev
+    develop:
+      watch:
+        # backend/.dockerignore already keeps target/ out.
+        - action: rebuild
+          path: ./backend
+          ignore:
+            # Not compiled while the checks are skipped.
+            - src/test/
+            - "**/.DS_Store"
+  web:
+    build:
+      context: ./frontend
+      target: dev
+    image: ${COMPOSE_PROJECT_NAME:-arc}-web-dev
+    environment:
+      ARC_API_PROXY_TARGET: http://api:8080
+    # Replaces the nginx mapping (…:80) instead of adding a second one on the same host port.
+    ports: !override
+      - "${ARC_WEB_PORT:-3080}:3080"
+    # As with bin/dev, Vite may start before the API. Waiting for API health would end the session
+    # whenever the API failed to start, and hold every frontend sync while a rebuilt API starts.
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3080/"]
+    develop:
+      # Only the files Vite serves, so frontend/node_modules (macOS builds of native packages) never
+      # reaches the container. initial_sync covers edits made while the stack starts.
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+          initial_sync: true
+        - action: sync
+          path: ./frontend/public
+          target: /app/public
+          initial_sync: true
+        - action: sync
+          path: ./frontend/index.html
+          target: /app/index.html
+          initial_sync: true
+        # Vite restarts itself when its configuration changes.
+        - action: sync
+          path: ./frontend/vite.config.ts
+          target: /app/vite.config.ts
+          initial_sync: true
+        # A dependency change needs a fresh npm ci in the image.
+        - action: rebuild
+          path: ./frontend/package.json
+        - action: rebuild
+          path: ./frontend/package-lock.json
