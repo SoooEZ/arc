@@ -1,9 +1,10 @@
 import type { Definition, RuleNode } from "../../types";
+import { choosesOneExit } from "../../domain/nodeKinds";
 
-/** The node an editor selects first: the first Condition, otherwise the first node. */
+/** The node an editor selects first: the first Condition (True / False or cases), otherwise the first node. */
 export function defaultSelection(definition: Definition): RuleNode {
   return (
-    definition.nodes.find((node) => node.type === "CONDITION") ??
+    definition.nodes.find((node) => choosesOneExit(node.type)) ??
     definition.nodes[0]
   );
 }

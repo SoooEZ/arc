@@ -155,18 +155,21 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     newNodeFields: () => ({ expression: "true" }),
     summary: expressionSummary,
   },
+  // The editor shows a Switch as the Condition node with cases: the menu adds
+  // a CONDITION, and the node's Branches setting turns it into cases and back
+  // (switchBranches.withBranchMode). The stored kind stays SWITCH.
   SWITCH: {
-    label: "Switch",
-    newNodeLabel: "Switch",
+    label: "Condition",
+    newNodeLabel: "Condition",
     className: "switch",
     storesResult: false,
-    addable: true,
+    addable: false,
     removable: true,
     acceptsIncoming: true,
     ownsInputs: false,
     exits: "cases",
     properties: ["selector", "cases"],
-    minimapColor: neutralMinimap,
+    minimapColor: "#e8d8b2",
     newNodeFields: () => ({
       cases: [
         { id: "case-1", label: "Case 1", expression: "true" },
@@ -257,6 +260,12 @@ export function entryInputNode(
 /** Formula, Transform and Reference nodes assign the scoped variable named by `output`. */
 export function storesResult(type: NodeType): boolean {
   return nodeKinds[type].storesResult;
+}
+
+/** Condition nodes, True / False or with cases: each run takes one of their exits. */
+export function choosesOneExit(type: NodeType): boolean {
+  const exits = nodeKinds[type].exits;
+  return exits === "true-false" || exits === "cases";
 }
 
 /** The RuleNode keys behind each property. */

@@ -19,11 +19,11 @@ Arguments follow the input declaration order in that published version. Trailing
 
 Choose **Open in Editor** for a larger editor with the grouped catalog, hover help, click-to-insert snippets and upstream-variable chips. Apply changes that expression in the shared draft; Cancel preserves it. Syntax, Formula pin/argument-count and unavailable-variable checks run as you edit in the dialog; Test rule checks runtime values and types. Read-only versions allow inspection without applying edits. The preview panel's **Input JSON** and the published API playground also use code editors with Tab/Shift+Tab indentation and bracket matching. Incomplete JSON stays editable; running checks the current buffer. Monaco's **Ctrl+M** (**Ctrl+Shift+M** on macOS) toggle lets Tab move focus out of the editor when needed.
 
-Condition remains a True/False node. Use **Add node → Switch** for multiple branches or **Add node → Transform** for data shaping. Formula expressions can nest functions and process objects/arrays; they are not restricted to arithmetic. They still use ARC's bounded expression language, rather than arbitrary JavaScript or host code.
+**Add node → Condition** adds a True/False node. Its **Branches** setting turns it into cases (stored as a `SWITCH`) for multiple branches and back while it has one condition case; use **Add node → Transform** for data shaping. Formula expressions can nest functions and process objects/arrays; they are not restricted to arithmetic. They still use ARC's bounded expression language, rather than arbitrary JavaScript or host code.
 
 ## Switch and data transformation
 
-Select a Switch and choose its **Switch mode**. Both modes check cases from top to bottom and follow only the first match. Reordering cases changes their priority while preserving connections. **Default** runs when no case matches. Every exit needs a target; an exit may also connect to several downstream nodes under the existing fan-out rules.
+Select a Condition and choose its **Branches**: **True / False**, **Cases · first true case** or **Match a value**; the last two make it a Switch. Both modes check cases from top to bottom and follow only the first match. Reordering cases changes their priority while preserving connections. **Default** runs when no case matches. Every exit needs a target; an exit may also connect to several downstream nodes under the existing fan-out rules.
 
 ### Conditions and ranges
 

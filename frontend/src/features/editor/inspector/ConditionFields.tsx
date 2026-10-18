@@ -1,12 +1,16 @@
 import { Autocomplete, Button, MenuItem, TextField } from "@mui/material";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import ValueBinding from "../../expressions/ValueBinding";
 import ExpressionField from "../../expressions/ExpressionField";
 import ExpressionDialogButton from "../../expressions/ExpressionDialogButton";
 import { useEditingPin } from "../../expressions/useEditingPin";
 import { comparisonText, simpleComparison } from "../../../domain/expressions";
+import { updateGraphNode } from "../../../domain/graph";
+import { shortId } from "../../../domain/ids";
+import { withBranchMode, withNewCase } from "../../../domain/switchBranches";
 import { comparisonBindingType } from "../../../domain/valueBinding";
 import type { NodeFieldsProps } from "./types";
+import BranchModeField from "./BranchModeField";
 import InspectorSection from "./InspectorSection";
 
 const operators = [
@@ -48,6 +52,7 @@ export default function ConditionFields({
   patch,
   variables,
   scopeKnown,
+  onDefinitionChange,
 }: NodeFieldsProps) {
   const expression = node.expression ?? "";
   const [editing, keepEditor] = useEditingPin<ConditionEditor>(expression);
@@ -66,6 +71,22 @@ export default function ConditionFields({
     else if (parsed)
       keepEditor({ kind: "builder", comparison: parsed }, expression);
   };
+  // The condition becomes Case 1, False becomes Default, and a second case follows.
+  const addCase = () => {
+    // Document updaters can run more than once, so the IDs are chosen here.
+    const first = shortId("case-");
+    const second = shortId("case-");
+    onDefinitionChange((definition) =>
+      updateGraphNode(
+        withBranchMode(definition, node.id, "conditions", first),
+        node.id,
+        (current) =>
+          current.type === "SWITCH"
+            ? { cases: withNewCase(current.cases ?? [], second) }
+            : {},
+      ),
+    );
+  };
   return (
     <InspectorSection
       title="Condition"
@@ -82,6 +103,11 @@ export default function ConditionFields({
         )
       }
     >
+      <BranchModeField
+        node={node}
+        readOnly={readOnly}
+        onDefinitionChange={onDefinitionChange}
+      />
       {editor.kind === "builder" ? (
         <ComparisonBuilder
           rule={rule}
@@ -128,6 +154,17 @@ export default function ConditionFields({
           <ChevronRight size={12} />
         </div>
       </div>
+      <Button
+        startIcon={<Plus size={14} />}
+        disabled={readOnly}
+        onClick={addCase}
+      >
+        Add case
+      </Button>
+      <p className="muted-copy">
+        More cases branch more than two ways: this condition becomes Case 1 and
+        False becomes Default, with their connections.
+      </p>
     </InspectorSection>
   );
 }

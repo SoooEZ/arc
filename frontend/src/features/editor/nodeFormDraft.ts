@@ -44,7 +44,11 @@ function mergeItems<T extends { id: string }>(
   return merged;
 }
 
-/** Rebase the form's changes, including connected default outputs, onto the live graph. */
+/**
+ * Rebase the form's changes, including connected default outputs, onto the
+ * live graph. The form may change the node's kind: a Condition's Branches
+ * setting turns True / False into cases and back, with its connections.
+ */
 export function applyNodeFormDraft(
   current: Definition,
   before: Definition,
@@ -58,7 +62,6 @@ export function applyNodeFormDraft(
     !originalNode ||
     !editedNode ||
     !currentNode ||
-    editedNode.type !== originalNode.type ||
     currentNode.type !== originalNode.type
   )
     return null;

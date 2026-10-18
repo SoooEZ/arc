@@ -499,6 +499,9 @@ test("the selection falls back to the default node when a loaded version or buil
     type: "CONDITION",
   });
   expect(selectedNode(withCondition, "right").id).toBe("output");
+  // A Condition with cases (a stored SWITCH) is the same node to the editor.
+  const withCases = patchGraphNode(version, "output", { type: "SWITCH" });
+  expect(selectedNode(withCases, "right").id).toBe("output");
 });
 
 test("preview roots are recognised by the sentinel and a null version; published versions of this rule are referenced graphs", () => {

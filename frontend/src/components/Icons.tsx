@@ -5,7 +5,6 @@ import {
   LogIn,
   LogOut,
   Network,
-  ListTree,
   Split,
   WandSparkles,
   type LucideIcon,
@@ -22,8 +21,9 @@ const kindIcons: Record<Kind, LucideIcon> = {
 const nodeIcons: Record<NodeType, LucideIcon> = {
   INPUT: LogIn,
   FORMULA: Calculator,
+  // One Condition node, True / False or with cases.
   CONDITION: Split,
-  SWITCH: ListTree,
+  SWITCH: Split,
   TRANSFORM: WandSparkles,
   REFERENCE: Braces,
   OUTPUT: LogOut,

@@ -14,7 +14,7 @@ export const handles = {
 } as const;
 
 /** The handle of a Switch case: its ID never depends on the case's position. */
-function caseHandle(caseId: string): string {
+export function caseHandle(caseId: string): string {
   return `case:${caseId}`;
 }
 

@@ -305,6 +305,7 @@ flowchart TB
 - **删除节点**：[`removeNode`](../frontend/src/features/editor/canvas/useGraphCommands.ts) 调 [`removeGraphNode`](../frontend/src/domain/graph.ts)，相关连线一起删掉；第一个 Input 和最后一个节点不能删。
 - **拖动**：[`onNodesChange`](../frontend/src/features/editor/canvas/useGraphCanvas.ts) 把新坐标写进草稿；卡片的实测尺寸只存在画布状态里。
 - **排版**：[`arrangeGraph`](../frontend/src/features/editor/canvas/graphLayout.ts) 在 Web Worker（[`layoutInWorker`](../frontend/src/features/editor/canvas/graphLayoutWorker.ts)）里跑 ELK，结果通过 `graph/arranged` 应用。
+- **分支方式**：Condition 的 Branches 选项（[`BranchModeField`](../frontend/src/features/editor/inspector/BranchModeField.tsx)）调 [`withBranchMode`](../frontend/src/domain/switchBranches.ts)，在 CONDITION 和 SWITCH 之间换类型，连线跟着改出口名。
 
 ### 保存和发布
 
@@ -482,7 +483,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [NodeExpressionDialog.tsx](../frontend/src/features/editor/NodeExpressionDialog.tsx) | 节点代码对话框：用 Monaco 编辑单个节点的 ARC Script，Apply 时构建并替换（`applying` 是对话框自己的进行中标志，readOnly 已含文档的命令锁） |  |
 | [ruleDeletion.ts](../frontend/src/features/editor/ruleDeletion.ts) | 删除规则命令：被命令锁拒绝时返回 `deletionDeclined`，成功后通知工作区并离开，409 带回调用方列表 | [rule-deletion.spec.ts](../frontend/tests/unit/rule-deletion.spec.ts) |
 | [nodeFormDraft.ts](../frontend/src/features/editor/nodeFormDraft.ts) | 把节点表单的修改三方合并回最新草稿，有冲突就返回 null | [node-form.spec.ts](../frontend/tests/unit/node-form.spec.ts) |
-| [nodeSelection.ts](../frontend/src/features/editor/nodeSelection.ts) | 纯函数：默认选中的节点，以及按当前草稿推导选中的节点和连线 | [document.spec.ts](../frontend/tests/unit/document.spec.ts) |
+| [nodeSelection.ts](../frontend/src/features/editor/nodeSelection.ts) | 纯函数：默认选中的节点（第一个 Condition，两路或多分支），以及按当前草稿推导选中的节点和连线 | [document.spec.ts](../frontend/tests/unit/document.spec.ts) |
 | [ReferenceDialog.tsx](../frontend/src/features/editor/ReferenceDialog.tsx) | 被引用规则查看器：栈式浏览，内嵌只读 Editor，可返回或全部关闭 |  |
 | [RuleSettings.tsx](../frontend/src/features/editor/RuleSettings.tsx) | 规则设置：名称、描述写入草稿，含删除规则的确认流程 |  |
 | [types.ts](../frontend/src/features/editor/types.ts) | 编辑器 props 和被引用规则目标的类型 |  |
@@ -516,7 +517,8 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
-| [ConditionFields.tsx](../frontend/src/features/editor/inspector/ConditionFields.tsx) | Condition 节点：比较构建器和表达式编辑可以互切，显示 True/False 说明 |  |
+| [BranchModeField.tsx](../frontend/src/features/editor/inspector/BranchModeField.tsx) | Condition 的 Branches 选项：在 True / False（CONDITION）、按条件的多分支和按值匹配（SWITCH）之间转换，连线跟着改出口名 | [switch.spec.ts](../frontend/tests/unit/switch.spec.ts) |
+| [ConditionFields.tsx](../frontend/src/features/editor/inspector/ConditionFields.tsx) | 两路 Condition（CONDITION）：比较构建器和表达式编辑可以互切，显示 True/False 说明；Add case 把它变成多分支 |  |
 | [FormulaFields.tsx](../frontend/src/features/editor/inspector/FormulaFields.tsx) | Formula 节点：一个表达式字段 |  |
 | [IdentifierField.tsx](../frontend/src/features/editor/inspector/IdentifierField.tsx) | 标识符输入框：拒绝非法输入并提示命名规则 |  |
 | [InputDefaultValue.tsx](../frontend/src/features/editor/inspector/InputDefaultValue.tsx) | 按参数类型选默认值控件（JSON、布尔、数字、文本） |  |
@@ -533,8 +535,8 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [ReferenceFields.tsx](../frontend/src/features/editor/inspector/ReferenceFields.tsx) | Reference 节点：选已发布规则和固定版本，绑定它的参数（参数卡片同样 memo，经 updateGraphNode 改草稿） |  |
 | [ResultFields.tsx](../frontend/src/features/editor/inspector/ResultFields.tsx) | 存结果的节点的结果变量名 |  |
 | [StringDefaultField.tsx](../frontend/src/features/editor/inspector/StringDefaultField.tsx) | STRING 默认值的文本缓冲：按服务器的长度和可存储文本规则校验，无效文本留在字段里 |  |
-| [SwitchDefaultReturn.tsx](../frontend/src/features/editor/inspector/SwitchDefaultReturn.tsx) | Switch 的 Default 出口：编辑它专属的 Output，或添加默认返回 |  |
-| [SwitchFields.tsx](../frontend/src/features/editor/inspector/SwitchFields.tsx) | Switch 节点：匹配模式、选择值，分支的增删改和排序 |  |
+| [SwitchDefaultReturn.tsx](../frontend/src/features/editor/inspector/SwitchDefaultReturn.tsx) | 多分支 Condition 的 Default 出口：编辑它专属的 Output，或添加默认返回 |  |
+| [SwitchFields.tsx](../frontend/src/features/editor/inspector/SwitchFields.tsx) | 多分支的 Condition（存为 SWITCH）：分支模式、选择值，分支的增删改和排序 |  |
 | [TransformFields.tsx](../frontend/src/features/editor/inspector/TransformFields.tsx) | Transform 节点：字段映射行，或一个整体表达式 |  |
 | [types.ts](../frontend/src/features/editor/inspector/types.ts) | 表单组件共用的 props 类型 |  |
 | [UnusedProperties.tsx](../frontend/src/features/editor/inspector/UnusedProperties.tsx) | 提示这种节点不用的属性，可以一键移除 |  |
@@ -676,7 +678,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [json.ts](../frontend/src/domain/json.ts) | 无损 JSON 编解码：double 保不住的数字存成 DecimalNumber，按原文写回 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[json.spec.ts](../frontend/tests/unit/json.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts)、[source-buffers.spec.ts](../frontend/tests/unit/source-buffers.spec.ts) |
 | [formulaReferences.ts](../frontend/src/domain/formulaReferences.ts) | `@id:version` 引用的唯一语法出处：由 resourceIds 的 ID 语法和服务器的版本语法组成，版本上限是 int；expressionSymbols、arcLanguage、useFormulaSupport、formulaCalls 和路由都从这里读 | [formula-references.spec.ts](../frontend/tests/unit/formula-references.spec.ts) |
 | [limits.ts](../frontend/src/domain/limits.ts) | 后端 Limits.java 的镜像：节点、连线、参数、$OBJECT 字段数、JSON 指针长度等上限，以及“还能不能再加”；规则名称/描述的校验（只含不换行空格或全角空格等 Unicode 空白的名称同样拒绝）；JSON 指针字段的规则（sourcePointerProblem） | [limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
-| [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) | 七种节点的描述表：出口、是否存结果、能否被连入、允许的属性、新建默认值、卡片摘要；`entryInputNode` 找服务器当作入口的 Input 节点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
+| [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) | 七种节点的描述表（SWITCH 在界面上就是带多个分支的 Condition，不在添加菜单里）：出口、是否存结果、能否被连入、允许的属性、新建默认值、卡片摘要；`entryInputNode` 找服务器当作入口的 Input 节点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [nodePorts.ts](../frontend/src/domain/nodePorts.ts) | 连接句柄的唯一出处：按节点类型算出口端口（ID、标签、位置、兜底）和卡片宽度 | [branches.spec.ts](../frontend/tests/unit/branches.spec.ts)、[document.spec.ts](../frontend/tests/unit/document.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [numericDefaults.ts](../frontend/src/domain/numericDefaults.ts) | 解析 NUMBER 默认值并保留写法的位数；超出服务器精度就拒绝 | [input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts) |
 | [outputNames.ts](../frontend/src/domain/outputNames.ts) | 多个 Output 时每个结果字段的名字：outputName → 变量名 → 节点 ID |  |
@@ -686,7 +688,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [ruleIdentity.ts](../frontend/src/domain/ruleIdentity.ts) | 用 ID + 创建时间识别一条规则，区分删除后用同一 ID 重建的规则 | [published-selection.spec.ts](../frontend/tests/unit/published-selection.spec.ts) |
 | [ruleKinds.ts](../frontend/src/domain/ruleKinds.ts) | 三种规则类型（DECISION_TREE、FORMULA、RULE）的界面文案表 |  |
 | [serverText.ts](../frontend/src/domain/serverText.ts) | 按 Java 的语义处理文本：`trimAsServer`（String.trim）和 `isBlankAsServer`（String.isBlank，认得 U+3000 等空白） | [expressions.spec.ts](../frontend/tests/unit/expressions.spec.ts)、[limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
-| [switchBranches.ts](../frontend/src/domain/switchBranches.ts) | Switch 的默认返回（找到只经 Default 到达的 Output，或新建 Output 和连线），以及分支列表的增、改、删、移动 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[limits.spec.ts](../frontend/tests/unit/limits.spec.ts)、[switch.spec.ts](../frontend/tests/unit/switch.spec.ts) |
+| [switchBranches.ts](../frontend/src/domain/switchBranches.ts) | Condition 的分支：True / False 和多分支之间的转换（`withBranchMode`，连线跟着改出口名）；多分支的默认返回（找到只经 Default 到达的 Output，或新建 Output 和连线），以及分支列表的增、改、删、移动 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[switch.spec.ts](../frontend/tests/unit/switch.spec.ts) |
 | [text.ts](../frontend/src/domain/text.ts) | 把名字列表拼成英文列举（"a, b and c"）；`markdownText` 转义用户文本，供编辑器悬浮提示的 Markdown 使用 | [markdown-text.spec.ts](../frontend/tests/unit/markdown-text.spec.ts) |
 | [transformFields.ts](../frontend/src/domain/transformFields.ts) | Transform 字段：新字段起一个不冲突的名字，把字段映射写成一个 `$OBJECT` 表达式 | [transform-fields.spec.ts](../frontend/tests/unit/transform-fields.spec.ts) |
 | [valueBinding.ts](../frontend/src/domain/valueBinding.ts) | 值来源模式（变量、常量、表达式、默认）的推断，常量类型兼容，参数映射增删 | [value-binding.spec.ts](../frontend/tests/unit/value-binding.spec.ts) |

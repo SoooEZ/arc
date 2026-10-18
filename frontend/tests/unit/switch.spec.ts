@@ -3,7 +3,10 @@ import type { BranchCase } from "../../src/types";
 import { createGraphNode } from "../../src/domain/graph";
 import {
   addSwitchDefaultReturn,
+  branchMode,
+  canBranchTrueFalse,
   switchDefaultOutput,
+  withBranchMode,
   withCaseChanged,
   withCaseMoved,
   withNewCase,
@@ -134,4 +137,113 @@ test("generated Default Output names stay valid at the node label limit", () => 
   expect(label.endsWith(" · Default")).toBe(true);
   expect(label.isWellFormed()).toBe(true);
   expect(before.nodes[0].label).toHaveLength(160);
+});
+
+/** A True / False Condition whose True exit fans out, as the Add node menu creates it. */
+function trueFalse(): Definition {
+  const node = (id: string, label: string) => ({
+    ...createGraphNode(empty, "OUTPUT", id, { x: 0, y: 300 }),
+    label,
+  });
+  return {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      createGraphNode(empty, "INPUT", "input", { x: 0, y: 0 }),
+      {
+        ...createGraphNode(empty, "CONDITION", "check", { x: 0, y: 150 }),
+        expression: "amount > 5",
+      },
+      node("yes", "Yes"),
+      node("also", "Also"),
+      node("no", "No"),
+    ],
+    edges: [
+      { id: "start", source: "input", sourceHandle: "next", target: "check" },
+      { id: "t", source: "check", sourceHandle: "true", target: "yes" },
+      { id: "t2", source: "check", sourceHandle: "true", target: "also" },
+      { id: "f", source: "check", sourceHandle: "false", target: "no" },
+    ],
+  };
+}
+
+test("a Condition turns into cases and back with every connection", () => {
+  const before = trueFalse();
+  const cases = withBranchMode(before, "check", "conditions", "c1");
+  const check = cases.nodes.find((node) => node.id === "check")!;
+  expect(check).toMatchObject({
+    type: "SWITCH",
+    selector: null,
+    cases: [{ id: "c1", label: "Case 1", expression: "amount > 5" }],
+  });
+  expect(check.expression).toBeUndefined();
+  expect(branchMode(check)).toBe("conditions");
+  // True moves to the case and False to Default; IDs and targets stay.
+  expect(cases.edges).toEqual([
+    before.edges[0],
+    { id: "t", source: "check", sourceHandle: "case:c1", target: "yes" },
+    { id: "t2", source: "check", sourceHandle: "case:c1", target: "also" },
+    { id: "f", source: "check", sourceHandle: "default", target: "no" },
+  ]);
+  expect(canBranchTrueFalse(check)).toBe(true);
+  const back = withBranchMode(cases, "check", "true-false", "unused");
+  expect(back).toEqual(before);
+  expect(branchMode(back.nodes[1])).toBe("true-false");
+});
+
+test("matching a value keeps the condition as the value to match", () => {
+  const before = trueFalse();
+  const value = withBranchMode(before, "check", "value", "c1");
+  const check = value.nodes.find((node) => node.id === "check")!;
+  expect(check).toMatchObject({
+    type: "SWITCH",
+    selector: "amount > 5",
+    cases: [{ id: "c1", label: "Case 1", expression: "true" }],
+  });
+  expect(value.edges.map((edge) => edge.sourceHandle)).toEqual([
+    "next",
+    "case:c1",
+    "case:c1",
+    "default",
+  ]);
+  // A matched value only routes like True / False through conditions.
+  expect(canBranchTrueFalse(check)).toBe(false);
+  expect(withBranchMode(value, "check", "true-false", "x")).toBe(value);
+  const conditions = withBranchMode(value, "check", "conditions", "x");
+  expect(conditions.nodes[1]).toMatchObject({ selector: null });
+  expect(
+    withBranchMode(conditions, "check", "value", "x").nodes[1],
+  ).toMatchObject({
+    selector: "true",
+  });
+});
+
+test("True / False takes one condition case; other requests leave the draft as it is", () => {
+  const before = trueFalse();
+  const two = withBranchMode(before, "check", "conditions", "c1");
+  const withSecond = {
+    ...two,
+    nodes: two.nodes.map((node) =>
+      node.id === "check"
+        ? { ...node, cases: withNewCase(node.cases ?? [], "c2") }
+        : node,
+    ),
+  };
+  expect(canBranchTrueFalse(withSecond.nodes[1])).toBe(false);
+  expect(withBranchMode(withSecond, "check", "true-false", "x")).toBe(
+    withSecond,
+  );
+  expect(withBranchMode(before, "check", "true-false", "x")).toBe(before);
+  expect(withBranchMode(before, "yes", "conditions", "x")).toBe(before);
+  expect(withBranchMode(before, "missing", "conditions", "x")).toBe(before);
+  // An unfinished Condition without an expression becomes an empty case.
+  const unfinished = {
+    ...before,
+    nodes: before.nodes.map((node) =>
+      node.id === "check" ? { ...node, expression: null } : node,
+    ),
+  };
+  expect(
+    withBranchMode(unfinished, "check", "conditions", "c1").nodes[1].cases,
+  ).toEqual([{ id: "c1", label: "Case 1", expression: "" }]);
 });

@@ -102,7 +102,7 @@ for (const scenario of [
       matchingDefinition(scenario.type, scenario.value),
     );
     await page.goto(`/#/rules/${id}?node=choose`);
-    await select(page, page, "Switch mode", "Match a value");
+    await select(page, page, "Branches", "Match a value");
     await select(
       page,
       page,
@@ -172,7 +172,7 @@ for (const scenario of [
       .locator('.react-flow__node[data-id="choose"] .graph-node')
       .click();
     await expect(
-      page.getByRole("combobox", { name: "Switch mode", exact: true }),
+      page.getByRole("combobox", { name: "Branches", exact: true }),
     ).toHaveText("Match a value");
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(

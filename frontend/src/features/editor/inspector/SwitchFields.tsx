@@ -1,10 +1,4 @@
-import {
-  Button,
-  IconButton,
-  MenuItem,
-  TextField,
-  Tooltip,
-} from "@mui/material";
+import { Button, IconButton, TextField, Tooltip } from "@mui/material";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { memo, useCallback } from "react";
 import { shortId } from "../../../domain/ids";
@@ -20,12 +14,14 @@ import type { VariableOption } from "../../../domain/variables";
 import type { Definition, RuleNode } from "../../../types";
 import ExpressionField from "../../expressions/ExpressionField";
 import ValueBinding from "../../expressions/ValueBinding";
+import BranchModeField from "./BranchModeField";
 import SwitchDefaultReturn from "./SwitchDefaultReturn";
 import type { NodeFieldsProps } from "./types";
 import InspectorSection from "./InspectorSection";
 
 type Case = NonNullable<RuleNode["cases"]>[number];
 
+/** The Condition node with cases (a stored SWITCH). */
 export default function SwitchFields(props: NodeFieldsProps) {
   const { node, patch, variables, scopeKnown, readOnly, onDefinitionChange } =
     props;
@@ -63,21 +59,14 @@ export default function SwitchFields(props: NodeFieldsProps) {
   return (
     <>
       <InspectorSection
-        title="Switch cases"
+        title="Condition"
         help="Cases are checked in order. Match a selector value or use conditions that return true or false; the first match selects the branch."
       >
-        <TextField
-          select
-          label="Switch mode"
-          value={matchingValue ? "value" : "conditions"}
-          disabled={readOnly}
-          onChange={(event) =>
-            patch({ selector: event.target.value === "value" ? "true" : null })
-          }
-        >
-          <MenuItem value="conditions">Conditions · first true case</MenuItem>
-          <MenuItem value="value">Match a value</MenuItem>
-        </TextField>
+        <BranchModeField
+          node={node}
+          readOnly={readOnly}
+          onDefinitionChange={onDefinitionChange}
+        />
         {matchingValue && (
           <ValueBinding
             key={`${node.id}:selector`}

@@ -180,7 +180,8 @@ function expectations(childId: string): Record<string, Expected> {
       ...step,
       label: "Pick band",
       key: "switch",
-      kindLabel: "Switch",
+      // A Switch is the Condition node with cases.
+      kindLabel: "Condition",
       detail: "2 cases · first match + default",
       sources: 3,
       storesResult: false,
@@ -300,29 +301,28 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
     "230px",
   );
 
-  // Only Conditions stand out on the minimap.
+  // Only Conditions, True / False or with cases, stand out on the minimap.
   const minimapNodes = page.locator(".react-flow__minimap-node");
   await expect(minimapNodes).toHaveCount(8);
   const fills = await minimapNodes.evaluateAll((rects) =>
     rects.map((rect) => getComputedStyle(rect).fill).sort(),
   );
   expect(fills).toEqual([
-    ...Array(7).fill("rgb(212, 223, 216)"),
-    "rgb(232, 216, 178)",
+    ...Array(6).fill("rgb(212, 223, 216)"),
+    ...Array(2).fill("rgb(232, 216, 178)"),
   ]);
 
-  // The Add node menu offers every kind but Input, in a fixed order.
+  // The Add node menu offers every kind but Input, and one Condition, in a fixed order.
   await page.getByRole("button", { name: "Add node", exact: true }).click();
   const items = page.getByRole("menuitem");
   await expect(items).toHaveText([
     "Formula",
     "Condition",
-    "Switch",
     "Transform",
     "Reuse rule",
     "Output",
   ]);
-  const keys = ["formula", "condition", "switch", "transform", "reference"];
+  const keys = ["formula", "condition", "transform", "reference"];
   for (const [index, key] of [...keys, "output"].entries())
     await expect(items.nth(index).locator(`.node-icon.${key}`)).toHaveCount(1);
   await page.keyboard.press("Escape");

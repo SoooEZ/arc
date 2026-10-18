@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Definition } from "../../src/types";
 import { patchGraphNode } from "../../src/domain/graph";
+import { withBranchMode } from "../../src/domain/switchBranches";
 import { applyNodeFormDraft } from "../../src/features/editor/nodeFormDraft";
 
 const definition = (): Definition => ({
@@ -204,4 +205,43 @@ test("node forms reject newly dangling concurrent connections while preserving p
   const applied = applyNodeFormDraft(current, before, edited, "branch")!;
   expect(applied).not.toBeNull();
   expect(applied.edges).toEqual([before.edges[0], incomplete]);
+});
+
+test("a node form may turn a Condition into cases; the connections it renamed apply with it", () => {
+  const before: Definition = {
+    ...definition(),
+    nodes: definition().nodes.map((node) =>
+      node.id === "branch"
+        ? {
+            id: "branch",
+            type: "CONDITION" as const,
+            label: "Branch",
+            expression: "true",
+            position: node.position,
+          }
+        : node,
+    ),
+    edges: [
+      definition().edges[0],
+      { id: "case", source: "branch", sourceHandle: "true", target: "out" },
+    ],
+  };
+  const edited = withBranchMode(before, "branch", "conditions", "first");
+  const current = patchGraphNode(before, "out", { expression: "9" });
+  const applied = applyNodeFormDraft(current, before, edited, "branch")!;
+  expect(applied.nodes.find((node) => node.id === "branch")).toMatchObject({
+    type: "SWITCH",
+    cases: [{ id: "first", label: "Case 1", expression: "true" }],
+  });
+  expect(applied.edges).toEqual(edited.edges);
+  expect(applied.nodes.find((node) => node.id === "out")?.expression).toBe("9");
+  // A kind changed elsewhere while the form was open is a conflict.
+  expect(
+    applyNodeFormDraft(
+      patchGraphNode(before, "branch", { type: "SWITCH" }),
+      before,
+      edited,
+      "branch",
+    ),
+  ).toBeNull();
 });

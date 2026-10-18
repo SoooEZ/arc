@@ -39,11 +39,11 @@ test("the descriptor covers every node kind, and only exact kind names", () => {
     expect(isNodeType(text), text).toBe(false);
 });
 
-test("the Add node menu offers every kind but Input, in its previous order", () => {
+test("the Add node menu offers every kind but Input, and one Condition", () => {
+  // A Switch is the Condition node with cases: its Branches setting makes one.
   expect(addableNodeTypes).toEqual([
     "FORMULA",
     "CONDITION",
-    "SWITCH",
     "TRANSFORM",
     "REFERENCE",
     "OUTPUT",
@@ -58,7 +58,7 @@ test("labels and style keys keep the names that cards, previews and styles use",
     INPUT: "Input",
     FORMULA: "Formula",
     CONDITION: "Condition",
-    SWITCH: "Switch",
+    SWITCH: "Condition",
     TRANSFORM: "Transform",
     REFERENCE: "Reuse rule",
     OUTPUT: "Output",
@@ -89,7 +89,7 @@ test("new nodes serialize exactly as before the descriptor", () => {
     INPUT: `${start}"INPUT","position":{"x":1,"y":2},"label":"Input"}`,
     FORMULA: `${start}"FORMULA","position":{"x":1,"y":2},"label":"Formula","expression":"1 + 1","output":"result_1"}`,
     CONDITION: `${start}"CONDITION","position":{"x":1,"y":2},"label":"Condition","expression":"true"}`,
-    SWITCH: `${start}"SWITCH","position":{"x":1,"y":2},"label":"Switch","cases":[{"id":"case-1","label":"Case 1","expression":"true"},{"id":"case-2","label":"Case 2","expression":"false"}]}`,
+    SWITCH: `${start}"SWITCH","position":{"x":1,"y":2},"label":"Condition","cases":[{"id":"case-1","label":"Case 1","expression":"true"},{"id":"case-2","label":"Case 2","expression":"false"}]}`,
     TRANSFORM: `${start}"TRANSFORM","position":{"x":1,"y":2},"label":"Transform","output":"result_1","fields":[{"name":"value","expression":"null"}]}`,
     REFERENCE: `${start}"REFERENCE","position":{"x":1,"y":2},"label":"Reusable rule","output":"result_1","bindings":{}}`,
     OUTPUT: `${start}"OUTPUT","position":{"x":1,"y":2},"label":"Output","expression":"0"}`,
@@ -182,10 +182,10 @@ test("only the Input node owns the definition's input parameters", () => {
     expect(nodeKinds[type].ownsInputs, type).toBe(type === "INPUT");
 });
 
-test("only Conditions stand out on the minimap", () => {
+test("only Conditions, True / False or with cases, stand out on the minimap", () => {
   for (const type of nodeTypes)
     expect(nodeKinds[type].minimapColor, type).toBe(
-      type === "CONDITION" ? "#e8d8b2" : "#d4dfd8",
+      type === "CONDITION" || type === "SWITCH" ? "#e8d8b2" : "#d4dfd8",
     );
 });
 
