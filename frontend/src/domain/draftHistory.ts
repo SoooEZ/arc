@@ -21,25 +21,26 @@ const joinWithinMs = 1000;
 
 /**
  * The history after `before` became `after` at `at` (ms). An edit joins the
- * previous step when both belong to one group (see editGroup) and follow
- * each other within a second, so Undo reverts a burst of typing or a whole
- * drag. An edit without a time, such as Arrange or a code build, is always a
- * step of its own.
+ * previous step when both belong to one group (`group`, else see editGroup)
+ * and follow each other within a second, so Undo reverts a burst of typing or
+ * a whole drag. An edit without a time, such as Arrange or a code build, is
+ * always a step of its own.
  */
 export function recordEdit(
   history: DraftHistory,
   before: Definition,
   after: Definition,
   at?: number,
+  group?: string,
 ): DraftHistory {
   const past = [...history.past, before].slice(-historyLimit);
-  const group = at === undefined ? null : editGroup(before, after);
-  if (at === undefined || group === null)
+  const joins = at === undefined ? null : (group ?? editGroup(before, after));
+  if (at === undefined || joins === null)
     return { past, future: [], last: null };
   const last = history.last;
-  if (last?.group === group && at - last.at <= joinWithinMs)
-    return { past: history.past, future: [], last: { group, at } };
-  return { past, future: [], last: { group, at } };
+  if (last?.group === joins && at - last.at <= joinWithinMs)
+    return { past: history.past, future: [], last: { group: joins, at } };
+  return { past, future: [], last: { group: joins, at } };
 }
 
 /** The history after Undo replaced `current` with the last past draft. */

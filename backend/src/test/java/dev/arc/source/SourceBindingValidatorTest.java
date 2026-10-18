@@ -64,7 +64,10 @@ class SourceBindingValidatorTest {
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
-              assertThat(error.getMessage()).isEqualTo("Unknown source parameter: wrong");
+              assertThat(error.getMessage())
+                  .isEqualTo(
+                      "amount: data source rates v1 has no parameter named wrong; remove what this"
+                          + " input passes as wrong");
               assertThat(error.locations())
                   .containsExactly(new Location(null, null, "in", "Inputs"));
             });
@@ -76,7 +79,10 @@ class SourceBindingValidatorTest {
             ArcException.class,
             error -> {
               assertThat(error.status()).isEqualTo(422);
-              assertThat(error.getMessage()).isEqualTo("Unknown source parameter: wrong");
+              assertThat(error.getMessage())
+                  .isEqualTo(
+                      "amount: data source rates v1 has no parameter named wrong; remove what this"
+                          + " input passes as wrong");
               assertThat(error.locations()).isEmpty();
             });
   }
@@ -209,7 +215,7 @@ class SourceBindingValidatorTest {
           assertThatThrownBy(
                   () -> validator.validatePinnedContracts(graph, noRules, CalleeCheck.NONE))
               .as(parameter.toString())
-              .hasMessage("amount: missing source mapping for key");
+              .hasMessage("amount: choose what to pass as key to data source table v1");
           assertThatThrownBy(
                   () -> execution.test("table", new SourceExecutionService.Test(Map.of(), 1)))
               .as(parameter.toString())

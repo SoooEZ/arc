@@ -121,3 +121,51 @@ export function httpUrlProblem(url: string): string | null {
     return "Use a port from 1 to 65535.";
   return null;
 }
+
+/** The most secret headers one source sends (HttpDestinationPolicy). */
+export const MAX_SECRET_HEADERS = 10;
+/** Longest secret header name, and longest alias after ARC_SECRET_. */
+const MAX_SECRET_NAME_CHARACTERS = 64;
+const secretHeaderName = new RegExp(
+  `^[A-Za-z][A-Za-z0-9-]{0,${MAX_SECRET_NAME_CHARACTERS - 1}}$`,
+);
+const secretAlias = new RegExp(
+  `^[A-Z][A-Z0-9_]{0,${MAX_SECRET_NAME_CHARACTERS - 1}}$`,
+);
+const forbiddenSecretHeaders = new Set([
+  "host",
+  "content-length",
+  "connection",
+  "transfer-encoding",
+]);
+const secretHeadersRule =
+  "Secret headers map header names to uppercase environment aliases";
+
+/** Whether the server sends a secret header of this name. */
+export function isSecretHeaderName(name: string): boolean {
+  return (
+    secretHeaderName.test(name) &&
+    !forbiddenSecretHeaders.has(name.toLowerCase())
+  );
+}
+
+/** Whether an alias names an environment variable the server reads, ARC_SECRET_<alias>. */
+export function isSecretAlias(alias: string): boolean {
+  return secretAlias.test(alias);
+}
+
+/**
+ * Why the server would refuse these secret headers, in its order and words, or
+ * null. Whether the host is allowlisted for secrets is server configuration.
+ */
+export function secretHeadersProblem(
+  headers: Record<string, string>,
+): string | null {
+  const entries = Object.entries(headers);
+  if (entries.length > MAX_SECRET_HEADERS)
+    return `At most ${MAX_SECRET_HEADERS} secret headers`;
+  for (const [name, alias] of entries)
+    if (!isSecretHeaderName(name) || !isSecretAlias(alias))
+      return secretHeadersRule;
+  return null;
+}

@@ -1,34 +1,52 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
+  Checkbox,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   TextField,
 } from "@mui/material";
+import { CheckCircle2 } from "lucide-react";
+import type { Definition } from "../../types";
 import { MAX_RELEASE_NOTE_CHARACTERS } from "../../domain/limits";
-import { changeLines } from "../../domain/versionChanges";
+import { changeLines, type FieldChange } from "../../domain/versionChanges";
+import {
+  resultCounts,
+  runSavedTests,
+  type TestResult,
+} from "../execution/savedTests";
+import type { SavedTests } from "../execution/useSavedTests";
 import type { PublishReview } from "./useRuleDocument";
 
 /**
  * Confirms a publication after its review: what the new version changes since
- * the latest one, and an optional note the version history shows. A draft
- * identical to the latest version cannot be published again.
+ * the latest one, how the reviewed draft does on the rule's saved tests, and
+ * an optional note the version history shows. A draft identical to the latest
+ * version cannot be published again; one that fails a saved test can, once
+ * the publisher says so.
  */
 export default function PublishDialog({
   review,
+  tests,
   onConfirm,
   onCancel,
 }: {
   review: PublishReview;
+  tests: SavedTests;
   onConfirm: (note: string) => void;
   onCancel: () => void;
 }) {
   const [note, setNote] = useState("");
+  const [failuresAccepted, setFailuresAccepted] = useState(false);
+  const check = useTestCheck(tests, review.definition);
   const tooLong = note.length > MAX_RELEASE_NOTE_CHARACTERS;
   const unchanged = !!review.previous?.changes.identical;
+  const held = check.running || (check.failed > 0 && !failuresAccepted);
   return (
     <Dialog
       open
@@ -42,6 +60,14 @@ export default function PublishDialog({
       </DialogTitle>
       <DialogContent className="publish-review">
         <ReviewedChanges review={review} />
+        {!unchanged && (
+          <TestCheck
+            tests={tests}
+            check={check}
+            accepted={failuresAccepted}
+            onAccept={setFailuresAccepted}
+          />
+        )}
         <TextField
           label="Release note (optional)"
           multiline
@@ -65,7 +91,7 @@ export default function PublishDialog({
         <Button onClick={onCancel}>Cancel</Button>
         <Button
           variant="contained"
-          disabled={unchanged || tooLong}
+          disabled={unchanged || tooLong || held}
           onClick={() => onConfirm(note)}
         >
           Publish v{review.version}
@@ -96,9 +122,145 @@ function ReviewedChanges({ review }: { review: PublishReview }) {
       <strong>Changes since v{version}</strong>
       <ul>
         {changeLines(changes).map((line) => (
-          <li key={line}>{line}</li>
+          <li key={line.text}>
+            {line.text}
+            {line.details.length > 0 && (
+              <ul className="change-details">
+                {line.details.map((detail, index) => (
+                  <li key={`${detail.field}-${index}`}>
+                    <FieldChangeText change={detail} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+function ChangeValue({ value }: { value: string }) {
+  return (
+    <code className="change-value" title={value}>
+      {value}
+    </code>
+  );
+}
+
+/** "Condition: a → b", or that the property was added or removed. */
+function FieldChangeText({ change }: { change: FieldChange }) {
+  const { field, before, after } = change;
+  return (
+    <>
+      <span className="change-field">{field}:</span>{" "}
+      {before === null && after !== null && (
+        <>
+          added <ChangeValue value={after} />
+        </>
+      )}
+      {after === null && before !== null && (
+        <>
+          removed <ChangeValue value={before} />
+        </>
+      )}
+      {before !== null && after !== null && (
+        <>
+          <ChangeValue value={before} /> → <ChangeValue value={after} />
+        </>
+      )}
+    </>
+  );
+}
+
+/** The saved tests run against the reviewed draft once they are read. */
+function useTestCheck(tests: SavedTests, definition: Definition) {
+  const [results, setResults] = useState<Record<number, TestResult>>({});
+  const [done, setDone] = useState(false);
+  const { status, tests: saved } = tests;
+  useEffect(() => {
+    if (status !== "ready" || !saved.length) return;
+    const controller = new AbortController();
+    void runSavedTests(definition, saved, controller.signal, (id, result) =>
+      setResults((current) => ({ ...current, [id]: result })),
+    ).then(() => {
+      if (!controller.signal.aborted) setDone(true);
+    });
+    return () => controller.abort();
+  }, [status, saved, definition]);
+  const counts = resultCounts(saved, results);
+  return {
+    results,
+    running: status === "loading" || (saved.length > 0 && !done),
+    ...counts,
+  };
+}
+
+function TestCheck({
+  tests,
+  check,
+  accepted,
+  onAccept,
+}: {
+  tests: SavedTests;
+  check: ReturnType<typeof useTestCheck>;
+  accepted: boolean;
+  onAccept: (accepted: boolean) => void;
+}) {
+  if (tests.status === "failed")
+    return (
+      <Alert severity="warning">
+        The saved tests could not be read: {tests.error}
+      </Alert>
+    );
+  if (check.running)
+    return (
+      <div className="publish-tests">
+        <CircularProgress size={14} /> Running the saved tests…
+      </div>
+    );
+  if (!tests.tests.length)
+    return (
+      <p className="muted-copy">
+        No saved tests. Save tests in the Test panel to check every version
+        before it is published.
+      </p>
+    );
+  if (!check.failed)
+    return (
+      <div className="publish-tests passed">
+        <CheckCircle2 size={15} />
+        {tests.tests.length === 1
+          ? "The saved test passes."
+          : `All ${tests.tests.length} saved tests pass.`}
+      </div>
+    );
+  const failing = tests.tests.filter(
+    (test) => check.results[test.id] && !check.results[test.id].passed,
+  );
+  return (
+    <Alert severity="warning" className="publish-tests-failed">
+      <strong>
+        {check.failed} of {tests.tests.length} saved tests fail
+      </strong>
+      <ul>
+        {failing.slice(0, 5).map((test) => (
+          <li key={test.id}>
+            {test.name}: {check.results[test.id].reason}
+          </li>
+        ))}
+        {failing.length > 5 && <li>and {failing.length - 5} more</li>}
+      </ul>
+      <FormControlLabel
+        control={
+          <Checkbox
+            size="small"
+            checked={accepted}
+            onChange={(_, value) => onAccept(value)}
+          />
+        }
+        label="Publish anyway"
+      />
+    </Alert>
   );
 }

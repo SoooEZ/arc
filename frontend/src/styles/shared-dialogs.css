@@ -36,3 +36,67 @@
   padding-left: 18px;
   line-height: 1.7;
 }
+/* A changed node's properties, each "Field: before → after". */
+.publish-changes .change-details {
+  margin: 0 0 4px;
+  padding-left: 16px;
+  list-style: none;
+  color: var(--color-library-muted);
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+.change-field {
+  color: var(--color-ink);
+}
+.change-value {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--color-badge);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+/* The saved tests' verdict on the reviewed draft. */
+.publish-tests {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-lg);
+  color: var(--color-library-muted);
+}
+.publish-tests.passed {
+  color: var(--color-brand);
+}
+.publish-tests-failed ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+/* Saving or editing a test: name, inputs and what they must produce. */
+.save-test-dialog.MuiDialogContent-root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* MUI drops the content's top padding after a title, which clips the first
+   outlined field's label. */
+.MuiDialogTitle-root + .save-test-dialog.MuiDialogContent-root {
+  padding-top: 8px;
+}
+.save-test-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-md);
+  color: var(--color-library-muted);
+}
+.save-test-inputs code {
+  font-family: var(--font-mono);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}

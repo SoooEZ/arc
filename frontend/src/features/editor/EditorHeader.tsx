@@ -17,6 +17,8 @@ import {
   type EditorCapabilities,
   type EditorTask,
 } from "./editorCapabilities";
+import type { Publication } from "./usePublication";
+import RestoreVersion from "./RestoreVersion";
 
 /** How the draft relates to what is saved, shown beside the rule kind. */
 function saveStatus(dirty: boolean, readOnly: boolean): string {
@@ -25,8 +27,51 @@ function saveStatus(dirty: boolean, readOnly: boolean): string {
   return "All changes saved";
 }
 
+/**
+ * Whether the draft is live: never published, the latest version as it is,
+ * or changed since that version, as the library card says it.
+ */
+function PublicationChips({ publication }: { publication: Publication }) {
+  if (publication.state === "unpublished")
+    return (
+      <Tooltip title="Publish a version to make this rule callable through the API.">
+        <Chip size="small" className="draft-chip" label="Not published" />
+      </Tooltip>
+    );
+  return (
+    <>
+      <Tooltip
+        title={
+          publication.state === "current"
+            ? `The draft is version ${publication.version} as published.`
+            : `Version ${publication.version} is what the API runs.`
+        }
+      >
+        <Chip
+          size="small"
+          className="published-chip"
+          label={`Published · v${publication.version}`}
+        />
+      </Tooltip>
+      {publication.state === "changed" && (
+        <Tooltip
+          title={`The draft differs from version ${publication.version}. Publish to make the changes callable.`}
+        >
+          <Chip
+            size="small"
+            className="changed-chip"
+            label="Unpublished changes"
+          />
+        </Tooltip>
+      )}
+    </>
+  );
+}
+
 interface Props {
   rule: Rule;
+  /** How the draft relates to the latest published version. */
+  publication: Publication;
   /** The view on screen (`shownView`), which the toggle leaves. */
   mode: "code" | "graph";
   readOnly: boolean;
@@ -46,6 +91,7 @@ interface Props {
 }
 export default function EditorHeader({
   rule,
+  publication,
   mode,
   readOnly,
   dirty,
@@ -80,11 +126,15 @@ export default function EditorHeader({
                 <Settings size={17} />
               </IconButton>
             </Tooltip>
-            <Chip
-              size="small"
-              className={readOnly ? "published-chip" : "draft-chip"}
-              label={readOnly ? `Version ${requestedVersion}` : "Draft"}
-            />
+            {readOnly ? (
+              <Chip
+                size="small"
+                className="published-chip"
+                label={`Version ${requestedVersion}`}
+              />
+            ) : (
+              <PublicationChips publication={publication} />
+            )}
           </div>
           <span>
             {ruleKinds[rule.kind].label}
@@ -136,13 +186,21 @@ export default function EditorHeader({
             </Button>
           </>
         )}
-        {readOnly && !embedded && (
-          <Button
-            variant="contained"
-            onClick={() => navigate(rulePath({ ruleId: rule.id }))}
-          >
-            Edit draft
-          </Button>
+        {readOnly && !embedded && requestedVersion !== null && (
+          <>
+            <RestoreVersion
+              rule={rule}
+              version={requestedVersion}
+              disabled={!can.validate}
+              navigate={navigate}
+            />
+            <Button
+              variant="contained"
+              onClick={() => navigate(rulePath({ ruleId: rule.id }))}
+            >
+              Edit draft
+            </Button>
+          </>
         )}
       </div>
     </div>

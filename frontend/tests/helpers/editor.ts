@@ -68,3 +68,12 @@ export async function publishDraft(page: Page, note?: string) {
   await dialog.getByRole("button", { name: /^Publish v\d+$/ }).click();
   await expect(dialog).toHaveCount(0);
 }
+
+/** Unfolds the Test panel's Run options, where the trace switch and timeout are. */
+export async function openRunOptions(page: Page) {
+  const options = page.locator(".test-panel .run-options");
+  if (
+    !(await options.evaluate((element) => (element as HTMLDetailsElement).open))
+  )
+    await options.locator("summary").click();
+}

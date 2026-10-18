@@ -78,8 +78,8 @@ export default function LookupTableEditor({
     );
   };
   return (
-    <div className="lookup-table">
-      <div className="lookup-table-scroll">
+    <div className="source-table lookup-table">
+      <div className="source-table-scroll">
         <table>
           <thead>
             <tr>
@@ -127,7 +127,7 @@ export default function LookupTableEditor({
           </tbody>
         </table>
       </div>
-      <div className="lookup-table-actions">
+      <div className="source-table-actions">
         <Button
           size="small"
           startIcon={<Plus size={14} />}
@@ -284,7 +284,7 @@ function ValueCell({
   });
   return (
     <input
-      className="lookup-cell"
+      className="table-cell-input"
       aria-label={label}
       value={text}
       disabled={disabled}
@@ -309,7 +309,7 @@ function KeyCell({
   const problem = keyProblem(text, name, taken);
   return (
     <input
-      className={`lookup-cell lookup-key ${problem ? "lookup-cell-invalid" : ""}`}
+      className={`table-cell-input lookup-key ${problem ? "table-cell-invalid" : ""}`}
       aria-label={`Key ${name}`}
       aria-invalid={!!problem}
       title={problem ?? undefined}

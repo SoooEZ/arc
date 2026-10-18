@@ -93,7 +93,7 @@ export default function ReferenceFields({
   return (
     <>
       <InspectorSection
-        title="Select Rule"
+        title="Reused rule"
         help="Choose a published rule and version. This reference stays on the selected version, even when that rule is updated."
         actions={
           <>
@@ -188,7 +188,7 @@ export default function ReferenceFields({
       </InspectorSection>
       {child && (
         <InspectorSection
-          title="Parameters for Rule"
+          title="Rule inputs"
           help="Supply values for the selected version’s parameters. Each card shows its required status and type; values may come from variables, constants, expressions or the referenced rule’s defaults."
         >
           <p className="muted-copy">

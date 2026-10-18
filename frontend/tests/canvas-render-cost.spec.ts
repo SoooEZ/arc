@@ -10,6 +10,7 @@ import {
   installRenderProbe,
   renderCounts,
   resetRenderCounts,
+  settledCommits,
 } from "./helpers/renderProbe";
 import { createRule, publishRule, uniqueId } from "./helpers/api";
 
@@ -116,6 +117,7 @@ test("editing a name on a 100-node rule re-renders about one card per keystroke"
   const name = page.getByLabel("Node name", { exact: true });
   await name.click();
   await page.keyboard.press("End");
+  await settledCommits(page);
   await resetRenderCounts(page);
   await page.keyboard.type("abcdefg", { delay: 80 });
   await expect(name).toHaveValue("Step 1abcdefg");
@@ -315,6 +317,7 @@ test("typing an input parameter's name or dragging another card leaves the other
   const first = names.first();
   await first.click();
   await page.keyboard.press("End");
+  await settledCommits(page);
   await resetRenderCounts(page);
   await page.keyboard.type("0123456789", { delay: 60 });
   await expect(first).toHaveValue("input_10123456789");
@@ -416,6 +419,7 @@ test("typing a Reference parameter mapping leaves the other parameter cards alon
     .getByLabel("p1 *", { exact: true });
   await first.click();
   await page.keyboard.press("End");
+  await settledCommits(page);
   await resetRenderCounts(page);
   await page.keyboard.type("2345", { delay: 60 });
   await expect(first).toHaveValue("12345");

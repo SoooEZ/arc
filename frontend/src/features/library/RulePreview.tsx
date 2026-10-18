@@ -119,7 +119,7 @@ export default function RulePreview({ rule }: { rule: Rule }) {
         <span>
           {detail === "overview"
             ? "Draft overview · open to explore"
-            : "Complete draft graph"}
+            : "Draft graph"}
         </span>
         {graph.missingConnections > 0 && (
           <span className="preview-warning">

@@ -134,13 +134,13 @@ test("reference header actions stay separate from collapse and parameter cards d
   await page.goto(`/#/rules/${parent.id}?node=ref`);
   const inspector = sidebar(page);
   const heading = inspector.locator(".inspector-section-heading").filter({
-    has: page.getByRole("button", { name: "Select Rule", exact: true }),
+    has: page.getByRole("button", { name: "Reused rule", exact: true }),
   });
   const section = heading.getByRole("button", {
-    name: "Select Rule",
+    name: "Reused rule",
     exact: true,
   });
-  const info = heading.getByRole("button", { name: "Select Rule help" });
+  const info = heading.getByRole("button", { name: "Reused rule help" });
   const open = heading.getByRole("button", { name: "Open referenced rule" });
   await expect(section).toHaveAttribute("aria-expanded", "true");
   await expect(heading.locator("button button")).toHaveCount(0);
@@ -160,7 +160,7 @@ test("reference header actions stay separate from collapse and parameter cards d
     }),
   ).toBeVisible();
   const parameters = inspector.getByRole("region", {
-    name: "Parameters for Rule section",
+    name: "Rule inputs section",
     exact: true,
   });
   const amount = parameters.getByRole("group", { name: "Parameter amount" });
@@ -182,7 +182,7 @@ test("reference header actions stay separate from collapse and parameter cards d
     ).toHaveCount(0);
   }
   await expect(
-    inspector.getByRole("button", { name: "Output As", exact: true }),
+    inspector.getByRole("button", { name: "Save result as", exact: true }),
   ).toBeVisible();
   await page.mouse.move(70, 70);
   await page.screenshot({

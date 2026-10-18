@@ -200,7 +200,8 @@ class RuleDefinitionServiceTest {
 
     assertThat(problems).extracting(Validator.Problem::message).hasSize(2);
     assertThat(problems.getFirst().message()).startsWith("Calc: ");
-    assertThat(problems.getLast().message()).isEqualTo("value: missing source mapping for key");
+    assertThat(problems.getLast().message())
+        .isEqualTo("value: choose what to pass as key to data source remote v1");
     assertThat(problems.getLast().locations())
         .containsExactly(
             new Location("child", 1, "in", "Input"), new Location(null, null, "out", "Return"));
@@ -240,7 +241,7 @@ class RuleDefinitionServiceTest {
     assertThat(problems)
         .contains(
             new Validator.Problem(
-                "value: missing source mapping for key",
+                "value: choose what to pass as key to data source remote v1",
                 List.of(
                     new Location("child", 1, "in", "Input"),
                     new Location(null, null, "reuse", "Reuse"))));

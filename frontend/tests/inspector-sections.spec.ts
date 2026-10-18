@@ -65,7 +65,7 @@ test("inspector accordions start expanded and variable help opens above without 
     exact: true,
   });
   const result = sidebar.getByRole("button", {
-    name: "Output As",
+    name: "Save result as",
     exact: true,
   });
   await expect(expression).toHaveAttribute("aria-expanded", "true");
@@ -182,7 +182,7 @@ test("inspector accordions start expanded and variable help opens above without 
   await expression.click();
   await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
   await expect(
-    sidebar.getByRole("button", { name: "Output As", exact: true }),
+    sidebar.getByRole("button", { name: "Returns", exact: true }),
   ).toHaveAttribute("aria-expanded", "true");
   await expect(
     sidebar.getByRole("button", { name: /^Available variables/ }),
@@ -256,7 +256,7 @@ test("node edit modal shares section controls without losing pending form values
     .getByLabel("Result variable", { exact: true })
     .fill("quoted_price");
   const result = dialog.getByRole("button", {
-    name: "Output As",
+    name: "Save result as",
     exact: true,
   });
   await result.click();

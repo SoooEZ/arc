@@ -137,13 +137,22 @@ public final class SourceBindingValidator {
       var binding = input.source();
       var configuration = configurations.get(binding.id(), binding.version());
       var names = configuration.parameters().stream().map(Input::name).toList();
+      String source = "data source " + binding.id() + " v" + binding.version();
       for (String key : binding.bindings().keySet())
-        if (!names.contains(key)) throw ArcException.invalid("Unknown source parameter: " + key);
+        if (!names.contains(key))
+          throw ArcException.invalid(
+              input.name()
+                  + ": "
+                  + source
+                  + " has no parameter named "
+                  + key
+                  + "; remove what this input passes as "
+                  + key);
       // Source parameters are never sourced themselves (SourceValidator), so the one rule applies.
       for (Input parameter : configuration.parameters())
         if (parameter.needsCallerValue() && !binding.bindings().containsKey(parameter.name()))
           throw ArcException.invalid(
-              input.name() + ": missing source mapping for " + parameter.name());
+              input.name() + ": choose what to pass as " + parameter.name() + " to " + source);
     } catch (ArcException error) {
       throw Validator.onInputNode(error, definition);
     }

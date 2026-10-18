@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Alert, Button } from "@mui/material";
 import type { ErrorLocation, GraphProblem } from "../../api/errors";
 import { isCurrentGraphLocation } from "../../domain/graph";
@@ -25,6 +26,7 @@ export default function ExecutionError({
   others,
   shown,
   inputNodeId,
+  action,
   onNode,
   onOpenReference,
   onEditInputs,
@@ -37,6 +39,8 @@ export default function ExecutionError({
   shown: { ruleId: string; version: number | null };
   /** The shown graph's Input node, or null when the draft has none. */
   inputNodeId: string | null;
+  /** A command after the ways out, such as saving the run as a test. */
+  action?: ReactNode;
   onNode: (id: string) => void;
   onOpenReference: (target: ReferenceTarget) => void;
   onEditInputs: () => void;
@@ -88,6 +92,7 @@ export default function ExecutionError({
             Edit test inputs
           </Button>
         )}
+        {action}
       </div>
       {!!others.length && (
         <OtherProblems problems={others} shown={shown} onNode={onNode} />

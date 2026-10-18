@@ -5,7 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import { editorLines, setEditorText } from "./helpers/editor";
+import { editorLines, openRunOptions, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
@@ -70,6 +70,7 @@ test("preview inputs, options and result survive view switches and unbuilt code"
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await setEditorText(page, inputJson(page), '{"amount": 3}');
+  await openRunOptions(page);
   await traceSwitch(page).uncheck();
   await timeout(page).click();
   await page.getByRole("option", { name: "5 seconds", exact: true }).click();

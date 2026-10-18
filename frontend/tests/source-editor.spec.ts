@@ -1,5 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { lookupEntriesJson } from "./helpers/sources";
+import {
+  lookupEntriesJson,
+  secretHeadersJson,
+  sourceParametersJson,
+  testParametersJson,
+} from "./helpers/sources";
 import type { DataSource } from "../src/types";
 
 function source(id: string, name: string): DataSource {
@@ -175,7 +180,7 @@ for (const scenario of ["current", "reopened", "failed"] as const) {
           "Source A",
         );
       }
-      const input = page.getByLabel("Test parameters · JSON");
+      const input = await testParametersJson(page);
       await expect(input).toBeEnabled();
       await input.fill('{"key":"CUSTOM"}');
       gate.release();
@@ -241,7 +246,7 @@ for (const change of ["source", "version", "input"] as const) {
         await page.getByRole("option", { name: "v1 · immutable" }).click();
       }
       if (change === "input")
-        await page.getByLabel("Test parameters · JSON").fill('{"key":"GB"}');
+        await (await testParametersJson(page)).fill('{"key":"GB"}');
       gate.release();
       await expect.poll(() => delivered).toBe(true);
       await response;
@@ -609,7 +614,7 @@ for (const failure of [false, true]) {
       await page.getByRole("combobox", { name: "Inspect version" }).click();
       await page.getByRole("option", { name: "v1 · immutable" }).click();
       await expect.poll(() => held).toBe(true);
-      const input = page.getByLabel("Test parameters · JSON");
+      const input = await testParametersJson(page);
       await input.fill('{"key":"CUSTOM"}');
       gate.release();
       await expect(page.getByLabel("Loading source version")).toHaveCount(0);
@@ -661,18 +666,16 @@ for (const provider of ["HTTP", "LOOKUP"] as const) {
         .getByRole("option", { name: "HTTP GET · JSON response" })
         .click();
       await page.getByLabel("HTTP URL").fill("https://example.com/source");
-      await page
-        .getByLabel("Secret header aliases · JSON")
-        .fill('{"Authorization":"CRM_TOKEN"}');
+      await (
+        await secretHeadersJson(page)
+      ).fill('{"Authorization":"CRM_TOKEN"}');
     } else {
       await providerField.click();
       await page
         .getByRole("option", { name: "HTTP GET · JSON response" })
         .click();
       await page.getByLabel("HTTP URL").fill("https://example.com/obsolete");
-      await page
-        .getByLabel("Secret header aliases · JSON")
-        .fill("{unfinished headers");
+      await (await secretHeadersJson(page)).fill("{unfinished headers");
       await providerField.click();
       await page.getByRole("option", { name: "Local lookup table" }).click();
       await (await lookupEntriesJson(page)).fill('{"US": false}');
@@ -757,7 +760,14 @@ test("the HTTP timeout keeps typed text and blocks values the server rejects", a
   await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
   await page.getByLabel("Provider").click();
   await page.getByRole("option", { name: "HTTP GET · JSON response" }).click();
-  // Source parameters are scalar; the helper lists only accepted types.
+  // Source parameters are scalar: the table offers only the accepted types,
+  // and the JSON view's helper lists only those.
+  await expect(
+    page
+      .getByRole("combobox", { name: "Parameter 1 · type", exact: true })
+      .locator("option"),
+  ).toHaveText(["number", "string", "boolean"]);
+  await sourceParametersJson(page);
   await expect(
     page.getByText(
       "Declare name, type (STRING / NUMBER / BOOLEAN), required, and optional defaultValue.",
@@ -870,7 +880,7 @@ test("switching the provider away and back leaves an unchanged source clean", as
   );
   await page.goto("/#/sources");
   await expect(page.getByLabel("Source ID")).toHaveValue("source-a");
-  const parameters = page.getByLabel("Source parameters · JSON");
+  const parameters = await sourceParametersJson(page);
   await expect(parameters).toHaveValue(/country/);
   // The version chip says whether the source has unsaved edits; Save also
   // waits for a URL here, which the HTTP provider needs.

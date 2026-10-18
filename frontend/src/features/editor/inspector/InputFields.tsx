@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button, Tooltip } from "@mui/material";
 import { Plus } from "lucide-react";
 import type { Definition } from "../../../types";
@@ -28,10 +28,9 @@ export default function InputFields({
   onInvalidDefault,
 }: NodeFieldsProps) {
   const allVariables = useInputVariables(rule.draft);
-  const parameters = useInputParameterRows(
-    rule.draft.inputs,
-    onDefinitionChange,
-  );
+  const parameters = useInputParameterRows(rule.draft, onDefinitionChange);
+  // The parameter Add parameter appended, whose name field takes the focus.
+  const [added, setAdded] = useState<number | null>(null);
   const onValidity = useCallback(
     (id: string, valid: boolean) => onInvalidDefault(id, !valid),
     [onInvalidDefault],
@@ -53,7 +52,9 @@ export default function InputFields({
           // without a source shows none, so a name typed in another card
           // leaves it alone (lesson F39).
           variables={input.source ? allVariables : noVariables}
+          focusName={index === added}
           onChange={parameters.change}
+          onRename={parameters.rename}
           onRemove={parameters.remove}
           onValidity={onValidity}
         />
@@ -73,7 +74,10 @@ export default function InputFields({
               variant="outlined"
               startIcon={<Plus size={14} />}
               disabled={!canAddInput(rule.draft)}
-              onClick={parameters.add}
+              onClick={() => {
+                setAdded(rule.draft.inputs.length);
+                parameters.add();
+              }}
             >
               Add parameter
             </Button>

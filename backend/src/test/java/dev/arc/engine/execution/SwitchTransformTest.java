@@ -117,7 +117,9 @@ class SwitchTransformTest {
         ScriptParsing.parse(
             script.render(choice()).replace("let price = amount;", "let other = amount;"));
     assertThatThrownBy(() -> run(missing, Map.of("amount", 100)))
-        .hasMessageContaining("unavailable");
+        .hasMessageContaining(
+            "Result: uses price, which is not set on every path into this step; set it on each"
+                + " path that leads here");
   }
 
   @Test

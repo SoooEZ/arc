@@ -53,7 +53,14 @@ test("publishing reviews the changes since the latest version, keeps a note and 
   await page.goto(`/#/rules/${rule.id}`);
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   dialog = page.getByRole("dialog", { name: "Publish version 2" });
-  await expect(dialog.getByRole("listitem")).toHaveText(["Changed: Total"]);
+  // Each changed node lists its properties before and after.
+  await expect(dialog.locator(".publish-changes > ul > li")).toHaveCount(1);
+  await expect(dialog.locator(".publish-changes > ul > li")).toContainText(
+    "Changed: Total",
+  );
+  await expect(dialog.locator(".change-details > li")).toHaveText([
+    "Name: Result → Total",
+  ]);
   await dialog.getByLabel("Release note (optional)").fill("Names the total");
   await dialog.getByRole("button", { name: "Publish v2", exact: true }).click();
   await expect(

@@ -156,7 +156,8 @@ class FanOutTest {
         .isInstanceOfSatisfying(
             ArcException.class,
             e -> {
-              assertThat(e.getMessage()).contains("unavailable");
+              assertThat(e.getMessage())
+                  .contains("uses shipping, which is not set on every path into this step");
               assertThat(e.locations().getFirst().nodeId()).isEqualTo("tax");
             });
   }

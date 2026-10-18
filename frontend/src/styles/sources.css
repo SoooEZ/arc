@@ -37,6 +37,11 @@
   grid-template-columns: 240px minmax(0, 1fr);
   gap: 28px;
 }
+/* A narrow screen stacks the layout and scrolls the cards sideways
+   (studio-compact.css); without a zero minimum, their row widened the page. */
+.source-catalog {
+  min-width: 0;
+}
 .source-list > button {
   display: flex;
   align-items: center;
@@ -66,7 +71,7 @@
   margin-top: 6px;
   color: #69796a;
 }
-.source-list p {
+.source-catalog > p {
   font-size: var(--text-lg);
   color: #6b786a;
   line-height: 1.8;
@@ -176,7 +181,7 @@
 .source-manager-dialog .source-detail-heading h2 {
   overflow-wrap: anywhere;
 }
-.source-manager-dialog .source-detail-heading > .MuiButton-root {
+.source-manager-dialog .source-detail-heading > .source-save {
   flex-shrink: 0;
 }
 .source-manager-dialog .MuiDialogActions-root {
@@ -186,34 +191,43 @@
   color: #657869;
   font-size: var(--text-xl);
 }
-/* Lookup entries: a heading with the Table / JSON switch, then either view. */
-.lookup-entries {
+/* A form section with a heading and its view switch: the source parameters,
+   the lookup entries and the test parameters. */
+.source-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.lookup-entries-heading {
+.source-section-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   font-size: var(--text-lg);
   font-weight: 600;
   color: #4f6a57;
 }
-.lookup-table {
+.source-section-problem {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-danger);
+}
+/* The parameter and lookup tables: compact cells that read as text until
+   they are hovered or focused. */
+.source-table {
   border: 1px solid #e2e8e0;
   border-radius: 8px;
 }
-.lookup-table-scroll {
+.source-table-scroll {
   max-height: 360px;
   overflow: auto;
 }
-.lookup-table table {
+.source-table table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--text-lg);
 }
-.lookup-table th {
+.source-table th {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -225,14 +239,14 @@
   border-bottom: 1px solid #e2e8e0;
   white-space: nowrap;
 }
-.lookup-table th > span:first-child {
+.source-table th > span:first-child {
   margin-right: 2px;
 }
-.lookup-table td {
+.source-table td {
   padding: 2px 4px;
   border-bottom: 1px solid #eef2ed;
 }
-.lookup-cell {
+.table-cell-input {
   width: 100%;
   min-width: 80px;
   padding: 6px;
@@ -243,21 +257,29 @@
   font-size: var(--text-lg);
   color: var(--color-code-text);
 }
-.lookup-cell:hover:not(:disabled) {
+.table-cell-input:hover:not(:disabled) {
   border-color: #dfe7dc;
 }
-.lookup-cell:focus {
+.table-cell-input:focus {
   outline: none;
   border-color: var(--color-focus-ring);
   background: var(--color-surface);
 }
-.lookup-key {
-  font-weight: 600;
-}
-.lookup-cell-invalid {
+.table-cell-invalid {
   border-color: var(--color-danger);
 }
-.lookup-table-actions {
+.lookup-key,
+.parameter-name,
+.secret-header-name {
+  font-weight: 600;
+}
+.source-table-empty {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: var(--text-md);
+  color: var(--color-library-muted);
+}
+.source-table-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -267,11 +289,49 @@
   font-size: var(--text-sm);
   color: var(--color-library-muted);
 }
-.lookup-table-actions > span:last-child {
+.source-table-actions > span:last-child {
   margin-left: auto;
 }
 .lookup-add-field {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+/* The button kept only the room the field left it and wrapped "Add column". */
+.lookup-add-field .MuiButton-root {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+/* Name and Default share what the fixed-width Type and Required leave. */
+.parameter-table th:nth-child(2) {
+  width: 150px;
+}
+.parameter-table th:nth-child(3) {
+  width: 96px;
+}
+.parameter-table select.table-cell-input {
+  min-width: 96px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.parameter-table select.table-cell-input:disabled {
+  cursor: default;
+}
+.parameter-fixed-name {
+  display: block;
+  padding: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-code-text);
+}
+.parameter-default {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.parameter-default small {
+  padding: 0 6px 4px;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
 }

@@ -3,6 +3,7 @@ import type { Definition, Input } from "../../../types";
 import { newInputParameter, updateGraphInputs } from "../../../domain/graph";
 import { canAddInput } from "../../../domain/limits";
 import { useRowIdentities } from "./useRowIdentities";
+import { useVariableRename } from "./useVariableRename";
 
 /**
  * Row identity belongs to the editing session, never to the persisted input
@@ -11,22 +12,47 @@ import { useRowIdentities } from "./useRowIdentities";
  * for its own edits alone (lesson F39).
  */
 export function useInputParameterRows(
-  inputs: Input[],
-  onDefinitionChange: (update: (definition: Definition) => Definition) => void,
+  definition: Definition,
+  onDefinitionChange: (
+    update: (definition: Definition) => Definition,
+    group?: string,
+  ) => void,
 ) {
   const rows = useRowIdentities<Input>("input-row");
-  const change = useCallback(
-    (id: string, patch: Partial<Input>) =>
-      onDefinitionChange((definition) =>
-        updateGraphInputs(definition, (current) =>
-          current.map((input) =>
-            rows.identity(input) === id
-              ? rows.carry(input, { ...input, ...patch })
-              : input,
-          ),
+  const renameVariable = useVariableRename(definition, onDefinitionChange);
+  const update = useCallback(
+    (id: string, patch: Partial<Input>) => (definition: Definition) =>
+      updateGraphInputs(definition, (current) =>
+        current.map((input) =>
+          rows.identity(input) === id
+            ? rows.carry(input, { ...input, ...patch })
+            : input,
         ),
       ),
-    [onDefinitionChange, rows],
+    [rows],
+  );
+  const change = useCallback(
+    (id: string, patch: Partial<Input>) =>
+      onDefinitionChange(update(id, patch)),
+    [onDefinitionChange, update],
+  );
+  /** A typed name also renames the variable in every expression that reads it. */
+  const rename = useCallback(
+    (id: string, name: string) =>
+      renameVariable(
+        `input-name:${id}`,
+        (draft) => {
+          const index = draft.inputs.findIndex(
+            (input) => rows.identity(input) === id,
+          );
+          return index < 0
+            ? null
+            : { declaration: { input: index }, name: draft.inputs[index].name };
+        },
+        name,
+        update(id, { name }),
+      ),
+    [renameVariable, rows, update],
   );
   const remove = useCallback(
     (id: string) =>
@@ -50,12 +76,13 @@ export function useInputParameterRows(
     [onDefinitionChange],
   );
   return {
-    rows: inputs.map((input, index) => ({
+    rows: definition.inputs.map((input, index) => ({
       input,
       index,
       id: rows.identity(input),
     })),
     change,
+    rename,
     remove,
     add,
   };

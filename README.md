@@ -287,6 +287,7 @@ The result is `120`, alongside the executed version, phase timing, and a bounded
 - Undo and redo graph edits with the toolbar or ⌘/Ctrl Z and ⌘/Ctrl Shift Z (a burst of typing or a drag is one step); Delete or Backspace removes the selected card or connection.
 - Connect one result to multiple downstream nodes by dragging from the same handle; select an edge to remove it.
 - Connections route around node cards automatically, including while moving nodes or dragging a new connection. Covered handles show a warning with links to the affected connections; move nodes apart or use **Arrange graph** to restore a clear path.
+- Rename an input parameter or a result variable and every expression that reads it follows as you type, in one Undo step. While the new name is incomplete or another variable already has it, the expressions keep the last name they could follow.
 - Use the condition builder or write an expression, including compound conditions. A Condition branches True/False, or through ordered first-match cases plus Default: its **Branches** setting switches between True / False, cases checked as conditions, and matching a value, and keeps the node's connections (True becomes the first case and False becomes Default).
 - Choose an Output’s return value from available inputs/upstream results, enter a typed constant (number, string, boolean, array or null), or write an expression. String constants need no manual quotation marks.
 - Navigate with the node outline, minimap, auto-layout, or links to referenced rules. Arrange graph accounts for the fixed True/False exits and reorders branches to reduce crossings.
@@ -294,10 +295,11 @@ The result is `120`, alongside the executed version, phase timing, and a bounded
 - Map parameters using connected upstream variables, typed constants, or expressions, and pin an exact published version. String constants need no manual quotation marks.
 - Open a node’s **Node expression** editor to change its calculations, mappings and connections together. Syntax and scope errors mark their owning nodes red, and each card and the inspector state the node's first problem as a sentence ("Connect the True and False exits"); runtime failures also mark the calling reference.
 - Browse referenced versions in one modal with **Back** and **Close all**, preserving the parent draft.
-- Test the current graph without saving, entering inputs in a form built from their declared types (an input can be left out or sent as null) or as JSON; inspect results and a highlighted execution path. Error actions jump to the affected node, including failures inside referenced rules, and a refused run lists every problem of the graph.
+- Test the current graph without saving, entering inputs in a form built from their declared types (an input can be left out or sent as null) or as JSON; inspect results and a highlighted execution path. A form field whose text is not a value of its type holds the run and takes the focus. Error actions jump to the affected node, including failures inside referenced rules, and a refused run lists every problem of the graph.
+- Save a run as a test with the result, or the error, it should produce. **Saved tests** run against the draft in one click and show what each returned against what it expects; an intended change becomes the new expectation with **Expect this result**. Publishing runs them against the reviewed draft and asks before it publishes a version that fails one.
 - Edit the rule name and description with the gear beside the current rule name.
-- Save incomplete drafts, validate complete graphs, and publish immutable versions. Publishing shows what changed since the latest version and takes an optional release note, which the version history lists; a draft identical to the latest version cannot be published again, and the library marks rules with unpublished changes.
-- Inspect historical versions, export graph JSON, and execute releases in the API playground.
+- Save incomplete drafts (⌘/Ctrl S), validate complete graphs, and publish immutable versions. Publishing shows what changed since the latest version, property by property ("Condition: orderTotal >= 100 → orderTotal >= 120"), and takes an optional release note, which the version history lists; a draft identical to the latest version cannot be published again. The editor header and the library say whether a rule is unpublished, published as it is, or has unpublished changes.
+- Inspect historical versions and restore one to the draft, as one undoable edit, to publish it again; export graph JSON; and execute releases in the API playground with inputs as JSON or in a form.
 - Call the service using HTTP/cURL from any origin. Authentication is deliberately deferred.
 
 **Access model:** all authoring and execution endpoints are currently unauthenticated, and CORS allows all origins. The containers listen on the host's configured ports. Other machines can call the host's reachable IP or hostname; this repository does not provision a public cloud host. JWT, authorization, and production rate limiting remain future work.
@@ -400,11 +402,11 @@ GitHub Actions runs module-boundary and native startup diagnostics checks, Java 
 
 - JWT authentication and permission boundaries for authoring versus execution.
 - Aggregation sources and operations (the **A** in ARC).
-- Rule test suites, richer value types, audit history, and release promotion.
+- Running saved tests from CI, richer value types, audit history, and release promotion.
 - Production deployment, request quotas, monitoring, and backup policies.
 
 ### Code studio and data sources
 
-Use the separate **Code studio** page for Monaco editing, function chips grouped by purpose with expandable categories, search and hover help, reusable module insertion, and bidirectional graph editing. **Data sources** supplies missing inputs from versioned lookup tables, edited as a table or as JSON, or HTTP JSON APIs. See [the studio guide](docs/studio.md) for syntax, examples, compatibility boundaries, source configuration, and endpoints.
+Use the separate **Code studio** page for Monaco editing, function chips grouped by purpose with expandable categories, search and hover help, reusable module insertion, and bidirectional graph editing. **Data sources** supplies missing inputs from versioned lookup tables or HTTP JSON APIs; parameters, lookup entries, secret headers and test parameters are edited as tables or forms, with JSON one toggle away. See [the studio guide](docs/studio.md) for syntax, examples, compatibility boundaries, source configuration, and endpoints.
 
 Graph expressions also offer **Functions & editor**, with the same catalog, completion, variable insertion and validation. Condition nodes with cases provide ordered, first-match cases plus Default (stored and scripted as a `SWITCH`, while a True/False Condition stays a `CONDITION`); **Transform** nodes provide field mappings or whole object/array expressions for data cleaning, conversion and reshaping. Both round-trip through Code studio and use the normal save, publish and reuse workflow. Existing graphs and published versions keep both node types and their behavior.

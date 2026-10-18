@@ -1,4 +1,4 @@
-import { lazy, useCallback, useMemo, useRef, useState } from "react";
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, CircularProgress } from "@mui/material";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { GraphProblem } from "../../api/errors";
@@ -24,6 +24,10 @@ import { useGraphCommands } from "./canvas/useGraphCommands";
 import { useGraphFocus } from "./canvas/useGraphFocus";
 import { exportDefinition } from "./exportDefinition";
 import { usePreviewExecution } from "./usePreviewExecution";
+import { useSavedTests } from "../execution/useSavedTests";
+import { usePublication } from "./usePublication";
+import { useSaveShortcut } from "./useSaveShortcut";
+import { takeRestore } from "./draftRestore";
 import { useNodeDialog } from "./useNodeDialog";
 import LazyNodeDialog from "./LazyNodeDialog";
 import { useNodeSelection } from "./useNodeSelection";
@@ -49,8 +53,8 @@ function MoreProblems({ count }: { count: number }) {
   return (
     <span className="alert-more">
       {count === 1
-        ? " 1 more problem is marked on the canvas."
-        : ` ${count} more problems are marked on the canvas.`}
+        ? "1 more problem is marked on the canvas."
+        : `${count} more problems are marked on the canvas.`}
     </span>
   );
 }
@@ -134,7 +138,30 @@ function EditorContent({
     deleteRule,
   } = document;
   const graphKey = useMemo(() => semanticGraphKey(rule.draft), [rule.draft]);
+  const publication = usePublication(rule, !readOnly && !embedded);
+  // A version restored from its view arrives once, as the draft editor opens.
+  const restoreChecked = useRef(false);
+  const { id: ruleId, createdAt } = rule;
+  useEffect(() => {
+    if (restoreChecked.current || readOnly || embedded) return;
+    restoreChecked.current = true;
+    const restore = takeRestore({ id: ruleId, createdAt });
+    if (restore && edit(() => editableDraft(restore.definition)))
+      notify(
+        `Version ${restore.version} restored to the draft. Save it, or publish it as a new version.`,
+      );
+  }, [readOnly, embedded, ruleId, createdAt, edit, notify]);
+  // ⌘/Ctrl S saves the draft wherever the focus is, as Code studio does.
+  useSaveShortcut(!readOnly && !embedded, () => {
+    if (can.save) void action("save");
+  });
   const preview = usePreviewExecution(rule.draft, graphKey);
+  const savedTests = useSavedTests(
+    rule.id,
+    rule.draft,
+    graphKey,
+    preview.open || publishReview !== null,
+  );
   const {
     node,
     selected,
@@ -266,6 +293,7 @@ function EditorContent({
   const testPanel = preview.open && (
     <TestPanel
       preview={preview}
+      tests={savedTests}
       ruleId={rule.id}
       definition={rule.draft}
       version={requestedVersion}
@@ -302,6 +330,7 @@ function EditorContent({
     <div className="editor">
       <EditorHeader
         rule={rule}
+        publication={publication}
         mode={view}
         readOnly={readOnly}
         dirty={dirty}
@@ -474,6 +503,7 @@ function EditorContent({
         <LazyBoundary label="publish dialog" onDismiss={cancelPublication}>
           <PublishDialog
             review={publishReview}
+            tests={savedTests}
             onConfirm={(note) => void confirmPublication(note)}
             onCancel={cancelPublication}
           />

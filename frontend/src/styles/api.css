@@ -44,6 +44,7 @@
   overflow: hidden;
 }
 .api-console-heading {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -60,6 +61,30 @@
   margin-left: auto;
   font-size: var(--text-sm);
   color: var(--color-api-muted);
+}
+.api-console-heading .MuiButton-root {
+  flex-shrink: 0;
+}
+/* The inputs' label with its JSON | Form switch. */
+.api-input-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.api-input-heading .MuiTabs-root,
+.api-input-heading .MuiTab-root {
+  min-height: 30px;
+}
+.api-input-heading .MuiTab-root {
+  padding: 0 12px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  text-transform: none;
+}
+.api-request .input-form {
+  padding: 0;
+  overflow: visible;
 }
 .api-console-body {
   display: grid;

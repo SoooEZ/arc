@@ -235,6 +235,40 @@ export function expressionSymbols(
 }
 
 /**
+ * The expression with every read of the variable `from` reading `to` instead:
+ * the root of a name or property path (`from.total` keeps its `.total`), never
+ * a property after a dot, a function, a Formula call, text inside a string, or
+ * a collection binder named `from` with the body that reads it.
+ */
+export function renameVariable(
+  source: string,
+  from: string,
+  to: string,
+): string {
+  const lexical = tokens(source, false);
+  const locals = localScopes(lexical);
+  let renamed = "";
+  let copied = 0;
+  for (let index = 0; index < lexical.length; index++) {
+    const token = lexical[index];
+    if (!token.identifier || /^[$@]/.test(token.text)) continue;
+    const root = token.text.split(".")[0];
+    if (root !== from || lexical[index + 1]?.text === "(") continue;
+    if (lexical[index - 1]?.text === ".") continue;
+    const local = locals.some(
+      (scope) =>
+        scope.name === root &&
+        (index === scope.declaration ||
+          (index >= scope.start && index < scope.end)),
+    );
+    if (local) continue;
+    renamed += source.slice(copied, token.offset) + to;
+    copied = token.offset + root.length;
+  }
+  return copied ? renamed + source.slice(copied) : source;
+}
+
+/**
  * The variable names a script buffer declares, whether or not it builds:
  * parameters in `inputs`, `let` locals, `as` results and `source` parameters.
  */

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ComponentType } from "react";
-import type { Definition, NodeType, Rule, RuleNode } from "../../../types";
+import type { NodeType, Rule, RuleNode } from "../../../types";
 import type { ReferenceTarget } from "../types";
 import { clearUnusedProperties, nodeKinds } from "../../../domain/nodeKinds";
 import InputFields from "./InputFields";
@@ -31,7 +31,7 @@ export interface NodeFormProps {
   node: RuleNode;
   readOnly: boolean;
   onNodeChange: (id: string, patch: Partial<RuleNode>) => void;
-  onDefinitionChange: (fn: (d: Definition) => Definition) => void;
+  onDefinitionChange: NodeFieldsProps["onDefinitionChange"];
   onInvalidDefault: (key: string, invalid: boolean) => void;
   onOpenReference: (target: ReferenceTarget) => void;
 }

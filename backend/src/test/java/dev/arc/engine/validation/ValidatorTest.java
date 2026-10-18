@@ -61,7 +61,9 @@ class ValidatorTest {
                 edge("test", "result", "false"),
                 edge("calculation", "result", "next")));
     assertThatThrownBy(() -> validator.validate(d, resolver))
-        .hasMessageContaining("unavailable on every incoming path: x");
+        .hasMessageContaining(
+            "uses x, which is not set on every path into this step; set it on each path that"
+                + " leads here");
   }
 
   /**
@@ -308,7 +310,7 @@ class ValidatorTest {
             calculation().nodes(),
             calculation().edges());
     assertThatThrownBy(() -> validator.validate(d, (id, v) -> child))
-        .hasMessageContaining("missing binding for amount");
+        .hasMessage("reuse: choose what to pass as amount to missing v1");
 
     // A binding must name an input of the pinned version; removing this check failed no test.
     var bindings = new LinkedHashMap<String, String>();
@@ -332,13 +334,16 @@ class ValidatorTest {
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
-              assertThat(error.getMessage()).isEqualTo("reuse: unknown parameter ghost");
+              assertThat(error.getMessage())
+                  .isEqualTo(
+                      "reuse: child v1 has no input named ghost; remove what this step passes as ghost");
               assertThat(error.locations())
                   .containsExactly(new ArcException.Location(null, null, "reuse", "reuse"));
             });
     assertThat(validator.diagnose(extra, (id, v) -> child).problems())
         .extracting(Validator.Problem::message)
-        .containsExactly("reuse: unknown parameter ghost");
+        .containsExactly(
+            "reuse: child v1 has no input named ghost; remove what this step passes as ghost");
   }
 
   @Test

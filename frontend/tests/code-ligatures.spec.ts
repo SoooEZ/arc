@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { lookupEntriesJson } from "./helpers/sources";
+import { lookupEntriesJson, testParametersJson } from "./helpers/sources";
 import { createRule, uniqueId, uniqueStamp } from "./helpers/api";
 
 /**
@@ -112,7 +112,8 @@ test("canvas expressions and JSON fields draw every operator character", async (
     matchesOff: true,
     ligaturesVisible: true,
   });
-  for (const surface of [entries, page.getByLabel("Test parameters · JSON")])
+  const testInput = await testParametersJson(page);
+  for (const surface of [entries, testInput])
     await expect(surface).toHaveCSS("font-variant-ligatures", "none");
 });
 

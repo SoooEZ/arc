@@ -16,7 +16,10 @@ const providerIcons: Record<SourceKind, LucideIcon> = {
   HTTP: Globe2,
 };
 
-/** The searchable, paged list of sources beside the open one. */
+/**
+ * The searchable, paged list of sources beside the open one. On a narrow
+ * screen the list itself scrolls sideways under the search field.
+ */
 export default function SourceList({
   catalog,
   selectedId,
@@ -27,7 +30,7 @@ export default function SourceList({
   onSelect: (source: SourceSummary) => Promise<void>;
 }) {
   return (
-    <aside className="source-list">
+    <aside className="source-catalog">
       <TextField
         label="Search data sources"
         value={catalog.search}
@@ -48,21 +51,23 @@ export default function SourceList({
           Could not load data sources: {catalog.error}
         </Alert>
       )}
-      {catalog.rows.map((source) => (
-        <button
-          className={selectedId === source.id ? "active" : ""}
-          key={source.id}
-          onClick={() => void onSelect(source)}
-        >
-          <ProviderIcon kind={source.kind} />
-          <span>
-            {source.name}
-            <small>
-              {source.id} · v{source.version}
-            </small>
-          </span>
-        </button>
-      ))}
+      <div className="source-list">
+        {catalog.rows.map((source) => (
+          <button
+            className={selectedId === source.id ? "active" : ""}
+            key={source.id}
+            onClick={() => void onSelect(source)}
+          >
+            <ProviderIcon kind={source.kind} />
+            <span>
+              {source.name}
+              <small>
+                {source.id} · v{source.version}
+              </small>
+            </span>
+          </button>
+        ))}
+      </div>
       <CatalogPagination
         label="Data sources"
         offset={catalog.page.offset}

@@ -60,6 +60,8 @@ export interface PublishReview {
   previous: { version: number; changes: VersionChanges } | null;
   /** ruleSnapshot of the reviewed rule: confirming publishes that rule only. */
   snapshot: string;
+  /** The reviewed draft, which the saved tests run against. */
+  definition: Definition;
 }
 
 /** Computes positions for the draft it receives, e.g. with the ELK layout. */
@@ -215,11 +217,16 @@ export function useRuleDocument({
       }),
     [readOnly, runner, versionUnavailable],
   );
-  /** Applies a graph edit unless the document refuses edits now; reports whether it did. */
+  /**
+   * Applies a graph edit unless the document refuses edits now; reports
+   * whether it did. `group` joins the edit's quick repeats into one Undo step
+   * when the changed objects do not tell them apart, as for a rename that
+   * rewrites the expressions reading the name.
+   */
   const edit = useCallback(
-    (change: DefinitionChange): boolean => {
+    (change: DefinitionChange, group?: string): boolean => {
       if (!acceptsEditsNow()) return false;
-      dispatch({ type: "graph/change", change, at: Date.now() });
+      dispatch({ type: "graph/change", change, at: Date.now(), group });
       setError("");
       return true;
     },
@@ -475,6 +482,7 @@ export function useRuleDocument({
         version: (latest ?? 0) + 1,
         previous,
         snapshot: ruleSnapshot(candidate),
+        definition: candidate.draft,
       });
     });
   };

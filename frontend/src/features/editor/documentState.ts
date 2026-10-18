@@ -30,8 +30,16 @@ export function initialDocument(rule: Rule): DocumentState {
   };
 }
 export type DocumentAction =
-  /** `at` (ms) lets a quick repeat of the same edit join one Undo step. */
-  | { type: "graph/change"; change: DefinitionChange; at?: number }
+  /**
+   * `at` (ms) lets a quick repeat of the same edit join one Undo step;
+   * `group` names that edit when the changed objects cannot (draftHistory).
+   */
+  | {
+      type: "graph/change";
+      change: DefinitionChange;
+      at?: number;
+      group?: string;
+    }
   | { type: "graph/undo" }
   | { type: "graph/redo" }
   | { type: "graph/arranged"; before: Definition; definition: Definition }
@@ -59,7 +67,13 @@ export function documentReducer(
       if (draft === state.rule.draft) return state;
       return {
         ...withDraft(state, draft),
-        history: recordEdit(state.history, state.rule.draft, draft, action.at),
+        history: recordEdit(
+          state.history,
+          state.rule.draft,
+          draft,
+          action.at,
+          action.group,
+        ),
       };
     }
     // Unbuilt code is not part of the draft, so stepping would discard it.

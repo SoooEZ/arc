@@ -32,10 +32,12 @@
 .editor-title > div {
   min-width: 0;
 }
+/* The publication chips wrap under the name where the header is narrow. */
 .editor-name {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 11px;
+  gap: 4px 11px;
 }
 .editor-name h1 {
   font-size: 19px;
@@ -131,7 +133,10 @@
 .node-kind-option {
   margin-left: 10px;
 }
+/* Its own line: server messages end without a full stop. */
 .alert-more {
+  display: block;
+  margin-top: 2px;
   font-weight: 600;
 }
 /* The class pair outranks the rounded corners of MUI's Alert. */

@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * Counts of the work React committed, read from the page (`window.__renderProbe`).
@@ -187,4 +187,25 @@ export function resetRenderCounts(page: Page): Promise<void> {
   return page.evaluate(() =>
     (window as unknown as ProbeWindow).__renderProbe.reset(),
   );
+}
+
+/**
+ * Waits until React has committed nothing for 250 ms, so a count starts after
+ * the work the previous interaction scheduled. A click leaves deferred
+ * updates, such as an MUI button in another card mounting its ripple, which
+ * otherwise land in the count of the typing that follows.
+ */
+export async function settledCommits(page: Page): Promise<void> {
+  let last = -1;
+  await expect
+    .poll(
+      async () => {
+        const { commits } = await renderCounts(page);
+        const quiet = commits === last;
+        last = commits;
+        return quiet;
+      },
+      { intervals: [250] },
+    )
+    .toBe(true);
 }

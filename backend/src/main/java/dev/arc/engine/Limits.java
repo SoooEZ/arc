@@ -85,6 +85,17 @@ public final class Limits {
   /** The note a publisher writes with a rule version. */
   public static final int MAX_RELEASE_NOTE_CHARACTERS = 500;
 
+  // Saved test cases
+
+  /** Test cases that one rule keeps. */
+  public static final int MAX_TEST_CASES = 100;
+
+  /** One test case's inputs and expected result, encoded as stored, in bytes. */
+  public static final int MAX_TEST_CASE_BYTES = 64 * 1024;
+
+  /** The error text a test case expects a failing run's message to contain. */
+  public static final int MAX_EXPECTED_ERROR_CHARACTERS = 2_000;
+
   // Expression and ARC Script source
 
   /** Every stored expression: node, selector, case, field, binding and source mapping. */

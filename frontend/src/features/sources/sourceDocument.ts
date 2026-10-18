@@ -6,6 +6,7 @@ import {
   httpTimeoutGuidance,
   httpUrlProblem,
   parseHttpTimeout,
+  secretHeadersProblem,
 } from "./httpSourcePolicy";
 import {
   providerParameterTemplate,
@@ -14,7 +15,7 @@ import {
   sourceSample,
   type SourceBuffers,
 } from "./model";
-import { sourceProviders } from "./sourceProviders";
+import { secretHeaderAliases, sourceProviders } from "./sourceProviders";
 
 export interface SourceDocument {
   selection: number;
@@ -147,7 +148,20 @@ export function sourceSaveProblem(document: SourceDocument): string | null {
   }
   if (provider.usesTimeout && parseHttpTimeout(document.timeout) === null)
     return `Timeout: ${httpTimeoutGuidance}`;
+  if (provider.usesSecretHeaders)
+    return secretHeadersBufferProblem(document.buffers.secretHeaders);
   return null;
+}
+
+/** Why the secret headers text cannot be saved, or null; each message names the field. */
+export function secretHeadersBufferProblem(text: string): string | null {
+  let headers: Record<string, string>;
+  try {
+    headers = secretHeaderAliases(text);
+  } catch (failure) {
+    return (failure as Error).message;
+  }
+  return secretHeadersProblem(headers);
 }
 
 export type SourceDocumentAction =

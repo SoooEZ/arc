@@ -5,7 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Execution } from "../src/types";
-import { editorLines, setEditorText } from "./helpers/editor";
+import { editorLines, openRunOptions, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
@@ -141,6 +141,7 @@ test("trace and timeout controls reach preview and changing options discards a p
   try {
     await page.getByRole("button", { name: "Run test", exact: true }).click();
     await expect.poll(pending.held).toBe(true);
+    await openRunOptions(page);
     await page.getByLabel("Include execution trace", { exact: true }).uncheck();
     await page.getByLabel("Execution timeout", { exact: true }).click();
     await page.getByRole("option", { name: "5 seconds", exact: true }).click();
@@ -159,9 +160,12 @@ test("trace and timeout controls reach preview and changing options discards a p
       page.getByText("Trace disabled.", { exact: false }),
     ).toBeVisible();
     await expect(page.locator(".trace-list button")).toHaveCount(0);
-    await expect(page.getByTestId("execution-timing")).toContainText("Request");
-    await expect(page.getByTestId("execution-timing")).toContainText(
-      "Preparation",
+    // The Test panel names one duration; its tooltip breaks it down.
+    const timing = page.getByTestId("execution-timing");
+    await expect(timing).toContainText(/^Ran in \d+ ms$/);
+    await expect(timing).toHaveAttribute(
+      "aria-label",
+      /Request .* Preparation/,
     );
     pending.release();
     await expect.poll(pending.delivered).toBe(true);

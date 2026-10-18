@@ -270,10 +270,15 @@
   width: 135px;
   height: 90px;
 }
+/* Over the cards a panned graph slides under it, so it keeps a backing. */
 .canvas-hint {
   position: absolute;
   bottom: 12px;
   left: 57px;
+  z-index: 5;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgb(248 250 248 / 90%);
   font-size: var(--text-xs);
   color: #6b795f;
   display: flex;

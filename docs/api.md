@@ -76,7 +76,7 @@ Supply the most recently read `revision`. A successful save advances it. A stale
 
 ## Validate and preview
 
-`POST /validate` accepts the graph document directly, and returns `{"valid":true}` for a complete graph. Invalid graphs return `422`; missing published dependencies return `404`. Expression problems name their position, for example `rate source / region: Variables unavailable on every incoming path: missing`.
+`POST /validate` accepts the graph document directly, and returns `{"valid":true}` for a complete graph. Invalid graphs return `422`; missing published dependencies return `404`. Expression problems name their position, for example `rate source / region: uses missing, which is not an input of this rule; a source mapping reads only inputs`. A node expression that reads a name tells whether anything declares it: `Check: uses amount, which no input or result variable provides; correct the name or add an input named amount` when no input or result variable has the name, and `Total: uses discount, which is not set on every path into this step; set it on each path that leads here` when some step sets it but not every path into the node.
 
 `POST /preview` accepts `{"definition": {...}, "inputs": {...}}`. It runs an unsaved graph and returns the same execution structure, with `ruleId: "preview"` and `version: null`. A published rule may also use the ID `preview`, but its locations always carry a version, so recognize the preview root by `ruleId: "preview"` together with `version: null`. Referenced rules must still be published and explicitly versioned.
 
@@ -102,6 +102,38 @@ A rule that another rule still calls is kept. That covers a Reference node that 
 
 Revisions come from one sequence for all rules, so they advance but are not consecutive, and a rule created again under a deleted ID never repeats a revision an editor may still hold: that editor's next save, publish or delete answers `409`.
 
+## Saved test cases
+
+A rule keeps up to 100 test cases: inputs to run and the outcome they should produce. They belong to the rule, not to its draft or its published versions, so writing one changes neither the draft nor its `revision` or `updatedAt`, and deleting the rule deletes its cases. The server stores cases; running and comparing them is the client's work. The editor runs each case through `POST /preview` against the graph it shows; an API client can run them through `POST /rules/{id}/execute` against a published version.
+
+- `GET /rules/{id}/test-cases`: the rule's cases, oldest first.
+- `POST /rules/{id}/test-cases`: adds a case and returns it with `201`.
+- `PUT /rules/{id}/test-cases/{caseId}`: replaces a case's name, inputs and expected outcome.
+- `DELETE /rules/{id}/test-cases/{caseId}`: deletes a case and returns `204` without a body.
+
+```json
+{"name": "Premium order", "inputs": {"orderTotal": 150, "customerTier": "premium"}, "expectedResult": 120.00}
+```
+
+A stored case adds `id`, `ruleId`, `createdAt` and `updatedAt`, and always carries both `expectedResult` and `expectedError`. Inputs are kept as written, including an explicit `null` beside an omitted input, and numbers keep their decimal places (`120.00` stays `120.00`).
+
+- **Expected outcome:** without `expectedError` the run passes when its result equals `expectedResult`; an omitted or null `expectedResult` expects a null result. With `expectedError` (1–2,000 characters) it passes when the run fails with a message containing that text, and `expectedResult` must be null or omitted. The editor compares results by value, so `120` equals `120.00`, objects by their fields and arrays in order.
+- **Requests** are read strictly: an unknown field is a `400` that names it, and a `caseId` that is not a whole number is a `400` too.
+- **Not found:** an unknown rule is `404` "Rule not found: pricing" and an unknown case, or a case of another rule, `404` "Test case not found: 12". The rule and the case are found before the body is checked.
+- **Invalid content** is a `422`:
+
+| Message | When |
+| --- | --- |
+| Test case name must contain 1 to 160 characters | The name is missing, blank or longer once trimmed |
+| Test case name cannot contain control characters | The name has a control character |
+| Test case inputs must be a JSON object; send {} for none | `inputs` is missing, null or not an object |
+| A test case expects a result or an error, not both | `expectedError` is set together with a non-null `expectedResult` |
+| Expected error must contain text; send null to expect a result instead | `expectedError` is blank |
+| Expected error exceeds 2,000 characters | `expectedError` is longer |
+| Test case inputs and expected result exceed 64 KiB | The two take more than 64 KiB of JSON together |
+| A rule keeps at most 100 test cases; delete one before adding another | The rule already has 100 cases; creations are counted under the rule's lock, so concurrent ones never pass the limit |
+| Text cannot contain the NUL character (U+0000), or an unpaired UTF-16 surrogate | Text that storage cannot hold, as for every stored text |
+
 ## Errors
 
 ```json
@@ -113,7 +145,7 @@ Revisions come from one sequence for all rules, so they advance but are not cons
 | HTTP status | Meaning |
 | --- | --- |
 | `400` | Malformed JSON, a second document after the body, a fraction where an integer belongs (`"version": 1.9`) or another invalid request value ("Request contains malformed JSON or an invalid value"); an unknown field, named by its path ("Request contains an unknown field: definition.inputs[0].source.pointr") |
-| `404` | Missing rule, source or version |
+| `404` | Missing rule, source, version or test case |
 | `405` | Method not supported by the path; the `Allow` header lists the supported ones |
 | `409` | Duplicate rule or source ID (`This rule ID already exists`, `This source ID already exists`), stale revision, execution of an unpublished rule, or deletion of a rule that other rules call |
 | `413` | Request body larger than 1 MiB, for any method or path |
@@ -127,6 +159,17 @@ The current release has no batch endpoint, run-history storage, or authenticatio
 ## Code studio and external parameters
 
 See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults. Entries appear in read order: an input's source dependencies are read first, in declaration order.
+
+## Behavior changes from the 2026-10-18 usability work
+
+Graph JSON, ARC Script, stored versions and pins are unchanged. Saved test cases are new, and the messages below say what to do.
+
+- `GET`/`POST /rules/{id}/test-cases` and `PUT`/`DELETE /rules/{id}/test-cases/{caseId}` store a rule's test cases ([Saved test cases](#saved-test-cases)) in a table that migration V7 adds; deleting a rule deletes its cases.
+- A node expression that reads a name outside its scope said "Variables unavailable on every incoming path: amount" whatever the cause. It now tells a name that no input or result variable declares, typically left behind by a rename ("Check: uses amount, which no input or result variable provides; correct the name or add an input named amount"), from one that some step sets but not every path into the node ("Total: uses discount, which is not set on every path into this step; set it on each path that leads here"). Several names are listed as "amount and rate" with plural wording, and an expression with both kinds reports both sentences. A single undeclared name that differs from a declared input or result variable only in case, or by one edit (an inserted, deleted, replaced or swapped character; two edits for names of six or more characters), asks instead: "Check: uses amont, which no input or result variable provides; did you mean amount?". The closest name is offered, the earlier declaration on a tie.
+- A source mapping that reads a name other than an input said the same; it now reports "rate source / region: uses missing, which is not an input of this rule; a source mapping reads only inputs", or "rate source / key: uses contry, which is not an input of this rule; did you mean country?" when one name closely misspells an input.
+- A sourced input without a mapping for a required source parameter reported "amount: missing source mapping for key"; it now reports "amount: choose what to pass as key to data source country-tax v1". A mapping for a parameter the source does not have reported "Unknown source parameter: wrong" without the input; it now reports "amount: data source country-tax v1 has no parameter named wrong; remove what this input passes as wrong". `POST /sources/{id}/test` keeps "Unknown source parameter: wrong" for an argument the source does not declare.
+- A Reference that leaves a required input of its rule unset reported "Reuse: missing binding for amount"; it now reports "Reuse: choose what to pass as amount to apply-discount v1". A binding for an input the pinned version does not have reported "Reuse: unknown parameter ghost"; it now reports "Reuse: apply-discount v1 has no input named ghost; remove what this step passes as ghost".
+- A result variable named like an input reported "Calc: cannot overwrite input amount"; it now reports "Calc: its result variable amount has the name of an input; choose another name".
 
 ## Behavior changes from the 2026-10-17 usability work
 

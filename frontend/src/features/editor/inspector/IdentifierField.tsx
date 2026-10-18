@@ -17,12 +17,17 @@ function fieldError(
   return identifierError(value);
 }
 
-/** Parameter and result names share the expression language's identifier contract. */
+/**
+ * Parameter and result names share the expression language's identifier
+ * contract. The naming rule shows when a name breaks it or an edit is
+ * refused; a valid name shows only the field's own help.
+ */
 export default function IdentifierField({
   label,
   value,
   disabled,
   optional = false,
+  autoFocus = false,
   helperText,
   onChange,
 }: {
@@ -30,6 +35,7 @@ export default function IdentifierField({
   value: string;
   disabled: boolean;
   optional?: boolean;
+  autoFocus?: boolean;
   helperText?: string;
   onChange: (value: string) => void;
 }) {
@@ -40,10 +46,9 @@ export default function IdentifierField({
       label={label}
       value={value}
       disabled={disabled}
+      autoFocus={autoFocus}
       error={!!error}
-      helperText={
-        error || [helperText, identifierGuidance].filter(Boolean).join(" ")
-      }
+      helperText={error || helperText}
       onChange={(event) => {
         if (disabled) return;
         const name = event.target.value;

@@ -49,7 +49,6 @@ export default function SourceProviderSelect({
         option.type === "source" ? `source:${option.source.id}` : "caller"
       }
       itemLabel={optionLabel}
-      helperText="Type a source name or ID to search. Scroll for more results."
       onChange={(option) =>
         onChange(option.type === "source" ? option.source : null)
       }

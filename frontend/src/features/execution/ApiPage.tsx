@@ -1,4 +1,13 @@
-import { Alert, Button, Chip, MenuItem, TextField } from "@mui/material";
+import { useState } from "react";
+import {
+  Alert,
+  Button,
+  Chip,
+  MenuItem,
+  Tab,
+  Tabs,
+  TextField,
+} from "@mui/material";
 import {
   ArrowRight,
   Braces,
@@ -15,6 +24,7 @@ import ExecutionOptionsFields from "./ExecutionOptionsFields";
 import ExecutionTiming from "./ExecutionTiming";
 import TraceNotices from "./TraceNotices";
 import LazyInputJsonEditor from "./LazyInputJsonEditor";
+import InputForm from "./InputForm";
 import CatalogPagination from "../../components/CatalogPagination";
 import PagedVersionSelect from "../../components/PagedVersionSelect";
 import { paginationProps } from "../../hooks/usePagedResource";
@@ -111,6 +121,7 @@ export default function ApiPage({
  */
 function RequestConsole({ notify }: { notify: (s: string) => void }) {
   const request = usePublishedExecution(notify);
+  const [inputView, setInputView] = useState<"json" | "form">("json");
   const {
     published,
     id,
@@ -130,6 +141,14 @@ function RequestConsole({ notify }: { notify: (s: string) => void }) {
         <Terminal size={18} />
         <strong>Request builder</strong>
         <span>Published rules only</span>
+        <Button
+          variant="contained"
+          startIcon={<Play size={14} />}
+          onClick={request.run}
+          disabled={running || loading || !definition || version === null}
+        >
+          {running ? "Executing…" : "Execute rule"}
+        </Button>
       </div>
       <div className="api-console-body">
         <div className="api-request">
@@ -183,16 +202,34 @@ function RequestConsole({ notify }: { notify: (s: string) => void }) {
             <strong>POST</strong>
             <code>{request.endpointPath}</code>
           </div>
-          <label className="field-label">
-            Input parameters <span>application/json</span>
-          </label>
-          <LazyInputJsonEditor
-            key={JSON.stringify([id, version])}
-            label="API input JSON"
-            value={inputs}
-            onChange={request.setInputs}
-          />
-          {definition && (
+          <div className="api-input-heading">
+            <label className="field-label">
+              Input parameters <span>application/json</span>
+            </label>
+            <Tabs
+              value={inputView}
+              onChange={(_, view: "json" | "form") => setInputView(view)}
+              aria-label="Input parameters view"
+            >
+              <Tab value="json" label="JSON" />
+              <Tab value="form" label="Form" disabled={!definition} />
+            </Tabs>
+          </div>
+          {inputView === "form" && definition ? (
+            <InputForm
+              inputs={definition.inputs}
+              text={inputs}
+              onChange={request.setInputs}
+            />
+          ) : (
+            <LazyInputJsonEditor
+              key={JSON.stringify([id, version])}
+              label="API input JSON"
+              value={inputs}
+              onChange={request.setInputs}
+            />
+          )}
+          {definition && inputView === "json" && (
             <div className="parameter-chips">
               {definition.inputs.map((p) => (
                 <span key={p.name}>
@@ -209,14 +246,6 @@ function RequestConsole({ notify }: { notify: (s: string) => void }) {
             value={request.options}
             onChange={request.changeOptions}
           />
-          <Button
-            variant="contained"
-            startIcon={<Play size={14} />}
-            onClick={request.run}
-            disabled={running || loading || !definition || version === null}
-          >
-            {running ? "Executing…" : "Execute rule"}
-          </Button>
         </div>
         <div className="api-response">
           <div className="code-panel-heading">

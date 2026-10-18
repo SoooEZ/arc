@@ -24,8 +24,12 @@ export interface SourceProvider {
   usesUrl: boolean;
   /** Whether the HTTP timeout applies (and is validated) for this kind. */
   usesTimeout: boolean;
-  /** The parameters field's help, before the shared identifier guidance. */
+  /** Whether the configuration sends secret headers the save checks. */
+  usesSecretHeaders: boolean;
+  /** The parameters JSON field's help, before the shared identifier guidance. */
   parametersHelp: string;
+  /** What the parameters table says when the parameters have no problem. */
+  parametersTableHelp: string;
   /** Why the server would refuse these parameter names for this kind, or null. */
   parametersProblem(names: string[]): string | null;
   /** The provider's payload fields from the definition and the raw buffers; throws today's messages for unusable text. */
@@ -35,7 +39,8 @@ export interface SourceProvider {
   ): Partial<SourceConfig>;
 }
 
-function secretHeaderAliases(text: string): Record<string, string> {
+/** The secret header aliases in `text`; throws today's messages for unusable text. */
+export function secretHeaderAliases(text: string): Record<string, string> {
   const aliases = parseJsonObject(
     text,
     "Secret header aliases must be a JSON object.",
@@ -59,7 +64,9 @@ export const sourceProviders: Record<SourceKind, SourceProvider> = {
     starterParameter: "key",
     usesUrl: false,
     usesTimeout: false,
+    usesSecretHeaders: false,
     parametersHelp: 'Lookup tables take exactly one parameter, named "key".',
+    parametersTableHelp: "A rule reads one row of the table by its key.",
     // LookupSourceAdapter: a table is read by its key and nothing else.
     parametersProblem: (names) =>
       names.length === 1 && names[0] === "key"
@@ -77,8 +84,11 @@ export const sourceProviders: Record<SourceKind, SourceProvider> = {
     starterParameter: "customerId",
     usesUrl: true,
     usesTimeout: true,
+    usesSecretHeaders: true,
     parametersHelp:
       "Declare name, type (STRING / NUMBER / BOOLEAN), required, and optional defaultValue.",
+    parametersTableHelp:
+      "A rule maps a value to each parameter when it reads this source.",
     parametersProblem: () => null,
     activeFields: (definition, buffers) => ({
       url: definition.url,

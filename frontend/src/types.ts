@@ -138,6 +138,26 @@ export interface ExecutionOptions {
   timeoutMs?: number;
 }
 
+/**
+ * A saved test of a rule: inputs and what they must produce. With
+ * `expectedError` set, the run must fail with a message containing it;
+ * otherwise it must return `expectedResult` (null expects null).
+ */
+export interface TestCase {
+  id: number;
+  ruleId: string;
+  name: string;
+  inputs: Record<string, unknown>;
+  expectedResult: unknown;
+  expectedError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export type TestCaseWrite = Pick<
+  TestCase,
+  "name" | "inputs" | "expectedResult" | "expectedError"
+>;
+
 export interface SourceBinding {
   id: string;
   version: number;

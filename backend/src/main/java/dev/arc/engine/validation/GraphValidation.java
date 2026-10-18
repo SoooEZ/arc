@@ -107,7 +107,13 @@ final class GraphValidation {
       for (var mapping : input.getValue()) {
         try {
           reads.addAll(
-              NodeValidation.check(mapping, inputNames, expressions, resolver).variables());
+              NodeValidation.check(
+                      mapping,
+                      inputNames,
+                      expressions,
+                      resolver,
+                      unknown -> NodeValidation.unavailableToSourceMapping(unknown, definition))
+                  .variables());
         } catch (ArcException error) {
           problems.accept(Problems.onInputNode(error, definition));
         }
@@ -259,7 +265,7 @@ final class GraphValidation {
   }
 
   /** "A", "A and B", "A, B and C". */
-  private static String listed(List<String> names) {
+  static String listed(List<String> names) {
     if (names.size() == 1) return names.getFirst();
     return String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
   }

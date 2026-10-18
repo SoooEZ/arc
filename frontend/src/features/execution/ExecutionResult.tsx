@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import { CheckCircle2, ChevronRight } from "lucide-react";
 import { NodeIcon } from "../../components/Icons";
 import type { Definition, Execution, Step } from "../../types";
@@ -34,12 +34,18 @@ export function branchBadge(
 export default function ExecutionResult({
   result,
   definition,
+  action,
+  compactTiming = false,
   onNode,
   requestDurationMs,
 }: {
   result: Execution;
   /** The shown graph, whose exits name the traced branches. */
   definition: Definition;
+  /** A command beside the result, such as saving the run as a test. */
+  action?: ReactNode;
+  /** One duration, with the breakdown in its tooltip. */
+  compactTiming?: boolean;
   onNode: (id: string) => void;
   requestDurationMs: number | null;
 }) {
@@ -61,8 +67,13 @@ export default function ExecutionResult({
         <strong data-testid="test-result">
           {stringifyJson(result.result)}
         </strong>
+        {action && <div className="test-result-action">{action}</div>}
       </div>
-      <ExecutionTiming result={result} requestDurationMs={requestDurationMs} />
+      <ExecutionTiming
+        result={result}
+        requestDurationMs={requestDurationMs}
+        compact={compactTiming}
+      />
       {!!result.sources?.length && (
         <div className="source-reads">
           {result.sources.map((s, i) => (

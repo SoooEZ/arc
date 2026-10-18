@@ -127,6 +127,112 @@ class NodeContractsTest {
     assertConnectionProblem(definition, stray, "check");
   }
 
+  /**
+   * A variable an expression cannot read is explained by whether anything declares it: renaming the
+   * input amount to orderTotal left "amount" in every expression that read it, and each said
+   * "Variables unavailable on every incoming path: amount" although no path could ever set it.
+   */
+  @Test
+  void anUnavailableVariableSaysWhetherAnyInputOrResultDeclaresIt() {
+    var definition =
+        new Definition(
+            1,
+            List.of(new Definition.Input("orderTotal", "NUMBER", true, null)),
+            List.of(
+                node("in", "INPUT", null),
+                node("check", "CONDITION", "amount >= 100"),
+                nodeOf("calc", "FORMULA", "CALC")
+                    .expression("amount * rate")
+                    .output("total")
+                    .build(),
+                nodeOf("bonus", "FORMULA", "BONUS").expression("2").output("extra_points").build(),
+                node("out", "OUTPUT", "total"),
+                node("mixed", "OUTPUT", "total + extra"),
+                node("partial", "OUTPUT", "total * extra_points")),
+            List.of(
+                edge("in", "check", "next"),
+                edge("check", "calc", "true"),
+                edge("calc", "bonus", "next"),
+                edge("bonus", "out", "next"),
+                edge("check", "mixed", "false"),
+                edge("check", "partial", "false")));
+
+    assertThat(validator.diagnose(definition, noRules).problems())
+        .extracting(Validator.Problem::message)
+        .containsExactlyInAnyOrder(
+            "CHECK: uses amount, which no input or result variable provides; correct the name or"
+                + " add an input named amount",
+            "CALC: uses amount and rate, which no input or result variable provides; correct the"
+                + " names or add inputs with those names",
+            "MIXED: uses extra, which no input or result variable provides; correct the name or add"
+                + " an input named extra. It also uses total, which is not set on every path into"
+                + " this step; set it on each path that leads here",
+            "PARTIAL: uses extra_points and total, which are not set on every path into this step;"
+                + " set them on each path that leads here");
+  }
+
+  /**
+   * One undeclared name that closely misspells a declared one asks whether that one was meant
+   * ({@link NameSuggestions}), in a node expression and in a source mapping alike. Several
+   * undeclared names, and names that only some paths set, keep their advice.
+   */
+  @Test
+  void aCloseMisspellingOfADeclaredNameAsksWhetherItWasMeant() {
+    var definition =
+        new Definition(
+            1,
+            List.of(
+                new Definition.Input("amount", "NUMBER", true, null),
+                new Definition.Input("rate", "NUMBER", true, null)),
+            List.of(
+                node("in", "INPUT", null),
+                node("check", "CONDITION", "amont >= 100"),
+                nodeOf("calc", "FORMULA", "CALC")
+                    .expression("amount * rate")
+                    .output("total")
+                    .build(),
+                node("out", "OUTPUT", "TOTAL"),
+                node("mixed", "OUTPUT", "rat + total"),
+                node("two", "OUTPUT", "amont + rat")),
+            List.of(
+                edge("in", "check", "next"),
+                edge("check", "calc", "true"),
+                edge("calc", "out", "next"),
+                edge("check", "mixed", "false"),
+                edge("check", "two", "false")));
+
+    assertThat(validator.diagnose(definition, noRules).problems())
+        .extracting(Validator.Problem::message)
+        .containsExactlyInAnyOrder(
+            "CHECK: uses amont, which no input or result variable provides; did you mean amount?",
+            "OUT: uses TOTAL, which no input or result variable provides; did you mean total?",
+            "MIXED: uses rat, which no input or result variable provides; did you mean rate? It"
+                + " also uses total, which is not set on every path into this step; set it on each"
+                + " path that leads here",
+            "TWO: uses amont and rat, which no input or result variable provides; correct the names"
+                + " or add inputs with those names");
+
+    var sourced =
+        new Definition(
+            1,
+            List.of(
+                new Definition.Input("country", "STRING", true, null),
+                new Definition.Input(
+                    "rate",
+                    "NUMBER",
+                    true,
+                    null,
+                    new Definition.SourceBinding(
+                        "rates", 1, Map.of("key", "contry"), null, "FAIL"))),
+            List.of(node("in", "INPUT", null), node("out", "OUTPUT", "rate")),
+            List.of(edge("in", "out", "next")));
+    assertThat(validator.diagnose(sourced, noRules).problems())
+        .extracting(Validator.Problem::message)
+        .containsExactly(
+            "rate source / key: uses contry, which is not an input of this rule; did you mean"
+                + " country?");
+  }
+
   private void assertConnectionProblem(Definition definition, String message, String nodeId) {
     assertThatThrownBy(() -> validator.validate(definition, noRules))
         .isInstanceOfSatisfying(

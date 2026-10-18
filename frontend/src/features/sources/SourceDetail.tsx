@@ -5,6 +5,7 @@ import {
   CircularProgress,
   MenuItem,
   TextField,
+  Tooltip,
 } from "@mui/material";
 import { Save } from "lucide-react";
 import { stringifyJson } from "../../domain/json";
@@ -18,6 +19,7 @@ import ResourceIdField from "../../components/ResourceIdField";
 import { paginationProps } from "../../hooks/usePagedResource";
 import SourceConfigurationFields from "./SourceConfigurationFields";
 import SourceTestPanel from "./SourceTestPanel";
+import { useFieldFeedback } from "./useFieldFeedback";
 
 /** The open source: its identity, version, configuration form and sample test. */
 export default function SourceDetail({
@@ -31,11 +33,19 @@ export default function SourceDetail({
 }) {
   const { open, saving, historical, dirty } = document;
   const selected = open?.source;
-  // The server's own rule, shown under the field it refuses (lesson F28).
+  const feedback = useFieldFeedback(open?.selection ?? 0);
+  // The server's own rule, shown under the field it refuses (lesson F28) once
+  // the field was edited or left: a new source opens with an empty name.
   const nameProblem =
-    selected && !historical
+    selected && !historical && feedback.touched("name")
       ? displayNameProblem("Source", selected.name)
       : null;
+  // Why Save is unavailable for a new source or one with edits, as the
+  // button's tooltip.
+  const blocked = feedback.hasInvalidCells
+    ? "Fix the marked default values first."
+    : document.saveProblem;
+  const explained = !saving && !historical && (dirty || !selected?.version);
   return (
     <section className="source-detail">
       {document.error && (
@@ -63,18 +73,20 @@ export default function SourceDetail({
                 label={sourceVersionLabel(selected.version, dirty)}
               />
             </div>
-            <Button
-              variant="contained"
-              startIcon={
-                saving ? <CircularProgress size={14} /> : <Save size={15} />
-              }
-              disabled={
-                saving || historical || !dirty || !!document.saveProblem
-              }
-              onClick={() => void commands.save()}
-            >
-              {selected.version ? "Save new version" : "Create source"}
-            </Button>
+            <Tooltip title={explained ? (blocked ?? "") : ""} describeChild>
+              <span className="source-save">
+                <Button
+                  variant="contained"
+                  startIcon={
+                    saving ? <CircularProgress size={14} /> : <Save size={15} />
+                  }
+                  disabled={saving || historical || !dirty || !!blocked}
+                  onClick={() => void commands.save()}
+                >
+                  {selected.version ? "Save new version" : "Create source"}
+                </Button>
+              </span>
+            </Tooltip>
           </div>
           <div className="source-form-grid">
             <ResourceIdField
@@ -91,9 +103,11 @@ export default function SourceDetail({
               disabled={saving || historical}
               error={!!nameProblem}
               helperText={nameProblem}
-              onChange={(event) =>
-                commands.changeMetadata({ name: event.target.value })
-              }
+              onChange={(event) => {
+                feedback.touch("name");
+                commands.changeMetadata({ name: event.target.value });
+              }}
+              onBlur={() => feedback.touch("name")}
             />
             <TextField
               select
@@ -153,6 +167,9 @@ export default function SourceDetail({
               buffers={open.buffers}
               timeout={open.timeout}
               disabled={saving}
+              touched={feedback.touched}
+              onTouch={feedback.touch}
+              onCellValidity={feedback.cellValidity}
               onConfig={commands.changeConfig}
               onBuffer={commands.changeBuffer}
               onTimeout={commands.changeTimeout}
@@ -160,6 +177,7 @@ export default function SourceDetail({
           )}
           <SourceTestPanel
             version={open.viewedVersion}
+            parameters={document.displayConfig?.parameters ?? null}
             input={open.testInput}
             result={open.result}
             running={open.testing !== null}

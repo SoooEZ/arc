@@ -28,7 +28,12 @@ export const MAX_LABEL_CHARACTERS = 160;
 export const MAX_NAME_CHARACTERS = 160;
 /** UTF-16 units of a rule description. */
 export const MAX_DESCRIPTION_CHARACTERS = 2_000;
+/** UTF-16 units of the note a publisher writes with a version. */
 export const MAX_RELEASE_NOTE_CHARACTERS = 500;
+/** UTF-16 units of the text a saved test expects an error message to contain. */
+export const MAX_EXPECTED_ERROR_CHARACTERS = 2_000;
+/** Parameters of one data source. */
+export const MAX_SOURCE_PARAMETERS = 20;
 /** Characters of a parameter, result or field identifier. */
 export const MAX_IDENTIFIER_CHARACTERS = 64;
 /** Characters of a rule or source ID (the API slug). */
@@ -101,7 +106,7 @@ const blankDisplayName = (text: string) =>
  * the server trims.
  */
 export function displayNameProblem(
-  resource: "Rule" | "Source",
+  resource: "Rule" | "Source" | "Test case",
   name: string,
 ): string | null {
   const unstorable = storableTextProblem(name);

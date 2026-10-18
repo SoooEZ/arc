@@ -29,7 +29,9 @@ export default memo(function InputParameterCard({
   index,
   readOnly,
   variables,
+  focusName,
   onChange,
+  onRename,
   onRemove,
   onValidity,
 }: {
@@ -40,7 +42,11 @@ export default memo(function InputParameterCard({
   readOnly: boolean;
   /** The input variables a source binding may map; none while the card has no source. */
   variables: VariableOption[];
+  /** Focus the name field as the card appears: Add parameter just added it. */
+  focusName: boolean;
   onChange: (rowId: string, patch: Partial<Input>) => void;
+  /** Renames the parameter and the expressions that read it. */
+  onRename: (rowId: string, name: string) => void;
   onRemove: (rowId: string) => void;
   onValidity: (rowId: string, valid: boolean) => void;
 }) {
@@ -87,7 +93,8 @@ export default memo(function InputParameterCard({
         label="Parameter name"
         value={input.name}
         disabled={readOnly}
-        onChange={(name) => change({ name })}
+        autoFocus={focusName}
+        onChange={(name) => onRename(rowId, name)}
       />
       <TextField
         select

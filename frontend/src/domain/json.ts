@@ -170,6 +170,21 @@ export function sameJsonNumber(
 }
 
 /**
+ * Whether two JSON numbers have one decimal value, whatever their decimal
+ * places: 120, 120.00 and 1.2e2 are equal, as the expression language's `==`
+ * compares them, where sameJsonNumber tells 120 from 120.00.
+ */
+export function sameJsonValue(
+  left: number | DecimalNumber,
+  right: number | DecimalNumber,
+): boolean {
+  const text = (value: number | DecimalNumber) =>
+    isDecimalNumber(value) ? value.text : JSON.stringify(value);
+  const value = decimal(text(left))?.value;
+  return value !== undefined && value === decimal(text(right))?.value;
+}
+
+/**
  * Parses JSON with the grammar and SyntaxError behavior of JSON.parse. Numbers
  * that a double would change become DecimalNumber values, and `__proto__` keys
  * become own properties, as with JSON.parse.

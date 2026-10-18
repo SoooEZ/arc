@@ -98,7 +98,7 @@ class FormulaCallExecutionTest {
           if (input.needsCallerValue()) {
             assertThatThrownBy(() -> validator.validate(reference, resolver))
                 .as(declaration)
-                .hasMessageContaining("Ref: missing binding for amount");
+                .hasMessageContaining("Ref: choose what to pass as amount to callee v1");
             assertThatThrownBy(() -> validator.validate(call, resolver))
                 .as(declaration)
                 .hasMessageContaining("@callee:1 needs argument 1 (amount)");

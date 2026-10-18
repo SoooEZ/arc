@@ -1,5 +1,6 @@
 import type { DataSource, Input, SourceConfig } from "../../types";
 import { identifierError } from "../../domain/identifiers";
+import { MAX_SOURCE_PARAMETERS } from "../../domain/limits";
 import { sampleValue } from "../../domain/executionInputs";
 import { parseJson, parseJsonObject, stringifyJson } from "../../domain/json";
 import { sourceProviders } from "./sourceProviders";
@@ -49,12 +50,24 @@ export function sourceCandidate(
   };
 }
 
+/**
+ * The server's parameter-list checks in its order (SourceValidator): the
+ * count, then each parameter's name, which must be an identifier that no
+ * earlier parameter has. The server words a bad or repeated name only
+ * "Invalid source parameter"; the field names the parameter and the rule.
+ */
 function sourceParameterNamesError(parameters: unknown): string | null {
   if (!Array.isArray(parameters))
     return "Source parameters must be a JSON array.";
+  if (parameters.length > MAX_SOURCE_PARAMETERS)
+    return `Provide up to ${MAX_SOURCE_PARAMETERS} source parameters`;
+  const names = new Set<unknown>();
   for (const [index, parameter] of parameters.entries()) {
     const error = identifierError(parameter?.name);
     if (error) return `Parameter ${index + 1}: ${error}`;
+    if (names.has(parameter.name))
+      return `Parameter ${index + 1}: another parameter is named ${parameter.name}`;
+    names.add(parameter.name);
   }
   return null;
 }

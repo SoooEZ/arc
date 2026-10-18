@@ -28,10 +28,17 @@ export default function InputForm({
   inputs,
   text,
   onChange,
+  onValidity = noValidity,
 }: {
   inputs: Input[];
   text: string;
   onChange: (text: string) => void;
+  /**
+   * Whether an input's field holds a value of its type. While it does not,
+   * the buffer keeps the field's last valid value, so a run would not send
+   * what the field shows.
+   */
+  onValidity?: (name: string, valid: boolean) => void;
 }) {
   const parsed = tryParseExecutionInputs(text);
   if (!parsed)
@@ -53,6 +60,7 @@ export default function InputForm({
           input={input}
           entry={inputEntry(parsed, input.name)}
           onEntry={(entry) => onChange(withInputEntry(text, input.name, entry))}
+          onValidity={(valid) => onValidity(input.name, valid)}
         />
       ))}
       {!!others.length && (
@@ -75,10 +83,12 @@ function InputRow({
   input,
   entry,
   onEntry,
+  onValidity,
 }: {
   input: Input;
   entry: InputEntry;
   onEntry: (entry: InputEntry) => void;
+  onValidity: (valid: boolean) => void;
 }) {
   const choose = (kind: InputEntry["kind"]) => {
     if (kind === entry.kind) return;
@@ -95,7 +105,12 @@ function InputRow({
         )}
       </div>
       <div className="input-form-controls">
-        <InputValue input={input} entry={entry} onEntry={onEntry} />
+        <InputValue
+          input={input}
+          entry={entry}
+          onEntry={onEntry}
+          onValidity={onValidity}
+        />
         <TextField
           select
           size="small"
@@ -181,17 +196,19 @@ const valueText = (value: unknown) => {
   return typeof value === "string" ? value : stringifyJson(value);
 };
 
-// A field's errors show in the field; nothing else waits for its validity.
-const noValidity = () => {};
+// Without a listener a field's errors show in the field alone.
+function noValidity() {}
 
 function InputValue({
   input,
   entry,
   onEntry,
+  onValidity,
 }: {
   input: Input;
   entry: InputEntry;
   onEntry: (entry: InputEntry) => void;
+  onValidity: (valid: boolean) => void;
 }) {
   const value = entry.kind === "value" ? entry.value : undefined;
   const buffer = useParsedTextBuffer<unknown, unknown>({
@@ -205,7 +222,7 @@ function InputValue({
           ? { kind: "omitted" }
           : { kind: "value", value: typed },
       ),
-    onValidity: noValidity,
+    onValidity,
   });
   if (input.type === "BOOLEAN")
     return (

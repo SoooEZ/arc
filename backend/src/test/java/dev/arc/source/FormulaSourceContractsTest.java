@@ -92,7 +92,8 @@ class FormulaSourceContractsTest {
           .isInstanceOfSatisfying(
               ArcException.class,
               error -> {
-                assertThat(error.getMessage()).contains("missing source mapping for key");
+                assertThat(error.getMessage())
+                    .contains("value: choose what to pass as key to data source remote v1");
                 assertThat(error.locations())
                     .contains(new ArcException.Location("child", 1, "in", "Input"));
               });

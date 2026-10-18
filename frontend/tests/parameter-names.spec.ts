@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
+import { sourceParametersJson } from "./helpers/sources";
 
 test("parameter names reject whitespace and dollars without losing edits, row identity, or literal keys", async ({
   page,
@@ -139,9 +140,7 @@ test("source parameter JSON retains invalid drafts, blocks invalid names before 
   await page
     .getByLabel("HTTP URL", { exact: true })
     .fill("https://example.com/profile");
-  const parameters = page.getByLabel("Source parameters · JSON", {
-    exact: true,
-  });
+  const parameters = await sourceParametersJson(page);
   const writes: string[] = [];
   page.on("request", (outgoing) => {
     if (

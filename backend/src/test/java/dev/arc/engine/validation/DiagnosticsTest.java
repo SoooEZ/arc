@@ -28,16 +28,20 @@ class DiagnosticsTest {
 
     assertThat(validator.diagnose(definition, noRules).problems())
         .containsExactly(
-            atInput("rate source / region: Variables unavailable on every incoming path: missing"),
-            atInput("rate source / zone: Variables unavailable on every incoming path: gone"));
+            atInput(
+                "rate source / region: uses missing, which is not an input of this rule; a"
+                    + " source mapping reads only inputs"),
+            atInput(
+                "rate source / zone: uses gone, which is not an input of this rule; a source"
+                    + " mapping reads only inputs"));
     assertThatThrownBy(() -> validator.validate(definition, noRules))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
               assertThat(error.getMessage())
                   .isEqualTo(
-                      "rate source / region: Variables unavailable on every incoming path:"
-                          + " missing");
+                      "rate source / region: uses missing, which is not an input of this rule; a"
+                          + " source mapping reads only inputs");
               assertThat(error.locations()).containsExactly(inputLocation());
             });
   }
@@ -202,7 +206,8 @@ class DiagnosticsTest {
                 .problems())
         .extracting(Validator.Problem::message)
         .containsExactly(
-            "rate source / key: Variables unavailable on every incoming path: missing",
+            "rate source / key: uses missing, which is not an input of this rule; a source mapping"
+                + " reads only inputs",
             "extra: not reachable from Input; connect it or remove it");
   }
 
@@ -429,7 +434,9 @@ class DiagnosticsTest {
     var expected =
         List.of(
             new Validator.Problem("F: provide a valid result variable", at("f", "F")),
-            new Validator.Problem("W: cannot overwrite input amount", at("w", "W")),
+            new Validator.Problem(
+                "W: its result variable amount has the name of an input; choose another name",
+                at("w", "W")),
             new Validator.Problem("Published rule version not found: nope v3", at("r", "R")),
             new Validator.Problem("S: add at least one case", at("s", "S")));
     assertThat(validator.diagnose(new Definition(1, amount, nodes, edges), noRules).problems())

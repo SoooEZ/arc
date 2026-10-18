@@ -7,9 +7,9 @@ info:
     pinned dependencies are immutable. Every request body is limited to 1 MiB
     (1,048,576 bytes) for any method or path spelling; larger bodies return 413.
     Responses write decimal numbers in plain notation (20 and 0.0000001, never
-    2E+1). Stored text (names, descriptions, drafts and source definitions)
-    cannot contain the NUL character U+0000 or an unpaired UTF-16 surrogate; such
-    writes return 422.
+    2E+1). Stored text (names, descriptions, drafts, source definitions and test
+    cases) cannot contain the NUL character U+0000 or an unpaired UTF-16
+    surrogate; such writes return 422.
 servers:
   - url: http://localhost:8080/api
   - url: http://localhost:3080/api
@@ -285,6 +285,78 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Version'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/test-cases:
+    parameters: [{$ref: '#/components/parameters/RuleId'}]
+    get:
+      operationId: listTestCases
+      description: >-
+        The rule's saved test cases, oldest first. A case keeps inputs and the outcome they should
+        produce; running and comparing them is the client's work (the editor runs each case through
+        /preview against the graph it shows). Cases belong to the rule, not to its draft or its
+        published versions, and are deleted with the rule.
+      responses:
+        '200':
+          description: Test cases, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items: {$ref: '#/components/schemas/TestCase'}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      operationId: createTestCase
+      description: >-
+        Adds a case. A rule keeps at most 100; the next one is a 422 "A rule keeps at most 100 test
+        cases; delete one before adding another". Writing a case changes neither the rule's draft
+        nor its revision or updatedAt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TestCaseWrite'}
+            example:
+              name: Premium order
+              inputs: {orderTotal: 150, customerTier: premium}
+              expectedResult: 120.00
+      responses:
+        '201':
+          description: The stored case
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TestCase'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/test-cases/{caseId}:
+    parameters:
+      - {$ref: '#/components/parameters/RuleId'}
+      - name: caseId
+        in: path
+        required: true
+        schema: {type: integer, format: int64, minimum: 1}
+    put:
+      operationId: updateTestCase
+      description: >-
+        Replaces a case's name, inputs and expected outcome. An unknown case, or a case of another
+        rule, is a 404 "Test case not found: N"; an unknown rule is a 404 "Rule not found: id".
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TestCaseWrite'}
+      responses:
+        '200':
+          description: The stored case
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TestCase'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      operationId: deleteTestCase
+      responses:
+        '204': {description: Test case deleted}
         default: {$ref: '#/components/responses/Error'}
   /variables:
     post:
@@ -629,7 +701,7 @@ components:
       description: >-
         400 malformed request (malformed JSON, an unknown field named by its path,
         a second document after the body, a fraction where an integer belongs);
-        404 missing rule, source or version; 409 revision
+        404 missing rule, source, version or test case; 409 revision
         conflict, duplicate rule or source ID, or execution of an unpublished
         rule; 413 request body over 1 MiB (any method or path); 422 invalid
         graph, input or calculation, exhausted execution limit (steps, nesting,
@@ -816,6 +888,32 @@ components:
         version: {type: integer}
         definition: {$ref: '#/components/schemas/Definition'}
         publishedAt: {type: string, format: date-time}
+    TestCase:
+      type: object
+      description: >-
+        A saved test of a rule. With expectedError set, a run passes when it fails with a message
+        that contains that text; otherwise it passes when its result equals expectedResult, where
+        null expects a null result.
+      properties:
+        id: {type: integer, format: int64}
+        ruleId: {type: string}
+        name: {type: string}
+        inputs: {type: object, additionalProperties: true, description: The execution inputs as written; an explicit null stays null and an omitted input stays omitted}
+        expectedResult: {nullable: true, description: 'The result the run must return, decimals as written (120.00 stays 120.00); null when expectedError is set'}
+        expectedError: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    TestCaseWrite:
+      type: object
+      description: >-
+        A case's content. Unknown fields are a 400. The inputs and the expected result take at most
+        64 KiB of JSON together (422 "Test case inputs and expected result exceed 64 KiB").
+      required: [name, inputs]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 160, description: 'Stored trimmed; a missing, blank or longer one is a 422 "Test case name must contain 1 to 160 characters"'}
+        inputs: {type: object, additionalProperties: true, description: 'Required, {} for none; a missing value or one that is not an object is a 422 "Test case inputs must be a JSON object; send {} for none"'}
+        expectedResult: {nullable: true, description: The result to expect when expectedError is null; omitted or null expects a null result}
+        expectedError: {type: string, nullable: true, minLength: 1, maxLength: 2000, description: 'Text that the failing run''s message must contain; with a non-null expectedResult it is a 422 "A test case expects a result or an error, not both", and blank text a 422 "Expected error must contain text; send null to expect a result instead"'}
     Definition:
       type: object
       required: [schemaVersion, inputs, nodes, edges]

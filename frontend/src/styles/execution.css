@@ -339,3 +339,139 @@
   font-size: var(--text-md);
   color: var(--color-test-muted);
 }
+/* A taller Test panel for long traces and test lists. */
+.test-panel.expanded {
+  height: min(62vh, 640px);
+}
+.test-panel-heading > div:first-child {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.test-panel-views .MuiToggleButton-root {
+  padding: 2px 10px;
+  font-size: var(--text-sm);
+  text-transform: none;
+  color: #4f6a45;
+}
+.test-panel-views .MuiToggleButton-root.Mui-selected {
+  color: var(--color-brand);
+  background: #eef6ee;
+}
+.saved-tests-summary {
+  font-size: var(--text-sm);
+  color: var(--color-test-muted);
+}
+/* Trace and timeout, folded under the inputs: most runs keep the defaults. */
+.run-options {
+  flex-shrink: 0;
+  border-top: 1px solid #e7edde;
+  padding: 6px 12px;
+  font-size: var(--text-md);
+  color: #4f6a45;
+}
+.run-options > summary {
+  cursor: pointer;
+  color: var(--color-test-muted);
+}
+.run-options .execution-options {
+  padding: 4px 0 0;
+}
+.test-result-action {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.test-result-action .MuiButton-root,
+.error-actions .MuiButton-root {
+  text-transform: none;
+}
+.execution-timing-compact {
+  display: inline-block;
+  margin: 0 0 10px;
+  color: var(--color-test-muted);
+}
+/* The rule's saved tests, one row each. */
+.test-panel-saved {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 15px;
+}
+/* The empty list's hint wraps at the panel's width, not at fixed breaks. */
+.saved-tests-hint {
+  max-width: 420px;
+}
+.saved-tests-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-md);
+  color: var(--color-test-muted);
+}
+.saved-tests ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.saved-test {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 6px;
+  border-bottom: 1px solid #edf1e9;
+}
+.saved-test.failed {
+  background: #fdf6f5;
+}
+.saved-test-main,
+.saved-test-expectation {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.saved-test-main strong {
+  font-size: var(--text-lg);
+  font-weight: 550;
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saved-test-main code,
+.saved-test-expectation span {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: #4f6a45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saved-test-expectation small {
+  font-size: var(--text-sm);
+  color: var(--color-test-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saved-test.failed .saved-test-expectation small {
+  color: #a3372f;
+}
+.saved-test-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.saved-test-actions .MuiButton-root {
+  text-transform: none;
+  white-space: nowrap;
+}
+.saved-test-passed {
+  color: var(--color-brand);
+}
+.saved-test-failed {
+  color: var(--color-danger);
+}
+.saved-test-pending {
+  color: #b7c4b0;
+}

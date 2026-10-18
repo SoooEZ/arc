@@ -84,25 +84,106 @@ test("changes name nodes by label and inputs by name, and count moves and connec
     identical: false,
     addedNodes: ["Maybe"],
     removedNodes: ["No"],
-    changedNodes: ["Large?"],
+    changedNodes: [
+      {
+        name: "Large?",
+        fields: [
+          {
+            field: "Condition",
+            before: "amount >= 100",
+            after: "amount > 100",
+          },
+        ],
+      },
+    ],
     movedNodes: 1,
     addedConnections: 1,
     removedConnections: 1,
     addedInputs: ["region"],
     removedInputs: ["tier"],
-    changedInputs: ["amount"],
+    renamedInputs: [],
+    changedInputs: [
+      {
+        name: "amount",
+        fields: [{ field: "Required", before: "yes", after: "no" }],
+      },
+    ],
     notesChanged: true,
   });
-  expect(changeLines(changes)).toEqual([
+  expect(changeLines(changes).map((line) => line.text)).toEqual([
     "Added: Maybe",
     "Removed: No",
     "Changed: Large?",
     "1 connection added, 1 connection removed",
     "New inputs: region",
     "Removed inputs: tier",
-    "Changed inputs: amount",
+    "Changed input: amount",
     "Notes changed",
     "Moved 1 card",
+  ]);
+});
+
+test("a changed node lists each property before and after, an input renamed in place is a rename", () => {
+  const draft: Definition = {
+    ...published,
+    inputs: [
+      {
+        name: "orderTotal",
+        type: "NUMBER",
+        required: true,
+        defaultValue: null,
+      },
+      { ...published.inputs[1], defaultValue: "gold" },
+    ],
+    nodes: published.nodes.map((node) => {
+      if (node.id === "check")
+        return {
+          ...node,
+          type: "SWITCH" as const,
+          label: "Size",
+          expression: undefined,
+          cases: [
+            { id: "case-1", label: "Large", expression: "orderTotal >= 100" },
+          ],
+        };
+      if (node.id === "yes")
+        return { ...node, expression: "orderTotal", outputName: "total" };
+      return node;
+    }),
+  };
+  const changes = versionChanges(published, draft);
+  expect(changes.renamedInputs).toEqual([{ from: "amount", to: "orderTotal" }]);
+  expect(changes.addedInputs).toEqual([]);
+  expect(changes.removedInputs).toEqual([]);
+  expect(changes.changedInputs).toEqual([
+    {
+      name: "tier",
+      fields: [{ field: "Default", before: '"basic"', after: '"gold"' }],
+    },
+  ]);
+  expect(changes.changedNodes).toEqual([
+    {
+      name: "Size",
+      fields: [
+        { field: "Name", before: "Large?", after: "Size" },
+        { field: "Kind", before: "Condition", after: "Condition with cases" },
+        { field: "Condition", before: "amount >= 100", after: null },
+        { field: "Case Large", before: null, after: "orderTotal >= 100" },
+      ],
+    },
+    {
+      name: "Yes",
+      fields: [
+        { field: "Returns", before: "1", after: "orderTotal" },
+        { field: "Output name", before: null, after: "total" },
+      ],
+    },
+  ]);
+  expect(changeLines(changes).map((line) => line.text)).toEqual([
+    "Changed: Size",
+    "Changed: Yes",
+    "Renamed input: amount → orderTotal",
+    "Changed input: tier",
   ]);
 });
 
@@ -120,7 +201,7 @@ test("long name lists are shortened and a layout change alone still counts", () 
       })),
     ],
   };
-  expect(changeLines(versionChanges(published, many))[0]).toBe(
+  expect(changeLines(versionChanges(published, many))[0].text).toBe(
     "Added: Extra 0, Extra 1, Extra 2, Extra 3, Extra 4 and 2 more",
   );
   const movedOnly = {
@@ -132,5 +213,7 @@ test("long name lists are shortened and a layout change alone still counts", () 
   };
   const changes = versionChanges(published, movedOnly);
   expect(changes.identical).toBe(false);
-  expect(changeLines(changes)).toEqual(["Moved 4 cards"]);
+  expect(changeLines(changes).map((line) => line.text)).toEqual([
+    "Moved 4 cards",
+  ]);
 });

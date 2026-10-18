@@ -33,6 +33,20 @@ test("frontend limits carry the values of backend Limits.java", () => {
   }
 });
 
+test("the secret header limit of HTTP sources matches HttpDestinationPolicy", () => {
+  const java = /MAX_SECRET_HEADERS = (\d+);/.exec(
+    read(
+      "backend/src/main/java/dev/arc/source/http/HttpDestinationPolicy.java",
+    ),
+  );
+  const frontend = /export const MAX_SECRET_HEADERS = (\d+);/.exec(
+    read("frontend/src/features/sources/httpSourcePolicy.ts"),
+  );
+  assert.ok(java, "HttpDestinationPolicy.java declares MAX_SECRET_HEADERS");
+  assert.ok(frontend, "httpSourcePolicy.ts declares MAX_SECRET_HEADERS");
+  assert.equal(Number(frontend[1]), Number(java[1]));
+});
+
 test("frontend input types list the backend InputTypes.Type constants", () => {
   const java = read("backend/src/main/java/dev/arc/engine/InputTypes.java");
   const constants = /enum Type \{\s*([A-Z_,\s]+);/.exec(java);

@@ -511,6 +511,52 @@ try:
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         statuses = sorted(executor.map(competing_update, [1, 2]))
     assert statuses == [200, 409], statuses
-    print(f"PASS: {checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, and concurrent edits.")
+
+    # Saved test cases live beside the rule: decimals and explicit nulls are kept as written, a
+    # write never touches the draft's revision, and the cases go with the rule.
+    tested = create("test-cases")
+    cases_path = "/api/rules/" + tested["id"] + "/test-cases"
+    assert request("GET", cases_path) == []
+    status, text = raw_text_request("POST", cases_path, '{"name":" Premium order ","inputs":'
+                                    '{"amount":120.00,"note":null},"expectedResult":120.00}')
+    assert status == 201 and '"amount":120.00' in text and '"expectedResult":120.00' in text, (status, text)
+    case = json.loads(text)
+    assert case["name"] == "Premium order" and case["ruleId"] == tested["id"], case
+    assert case["inputs"] == {"amount": 120, "note": None} and case["expectedError"] is None, case
+    status, text = raw_text_request("GET", cases_path, "")
+    assert status == 200 and '"expectedResult":120.00' in text and str(case["id"]) in text, (status, text)
+    failing = request("PUT", f"{cases_path}/{case['id']}", {"name": "Fails", "inputs": {},
+                      "expectedError": "Missing required input"})
+    assert failing["expectedError"] == "Missing required input" and failing["expectedResult"] is None, failing
+    assert request("GET", "/api/rules/" + tested["id"])["revision"] == tested["revision"]
+    for body, message in [({"name": "No inputs"}, "Test case inputs must be a JSON object; send {} for none"),
+                          ({"name": "Both", "inputs": {}, "expectedResult": 1, "expectedError": "x"},
+                           "A test case expects a result or an error, not both")]:
+        assert request("POST", cases_path, body, 422)["message"] == message
+    request("POST", cases_path, {"name": "Typo", "inputs": {}, "expected": 1}, 400)
+    assert request("PUT", f"{cases_path}/999999999", {"name": "x", "inputs": {}}, 404)["message"] == \
+        "Test case not found: 999999999"
+    other = create("other-cases")
+    assert request("DELETE", f"/api/rules/{other['id']}/test-cases/{case['id']}", expected=404)["message"] == \
+        f"Test case not found: {case['id']}"
+    assert request("GET", f"/api/rules/{PREFIX}-missing/test-cases", expected=404)["message"] == \
+        f"Rule not found: {PREFIX}-missing"
+    request("DELETE", f"{cases_path}/{case['id']}", expected=204)
+    assert request("GET", cases_path) == []
+    # A rule keeps at most 100 cases, counted under its lock: two racing creations past 99 split.
+    for number in range(99):
+        request("POST", cases_path, {"name": f"Case {number}", "inputs": {"amount": number}}, 201)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        racing = [executor.submit(raw_request, "POST", cases_path, {"name": f"Race {n}", "inputs": {}})
+                  for n in range(2)]
+        statuses = sorted(future.result()[0] for future in racing)
+    assert statuses == [201, 422], statuses
+    assert len(request("GET", cases_path)) == 100
+    # Deleting the rule deletes its cases; a rule created again under the ID starts with none.
+    delete(tested["id"])
+    request("GET", cases_path, expected=404)
+    create("test-cases")
+    assert request("GET", cases_path) == []
+    print(f"PASS: {checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, concurrent edits, and saved test cases.")
 finally:
     print("Created fixtures: " + ", ".join(created))
