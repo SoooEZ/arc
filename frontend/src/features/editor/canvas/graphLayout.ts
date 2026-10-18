@@ -1,7 +1,11 @@
 import type { ElkExtendedEdge, ElkNode, ElkPort } from "elkjs/lib/elk-api.js";
 import type { Definition, RuleNode } from "../../../types";
 import { cardSize, type NodeSizes } from "./graphGeometry";
-import { hasTargetPort, sourcePorts } from "../../../domain/nodePorts";
+import {
+  hasTargetPort,
+  sourcePorts,
+  type LayoutDirection,
+} from "../../../domain/nodePorts";
 
 /** Lays out an ELK graph: the worker-backed instance in the browser, the bundled one in tests. */
 export type ElkLayout = (graph: ElkNode) => Promise<ElkNode>;
@@ -20,17 +24,47 @@ function compareId(a: { id: string }, b: { id: string }): number {
 const isFiniteNumber = (value: number | undefined): value is number =>
   value !== undefined && Number.isFinite(value);
 
+/**
+ * Where GraphNode draws a card's handles: the incoming one at the middle of the
+ * top (left) edge, exits along the bottom (right) edge at their ratio.
+ */
+function portPlace(
+  direction: LayoutDirection,
+  size: { width: number; height: number },
+  ratio: number,
+  source: boolean,
+) {
+  if (direction === "horizontal")
+    return {
+      x: source ? size.width : 0,
+      y: size.height * ratio,
+      side: source ? "EAST" : "WEST",
+    };
+  return {
+    x: size.width * ratio,
+    y: source ? size.height : 0,
+    side: source ? "SOUTH" : "NORTH",
+  };
+}
+
 /** One layout box per node, with ports where GraphNode draws its handles. */
-function layoutNode(node: RuleNode, sizes: NodeSizes) {
-  const { width, height } = cardSize(node, sizes);
-  const port = (handle: string, ratio: number, source: boolean): ElkPort => ({
-    id: portId(node.id, handle),
-    width: 0,
-    height: 0,
-    x: width * ratio,
-    y: source ? height : 0,
-    layoutOptions: { "elk.port.side": source ? "SOUTH" : "NORTH" },
-  });
+function layoutNode(
+  node: RuleNode,
+  sizes: NodeSizes,
+  direction: LayoutDirection,
+) {
+  const { width, height } = cardSize(node, sizes, direction);
+  const port = (handle: string, ratio: number, source: boolean): ElkPort => {
+    const place = portPlace(direction, { width, height }, ratio, source);
+    return {
+      id: portId(node.id, handle),
+      width: 0,
+      height: 0,
+      x: place.x,
+      y: place.y,
+      layoutOptions: { "elk.port.side": place.side },
+    };
+  };
   const ports: ElkPort[] = [];
   if (hasTargetPort(node)) ports.push(port("target", 0.5, false));
   for (const exit of sourcePorts(node))
@@ -46,15 +80,20 @@ function layoutNode(node: RuleNode, sizes: NodeSizes) {
   };
 }
 
-/** Arrange presentation coordinates only; edge identities and execution semantics stay intact. */
+/**
+ * Arrange presentation coordinates only; edge identities and execution
+ * semantics stay intact. Arrange lays the stored, top-to-bottom drawing out;
+ * the left-to-right view lays itself out for display (useHorizontalLayout).
+ */
 export async function arrangeGraph(
   definition: Definition,
   sizes: NodeSizes,
   layout: ElkLayout,
+  direction: LayoutDirection = "vertical",
 ): Promise<Definition> {
   const children = [...definition.nodes]
     .sort(compareId)
-    .map((node) => layoutNode(node, sizes));
+    .map((node) => layoutNode(node, sizes, direction));
   const edges: ElkExtendedEdge[] = [...definition.edges]
     .sort(compareId)
     .map((edge) => ({
@@ -77,10 +116,12 @@ export async function arrangeGraph(
     id: "arc-layout",
     layoutOptions: {
       "elk.algorithm": "layered",
-      "elk.direction": "DOWN",
+      "elk.direction": direction === "horizontal" ? "RIGHT" : "DOWN",
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.spacing.nodeNode": "65",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "80",
+      // Exit captions sit beside a card's right edge, between the layers.
+      "elk.layered.spacing.nodeNodeBetweenLayers":
+        direction === "horizontal" ? "120" : "80",
       "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
       "elk.randomSeed": "1",
       "elk.layered.thoroughness": "20",

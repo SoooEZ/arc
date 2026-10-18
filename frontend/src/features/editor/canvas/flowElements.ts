@@ -1,6 +1,10 @@
 import type { Edge, NodeChange } from "@xyflow/react";
 import type { Definition, Execution, RuleNode } from "../../../types";
-import { nodeWidth, sourcePort } from "../../../domain/nodePorts";
+import {
+  nodeWidth,
+  sourcePort,
+  type LayoutDirection,
+} from "../../../domain/nodePorts";
 import type { FlowNode } from "./GraphNode";
 import { cardSize, type NodeSizes } from "./graphGeometry";
 
@@ -13,10 +17,14 @@ export interface CardBounds {
   height: number;
 }
 
-/** Card bounds from saved positions and measured sizes (default size until measured). */
-export function cardBounds(nodes: RuleNode[], sizes: NodeSizes): CardBounds[] {
+/** Card bounds from shown positions and measured sizes (default size until measured). */
+export function cardBounds(
+  nodes: RuleNode[],
+  sizes: NodeSizes,
+  direction: LayoutDirection = "vertical",
+): CardBounds[] {
   return nodes.map((node) => {
-    const size = cardSize(node, sizes);
+    const size = cardSize(node, sizes, direction);
     return {
       id: node.id,
       x: node.position.x,
@@ -64,6 +72,7 @@ export interface FlowNodeInputs {
   sizes: NodeSizes;
   onExpression: (id: string) => void;
   canOpenCode: boolean;
+  direction: LayoutDirection;
 }
 
 export function flowNodes(
@@ -81,6 +90,7 @@ export function flowNodes(
       errors: inputs.errors.get(model.id) ?? noErrors,
       onExpression: inputs.onExpression,
       canOpenCode: inputs.canOpenCode,
+      direction: inputs.direction,
     };
     const earlier = previous.get(model.id);
     if (
@@ -92,7 +102,8 @@ export function flowNodes(
       earlier.data.inputCount === data.inputCount &&
       earlier.data.errors === data.errors &&
       earlier.data.onExpression === data.onExpression &&
-      earlier.data.canOpenCode === data.canOpenCode
+      earlier.data.canOpenCode === data.canOpenCode &&
+      earlier.data.direction === data.direction
     )
       return earlier;
     return {
@@ -100,7 +111,7 @@ export function flowNodes(
       type: "arc",
       position: model.position,
       measured,
-      style: { width: nodeWidth(model) },
+      style: { width: nodeWidth(model, inputs.direction) },
       selected,
       data,
     };

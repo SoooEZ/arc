@@ -13,8 +13,10 @@ import { NodeIcon } from "../../../components/Icons";
 import { nodeKinds } from "../../../domain/nodeKinds";
 import {
   hasTargetPort,
+  nodeMinHeight,
   nodeWidth,
   sourcePorts,
+  type LayoutDirection,
 } from "../../../domain/nodePorts";
 
 export type FlowNode = Node<
@@ -27,9 +29,35 @@ export type FlowNode = Node<
     onExpression: (id: string) => void;
     /** False while a document command runs, like the context menu's actions. */
     canOpenCode: boolean;
+    /** Top to bottom: enters at the top, exits along the bottom; left to right: enters left, exits right. */
+    direction: LayoutDirection;
   },
   "arc"
 >;
+
+/** Where a card's handles and exit captions go in each drawing direction. */
+const handlePlaces: Record<
+  LayoutDirection,
+  {
+    target: Position;
+    source: Position;
+    offset: "left" | "top";
+    captionClass: string;
+  }
+> = {
+  vertical: {
+    target: Position.Top,
+    source: Position.Bottom,
+    offset: "left",
+    captionClass: "",
+  },
+  horizontal: {
+    target: Position.Left,
+    source: Position.Right,
+    offset: "top",
+    captionClass: "handle-caption-side",
+  },
+};
 /**
  * A card renders only when its own node object, selection, errors or trace
  * status changes: flowElements keeps the data object of an unchanged card, and
@@ -41,7 +69,9 @@ function GraphNode({ data, selected }: NodeProps<FlowNode>) {
   const n = data.model;
   const kind = nodeKinds[n.type];
   const ports = sourcePorts(n);
-  const portKey = ports.map((port) => port.id).join(",");
+  const place = handlePlaces[data.direction];
+  // Handles move when the exits or the drawing direction change.
+  const portKey = `${data.direction}:${ports.map((port) => port.id).join(",")}`;
   const updateInternals = useUpdateNodeInternals();
   const previousPorts = useRef(portKey);
   useEffect(() => {
@@ -55,9 +85,12 @@ function GraphNode({ data, selected }: NodeProps<FlowNode>) {
   return (
     <div
       className={`graph-node node-${kind.className} ${selected ? "node-selected" : ""} ${data.visited ? "node-visited" : ""} ${data.errors.length ? "node-error" : ""}`}
-      style={{ width: nodeWidth(n) }}
+      style={{
+        width: nodeWidth(n, data.direction),
+        minHeight: nodeMinHeight(n, data.direction) || undefined,
+      }}
     >
-      {hasTargetPort(n) && <Handle type="target" position={Position.Top} />}
+      {hasTargetPort(n) && <Handle type="target" position={place.target} />}
       <div className="node-type-line">
         <span className={`node-icon ${kind.className}`}>
           <NodeIcon type={n.type} size={14} />
@@ -103,16 +136,16 @@ function GraphNode({ data, selected }: NodeProps<FlowNode>) {
         <Fragment key={port.id}>
           <Handle
             type="source"
-            position={Position.Bottom}
+            position={place.source}
             id={port.id}
-            style={{ left: `${port.ratio * 100}%` }}
+            style={{ [place.offset]: `${port.ratio * 100}%` }}
             aria-label={`${n.label} · ${port.label || "Next"}`}
           />
           {port.label && (
             <span
               title={port.label}
-              className={`handle-label handle-caption ${port.fallback ? "handle-fallback" : ""}`}
-              style={{ left: `${port.ratio * 100}%` }}
+              className={`handle-label handle-caption ${place.captionClass} ${port.fallback ? "handle-fallback" : ""}`}
+              style={{ [place.offset]: `${port.ratio * 100}%` }}
             >
               {port.label}
             </span>

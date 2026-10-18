@@ -10,6 +10,7 @@ import {
 } from "../../src/domain/nodeKinds";
 import {
   hasTargetPort,
+  nodeMinHeight,
   nodeWidth,
   sourcePorts,
 } from "../../src/domain/nodePorts";
@@ -149,6 +150,13 @@ test("exits, incoming handles and card widths follow each kind", () => {
     })),
   };
   expect(nodeWidth(manyCases)).toBe(720);
+  // Left to right, exits stack down the right edge: the card keeps its width
+  // and grows taller instead; top to bottom it sizes to its content.
+  expect(nodeWidth(manyCases, "horizontal")).toBe(230);
+  expect(nodeMinHeight(manyCases, "horizontal")).toBe(8 * 34);
+  expect(nodeMinHeight(node("CONDITION"), "horizontal")).toBe(2 * 34);
+  expect(nodeMinHeight(node("OUTPUT"), "horizontal")).toBe(0);
+  expect(nodeMinHeight(manyCases, "vertical")).toBe(0);
 });
 
 test("nothing connects into a kind without an incoming handle", () => {

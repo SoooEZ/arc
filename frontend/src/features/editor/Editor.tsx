@@ -28,6 +28,10 @@ import LazyNodeDialog from "./LazyNodeDialog";
 import { useNodeSelection } from "./useNodeSelection";
 import type { EditorProps, ReferenceTarget } from "./types";
 import { rulePath } from "../../app/routing";
+import {
+  setLayoutDirection,
+  useLayoutDirection,
+} from "../../app/layoutDirection";
 const CodeStudio = lazy(() => import("../studio/CodeStudio"));
 const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
 const NodeEditDialog = lazy(() => import("./NodeEditDialog"));
@@ -150,6 +154,7 @@ function EditorContent({
     clearCommandProblem,
     onError: setError,
   });
+  const direction = useLayoutDirection();
   const canvas = useGraphCanvas({
     definition: rule.draft,
     selected,
@@ -161,6 +166,7 @@ function EditorContent({
     nodeErrors,
     edit,
     onRefused: setError,
+    direction,
   });
   const { measurements, requestFit } = canvas;
   const { patchNode, addNode, removeNode, arrange } = useGraphCommands({
@@ -173,7 +179,10 @@ function EditorContent({
     requestFit,
   });
   const { focusNode, jumpToNode, focusPending } = useGraphFocus({
-    definition: rule.draft,
+    // Focus centres a card where the canvas draws it.
+    definition: canvas.shown,
+    direction,
+    layoutReady: canvas.layoutReady,
     ruleId: rule.id,
     requestedVersion,
     requestedNode,
@@ -341,6 +350,8 @@ function EditorContent({
             onRenameNode={renameNode}
             onDeleteNode={removeNode}
             hasTrace={!!preview.result}
+            direction={direction}
+            onDirectionChange={setLayoutDirection}
           >
             {testPanel}
           </GraphCanvas>

@@ -24,6 +24,18 @@ const port = (
   side,
 });
 
+/** A port on a card's left or right edge, as the left-to-right view draws them. */
+const sidePort = (
+  n: RoutingNode,
+  side: "left" | "right",
+  ratio = 0.5,
+): Endpoint => ({
+  x: n.x + (side === "right" ? n.width : 0),
+  y: n.y + n.height * ratio,
+  nodeId: n.id,
+  side,
+});
+
 function assertClear(source: Endpoint, target: Endpoint, nodes: RoutingNode[]) {
   const before = structuredClone(nodes);
   const route = routeEdge(source, target, nodes);
@@ -114,6 +126,77 @@ test("routes through multiple staggered obstacles in a larger graph", () => {
   expect(performance.now() - start).toBeLessThan(1000);
   expect(route).not.toBeNull();
   assertClear(port(nodes[0], "bottom"), port(nodes[1], "top"), nodes);
+});
+
+test("left-to-right connections leave right edges, enter left edges and avoid every card", () => {
+  const nodes = [
+    box("decision", 0, 100),
+    box("upper", 360, -60),
+    box("lower", 360, 220, 230, 150),
+    box("join", 760, 80),
+    box("obstacle", 620, 230, 100, 120),
+  ];
+  for (const source of [
+    sidePort(nodes[0], "right", 0.27),
+    sidePort(nodes[0], "right", 0.73),
+  ])
+    for (const target of [
+      sidePort(nodes[1], "left"),
+      sidePort(nodes[2], "left"),
+    ]) {
+      const route = assertClear(source, target, nodes);
+      // It leaves and enters across the card edges, moving right.
+      expect(route.points[1].y).toBe(source.y);
+      expect(route.points[1].x).toBeGreaterThan(source.x);
+      expect(route.points.at(-2)!.y).toBe(target.y);
+      expect(route.points.at(-2)!.x).toBeLessThan(target.x);
+    }
+  for (const n of [nodes[1], nodes[2]])
+    assertClear(sidePort(n, "right"), sidePort(nodes[3], "left"), nodes);
+  assertClear(sidePort(nodes[3], "right"), sidePort(nodes[0], "left"), nodes);
+  // A card against a right-edge port covers it.
+  const covered = [
+    box("source", 0, 0),
+    box("target", 400, 0),
+    box("cover", 236, 20, 100, 60),
+  ];
+  expect(
+    routeEdge(
+      sidePort(covered[0], "right"),
+      sidePort(covered[1], "left"),
+      covered,
+    ),
+  ).toBeNull();
+});
+
+test("a left-to-right route is the top-to-bottom route of the drawing mirrored across its diagonal", () => {
+  const nodes = [
+    box("a", 0, 0),
+    box("b", 300, 160, 230, 140),
+    box("c", 620, 40),
+  ];
+  const mirror = (n: RoutingNode): RoutingNode => ({
+    id: n.id,
+    x: n.y,
+    y: n.x,
+    width: n.height,
+    height: n.width,
+  });
+  const mirrored = nodes.map(mirror);
+  const sideways = routeEdge(
+    sidePort(nodes[0], "right", 0.27),
+    sidePort(nodes[2], "left"),
+    nodes,
+  );
+  const downward = routeEdge(
+    port(mirrored[0], "bottom", 0.27),
+    port(mirrored[2], "top"),
+    mirrored,
+  );
+  expect(sideways).not.toBeNull();
+  expect(sideways!.points).toEqual(
+    downward!.points.map((p) => ({ x: p.y, y: p.x })),
+  );
 });
 
 const definition: Definition = {
@@ -464,4 +547,97 @@ test("a deep link to a wide Switch centres the whole card in the pane", async ({
       };
     })
     .toEqual({ centred: true, inside: true });
+});
+
+/** Waits for a canvas that shows its layout; a view that remounts has none for a moment. */
+const laidOut = (page: Page, count: number) =>
+  expect(
+    page.locator(".flow-container:not(.flow-laying-out) .react-flow__node"),
+  ).toHaveCount(count);
+
+/** A card's position as React Flow draws it, in flow coordinates. */
+const drawnAt = (page: Page, id: string) =>
+  page
+    .locator(`.react-flow__node[data-id="${id}"]`)
+    .evaluate((node) => (node as HTMLElement).style.transform);
+
+test("left to right lays the graph out for display, around every card, without touching the draft", async ({
+  page,
+}) => {
+  const saved = await fixture(page);
+  await page.goto("/#/rules/routing-fixture");
+  const card = (id: string) =>
+    page.locator(`.react-flow__node[data-id="${id}"]`);
+  await expect(card("out")).toBeVisible();
+  const stored = await drawnAt(page, "blocker");
+  await page
+    .getByRole("button", { name: "Left to right", exact: true })
+    .click();
+  await laidOut(page, 3);
+  await expect.poll(() => drawnAt(page, "blocker")).not.toBe(stored);
+  const at = async (id: string) => (await card(id).boundingBox())!;
+  const [input, blocker, out] = [
+    await at("input"),
+    await at("blocker"),
+    await at("out"),
+  ];
+  expect(blocker.x).toBeGreaterThan(input.x + input.width);
+  expect(out.x).toBeGreaterThan(blocker.x + blocker.width);
+  // Connections enter the left edge and leave the right edge.
+  const centre = async (handle: string) => {
+    const box = (await card("blocker").locator(handle).boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  expect(
+    Math.abs((await centre(".react-flow__handle.target")).x - blocker.x),
+  ).toBeLessThan(2);
+  expect(
+    Math.abs(
+      (await centre(".react-flow__handle.source")).x -
+        (blocker.x + blocker.width),
+    ),
+  ).toBeLessThan(2);
+  await expect.poll(() => collisions(page)).toEqual([]);
+  // Display only: nothing to save; arranging and dragging stay top to bottom.
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Arrange graph", exact: true }),
+  ).toBeDisabled();
+  const shownAt = await drawnAt(page, "blocker");
+  await page.mouse.move(blocker.x + 40, blocker.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(blocker.x + 140, blocker.y + 130, { steps: 5 });
+  await page.mouse.up();
+  expect(await drawnAt(page, "blocker")).toBe(shownAt);
+  await expect(page.getByText("All changes saved")).toBeVisible();
+
+  // The preference outlives a reload and applies to saved versions and previews.
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Left to right", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await laidOut(page, 3);
+  await expect.poll(() => collisions(page)).toEqual([]);
+  await page.goto("/#/rules/routing-fixture?version=1");
+  await laidOut(page, 3);
+  await expect(card("out")).toBeVisible();
+  expect((await at("out")).x).toBeGreaterThan((await at("blocker")).x);
+  await expect.poll(() => collisions(page)).toEqual([]);
+  await page.goto("/#/library");
+  const preview = page.locator(".rule-preview-svg");
+  await expect(preview).toHaveAttribute("data-direction", "horizontal");
+  const previewX = (id: string) =>
+    preview
+      .locator(`[data-preview-node="${id}"]`)
+      .evaluate((node) => (node as SVGGElement).transform.baseVal[0].matrix.e);
+  expect(await previewX("out")).toBeGreaterThan(await previewX("input"));
+
+  // Top to bottom draws the stored positions again; nothing was ever saved.
+  await page.goto("/#/rules/routing-fixture");
+  await page
+    .getByRole("button", { name: "Top to bottom", exact: true })
+    .click();
+  await expect.poll(() => drawnAt(page, "blocker")).toBe(stored);
+  expect(saved().revision).toBe(1);
+  expect(saved().draft).toEqual(definition);
 });

@@ -1,5 +1,9 @@
 import type { RuleNode } from "../../../types";
-import { nodeWidth } from "../../../domain/nodePorts";
+import {
+  nodeMinHeight,
+  nodeWidth,
+  type LayoutDirection,
+} from "../../../domain/nodePorts";
 
 export interface NodeSize {
   width: number;
@@ -11,13 +15,25 @@ export type NodeSizes = ReadonlyMap<string, NodeSize>;
 /** The height of a card before it is measured; its width comes from its exits (nodePorts). */
 const defaultCardHeight = 105;
 
-/** A card's size: as measured, else its exit-driven width and the default height. */
-export function cardSize(node: RuleNode, sizes: NodeSizes): NodeSize {
+/**
+ * A card's size: as measured, else its exit-driven width and the default
+ * height, or the taller height its exits need along the right edge.
+ */
+export function cardSize(
+  node: RuleNode,
+  sizes: NodeSizes,
+  direction: LayoutDirection = "vertical",
+): NodeSize {
   const measured = sizes.get(node.id);
   return {
-    width: measured && measured.width > 0 ? measured.width : nodeWidth(node),
+    width:
+      measured && measured.width > 0
+        ? measured.width
+        : nodeWidth(node, direction),
     height:
-      measured && measured.height > 0 ? measured.height : defaultCardHeight,
+      measured && measured.height > 0
+        ? measured.height
+        : Math.max(defaultCardHeight, nodeMinHeight(node, direction)),
   };
 }
 
@@ -25,8 +41,9 @@ export function cardSize(node: RuleNode, sizes: NodeSizes): NodeSize {
 export function cardCenter(
   node: RuleNode,
   sizes: NodeSizes,
+  direction: LayoutDirection = "vertical",
 ): { x: number; y: number } {
-  const size = cardSize(node, sizes);
+  const size = cardSize(node, sizes, direction);
   return {
     x: node.position.x + size.width / 2,
     y: node.position.y + size.height / 2,

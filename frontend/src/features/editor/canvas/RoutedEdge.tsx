@@ -8,14 +8,17 @@ import {
 } from "react";
 import {
   BaseEdge,
+  Position,
   type ConnectionLineComponentProps,
   type EdgeProps,
 } from "@xyflow/react";
+import type { LayoutDirection } from "../../../domain/nodePorts";
 import {
   routeEdge,
   routeWithCache,
   type CachedRoute,
   type MovedCard,
+  type PortSide,
   type RoutingNode,
 } from "./edgeRouting";
 
@@ -24,10 +27,30 @@ export const RoutingContext = createContext<{
   /** The cards a drag in progress has moved, or null between drags. */
   moved: MovedCard[] | null;
   reportBlocked: (id: string, blocked: boolean) => void;
-}>({ nodes: [], moved: null, reportBlocked: () => {} });
+  /** Exits leave a card's bottom (right) edge and enter the next card's top (left) edge. */
+  direction: LayoutDirection;
+}>({ nodes: [], moved: null, reportBlocked: () => {}, direction: "vertical" });
+
+/** The card edges a connection leaves and enters in each drawing direction. */
+const connectionSides: Record<
+  LayoutDirection,
+  { source: PortSide; target: PortSide }
+> = {
+  vertical: { source: "bottom", target: "top" },
+  horizontal: { source: "right", target: "left" },
+};
+
+/** The card edge of a React Flow handle position. */
+const sideOf: Record<Position, PortSide> = {
+  [Position.Top]: "top",
+  [Position.Bottom]: "bottom",
+  [Position.Left]: "left",
+  [Position.Right]: "right",
+};
 
 export default memo(function RoutedEdge(props: EdgeProps) {
-  const { nodes, moved, reportBlocked } = useContext(RoutingContext);
+  const { nodes, moved, reportBlocked, direction } = useContext(RoutingContext);
+  const sides = connectionSides[direction];
   const {
     id,
     source,
@@ -56,12 +79,12 @@ export default memo(function RoutedEdge(props: EdgeProps) {
     () =>
       routeWithCache(
         cache.current,
-        { x: sourceX, y: sourceY, nodeId: source, side: "bottom" },
-        { x: targetX, y: targetY, nodeId: target, side: "top" },
+        { x: sourceX, y: sourceY, nodeId: source, side: sides.source },
+        { x: targetX, y: targetY, nodeId: target, side: sides.target },
         nodes,
         moved,
       ),
-    [source, target, sourceX, sourceY, targetX, targetY, nodes, moved],
+    [source, target, sourceX, sourceY, targetX, targetY, nodes, moved, sides],
   );
   useEffect(() => {
     cache.current = cached;
@@ -112,13 +135,13 @@ export function RoutedConnectionLine({
           x: fromX,
           y: fromY,
           nodeId: fromNode.id,
-          side: fromPosition === "top" ? "top" : "bottom",
+          side: sideOf[fromPosition],
         },
         {
           x: toX,
           y: toY,
           nodeId: toNode?.id,
-          side: toPosition === "bottom" ? "bottom" : "top",
+          side: sideOf[toPosition],
         },
         nodes,
       ),

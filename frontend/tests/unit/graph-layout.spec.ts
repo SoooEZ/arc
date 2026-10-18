@@ -85,3 +85,48 @@ test("Arrange gives the same layout in every browser locale and for any node ord
     }
   }
 });
+
+test("left to right, layers become columns and exits keep their order down the right edge", async () => {
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs: [],
+    nodes: [
+      {
+        id: "input",
+        type: "INPUT",
+        label: "Inputs",
+        position: { x: 0, y: 0 },
+      },
+      {
+        id: "check",
+        type: "CONDITION",
+        label: "Check",
+        expression: "true",
+        position: { x: 0, y: 0 },
+      },
+      output("approved"),
+      output("declined"),
+    ],
+    edges: [
+      { id: "a", source: "input", target: "check", sourceHandle: "next" },
+      // Listed False first, so the order comes from the exits, not the list.
+      { id: "b", source: "check", target: "declined", sourceHandle: "false" },
+      { id: "c", source: "check", target: "approved", sourceHandle: "true" },
+    ],
+  };
+  const arranged = await arrangeWith(
+    definition,
+    new Map(),
+    inThread,
+    "horizontal",
+  );
+  const at = Object.fromEntries(arranged.nodes.map((n) => [n.id, n.position]));
+  expect(at.check.x).toBeGreaterThan(at.input.x + 230);
+  expect(at.approved.x).toBeGreaterThan(at.check.x + 230);
+  expect(at.declined.x).toBe(at.approved.x);
+  // True leaves the right edge above False, so its target is drawn above.
+  expect(at.approved.y).toBeLessThan(at.declined.y);
+  expect(
+    await arrangeWith(definition, new Map(), inThread, "horizontal"),
+  ).toEqual(arranged);
+});

@@ -190,6 +190,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Left to right, exits are on the right edge: the caption sits beside its
+   handle, above the connection that leaves it. */
+.handle-caption-side {
+  bottom: auto;
+  left: calc(100% + 6px);
+  transform: translateY(-120%);
+}
 .handle-fallback {
   color: #ac957a;
 }

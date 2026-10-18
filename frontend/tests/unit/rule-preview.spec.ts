@@ -12,8 +12,8 @@ const node = (id: string): RuleNode => ({
   label: id,
   position: { x: 0, y: 0 },
 });
-test("overview preserves fan-out, joins, disconnected nodes and cycles without overlap or crop", () => {
-  const definition: Definition = {
+function branching(): Definition {
+  return {
     schemaVersion: 1,
     inputs: [],
     nodes: [
@@ -39,6 +39,10 @@ test("overview preserves fan-out, joins, disconnected nodes and cycles without o
       sourceHandle: "next",
     })),
   };
+}
+
+test("overview preserves fan-out, joins, disconnected nodes and cycles without overlap or crop", () => {
+  const definition = branching();
   const graph = rulePreview(definition);
   expect(graph.nodes.map(({ node }) => node.id).sort()).toEqual(
     definition.nodes.map((node) => node.id).sort(),
@@ -79,4 +83,29 @@ test("invalid endpoints are explicitly counted while valid graph content remains
   expect(graph.nodes).toHaveLength(1);
   expect(graph.connections).toHaveLength(0);
   expect(graph.missingConnections).toBe(1);
+});
+
+test("left to right, the overview draws layers as columns and connections from right edges", () => {
+  const definition = branching();
+  const graph = rulePreview(definition, "horizontal");
+  const at = new Map(graph.nodes.map((placed) => [placed.node.id, placed]));
+  for (const current of graph.nodes) {
+    expect(current.x).toBeGreaterThanOrEqual(0);
+    expect(current.y).toBeGreaterThanOrEqual(0);
+    expect(current.x + previewNodeWidth).toBeLessThanOrEqual(graph.width);
+    expect(current.y + previewNodeHeight).toBeLessThanOrEqual(graph.height);
+    for (const other of graph.nodes) {
+      if (current === other) continue;
+      expect(
+        Math.abs(current.x - other.x) >= previewNodeWidth ||
+          Math.abs(current.y - other.y) >= previewNodeHeight,
+      ).toBe(true);
+    }
+  }
+  expect(at.get("join")!.x).toBeGreaterThan(at.get("left")!.x);
+  expect(at.get("left")!.x).toBe(at.get("right")!.x);
+  for (const { edge, sx } of graph.connections)
+    expect(sx).toBe(at.get(edge.source)!.x + previewNodeWidth);
+  // Top to bottom is unchanged by the new parameter.
+  expect(rulePreview(definition, "vertical")).toEqual(rulePreview(definition));
 });

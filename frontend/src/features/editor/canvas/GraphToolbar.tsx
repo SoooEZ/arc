@@ -5,9 +5,13 @@ import {
   IconButton,
   Menu,
   MenuItem,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
 } from "@mui/material";
 import {
+  ArrowDown,
+  ArrowRight,
   CheckCheck,
   ChevronDown,
   Download,
@@ -20,7 +24,14 @@ import { NodeIcon } from "../../../components/Icons";
 import type { NodeType } from "../../../types";
 import { MAX_NODES } from "../../../domain/limits";
 import { addableNodeTypes, nodeKinds } from "../../../domain/nodeKinds";
+import type { LayoutDirection } from "../../../domain/nodePorts";
 import type { EditorCapabilities } from "../editorCapabilities";
+
+/** The drawing directions in toolbar order, with their names and icons. */
+const directions = [
+  { value: "vertical", label: "Top to bottom", Icon: ArrowDown },
+  { value: "horizontal", label: "Left to right", Icon: ArrowRight },
+] as const;
 
 export default function GraphToolbar({
   nodeCount,
@@ -28,6 +39,8 @@ export default function GraphToolbar({
   readOnly,
   capabilities: can,
   arranging,
+  direction,
+  onDirectionChange,
   outline,
   onToggleOutline,
   onArrange,
@@ -42,6 +55,8 @@ export default function GraphToolbar({
   readOnly: boolean;
   capabilities: EditorCapabilities;
   arranging: boolean;
+  direction: LayoutDirection;
+  onDirectionChange: (direction: LayoutDirection) => void;
   outline: boolean;
   onToggleOutline: () => void;
   onArrange: () => Promise<void>;
@@ -67,11 +82,36 @@ export default function GraphToolbar({
             <ListTree size={17} />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Arrange graph · reduce crossings using branch exit positions">
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={direction}
+          aria-label="Graph direction"
+          className="graph-direction"
+          onChange={(_, value) => {
+            const chosen = directions.find((option) => option.value === value);
+            if (chosen) onDirectionChange(chosen.value);
+          }}
+        >
+          {directions.map(({ value, label, Icon }) => (
+            <ToggleButton key={value} value={value} aria-label={label}>
+              <Tooltip title={label}>
+                <Icon size={15} />
+              </Tooltip>
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+        <Tooltip
+          title={
+            direction === "vertical"
+              ? "Arrange graph · reduce crossings using branch exit positions"
+              : "Left to right arranges itself; Arrange graph works top to bottom"
+          }
+        >
           <span>
             <IconButton
               aria-label="Arrange graph"
-              disabled={!can.arrange}
+              disabled={!can.arrange || direction !== "vertical"}
               onClick={onArrange}
             >
               {arranging ? (

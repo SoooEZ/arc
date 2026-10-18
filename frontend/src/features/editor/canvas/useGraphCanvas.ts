@@ -25,8 +25,9 @@ import {
 } from "../../../domain/graph";
 import { newId } from "../../../domain/ids";
 import { canAddEdge, MAX_EDGES } from "../../../domain/limits";
-import { handles } from "../../../domain/nodePorts";
+import { handles, type LayoutDirection } from "../../../domain/nodePorts";
 import type { NodeErrors } from "../useGraphProblems";
+import { useHorizontalLayout, useShownDefinition } from "./useHorizontalLayout";
 interface Options {
   definition: Definition;
   selected: string;
@@ -41,6 +42,8 @@ interface Options {
   edit: (change: DefinitionChange) => boolean;
   /** Told why a connection gesture was refused, e.g. the connection limit. */
   onRefused: (message: string) => void;
+  /** Top to bottom (the stored positions) or left to right (laid out for display). */
+  direction: LayoutDirection;
 }
 export function useGraphCanvas({
   definition,
@@ -53,8 +56,16 @@ export function useGraphCanvas({
   nodeErrors,
   edit,
   onRefused,
+  direction,
 }: Options) {
   const [measurements, setMeasurements] = useState<NodeSizes>(() => new Map());
+  const horizontal = useHorizontalLayout(definition, measurements, direction);
+  // The draft as drawn. Edits, connections and scope read the draft itself.
+  const shown = useShownDefinition(definition, horizontal.positions);
+  const layoutReady =
+    direction === "vertical" ||
+    horizontal.positions !== null ||
+    horizontal.error !== null;
   const [blockedEdges, setBlockedEdges] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -77,12 +88,14 @@ export function useGraphCanvas({
   // One bounds array per geometry: label and expression edits replace node
   // objects without moving a card, so the bounds are parsed from their own
   // geometry text and keep their identity until a card moves or is measured.
-  const geometry = JSON.stringify(cardBounds(definition.nodes, measurements));
+  const geometry = JSON.stringify(
+    cardBounds(shown.nodes, measurements, direction),
+  );
   const bounds = useMemo((): CardBounds[] => JSON.parse(geometry), [geometry]);
   // Handlers keep their identity for the canvas's lifetime and read the
-  // latest draft and bounds through refs.
-  const latest = useRef({ definition, bounds });
-  latest.current = { definition, bounds };
+  // latest draft, bounds and direction through refs.
+  const latest = useRef({ definition, bounds, direction });
+  latest.current = { definition, bounds, direction };
   // The cards a drag in progress has moved: their bounds before the drag
   // started and now. Null between drags, so a settled graph routes fully.
   const [dragging, setDragging] = useState(false);
@@ -105,8 +118,8 @@ export function useGraphCanvas({
   }, []);
   // The context keeps its identity while no card moves, so edges do not re-route.
   const routing = useMemo(
-    () => ({ nodes: bounds, moved, reportBlocked }),
-    [bounds, moved, reportBlocked],
+    () => ({ nodes: bounds, moved, reportBlocked, direction }),
+    [bounds, moved, reportBlocked, direction],
   );
   const visited = useMemo(
     () =>
@@ -118,27 +131,29 @@ export function useGraphCanvas({
   const nodes = useMemo(
     () =>
       flowNodes(
-        definition.nodes,
+        shown.nodes,
         {
           selected,
           visited,
-          inputCount: definition.inputs.length,
+          inputCount: shown.inputs.length,
           errors: nodeErrors,
           sizes: measurements,
           onExpression,
           canOpenCode,
+          direction,
         },
         previousNodes.current,
       ),
     [
-      definition.nodes,
-      definition.inputs.length,
+      shown.nodes,
+      shown.inputs.length,
       selected,
       visited,
       nodeErrors,
       measurements,
       onExpression,
       canOpenCode,
+      direction,
     ],
   );
   const previousEdges = useRef<ReadonlyMap<string, Edge>>(new Map());
@@ -182,6 +197,8 @@ export function useGraphCanvas({
         dragStart.current = start;
         setDragging(start !== null);
       }
+      // The left-to-right view shows laid-out positions; the draft keeps its own.
+      if (latest.current.direction === "horizontal") return;
       const moved = new Map<string, { x: number; y: number }>();
       for (const change of changes)
         if (change.type === "position" && change.position)
@@ -250,6 +267,11 @@ export function useGraphCanvas({
   );
   return {
     measurements,
+    /** The draft with the positions the canvas draws. */
+    shown,
+    /** False while a left-to-right view waits for its first layout. */
+    layoutReady,
+    layoutError: horizontal.error,
     blockedEdges,
     routing,
     nodes,

@@ -62,6 +62,7 @@ const inputs = (overrides: Partial<FlowNodeInputs> = {}): FlowNodeInputs => ({
   sizes: new Map(),
   onExpression,
   canOpenCode: true,
+  direction: "vertical",
   ...overrides,
 });
 const byId = <T extends { id: string }>(items: T[]) =>

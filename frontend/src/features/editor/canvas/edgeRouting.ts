@@ -7,9 +7,11 @@ export interface RoutingNode extends Point {
   width: number;
   height: number;
 }
+/** The card edge a port is on; a route leaves and enters a port across that edge. */
+export type PortSide = "top" | "bottom" | "left" | "right";
 export interface Endpoint extends Point {
   nodeId?: string;
-  side?: "top" | "bottom";
+  side?: PortSide;
 }
 interface Rect {
   id: string;
@@ -286,6 +288,48 @@ export function routeEdge(
   target: Endpoint,
   nodes: RoutingNode[],
 ): Route | null {
+  if (!sideways(source.side) && !sideways(target.side)) {
+    const route = verticalRoute(source, target, nodes);
+    return route && render(route.points, route.radius);
+  }
+  // Ports on the left and right edges: route the drawing mirrored across its
+  // diagonal, where they are on the top and bottom edges, and mirror back.
+  const route = verticalRoute(
+    transposeEndpoint(source),
+    transposeEndpoint(target),
+    nodes.map(transposeNode),
+  );
+  return route && render(route.points.map(transpose), route.radius);
+}
+
+const sideways = (side: PortSide | undefined) =>
+  side === "left" || side === "right";
+const transpose = (p: Point): Point => ({ x: p.y, y: p.x });
+const transposedSide: Record<PortSide, PortSide> = {
+  left: "top",
+  right: "bottom",
+  top: "left",
+  bottom: "right",
+};
+const transposeEndpoint = (p: Endpoint): Endpoint => ({
+  ...transpose(p),
+  nodeId: p.nodeId,
+  side: p.side && transposedSide[p.side],
+});
+const transposeNode = (n: RoutingNode): RoutingNode => ({
+  id: n.id,
+  x: n.y,
+  y: n.x,
+  width: n.height,
+  height: n.width,
+});
+
+/** The corner points of a route between ports on top and bottom edges, and its corner radius. */
+function verticalRoute(
+  source: Endpoint,
+  target: Endpoint,
+  nodes: RoutingNode[],
+): { points: Point[]; radius: number } | null {
   for (const margin of [20, 10, 4]) {
     const rects: Rect[] = nodes.map((n) => ({
       id: n.id,
@@ -333,7 +377,10 @@ export function routeEdge(
       ? simple
       : search(start, end, rects);
     if (middle)
-      return render([source, ...middle, target], Math.min(5, margin / 2));
+      return {
+        points: [source, ...middle, target],
+        radius: Math.min(5, margin / 2),
+      };
   }
   return null;
 }

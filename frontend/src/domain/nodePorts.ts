@@ -45,9 +45,19 @@ export interface SourcePort {
   fallback: boolean;
 }
 
+/**
+ * How a graph is drawn: top to bottom, with exits along a card's bottom edge,
+ * or left to right, with exits along its right edge. A display preference
+ * (app/layoutDirection): handles and stored positions do not depend on it, and
+ * stored positions are the top-to-bottom drawing.
+ */
+export type LayoutDirection = "vertical" | "horizontal";
+
 const cardWidth = 230;
 /** Room for one exit label; a Switch with many cases widens its card to fit them. */
 const exitSpacing = 90;
+/** Room for one exit along the right edge: there, many cases make the card taller. */
+const exitRowSpacing = 34;
 
 function casePorts(cases: BranchCase[]): SourcePort[] {
   const branches = [
@@ -94,6 +104,21 @@ export function hasTargetPort(node: RuleNode): boolean {
   return nodeKinds[node.type].acceptsIncoming;
 }
 
-export function nodeWidth(node: RuleNode): number {
+/** A card's width: exits along the bottom edge widen it; along the right edge they do not. */
+export function nodeWidth(
+  node: RuleNode,
+  direction: LayoutDirection = "vertical",
+): number {
+  if (direction === "horizontal") return cardWidth;
   return Math.max(cardWidth, sourcePorts(node).length * exitSpacing);
+}
+
+/** The least height that keeps exits along the right edge apart; 0 when they are along the bottom. */
+export function nodeMinHeight(
+  node: RuleNode,
+  direction: LayoutDirection,
+): number {
+  return direction === "horizontal"
+    ? sourcePorts(node).length * exitRowSpacing
+    : 0;
 }

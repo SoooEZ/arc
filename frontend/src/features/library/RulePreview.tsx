@@ -1,6 +1,7 @@
 import { useId } from "react";
 import type { Rule } from "../../types";
 import { nodeKinds } from "../../domain/nodeKinds";
+import { useLayoutDirection } from "../../app/layoutDirection";
 import {
   rulePreview,
   previewNodeHeight,
@@ -8,7 +9,8 @@ import {
 } from "./previewLayout";
 
 export default function RulePreview({ rule }: { rule: Rule }) {
-  const graph = rulePreview(rule.draft);
+  const direction = useLayoutDirection();
+  const graph = rulePreview(rule.draft, direction);
   const markerId = useId().replaceAll(":", "");
   // At the smallest card width, text must still render at roughly 10px.
   const readable = graph.width <= 380 && graph.height <= 280;
@@ -26,6 +28,7 @@ export default function RulePreview({ rule }: { rule: Rule }) {
             role="img"
             aria-label={`${rule.name}: complete graph overview, ${graph.nodes.length} ${graph.nodes.length === 1 ? "node" : "nodes"}, ${graph.connections.length} ${graph.connections.length === 1 ? "connection" : "connections"}`}
             data-detail={readable ? "labels" : "overview"}
+            data-direction={direction}
           >
             <defs>
               <marker

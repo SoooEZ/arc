@@ -136,6 +136,13 @@
   background: var(--color-canvas);
   isolation: isolate;
 }
+/* A left-to-right view waits for its first layout: the cards render, so they
+   are measured, but stay out of sight at their stored positions. Opacity, not
+   visibility, which React Flow sets on every measured card. */
+.flow-laying-out .react-flow__viewport {
+  opacity: 0;
+  pointer-events: none;
+}
 /* Rule settings dialog. MUI removes the top padding of dialog content that
    follows a DialogTitle, so this one needs !important to keep its own. */
 .rule-settings-content {

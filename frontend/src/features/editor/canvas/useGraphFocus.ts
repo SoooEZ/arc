@@ -3,11 +3,16 @@ import { useReactFlow } from "@xyflow/react";
 import type { Definition } from "../../../types";
 import type { FlowNode } from "./GraphNode";
 import { cardCenter, type NodeSizes } from "./graphGeometry";
+import type { LayoutDirection } from "../../../domain/nodePorts";
 import type { EditorView } from "../editorCapabilities";
 import { rulePath } from "../../../app/routing";
 
 interface Options {
+  /** The graph as the canvas draws it. */
   definition: Definition;
+  direction: LayoutDirection;
+  /** False while a left-to-right view waits for its first layout. */
+  layoutReady: boolean;
   ruleId: string;
   requestedVersion: number | null;
   requestedNode?: string | null;
@@ -25,6 +30,8 @@ interface Options {
 /** Delay error/deep-link focus until the graph and its measured node are visible. */
 export function useGraphFocus({
   definition,
+  direction,
+  layoutReady,
   ruleId,
   requestedVersion,
   requestedNode,
@@ -62,10 +69,10 @@ export function useGraphFocus({
       const node = definition.nodes.find((candidate) => candidate.id === id);
       if (!node) return;
       // The card's own centre: a wide Switch is centred, not cut at the right.
-      const center = cardCenter(node, measurements);
+      const center = cardCenter(node, measurements, direction);
       void flow.setCenter(center.x, center.y, { zoom: 1, duration: 350 });
     },
-    [definition.nodes, measurements, flow, selectNode, selectEdge],
+    [definition.nodes, measurements, direction, flow, selectNode, selectEdge],
   );
 
   // Stable while the graph changes, so views such as the Test panel's trace,
@@ -95,7 +102,8 @@ export function useGraphFocus({
       shownView !== "graph" ||
       unavailable ||
       !pendingFocus ||
-      !measurements.has(pendingFocus)
+      !measurements.has(pendingFocus) ||
+      !layoutReady
     )
       return;
     const frame = requestAnimationFrame(() => {
@@ -103,7 +111,14 @@ export function useGraphFocus({
       setRequestedFocus(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [shownView, unavailable, pendingFocus, measurements, focusNode]);
+  }, [
+    shownView,
+    unavailable,
+    pendingFocus,
+    measurements,
+    layoutReady,
+    focusNode,
+  ]);
 
   // A canvas that mounts with a focus pending skips its initial fit (lesson F8):
   // the fit and the focus would otherwise race, whatever the frame order.

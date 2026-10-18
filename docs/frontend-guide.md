@@ -305,6 +305,7 @@ flowchart TB
 - **删除节点**：[`removeNode`](../frontend/src/features/editor/canvas/useGraphCommands.ts) 调 [`removeGraphNode`](../frontend/src/domain/graph.ts)，相关连线一起删掉；第一个 Input 和最后一个节点不能删。
 - **拖动**：[`onNodesChange`](../frontend/src/features/editor/canvas/useGraphCanvas.ts) 把新坐标写进草稿；卡片的实测尺寸只存在画布状态里。
 - **排版**：[`arrangeGraph`](../frontend/src/features/editor/canvas/graphLayout.ts) 在 Web Worker（[`layoutInWorker`](../frontend/src/features/editor/canvas/graphLayoutWorker.ts)）里跑 ELK，结果通过 `graph/arranged` 应用。
+- **显示方向**：工具栏的方向切换写全局偏好 [`layoutDirection`](../frontend/src/app/layoutDirection.ts)。从上到下画草稿里存的坐标；从左到右由 [`useHorizontalLayout`](../frontend/src/features/editor/canvas/useHorizontalLayout.ts) 另排一份只用于显示的坐标，拖动和 Arrange 停用，草稿不变。
 - **分支方式**：Condition 的 Branches 选项（[`BranchModeField`](../frontend/src/features/editor/inspector/BranchModeField.tsx)）调 [`withBranchMode`](../frontend/src/domain/switchBranches.ts)，在 CONDITION 和 SWITCH 之间换类型，连线跟着改出口名。
 
 ### 保存和发布
@@ -445,6 +446,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [chunkLoadFailures.ts](../frontend/src/app/chunkLoadFailures.ts) | 监听 vite:preloadError，记录懒加载分块下载失败，让页面提示刷新 |  |
 | [CreateRuleDialog.tsx](../frontend/src/app/CreateRuleDialog.tsx) | 新建规则对话框：由名称生成 ID，本地校验后 POST /rules |  |
 | [EditorRoute.ts](../frontend/src/app/EditorRoute.ts) | 编辑器懒加载入口：引入 React Flow 样式并转出 Editor |  |
+| [layoutDirection.ts](../frontend/src/app/layoutDirection.ts) | 全局显示偏好：图从上到下还是从左到右画，存在浏览器本地，编辑画布、历史版本、引用弹窗和规则库缩略图共用；不改规则和草稿 | [routing.spec.ts](../frontend/tests/routing.spec.ts) |
 | [navigationGuards.ts](../frontend/src/app/navigationGuards.ts) | 全局导航守卫注册表：有未保存或进行中的工作时，离开前先确认；`useStagedDialogEdits` 让对话框里还没应用的编辑在 Esc、点背景和路由离开时都先问 | [navigation-guards.spec.ts](../frontend/tests/unit/navigation-guards.spec.ts)、[workspace-routing.spec.ts](../frontend/tests/unit/workspace-routing.spec.ts) |
 | [pinnedReads.ts](../frontend/src/app/pinnedReads.ts) | 不可变“固定读取”的通用缓存：合并并发请求、按订阅数中止、LRU、forget；容量 0 时只合并进行中的读取，什么都不留 | [pinned-reads.spec.ts](../frontend/tests/unit/pinned-reads.spec.ts) |
 | [pinnedVersions.ts](../frontend/src/app/pinnedVersions.ts) | 规则版本和数据源版本的全页缓存实例及读取函数（检查器、Code studio 和数据源共用） |  |
@@ -464,9 +466,9 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [libraryOrder.ts](../frontend/src/features/library/libraryOrder.ts) | 卡片按 updatedAt 的时间先后排序（比较时刻，不比较文本） | [library-order.spec.ts](../frontend/tests/unit/library-order.spec.ts) |
 | [LibraryPage.tsx](../frontend/src/features/library/LibraryPage.tsx) | 规则库页：统计、类型筛选、搜索、卡片网格、分页、空状态；每张卡片套自己的 RecoverableBoundary，一张渲染失败不影响整页 |  |
 | [previewCache.ts](../frontend/src/features/library/previewCache.ts) | 按规则化身 + revision 缓存卡片预览用的完整规则，最多 40 条，先进先出；删除规则时 forgetPreview 清掉它的条目 | [library-previews.spec.ts](../frontend/tests/unit/library-previews.spec.ts) |
-| [previewLayout.ts](../frontend/src/features/library/previewLayout.ts) | 规则库缩略图：按拓扑分层算节点坐标和连线，容忍环和悬空连线 | [rule-preview.spec.ts](../frontend/tests/unit/rule-preview.spec.ts) |
+| [previewLayout.ts](../frontend/src/features/library/previewLayout.ts) | 规则库缩略图：按拓扑分层算节点坐标和连线（从上到下按行，从左到右按列），容忍环和悬空连线 | [rule-preview.spec.ts](../frontend/tests/unit/rule-preview.spec.ts) |
 | [RuleCard.tsx](../frontend/src/features/library/RuleCard.tsx) | 规则卡片：读取完整规则画缩略图（有缓存和重试），点击打开画布；memo 组件，搜索框打字时不重新渲染 |  |
-| [RulePreview.tsx](../frontend/src/features/library/RulePreview.tsx) | 用 SVG 画草稿的分层缩略图，并显示无效连线数 |  |
+| [RulePreview.tsx](../frontend/src/features/library/RulePreview.tsx) | 用 SVG 画草稿的分层缩略图，按显示方向排列，并显示无效连线数 |  |
 
 ### `features/editor/`：编辑器
 
@@ -499,19 +501,20 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
-| [edgeRouting.ts](../frontend/src/features/editor/canvas/edgeRouting.ts) | 正交避障路由：先试简单折线，不行再在网格上做 A* 搜索；拖拽时按增量缓存 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts) |
+| [edgeRouting.ts](../frontend/src/features/editor/canvas/edgeRouting.ts) | 正交避障路由：先试简单折线，不行再在网格上做 A* 搜索；左右两侧的端口把图沿对角线镜像后用同一套算法；拖拽时按增量缓存 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[routing.spec.ts](../frontend/tests/routing.spec.ts) |
 | [flowElements.ts](../frontend/src/features/editor/canvas/flowElements.ts) | 把草稿转成 React Flow 的节点和边，没变的对象原样复用；卡片边界、拖拽起点、已走分支 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts) |
 | [GraphCanvas.tsx](../frontend/src/features/editor/canvas/GraphCanvas.tsx) | 画布：ReactFlow、工具栏、右键菜单、小地图、大纲、删除连线和阻塞提示 |  |
-| [graphGeometry.ts](../frontend/src/features/editor/canvas/graphGeometry.ts) | 卡片尺寸（实测值，否则默认值）和中心点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts) |
-| [graphLayout.ts](../frontend/src/features/editor/canvas/graphLayout.ts) | ELK 分层排版：稳定排序，只改节点坐标 | [graph-layout.spec.ts](../frontend/tests/unit/graph-layout.spec.ts) |
+| [graphGeometry.ts](../frontend/src/features/editor/canvas/graphGeometry.ts) | 卡片尺寸（实测值，否则按显示方向的默认值）和中心点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts) |
+| [graphLayout.ts](../frontend/src/features/editor/canvas/graphLayout.ts) | ELK 分层排版：稳定排序，只改节点坐标；Arrange 从上到下排，横向视图从左到右排 | [graph-layout.spec.ts](../frontend/tests/unit/graph-layout.spec.ts) |
 | [graphLayoutWorker.ts](../frontend/src/features/editor/canvas/graphLayoutWorker.ts) | ELK Web Worker：懒创建，出错时拒绝，空闲 60 秒后释放 |  |
-| [GraphNode.tsx](../frontend/src/features/editor/canvas/GraphNode.tsx) | 节点卡片：图标、类型、名称、摘要、错误标记、代码按钮和连接句柄 |  |
+| [GraphNode.tsx](../frontend/src/features/editor/canvas/GraphNode.tsx) | 节点卡片：图标、类型、名称、摘要、错误标记、代码按钮和连接句柄（从上到下在上下两边，从左到右在左右两边） |  |
 | [GraphOutline.tsx](../frontend/src/features/editor/canvas/GraphOutline.tsx) | 节点大纲：按文档顺序列出节点，点击后聚焦 |  |
-| [GraphToolbar.tsx](../frontend/src/features/editor/canvas/GraphToolbar.tsx) | 画布工具栏：大纲、排版、导出、校验、添加节点菜单 |  |
-| [RoutedEdge.tsx](../frontend/src/features/editor/canvas/RoutedEdge.tsx) | 自定义连线：读取路由上下文、缓存路线（在 effect 里写缓存，不在渲染期间写 ref）、报告被挡住的连线；拖拽连线时的预览线 |  |
-| [useGraphCanvas.ts](../frontend/src/features/editor/canvas/useGraphCanvas.ts) | 画布状态：尺寸测量、拖拽与连线处理、路由上下文、测试路径高亮 |  |
+| [GraphToolbar.tsx](../frontend/src/features/editor/canvas/GraphToolbar.tsx) | 画布工具栏：大纲、显示方向切换、排版（只在从上到下时可用）、导出、校验、添加节点菜单 |  |
+| [RoutedEdge.tsx](../frontend/src/features/editor/canvas/RoutedEdge.tsx) | 自定义连线：读取路由上下文、按显示方向决定进出的边、缓存路线（在 effect 里写缓存，不在渲染期间写 ref）、报告被挡住的连线；拖拽连线时的预览线 |  |
+| [useGraphCanvas.ts](../frontend/src/features/editor/canvas/useGraphCanvas.ts) | 画布状态：尺寸测量、拖拽与连线处理、路由上下文、测试路径高亮；从左到右时画显示坐标，不把它写回草稿 |  |
 | [useGraphCommands.ts](../frontend/src/features/editor/canvas/useGraphCommands.ts) | 图命令：修改、添加、删除节点，排版（懒加载 ELK），都经过 edit 门控 |  |
 | [useGraphFocus.ts](../frontend/src/features/editor/canvas/useGraphFocus.ts) | 聚焦节点：视口居中；深链接和测试结果的跳转等节点测量完、而且图视图真的在屏幕上（`shownView`，不是路由）再执行 |  |
+| [useHorizontalLayout.ts](../frontend/src/features/editor/canvas/useHorizontalLayout.ts) | 从左到右视图的显示坐标：节点、出口、尺寸或连线变化后用 ELK 重新排版，只用于显示，不改也不弄脏草稿；只采用最新一次请求的结果，失败时报告原因 | [routing.spec.ts](../frontend/tests/routing.spec.ts) |
 
 ### `features/editor/inspector/`：检查器
 
@@ -679,7 +682,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [formulaReferences.ts](../frontend/src/domain/formulaReferences.ts) | `@id:version` 引用的唯一语法出处：由 resourceIds 的 ID 语法和服务器的版本语法组成，版本上限是 int；expressionSymbols、arcLanguage、useFormulaSupport、formulaCalls 和路由都从这里读 | [formula-references.spec.ts](../frontend/tests/unit/formula-references.spec.ts) |
 | [limits.ts](../frontend/src/domain/limits.ts) | 后端 Limits.java 的镜像：节点、连线、参数、$OBJECT 字段数、JSON 指针长度等上限，以及“还能不能再加”；规则名称/描述的校验（只含不换行空格或全角空格等 Unicode 空白的名称同样拒绝）；JSON 指针字段的规则（sourcePointerProblem） | [limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
 | [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) | 七种节点的描述表（SWITCH 在界面上就是带多个分支的 Condition，不在添加菜单里）：出口、是否存结果、能否被连入、允许的属性、新建默认值、卡片摘要；`entryInputNode` 找服务器当作入口的 Input 节点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
-| [nodePorts.ts](../frontend/src/domain/nodePorts.ts) | 连接句柄的唯一出处：按节点类型算出口端口（ID、标签、位置、兜底）和卡片宽度 | [branches.spec.ts](../frontend/tests/unit/branches.spec.ts)、[document.spec.ts](../frontend/tests/unit/document.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
+| [nodePorts.ts](../frontend/src/domain/nodePorts.ts) | 连接句柄的唯一出处：按节点类型算出口端口（ID、标签、位置、兜底），以及按显示方向的卡片宽度和最小高度 | [branches.spec.ts](../frontend/tests/unit/branches.spec.ts)、[document.spec.ts](../frontend/tests/unit/document.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [numericDefaults.ts](../frontend/src/domain/numericDefaults.ts) | 解析 NUMBER 默认值并保留写法的位数；超出服务器精度就拒绝 | [input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts) |
 | [outputNames.ts](../frontend/src/domain/outputNames.ts) | 多个 Output 时每个结果字段的名字：outputName → 变量名 → 节点 ID |  |
 | [placeholderLiterals.ts](../frontend/src/domain/placeholderLiterals.ts) | 各输入类型的占位字面量，用来填充还没选值的必填项 | [placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts) |

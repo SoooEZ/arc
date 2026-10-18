@@ -25,6 +25,7 @@ import {
 } from "../../../domain/graph";
 import { canAddNode } from "../../../domain/limits";
 import { nodeKinds } from "../../../domain/nodeKinds";
+import type { LayoutDirection } from "../../../domain/nodePorts";
 import type { useGraphCanvas } from "./useGraphCanvas";
 import type { EditorCapabilities } from "../editorCapabilities";
 import GraphToolbar from "./GraphToolbar";
@@ -65,6 +66,9 @@ interface Props {
   onRenameNode: (id: string) => void;
   onDeleteNode: (id: string) => void;
   hasTrace: boolean;
+  /** Top to bottom (stored positions, editable) or left to right (laid out for display). */
+  direction: LayoutDirection;
+  onDirectionChange: (direction: LayoutDirection) => void;
   children?: ReactNode;
 }
 export default function GraphCanvas({
@@ -88,6 +92,8 @@ export default function GraphCanvas({
   onRenameNode,
   onDeleteNode,
   hasTrace,
+  direction,
+  onDirectionChange,
   children,
 }: Props) {
   const [outline, setOutline] = useState(false);
@@ -128,6 +134,8 @@ export default function GraphCanvas({
     edges,
     routing,
     blockedEdges,
+    layoutReady,
+    layoutError,
     fitRequest,
     onNodesChange,
     onEdgesChange,
@@ -185,6 +193,28 @@ export default function GraphCanvas({
   // Decided once per mount: React Flow would otherwise fit on a later node
   // measurement once the pending focus has cleared and the prop turns true.
   const [fitOnMount] = useState(!initialFocus);
+  // React Flow fits the cards it first measures, which a left-to-right view
+  // draws at their stored positions until its layout arrives: that view fits
+  // once laid out instead, and so does every change of direction.
+  const [fitViewOnMount] = useState(fitOnMount && direction === "vertical");
+  const directionFit = useRef({
+    direction,
+    pending: fitOnMount && direction === "horizontal",
+  });
+  useEffect(() => {
+    const fit = directionFit.current;
+    if (fit.direction !== direction) {
+      fit.direction = direction;
+      fit.pending = true;
+    }
+    if (!fit.pending || !layoutReady) return;
+    const frame = requestAnimationFrame(() => {
+      fit.pending = false;
+      // Nothing awaits the fit: an interrupted fit may never settle.
+      void flow.fitView(arrangedFit);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [direction, layoutReady, flow]);
   // Fit requests made while this canvas was unmounted were covered by the
   // initial fit, so only requests made while it is mounted run here.
   const handledFit = useRef(fitRequest);
@@ -206,6 +236,8 @@ export default function GraphCanvas({
         readOnly={readOnly}
         capabilities={can}
         arranging={arranging}
+        direction={direction}
+        onDirectionChange={onDirectionChange}
         outline={outline}
         onToggleOutline={() => setOutline((value) => !value)}
         onArrange={layout}
@@ -213,6 +245,12 @@ export default function GraphCanvas({
         onValidate={() => action("validate")}
         onAddNode={onAddNode}
       />
+      {layoutError && (
+        <Alert severity="warning" className="routing-warning">
+          The left-to-right view could not be laid out: {layoutError} Cards stay
+          where they were drawn.
+        </Alert>
+      )}
       {!!blocked.length && (
         <Alert severity="warning" className="routing-warning">
           Connections blocked by overlapping or tightly spaced nodes. Move nodes
@@ -232,7 +270,7 @@ export default function GraphCanvas({
           ))}
         </Alert>
       )}
-      <div className="flow-container">
+      <div className={`flow-container ${layoutReady ? "" : "flow-laying-out"}`}>
         <RoutingContext.Provider value={routing}>
           <ReactFlow
             nodes={nodes}
@@ -252,11 +290,12 @@ export default function GraphCanvas({
             onConnect={connect}
             onConnectEnd={connectEnd}
             isValidConnection={isValidConnection}
-            nodesDraggable={can.edit}
+            // A left-to-right view lays itself out; cards move top to bottom.
+            nodesDraggable={can.edit && direction === "vertical"}
             nodesConnectable={can.edit}
             edgesReconnectable={false}
             deleteKeyCode={null}
-            fitView={fitOnMount}
+            fitView={fitViewOnMount}
             fitViewOptions={initialFit}
             minZoom={0.25}
             maxZoom={1.5}
