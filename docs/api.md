@@ -102,6 +102,37 @@ A rule that another rule still calls is kept. That covers a Reference node that 
 
 Revisions come from one sequence for all rules, so they advance but are not consecutive, and a rule created again under a deleted ID never repeats a revision an editor may still hold: that editor's next save, publish or delete answers `409`.
 
+## Find the rules that call a rule
+
+`GET /rules/{id}/callers?offset=0&limit=20` lists the other rules whose saved draft or published versions call this rule, through a Reference node or an `@id:version` call in any node or input source mapping: the rules a deletion would name, each once, ordered by rule ID. It returns the catalogs' `{items,total,offset,limit}` envelope with the same bounds (`offset` at least 0, `limit` from 1 to 100, default 20; `422` "Use offset >= 0 and limit from 1 to 100" otherwise), and `404` "Rule not found: id" for an unknown rule.
+
+```json
+{
+  "items": [
+    {"ruleId": "order-pricing", "name": "Order pricing", "draftPins": [1, 2], "published": {"version": 3, "pins": [1]}, "earlierVersions": 2}
+  ],
+  "total": 1, "offset": 0, "limit": 20
+}
+```
+
+- `draftPins`: the versions of this rule that the caller's saved draft pins, ascending; `null` when the draft does not call the rule, and `[]` while a Reference has chosen it without a version.
+- `published`: the caller's latest published version and the versions of this rule it pins, when that version calls the rule; `null` when the caller is unpublished or its latest version does not call it.
+- `earlierVersions`: how many of the caller's older published versions call the rule. They still run when a client names them, and they keep the rule from deletion.
+
+Pins are read from each caller's draft and latest version one at a time, so a caller changed between the page and those reads shows what the later read found: a draft saved without the call has no pins. The count and the page are separate statements, as in the catalogs.
+
+## Duplicate a rule
+
+`POST /rules/{id}/duplicate` creates a new rule from this one and returns it with `201`, as `POST /rules` does:
+
+```json
+{"id": "order-pricing-eu", "name": "Order pricing (EU)", "description": "Prices EU orders", "version": 3, "includeTests": true}
+```
+
+The new rule has the original's kind and, as its draft, the original's saved draft, or published `version` when one is given. Nothing is published. An omitted or null `description` copies the original's; any string, `""` included, is used as given. The original's saved test cases are copied, names, inputs and expectations as stored, unless `includeTests` is `false`. The rule and its copied cases are created together or not at all, and the original stays editable, but not deletable, while the copy runs.
+
+The body is read strictly: an unknown field is a `400` that names it. An unknown original is `404` "Rule not found: id" before the body's values are checked; `id`, `name` and `description` are then refused exactly as `POST /rules` refuses them (`422`), a taken `id` is `409` "This rule ID already exists", and a version the original lacks is `404` "Published rule version not found: id vN".
+
 ## Saved test cases
 
 A rule keeps up to 100 test cases: inputs to run and the outcome they should produce. They belong to the rule, not to its draft or its published versions, so writing one changes neither the draft nor its `revision` or `updatedAt`, and deleting the rule deletes its cases. The server stores cases; running and comparing them is the client's work. The editor runs each case through `POST /preview` against the graph it shows; an API client can run them through `POST /rules/{id}/execute` against a published version.
@@ -159,6 +190,13 @@ The current release has no batch endpoint, run-history storage, or authenticatio
 ## Code studio and external parameters
 
 See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults. Entries appear in read order: an input's source dependencies are read first, in declaration order.
+
+## Behavior changes from the 2026-10-18 round-3 usability work
+
+Two endpoints are new; existing endpoints, payloads and messages are unchanged, and no migration runs.
+
+- `GET /rules/{id}/callers` pages the other rules that call a rule, with the versions their drafts and latest versions pin ([Find the rules that call a rule](#find-the-rules-that-call-a-rule)). It reads the callee sets that rule deletion already reads.
+- `POST /rules/{id}/duplicate` creates a rule from another's saved draft or published version, with its saved test cases ([Duplicate a rule](#duplicate-a-rule)).
 
 ## Behavior changes from the 2026-10-18 usability work
 

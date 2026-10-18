@@ -65,12 +65,32 @@
 .api-console-heading .MuiButton-root {
   flex-shrink: 0;
 }
-/* The inputs' label with its JSON | Form switch. */
+/* The inputs' label with Load saved test and its JSON | Form switch. */
 .api-input-heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+.api-input-heading > .MuiButton-root {
+  font-size: var(--text-sm);
+}
+.saved-test-option,
+.saved-test-empty {
+  max-width: min(420px, calc(100vw - 32px));
+}
+/* The empty list's advice stays readable, though nothing in it can be chosen. */
+.saved-test-empty.Mui-disabled {
+  opacity: 1;
+  white-space: normal;
+}
+.saved-test-option .MuiListItemText-secondary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
 }
 .api-input-heading .MuiTabs-root,
 .api-input-heading .MuiTab-root {
@@ -139,14 +159,16 @@
   overflow-wrap: anywhere;
   min-width: 0;
 }
+/* "Input parameters application/json": the heading row places the label beside
+   its controls, so the caption keeps its own gap rather than spreading out. */
 .field-label {
   font-size: var(--text-md);
   font-weight: 500;
   color: var(--color-api-muted);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: -8px;
+  align-items: baseline;
+  gap: 8px;
+  margin-right: auto;
 }
 .field-label > span {
   font-size: var(--text-xs);

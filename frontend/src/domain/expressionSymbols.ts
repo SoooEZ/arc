@@ -235,37 +235,53 @@ export function expressionSymbols(
 }
 
 /**
- * The expression with every read of the variable `from` reading `to` instead:
- * the root of a name or property path (`from.total` keeps its `.total`), never
- * a property after a dot, a function, a Formula call, text inside a string, or
- * a collection binder named `from` with the body that reads it.
+ * The variable reads among an expression's tokens: the root of each name or
+ * property path (`total` in `total.amount`), never a property after a dot, a
+ * function, a Formula call, text inside a string, or a collection binder with
+ * the body that reads it.
  */
-export function renameVariable(
-  source: string,
-  from: string,
-  to: string,
-): string {
-  const lexical = tokens(source, false);
+function variableReads(lexical: Token[]): { token: Token; root: string }[] {
   const locals = localScopes(lexical);
-  let renamed = "";
-  let copied = 0;
+  const reads: { token: Token; root: string }[] = [];
   for (let index = 0; index < lexical.length; index++) {
     const token = lexical[index];
     if (!token.identifier || /^[$@]/.test(token.text)) continue;
-    const root = token.text.split(".")[0];
-    if (root !== from || lexical[index + 1]?.text === "(") continue;
+    if (lexical[index + 1]?.text === "(") continue;
     if (lexical[index - 1]?.text === ".") continue;
+    const root = token.text.split(".")[0];
     const local = locals.some(
       (scope) =>
         scope.name === root &&
         (index === scope.declaration ||
           (index >= scope.start && index < scope.end)),
     );
-    if (local) continue;
+    if (!local) reads.push({ token, root });
+  }
+  return reads;
+}
+
+/**
+ * The expression with every read of the variable `from` reading `to` instead
+ * (`from.total` keeps its `.total`); see variableReads for what is a read.
+ */
+export function renameVariable(
+  source: string,
+  from: string,
+  to: string,
+): string {
+  let renamed = "";
+  let copied = 0;
+  for (const { token, root } of variableReads(tokens(source, false))) {
+    if (root !== from) continue;
     renamed += source.slice(copied, token.offset) + to;
     copied = token.offset + root.length;
   }
   return copied ? renamed + source.slice(copied) : source;
+}
+
+/** The variables an expression reads, as renameVariable finds them. */
+export function variablesRead(source: string): string[] {
+  return variableReads(tokens(source, false)).map(({ root }) => root);
 }
 
 /**

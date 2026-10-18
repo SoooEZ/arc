@@ -29,17 +29,31 @@ public class RuleService {
   /** A publication names the revision its client reviewed, and may say what the version changes. */
   public record Publish(Integer revision, String note) {}
 
+  /**
+   * A copy of a rule as a new one. An omitted or null {@code description} copies the original's;
+   * {@code version} copies that published version instead of the saved draft; the saved test cases
+   * are copied unless {@code includeTests} is false.
+   */
+  public record Duplicate(
+      String id, String name, String description, Integer version, Boolean includeTests) {}
+
   /** How many callers a refused deletion names in its message; `issues` lists them all. */
   private static final int NAMED_CALLERS = 5;
 
   private final RuleRepository store;
+  private final RuleTestCaseRepository testCases;
   private final Validator validator;
   private final RuleDefinitionService definitions;
   private final Engine engine;
 
   public RuleService(
-      RuleRepository store, Validator validator, RuleDefinitionService definitions, Engine engine) {
+      RuleRepository store,
+      RuleTestCaseRepository testCases,
+      Validator validator,
+      RuleDefinitionService definitions,
+      Engine engine) {
     this.store = store;
+    this.testCases = testCases;
     this.validator = validator;
     this.definitions = definitions;
     this.engine = engine;
@@ -76,14 +90,43 @@ public class RuleService {
     return store.version(id, version);
   }
 
+  /**
+   * One page of the other rules that call the rule, by rule ID, with the versions of it that their
+   * saved drafts and latest published versions pin. Each definition is read on its own, so a page
+   * holds one at a time however large its callers' drafts are. A caller that changes between the
+   * reads shows what the later read found: a draft that stopped calling the rule has no pins.
+   */
+  public CatalogPage<RuleCaller> callers(String id, PageRequest page) {
+    CatalogPage<RuleRepository.CallingRule> calling = store.callingRules(id, page);
+    var callers = new ArrayList<RuleCaller>();
+    for (var rule : calling.items()) callers.add(caller(rule, id));
+    return new CatalogPage<>(callers, calling.total(), calling.offset(), calling.limit());
+  }
+
+  private RuleCaller caller(RuleRepository.CallingRule rule, String id) {
+    List<Integer> draftPins = rule.draftCalls() ? pins(rule.ruleId(), null, id) : null;
+    RuleCaller.Published published = null;
+    if (rule.latestCalls()) {
+      List<Integer> pins = pins(rule.ruleId(), rule.publishedVersion(), id);
+      if (pins != null) published = new RuleCaller.Published(rule.publishedVersion(), pins);
+    }
+    return new RuleCaller(rule.ruleId(), rule.name(), draftPins, published, rule.earlierVersions());
+  }
+
+  /**
+   * The versions of rule {@code id} that the caller's saved draft ({@code version} null) or
+   * published version pins; null when it no longer calls the rule.
+   */
+  private List<Integer> pins(String callerId, Integer version, String id) {
+    var definition = store.callingDefinition(callerId, version, id);
+    return definition.isEmpty()
+        ? null
+        : List.copyOf(Validator.pinnedVersions(definition.get(), id));
+  }
+
   @Transactional
   public Rule create(Create request) {
-    if (!Identifiers.isResourceId(request.id()))
-      throw ArcException.invalid(
-          "Rule ID must start with a lowercase letter and contain only lowercase letters, digits,"
-              + " and hyphens (max "
-              + Limits.MAX_RESOURCE_ID_CHARACTERS
-              + ")");
+    requireRuleId(request.id());
     Metadata metadata = metadata(request.name(), request.description());
     // The payload keeps the kind as text; an unknown one is a 422 here, never a Jackson 400.
     RuleKind kind =
@@ -99,6 +142,48 @@ public class RuleService {
         kind.name(),
         draft.definition(),
         draft.callees());
+  }
+
+  /**
+   * Creates rule {@code request.id()} with the original's kind and its saved draft, or published
+   * {@code version}, as the new draft, and copies the original's saved test cases unless asked not
+   * to; nothing is published. The original is a 404 before the request is checked, as for every
+   * write, and is held against deletion until the copy commits, so the draft, the version and the
+   * cases all come from one rule. The new rule is checked and stored exactly as a create stores it.
+   */
+  @Transactional
+  public Rule duplicate(String originalId, Duplicate request) {
+    Rule original = store.lockForCopy(originalId);
+    requireRuleId(request.id());
+    String description =
+        request.description() == null ? original.description() : request.description();
+    Metadata metadata = metadata(request.name(), description);
+    Definition copied =
+        request.version() == null
+            ? original.draft()
+            : store.version(originalId, request.version()).definition();
+    StorableDraft draft = storableDraft(copied);
+    Rule created =
+        store.create(
+            request.id(),
+            metadata.name(),
+            metadata.description(),
+            original.kind(),
+            draft.definition(),
+            draft.callees());
+    if (!Boolean.FALSE.equals(request.includeTests()))
+      testCases.copyCases(originalId, created.id());
+    return created;
+  }
+
+  /** IDs follow the shared resource ID policy ({@link Identifiers#isResourceId}). */
+  private static void requireRuleId(String id) {
+    if (!Identifiers.isResourceId(id))
+      throw ArcException.invalid(
+          "Rule ID must start with a lowercase letter and contain only lowercase letters, digits,"
+              + " and hyphens (max "
+              + Limits.MAX_RESOURCE_ID_CHARACTERS
+              + ")");
   }
 
   @Transactional

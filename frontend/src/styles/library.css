@@ -187,3 +187,43 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* Create rule from a template or a graph file, and Duplicate rule. */
+.create-start-from {
+  align-self: flex-start;
+}
+.create-start-from .MuiToggleButton-root {
+  padding: 4px 14px;
+  font-size: var(--text-md);
+}
+.graph-file {
+  display: grid;
+  gap: 8px;
+}
+.graph-file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.graph-file-name {
+  color: var(--color-library-muted);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+.graph-file-summary {
+  margin: 0;
+  color: var(--color-accent);
+  font-size: var(--text-md);
+}
+/* A card's More actions sits above the card-wide Open graph button. */
+.rule-card-menu.MuiIconButton-root {
+  position: relative;
+  z-index: 1;
+  margin: -4px -8px -4px 0;
+  color: var(--color-library-muted);
+}
+.duplicate-source-note {
+  margin: 0;
+  color: var(--color-library-muted);
+  font-size: var(--text-md);
+}

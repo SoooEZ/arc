@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -93,6 +94,48 @@ public class JdbcRuleRepository implements RuleRepository {
 
   private static final RowMapper<Caller> CALLER_MAPPER =
       (row, index) -> new Caller(row.getString("rule_id"), row.getObject("version", Integer.class));
+
+  /** Each other rule once whose draft or a published version calls the rule, as in CALLERS. */
+  private static final String CALLING_RULES =
+      """
+      SELECT id AS rule_id FROM rules
+      WHERE id <> ? AND callees @> ARRAY[?::text]
+      UNION
+      SELECT rule_id FROM rule_versions
+      WHERE rule_id <> ? AND callees @> ARRAY[?::text]
+      """;
+
+  /**
+   * A page of {@link #CALLING_RULES} with what the callee sets tell of each: whether the draft and
+   * the latest published version call the rule, and how many earlier versions do. Only callee sets
+   * are read; the definitions are read one at a time afterwards, for their pins.
+   */
+  private static final String CALLING_PAGE =
+      """
+      WITH page AS (
+        %s
+        ORDER BY rule_id LIMIT ? OFFSET ?)
+      SELECT r.id, r.name, r.published_version,
+        r.callees @> ARRAY[?::text] AS draft_calls,
+        COALESCE(v.callees @> ARRAY[?::text], false) AS latest_calls,
+        (SELECT count(*) FROM rule_versions earlier
+          WHERE earlier.rule_id = r.id AND earlier.version < r.published_version
+            AND earlier.callees @> ARRAY[?::text]) AS earlier_versions
+      FROM page JOIN rules r ON r.id = page.rule_id
+      LEFT JOIN rule_versions v ON v.rule_id = r.id AND v.version = r.published_version
+      ORDER BY r.id
+      """
+          .formatted(CALLING_RULES);
+
+  private static final RowMapper<CallingRule> CALLING_RULE_MAPPER =
+      (row, index) ->
+          new CallingRule(
+              row.getString("id"),
+              row.getString("name"),
+              row.getObject("published_version", Integer.class),
+              row.getBoolean("draft_calls"),
+              row.getBoolean("latest_calls"),
+              row.getInt("earlier_versions"));
 
   /**
    * The columns of a {@link Rule} without its draft, for a write that leaves the draft as it is.
@@ -233,6 +276,15 @@ public class JdbcRuleRepository implements RuleRepository {
   @Override
   public Rule lockForPublication(String id) {
     return find(id, " FOR NO KEY UPDATE");
+  }
+
+  /**
+   * KEY SHARE, as the callers of a rule hold it: deletion's FOR UPDATE waits for the copy, while a
+   * save's or a publication's NO KEY UPDATE does not.
+   */
+  @Override
+  public Rule lockForCopy(String id) {
+    return find(id, " FOR KEY SHARE");
   }
 
   /**
@@ -407,6 +459,50 @@ public class JdbcRuleRepository implements RuleRepository {
   @Override
   public List<Caller> callersOf(String id) {
     return jdbc.query(CALLERS, CALLER_MAPPER, id, id, id, id);
+  }
+
+  @Override
+  public CatalogPage<CallingRule> callingRules(String id, PageRequest page) {
+    requireRule(id);
+    long total =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM (" + CALLING_RULES + ") calling", Long.class, id, id, id, id);
+    var items =
+        jdbc.query(
+            CALLING_PAGE,
+            CALLING_RULE_MAPPER,
+            id,
+            id,
+            id,
+            id,
+            page.limit(),
+            page.offset(),
+            id,
+            id,
+            id);
+    return new CatalogPage<>(items, total, page.offset(), page.limit());
+  }
+
+  @Override
+  public Optional<Definition> callingDefinition(String callerId, Integer version, String id) {
+    List<String> rows;
+    if (version == null)
+      rows =
+          jdbc.query(
+              "SELECT draft FROM rules WHERE id = ? AND callees @> ARRAY[?::text]",
+              (row, index) -> row.getString("draft"),
+              callerId,
+              id);
+    else
+      rows =
+          jdbc.query(
+              "SELECT definition FROM rule_versions"
+                  + " WHERE rule_id = ? AND version = ? AND callees @> ARRAY[?::text]",
+              (row, index) -> row.getString("definition"),
+              callerId,
+              version,
+              id);
+    return rows.isEmpty() ? Optional.empty() : Optional.of(decode(rows.getFirst()));
   }
 
   @Override

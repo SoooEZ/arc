@@ -14,7 +14,6 @@ import {
 import { CheckCircle2 } from "lucide-react";
 import type { Definition } from "../../types";
 import { MAX_RELEASE_NOTE_CHARACTERS } from "../../domain/limits";
-import { changeLines, type FieldChange } from "../../domain/versionChanges";
 import {
   resultCounts,
   runSavedTests,
@@ -22,6 +21,7 @@ import {
 } from "../execution/savedTests";
 import type { SavedTests } from "../execution/useSavedTests";
 import type { PublishReview } from "./useRuleDocument";
+import VersionChangeList from "./VersionChangeList";
 
 /**
  * Confirms a publication after its review: what the new version changes since
@@ -118,58 +118,10 @@ function ReviewedChanges({ review }: { review: PublishReview }) {
       </Alert>
     );
   return (
-    <div className="publish-changes">
+    <div className="version-changes">
       <strong>Changes since v{version}</strong>
-      <ul>
-        {changeLines(changes).map((line) => (
-          <li key={line.text}>
-            {line.text}
-            {line.details.length > 0 && (
-              <ul className="change-details">
-                {line.details.map((detail, index) => (
-                  <li key={`${detail.field}-${index}`}>
-                    <FieldChangeText change={detail} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
+      <VersionChangeList changes={changes} />
     </div>
-  );
-}
-
-function ChangeValue({ value }: { value: string }) {
-  return (
-    <code className="change-value" title={value}>
-      {value}
-    </code>
-  );
-}
-
-/** "Condition: a → b", or that the property was added or removed. */
-function FieldChangeText({ change }: { change: FieldChange }) {
-  const { field, before, after } = change;
-  return (
-    <>
-      <span className="change-field">{field}:</span>{" "}
-      {before === null && after !== null && (
-        <>
-          added <ChangeValue value={after} />
-        </>
-      )}
-      {after === null && before !== null && (
-        <>
-          removed <ChangeValue value={before} />
-        </>
-      )}
-      {before !== null && after !== null && (
-        <>
-          <ChangeValue value={before} /> → <ChangeValue value={after} />
-        </>
-      )}
-    </>
   );
 }
 

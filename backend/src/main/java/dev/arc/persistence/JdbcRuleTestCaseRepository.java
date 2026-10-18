@@ -127,6 +127,21 @@ public class JdbcRuleTestCaseRepository implements RuleTestCaseRepository {
     if (deleted == 0) throw missing(ruleId, id);
   }
 
+  /**
+   * One statement copies the stored JSONB values as they are (120.00 stays 120.00) without passing
+   * them through the codec; identity values follow the copied order, so the copies list as the
+   * originals did.
+   */
+  @Override
+  public int copyCases(String from, String to) {
+    return jdbc.update(
+        "INSERT INTO rule_test_cases (rule_id, name, inputs, expected_result, expected_error)"
+            + " SELECT ?, name, inputs, expected_result, expected_error FROM rule_test_cases"
+            + " WHERE rule_id = ? ORDER BY id",
+        to,
+        from);
+  }
+
   /** The JSON a write stores; the expected result is SQL NULL when a failure is expected. */
   private record Encoded(String inputs, String expectedResult) {}
 

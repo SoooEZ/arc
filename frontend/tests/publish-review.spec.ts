@@ -29,15 +29,13 @@ test("publishing reviews the changes since the latest version, keeps a note and 
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();
 
-  // An unchanged draft would repeat v1, so it cannot be published.
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "Publish version 2" });
-  await expect(dialog).toContainText("Nothing changed since v1");
-  await expect(
-    dialog.getByRole("button", { name: "Publish v2", exact: true }),
-  ).toBeDisabled();
-  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(dialog).toHaveCount(0);
+  // An unchanged draft would repeat v1, so Publish is not offered, and says why.
+  const publish = page.getByRole("button", { name: "Publish", exact: true });
+  await expect(publish).toBeDisabled();
+  await page.locator(".editor-actions > span").filter({ has: publish }).hover();
+  await expect(page.getByRole("tooltip")).toHaveText(
+    "Nothing to publish: the draft is version 1 as published.",
+  );
 
   // A saved change marks the library card until it is published.
   await page.locator('.react-flow__node[data-id="out"]').click();
@@ -54,8 +52,8 @@ test("publishing reviews the changes since the latest version, keeps a note and 
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   dialog = page.getByRole("dialog", { name: "Publish version 2" });
   // Each changed node lists its properties before and after.
-  await expect(dialog.locator(".publish-changes > ul > li")).toHaveCount(1);
-  await expect(dialog.locator(".publish-changes > ul > li")).toContainText(
+  await expect(dialog.locator(".version-changes > ul > li")).toHaveCount(1);
+  await expect(dialog.locator(".version-changes > ul > li")).toContainText(
     "Changed: Total",
   );
   await expect(dialog.locator(".change-details > li")).toHaveText([

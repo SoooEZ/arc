@@ -19,8 +19,15 @@ interface Props {
   route: WorkspaceRoute;
   navigate: (path: string) => void;
   openCodeStudio: () => void;
+  /** Opens the Getting started help. */
+  openHelp: () => void;
 }
-export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
+export default function Sidebar({
+  route,
+  navigate,
+  openCodeStudio,
+  openHelp,
+}: Props) {
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(preferenceKey) === "true";
@@ -171,7 +178,11 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
               <button
                 className="help-link"
                 aria-label="Getting started"
-                onClick={() => open(pagePath("docs"))}
+                aria-haspopup="dialog"
+                onClick={() => {
+                  openHelp();
+                  if (mobile) toggleExpanded(false);
+                }}
               >
                 <CircleHelp size={19} />
                 <span className="nav-label">Getting started</span>

@@ -57,7 +57,7 @@ Example reference:
 }
 ```
 
-Bindings are expressions evaluated in the caller's scope. The callee receives only mapped inputs and its own defaults; it does not see the caller's other variables. Its result becomes the caller's `output` variable. References can be nested inside every artifact kind, including formulas.
+Bindings are expressions evaluated in the caller's scope. The callee receives only mapped inputs and its own defaults; it does not see the caller's other variables. Its result becomes the caller's `output` variable. References can be nested inside every artifact kind, including formulas. Every draft and version stores the set of rules it calls beside it; deletion refuses a rule that a draft or version still calls, and `GET /rules/{id}/callers` reads the same sets to list a rule's callers with the versions their draft and their latest published version pin. Pins never move on their own: publishing a new version leaves every caller on the version it chose until its author picks another (the editor offers the latest one on the Reuse rule step).
 
 Expressions read upstream Formula/Reference outputs as ordinary variables. A direct published Formula call uses `@rule-id:version(arguments)`, for example `@apply-discount:1(amount, rate)`. The expression itself stores the immutable ID/version pin, so no graph metadata or display-name lookup is needed. Only `FORMULA` library entries qualify. Positional arguments follow the pinned input order; trailing inputs may be omitted if their required/default/source contracts permit it. Explicit null is distinct from omission.
 

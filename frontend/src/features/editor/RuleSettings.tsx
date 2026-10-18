@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Copy } from "lucide-react";
 import {
   Alert,
   Button,
@@ -13,9 +14,14 @@ import { ruleMetadataProblem } from "../../domain/limits";
 import { ruleKinds } from "../../domain/ruleKinds";
 import type { Rule } from "../../types";
 import type { DeletionRefusal } from "./ruleDeletion";
+import RuleCallers from "./RuleCallers";
+import DuplicateRuleDialog from "../library/DuplicateRuleDialog";
 export default function RuleSettings({
   rule,
   readOnly,
+  dirty = false,
+  navigate,
+  onDuplicated,
   onApply,
   onClose,
   onDelete,
@@ -24,6 +30,12 @@ export default function RuleSettings({
 }: {
   rule: Rule;
   readOnly: boolean;
+  /** The draft has unsaved changes, which a copy of the saved draft leaves out. */
+  dirty?: boolean;
+  /** Opens another rule, such as one that calls this rule. */
+  navigate: (path: string) => void;
+  /** Opens a copy of the rule made from these settings, saying where it came from. */
+  onDuplicated: (rule: Rule, notice: string) => void;
   /** Applies the settings to the draft; false when the document refused them. */
   onApply: (patch: Pick<Rule, "name" | "description">) => boolean;
   onClose: () => void;
@@ -35,6 +47,7 @@ export default function RuleSettings({
   deleting?: boolean;
 }) {
   const [name, setName] = useState(rule.name);
+  const [duplicating, setDuplicating] = useState(false);
   const [description, setDescription] = useState(rule.description);
   // Settings are applied only on Apply: leaving the dialog otherwise asks first.
   const dismiss = useStagedDialogEdits(
@@ -98,6 +111,20 @@ export default function RuleSettings({
             Apply changes, then Save draft to persist them.
           </p>
         )}
+        {/* Only a published version can be called, so an unpublished rule has no callers. */}
+        {rule.publishedVersion !== null && (
+          <RuleCallers rule={rule} navigate={navigate} />
+        )}
+        <div>
+          <Button
+            variant="outlined"
+            startIcon={<Copy size={15} />}
+            disabled={deleting}
+            onClick={() => setDuplicating(true)}
+          >
+            Duplicate rule…
+          </Button>
+        </div>
         {onDelete && (
           <DeleteRule
             rule={rule}
@@ -123,6 +150,22 @@ export default function RuleSettings({
           </Button>
         )}
       </DialogActions>
+      {duplicating && (
+        <DuplicateRuleDialog
+          source={rule}
+          note={
+            dirty
+              ? "The copy starts from the saved draft: unsaved changes stay in this draft."
+              : undefined
+          }
+          onClose={() => setDuplicating(false)}
+          onDuplicated={(copy, notice) => {
+            // The copy exists whether or not leaving for it is confirmed.
+            setDuplicating(false);
+            onDuplicated(copy, notice);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

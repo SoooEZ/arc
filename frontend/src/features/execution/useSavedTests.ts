@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { testCaseApi } from "../../api/testCases";
 import { errorMessage } from "../../api/errors";
 import type { Definition, TestCase, TestCaseWrite } from "../../types";
+import { testOutcome, type TestRun } from "../../domain/testCases";
 import { runSavedTests, type TestResult } from "./savedTests";
 
 type TestList =
@@ -89,14 +90,29 @@ export function useSavedTests(
     });
   }, [tests, definition, graphKey]);
 
-  /** Saves a new test; resolves with it, or rejects with the server's reason. */
-  const create = async (write: TestCaseWrite) => {
+  /**
+   * Saves a new test; resolves with it, or rejects with the server's reason.
+   * `run` is the shown graph's run it was saved from, which is its result on
+   * this graph, so the list need not run it again.
+   */
+  const create = async (write: TestCaseWrite, run?: TestRun) => {
     const created = await testCaseApi.create(ruleId, write);
     setList((previous) =>
       previous.status === "ready"
         ? { ...previous, tests: [...previous.tests, created] }
         : previous,
     );
+    if (run) {
+      const result: TestResult = { ...testOutcome(created, run), run };
+      setRuns((previous) =>
+        previous.graphKey === graphKey
+          ? {
+              ...previous,
+              results: { ...previous.results, [created.id]: result },
+            }
+          : { graphKey, results: { [created.id]: result }, running: [] },
+      );
+    }
     return created;
   };
   const update = async (id: number, write: TestCaseWrite) => {

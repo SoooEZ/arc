@@ -286,6 +286,61 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/Version'}
         default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/callers:
+    parameters:
+      - {$ref: '#/components/parameters/RuleId'}
+      - {$ref: '#/components/parameters/Offset'}
+      - {$ref: '#/components/parameters/Limit'}
+    get:
+      operationId: listRuleCallers
+      description: >-
+        The other rules whose saved draft or published versions call this rule, through Reference
+        nodes or @id:version Formula calls, ordered by rule ID; the rules a deletion would name. Each
+        caller tells which versions of this rule its saved draft and its latest published version
+        pin, and how many of its earlier versions call the rule. Callers are found through the
+        callee sets stored with every write, and the count and the page are separate statements,
+        as in the catalogs. An unknown rule is a 404 "Rule not found: id".
+      responses:
+        '200':
+          description: Bounded page of callers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/PageMetadata'}
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/RuleCaller'}
+        default: {$ref: '#/components/responses/Error'}
+  /rules/{id}/duplicate:
+    parameters: [{$ref: '#/components/parameters/RuleId'}]
+    post:
+      operationId: duplicateRule
+      description: >-
+        Creates a rule with this rule's kind and its saved draft, or one of its published versions,
+        as the new draft, and copies its saved test cases unless includeTests is false; nothing is
+        published. The new rule's ID, name and description are checked as by createRule, and a
+        taken ID is its 409. An unknown original is a 404 "Rule not found: id" before the body is
+        checked, and a version it lacks a 404 "Published rule version not found: id vN". The rule
+        and its copied cases are created together or not at all.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RuleDuplicate'}
+            example:
+              id: order-pricing-eu
+              name: Order pricing (EU)
+      responses:
+        '201':
+          description: The new rule
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Rule'}
+        '409': {$ref: '#/components/responses/DuplicateRule'}
+        default: {$ref: '#/components/responses/Error'}
   /rules/{id}/test-cases:
     parameters: [{$ref: '#/components/parameters/RuleId'}]
     get:
@@ -914,6 +969,37 @@ components:
         inputs: {type: object, additionalProperties: true, description: 'Required, {} for none; a missing value or one that is not an object is a 422 "Test case inputs must be a JSON object; send {} for none"'}
         expectedResult: {nullable: true, description: The result to expect when expectedError is null; omitted or null expects a null result}
         expectedError: {type: string, nullable: true, minLength: 1, maxLength: 2000, description: 'Text that the failing run''s message must contain; with a non-null expectedResult it is a 422 "A test case expects a result or an error, not both", and blank text a 422 "Expected error must contain text; send null to expect a result instead"'}
+    RuleCaller:
+      type: object
+      description: Another rule that calls this one, and the versions of this rule it pins.
+      required: [ruleId, name, draftPins, published, earlierVersions]
+      properties:
+        ruleId: {type: string}
+        name: {type: string}
+        draftPins:
+          type: array
+          nullable: true
+          items: {type: integer, minimum: 1}
+          description: The versions of this rule that the caller's saved draft pins, ascending; null when the draft does not call it, and empty while a Reference has chosen it without a version
+        published:
+          type: object
+          nullable: true
+          description: The caller's latest published version, when that version calls this rule; null otherwise
+          required: [version, pins]
+          properties:
+            version: {type: integer, minimum: 1}
+            pins: {type: array, items: {type: integer, minimum: 1}, description: The versions of this rule that the version pins, ascending}
+        earlierVersions: {type: integer, minimum: 0, description: How many of the caller's earlier published versions call this rule}
+    RuleDuplicate:
+      type: object
+      description: A copy of a rule as a new rule. Unknown fields are a 400.
+      required: [id, name]
+      properties:
+        id: {type: string, pattern: '^[a-z][a-z0-9-]{0,79}$', description: 'The new rule''s ID, checked as by createRule'}
+        name: {type: string, minLength: 1, maxLength: 160}
+        description: {type: string, nullable: true, maxLength: 2000, description: 'Omitted or null copies the original''s description; a string, "" included, is used as given'}
+        version: {type: integer, nullable: true, minimum: 1, description: The published version to copy; omitted or null copies the saved draft}
+        includeTests: {type: boolean, nullable: true, default: true, description: Whether to copy the saved test cases; omitted or null copies them}
     Definition:
       type: object
       required: [schemaVersion, inputs, nodes, edges]

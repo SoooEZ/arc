@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Alert,
   CircularProgress,
@@ -6,12 +7,13 @@ import {
   TextField,
 } from "@mui/material";
 import { ArrowDown, ArrowRight, Plus, Search, Workflow } from "lucide-react";
-import type { Kind, RuleSummary } from "../../types";
+import type { Kind, Rule, RuleSummary } from "../../types";
 import { kinds, ruleKinds } from "../../domain/ruleKinds";
 import type { useRuleLibrary } from "../../app/useRuleLibrary";
 import { RecoverableBoundary } from "../../app/RecoverableBoundary";
 import CatalogPagination from "../../components/CatalogPagination";
 import RuleCard from "./RuleCard";
+import DuplicateRuleDialog from "./DuplicateRuleDialog";
 import { newestFirst } from "./libraryOrder";
 
 type KindFilter = Kind | "ALL";
@@ -55,14 +57,21 @@ function EmptyLibrary({
 export default function Library({
   library,
   onOpen,
+  onOpenCode,
   onCreate,
+  onDuplicated,
   onDocs,
 }: {
   library: ReturnType<typeof useRuleLibrary>;
   onOpen: (r: RuleSummary) => void;
+  /** Opens a rule in Code studio; stable, like `onOpen`, for the memoized cards. */
+  onOpenCode: (r: RuleSummary) => void;
   onCreate: () => void;
+  /** A rule copied from a card, with the notice that says what it came from. */
+  onDuplicated: (rule: Rule, notice: string) => void;
   onDocs: () => void;
 }) {
+  const [duplicating, setDuplicating] = useState<RuleSummary | null>(null);
   const {
     rules,
     search: query,
@@ -148,7 +157,12 @@ export default function Library({
             title="This rule card stopped working"
             resetKey={`${rule.id}:${rule.revision}`}
           >
-            <RuleCard rule={rule} onOpen={onOpen} />
+            <RuleCard
+              rule={rule}
+              onOpen={onOpen}
+              onDuplicate={setDuplicating}
+              onOpenCode={onOpenCode}
+            />
           </RecoverableBoundary>
         ))}
         {!library.loading && !library.loadError && !rules.length && (
@@ -194,6 +208,16 @@ export default function Library({
         <span>ARC / Aggregation, Rule & Calculation</span>
         <span>Thoughtful logic. Predictable outcomes.</span>
       </div>
+      {duplicating && (
+        <DuplicateRuleDialog
+          source={duplicating}
+          onClose={() => setDuplicating(null)}
+          onDuplicated={(rule, notice) => {
+            setDuplicating(null);
+            onDuplicated(rule, notice);
+          }}
+        />
+      )}
     </div>
   );
 }

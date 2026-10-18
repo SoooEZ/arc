@@ -1,5 +1,5 @@
 import type { Definition, Input, RuleNode } from "../types";
-import { renameVariable } from "./expressionSymbols";
+import { renameVariable, variablesRead } from "./expressionSymbols";
 import { isIdentifier } from "./identifiers";
 import { storesResult } from "./nodeKinds";
 
@@ -126,4 +126,27 @@ export function withRenamedReferences(
     nodes: nodesChanged ? nodes : definition.nodes,
     inputs: inputsChanged ? inputs : definition.inputs,
   };
+}
+
+/**
+ * Every variable an expression of the definition reads, in the places
+ * withRenamedReferences rewrites: node expressions, selectors, cases,
+ * Transform fields, Reference bindings and the mappings of sourced inputs.
+ */
+export function readVariables(definition: Definition): Set<string> {
+  const read = new Set<string>();
+  const scan = (expression: string | null | undefined) => {
+    if (expression)
+      for (const name of variablesRead(expression)) read.add(name);
+  };
+  for (const node of definition.nodes) {
+    scan(node.expression);
+    scan(node.selector);
+    node.cases?.forEach((item) => scan(item.expression));
+    node.fields?.forEach((field) => scan(field.expression));
+    if (node.bindings) Object.values(node.bindings).forEach(scan);
+  }
+  for (const input of definition.inputs)
+    if (input.source) Object.values(input.source.bindings).forEach(scan);
+  return read;
 }

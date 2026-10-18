@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import {
+  ClipboardCheck,
   ClipboardPlus,
   Hammer,
   Maximize2,
@@ -28,7 +29,7 @@ import type {
 import type { ReferenceTarget } from "../editor/types";
 import { tryParseExecutionInputs } from "../../domain/executionInputs";
 import { stringifyJson } from "../../domain/json";
-import { suggestedTestName } from "../../domain/testCases";
+import { suggestedTestName, type TestRun } from "../../domain/testCases";
 import ExecutionError from "./ExecutionError";
 import ExecutionResult from "./ExecutionResult";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
@@ -61,6 +62,14 @@ interface Props {
   onNode: (id: string) => void;
 }
 
+/** A shown run being saved as a test: what it will expect, the run, and which run it was. */
+interface SavingRun {
+  write: TestCaseWrite;
+  run: TestRun;
+  /** The shown run's identity (its result, problem or message). */
+  from: unknown;
+}
+
 /** "Saved tests · 3", with how many failed once they ran. */
 function savedTestsLabel(tests: SavedTests): string {
   if (tests.status !== "ready") return "Saved tests";
@@ -85,7 +94,11 @@ export default function TestPanel({
 }: Props) {
   const [inputFocusRequest, setInputFocusRequest] = useState(0);
   const [blocked, setBlocked] = useState<string[]>([]);
-  const [saving, setSaving] = useState<TestCaseWrite | null>(null);
+  const [saving, setSaving] = useState<SavingRun | null>(null);
+  // The run a test was just saved from: its action leads to the saved tests,
+  // and Try inputs stays open for the next case.
+  const [savedFrom, setSavedFrom] = useState<unknown>(null);
+  const shownRun = preview.result ?? preview.problem ?? preview.error;
   const saved = preview.panelView === "saved";
   const counts = resultCounts(tests.tests, tests.results);
   /** A field that shows text its type cannot take holds the run and gets the focus. */
@@ -103,25 +116,40 @@ export default function TestPanel({
     preview.run();
   };
   /** The shown run as a test that expects what it produced. */
-  const savable = (): TestCaseWrite | null => {
+  const savable = (): SavingRun | null => {
     const inputs = tryParseExecutionInputs(preview.input);
     if (!inputs || (!preview.result && !preview.error)) return null;
     return {
-      name: suggestedTestName(inputs),
-      inputs,
-      expectedResult: preview.result ? preview.result.result : null,
-      expectedError: preview.result ? null : preview.error,
+      write: {
+        name: suggestedTestName(inputs),
+        inputs,
+        expectedResult: preview.result ? preview.result.result : null,
+        expectedError: preview.result ? null : preview.error,
+      },
+      run: preview.result
+        ? { result: preview.result.result }
+        : { error: preview.error },
+      from: shownRun,
     };
   };
-  const saveAction = (
-    <Button
-      size="small"
-      startIcon={<ClipboardPlus size={14} />}
-      onClick={() => setSaving(savable())}
-    >
-      Save as test
-    </Button>
-  );
+  const saveAction =
+    savedFrom !== null && savedFrom === shownRun ? (
+      <Button
+        size="small"
+        startIcon={<ClipboardCheck size={14} />}
+        onClick={() => preview.setPanelView("saved")}
+      >
+        Saved · View tests
+      </Button>
+    ) : (
+      <Button
+        size="small"
+        startIcon={<ClipboardPlus size={14} />}
+        onClick={() => setSaving(savable())}
+      >
+        Save as test
+      </Button>
+    );
   return (
     <div className={`test-panel ${preview.expanded ? "expanded" : ""}`}>
       <div className="test-panel-heading">
@@ -313,11 +341,11 @@ export default function TestPanel({
       {saving && (
         <SaveTestDialog
           title="Save as test"
-          initial={saving}
+          initial={saving.write}
           editInputs={false}
           onSave={async (write) => {
-            await tests.create(write);
-            preview.setPanelView("saved");
+            await tests.create(write, saving.run);
+            setSavedFrom(saving.from);
           }}
           onClose={() => setSaving(null)}
         />

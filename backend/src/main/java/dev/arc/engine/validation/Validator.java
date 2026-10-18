@@ -8,6 +8,8 @@ import dev.arc.model.Definition.Node;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import org.springframework.stereotype.Component;
 
 /** Coordinates draft shape, executable graph checks and editor diagnostics. */
@@ -72,6 +74,18 @@ public class Validator {
    */
   public static Set<String> calledRuleIds(Definition definition) {
     return NodeValidation.calledRuleIds(definition, Validator::wellFormedFormulaCalls);
+  }
+
+  /**
+   * The versions of {@code ruleId} that a stored draft or version pins, read as leniently as {@link
+   * #calledRuleIds}: each Reference's version and each well-formed {@code @id:version} call. A
+   * Reference that has chosen the rule but not yet its version names the rule and pins none.
+   */
+  public static SortedSet<Integer> pinnedVersions(Definition definition, String ruleId) {
+    var versions = new TreeSet<Integer>();
+    for (var call : NodeValidation.namedCalls(definition, Validator::wellFormedFormulaCalls))
+      if (call.ruleId().equals(ruleId) && call.version() != null) versions.add(call.version());
+    return versions;
   }
 
   private static List<Expressions.FormulaCall> wellFormedFormulaCalls(String source) {

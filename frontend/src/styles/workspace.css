@@ -199,3 +199,100 @@
   font-weight: 550;
   color: #7e775d;
 }
+/* Getting started: the authoring path as numbered steps, then the shortcuts. */
+.help-dialog {
+  display: grid;
+  gap: 16px;
+  color: var(--color-ink);
+}
+.help-intro {
+  margin: 0;
+  color: var(--color-library-muted);
+  font-size: var(--text-md);
+}
+.help-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: help-step;
+  display: grid;
+  gap: 12px;
+}
+.help-steps > li {
+  counter-increment: help-step;
+  position: relative;
+  padding-left: 34px;
+}
+.help-steps > li::before {
+  content: counter(help-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--color-badge);
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.help-steps strong {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.help-steps p {
+  margin: 2px 0 0;
+  color: var(--color-library-muted);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+.help-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 0 -8px;
+}
+.help-shortcuts {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--text-md);
+}
+.help-shortcuts caption {
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--text-lg);
+  padding-bottom: 6px;
+}
+.help-shortcuts th,
+.help-shortcuts td {
+  text-align: left;
+  padding: 6px 0;
+  border-top: 1px solid var(--color-panel-border);
+  vertical-align: top;
+}
+.help-shortcuts th {
+  font-weight: 400;
+  white-space: nowrap;
+  padding-right: 16px;
+  width: 1%;
+}
+.help-shortcuts kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  margin-right: 4px;
+  border: 1px solid var(--color-editor-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--color-code-background);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+.help-or {
+  color: var(--color-library-muted);
+  font-size: var(--text-sm);
+  margin-right: 4px;
+}

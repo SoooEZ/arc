@@ -20,6 +20,11 @@
     "summary": "Create a rule from a template or a graph definition"
   },
   {
+    "method": "POST",
+    "path": "/rules/{id}/duplicate",
+    "summary": "Copy a rule's draft or a version, with its saved tests, into a new rule"
+  },
+  {
     "method": "GET",
     "path": "/rules/{id}",
     "summary": "Read a rule and its revision"
@@ -33,6 +38,11 @@
     "method": "DELETE",
     "path": "/rules/{id}",
     "summary": "Delete a rule that no other rule calls"
+  },
+  {
+    "method": "GET",
+    "path": "/rules/{id}/callers",
+    "summary": "List the rules that call a rule and the versions they pin"
   },
   {
     "method": "POST",
@@ -53,6 +63,26 @@
     "method": "GET",
     "path": "/rules/{id}/versions/{version}",
     "summary": "Read one immutable version"
+  },
+  {
+    "method": "GET",
+    "path": "/rules/{id}/test-cases",
+    "summary": "List a rule's saved test cases"
+  },
+  {
+    "method": "POST",
+    "path": "/rules/{id}/test-cases",
+    "summary": "Save inputs with the result or error they should produce"
+  },
+  {
+    "method": "PUT",
+    "path": "/rules/{id}/test-cases/{caseId}",
+    "summary": "Replace a saved test case"
+  },
+  {
+    "method": "DELETE",
+    "path": "/rules/{id}/test-cases/{caseId}",
+    "summary": "Delete a saved test case"
   },
   {
     "method": "POST",

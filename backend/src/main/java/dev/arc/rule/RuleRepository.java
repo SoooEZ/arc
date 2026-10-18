@@ -5,6 +5,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /** Storage port. lock/update/publish/delete are called inside the application transaction. */
@@ -19,6 +20,19 @@ public interface RuleRepository extends RuleResolver {
 
   /** A published version read together with the {@link RuleKind} name of its rule. */
   record KindedVersion(String kind, Definition definition) {}
+
+  /**
+   * A rule whose saved draft or published versions call another, as their stored callee sets tell
+   * before any definition is read: whether its draft and its latest published version call the
+   * rule, and how many of its earlier versions do.
+   */
+  record CallingRule(
+      String ruleId,
+      String name,
+      Integer publishedVersion,
+      boolean draftCalls,
+      boolean latestCalls,
+      int earlierVersions) {}
 
   List<Rule> list();
 
@@ -54,6 +68,12 @@ public interface RuleRepository extends RuleResolver {
 
   /** Locks a rule for a publication, as {@link #lockForSave} does, and reads the draft it needs. */
   Rule lockForPublication(String id);
+
+  /**
+   * Holds a rule against deletion until the transaction ends and reads it, for a copy of its draft,
+   * a version and its test cases; saves of the rule go on meanwhile. A missing rule is a 404.
+   */
+  Rule lockForCopy(String id);
 
   /**
    * Locks a rule for deletion and returns its revision; the lock waits for every writer of a rule
@@ -107,6 +127,20 @@ public interface RuleRepository extends RuleResolver {
    * version with the draft first, from the callee sets their writes stored.
    */
   List<Caller> callersOf(String id);
+
+  /**
+   * One page of the other rules whose draft or published versions call the rule, ordered by rule
+   * ID, from the same stored callee sets as {@link #callersOf}; a missing rule is a 404. The count
+   * and the page are separate statements, as in the catalogs.
+   */
+  CatalogPage<CallingRule> callingRules(String id, PageRequest page);
+
+  /**
+   * The saved draft of rule {@code callerId} ({@code version} null) or one of its published
+   * versions, when its stored callee set names rule {@code id}; empty when it does not, or no
+   * longer exists.
+   */
+  Optional<Definition> callingDefinition(String callerId, Integer version, String id);
 
   /** Removes the rule with its draft and every published version. */
   void delete(String id);

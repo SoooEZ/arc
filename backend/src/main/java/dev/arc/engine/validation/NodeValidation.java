@@ -320,26 +320,45 @@ final class NodeValidation {
   }
 
   /**
-   * See {@link Validator#calledRuleIds}: every rule the definition names, in node order. A stored
-   * row is read as it is, so a deletion check or a publish never answers 500 for a row of another
-   * model shape: a missing input or node list, a null node, a node of a type this model does not
-   * know (which keeps the pin and the expressions it carries) and a source without mappings call
-   * nothing more. Every expression field is read whatever the node's type, which for a shaped row
-   * is exactly what {@link #expressions} enumerates.
+   * A rule that a stored definition names: a node's pinned rule with its version, null while a
+   * Reference has chosen the rule but not its version, or an {@code @id:version} call.
    */
+  record NamedCall(String ruleId, Integer version) {}
+
+  /** See {@link Validator#calledRuleIds}: the IDs of {@link #namedCalls}, in their order. */
   static Set<String> calledRuleIds(
       Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
     var ids = new LinkedHashSet<String>();
+    for (NamedCall call : namedCalls(definition, formulaCalls)) ids.add(call.ruleId());
+    return ids;
+  }
+
+  /**
+   * Every rule the definition names: node pins in node order, then the calls of the Input source
+   * mappings and of the nodes' expressions. A stored row is read as it is, so a deletion check or a
+   * publish never answers 500 for a row of another model shape: a missing input or node list, a
+   * null node, a node of a type this model does not know (which keeps the pin and the expressions
+   * it carries) and a source without mappings call nothing more. Every expression field is read
+   * whatever the node's type, which for a shaped row is exactly what {@link #expressions}
+   * enumerates.
+   */
+  static List<NamedCall> namedCalls(
+      Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
+    var calls = new ArrayList<NamedCall>();
     List<Node> nodes = definition.nodes() == null ? List.of() : definition.nodes();
-    for (Node node : nodes) if (node != null && node.ruleId() != null) ids.add(node.ruleId());
+    for (Node node : nodes)
+      if (node != null && node.ruleId() != null)
+        calls.add(new NamedCall(node.ruleId(), node.version()));
     var sources = new ArrayList<String>();
     if (definition.inputs() != null)
       for (Input input : definition.inputs())
         if (input != null && input.source() != null && input.source().bindings() != null)
           sources.addAll(input.source().bindings().values());
     for (Node node : nodes) if (node != null) sources.addAll(expressionTexts(node));
-    for (String source : sources) for (var call : formulaCalls.apply(source)) ids.add(call.id());
-    return ids;
+    for (String source : sources)
+      for (var call : formulaCalls.apply(source))
+        calls.add(new NamedCall(call.id(), call.version()));
+    return calls;
   }
 
   /** Every expression text a node may hold, whatever its type; unset ones are null. */

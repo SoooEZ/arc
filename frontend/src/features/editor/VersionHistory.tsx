@@ -1,5 +1,5 @@
-import { Alert, CircularProgress, IconButton } from "@mui/material";
-import { Clock3, X } from "lucide-react";
+import { Alert, Button, CircularProgress, IconButton } from "@mui/material";
+import { Clock3, GitCompare, X } from "lucide-react";
 import { ruleApi } from "../../api/rules";
 import { rulePath } from "../../app/routing";
 import {
@@ -7,16 +7,20 @@ import {
   usePagedResource,
 } from "../../hooks/usePagedResource";
 import CatalogPagination from "../../components/CatalogPagination";
+import type { ComparedState } from "./CompareVersions";
 export default function VersionHistory({
   ruleId,
   publishedVersion,
   navigate,
+  onCompare,
   onClose,
 }: {
   ruleId: string;
   /** The latest published version; publishing changes it and reloads the list. */
   publishedVersion: number | null;
   navigate: (path: string) => void;
+  /** Opens the version comparison with these two states. */
+  onCompare: (states: { from: ComparedState; to: ComparedState }) => void;
   onClose: () => void;
 }) {
   const page = usePagedResource(
@@ -64,6 +68,15 @@ export default function VersionHistory({
           {...paginationProps(page)}
           loading={loading}
         />
+      )}
+      {publishedVersion !== null && (
+        <Button
+          size="small"
+          startIcon={<GitCompare size={14} />}
+          onClick={() => onCompare({ from: publishedVersion, to: "draft" })}
+        >
+          Compare
+        </Button>
       )}
       <IconButton aria-label="Close history" onClick={() => onClose()}>
         <X size={15} />

@@ -1,8 +1,9 @@
 import { Button } from "@mui/material";
 
 /**
- * A catalog's page and count. Previous and Next show only when there is more
- * than one page: a list that fits on one keeps just its count.
+ * A catalog's page and count. A list that fits on one page shows no pager:
+ * its items are all in view. An empty list still says "0 results", where it
+ * may be the only sign that a search matched nothing.
  */
 export default function CatalogPagination({
   offset,
@@ -20,11 +21,9 @@ export default function CatalogPagination({
   label?: string;
 }) {
   const paged = offset > 0 || total > limit;
+  if (!paged && total > 0) return null;
   return (
-    <nav
-      aria-label={`${label} pages`}
-      className={`catalog-pagination ${paged ? "" : "single-page"}`}
-    >
+    <nav aria-label={`${label} pages`} className="catalog-pagination">
       {paged && (
         <Button
           size="small"

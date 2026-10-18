@@ -49,10 +49,24 @@ public class RuleController {
     return rules.versionSummaries(id, PageParameters.page(offset, limit, search));
   }
 
+  @GetMapping("/rules/{id}/callers")
+  public CatalogPage<RuleCaller> callers(
+      @PathVariable String id,
+      @RequestParam(required = false) Integer offset,
+      @RequestParam(required = false) Integer limit) {
+    return rules.callers(id, PageParameters.page(offset, limit, null));
+  }
+
   @PostMapping("/rules")
   @ResponseStatus(HttpStatus.CREATED)
   public Rule create(@RequestBody Create request) {
     return rules.create(request);
+  }
+
+  @PostMapping("/rules/{id}/duplicate")
+  @ResponseStatus(HttpStatus.CREATED)
+  public Rule duplicate(@PathVariable String id, @RequestBody Duplicate request) {
+    return rules.duplicate(id, request);
   }
 
   @GetMapping("/rules/{id}")

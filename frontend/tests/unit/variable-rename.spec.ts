@@ -1,8 +1,12 @@
 import { test, expect } from "@playwright/test";
 import type { Definition } from "../../src/types";
-import { renameVariable } from "../../src/domain/expressionSymbols";
+import {
+  renameVariable,
+  variablesRead,
+} from "../../src/domain/expressionSymbols";
 import {
   canRenameReferences,
+  readVariables,
   withRenamedReferences,
 } from "../../src/domain/variableRename";
 import { recordEdit, noHistory } from "../../src/domain/draftHistory";
@@ -177,5 +181,49 @@ test.describe("renaming a declared variable across the graph", () => {
     expect(second.past).toHaveLength(1);
     const other = recordEdit(first, renamed, draft, 1500, "result-name:calc");
     expect(other.past).toHaveLength(2);
+  });
+});
+
+test.describe("finding the variables a graph reads", () => {
+  test("an expression reads the roots a rename would rewrite, and nothing else", () => {
+    expect(variablesRead("amount * rate + customer.tier")).toEqual([
+      "amount",
+      "rate",
+      "customer",
+    ]);
+    for (const expression of [
+      "order.amount",
+      '"amount"',
+      "$amount(1)",
+      "@amount:1(2)",
+      "$MAP(items, amount, amount * 2)",
+    ])
+      expect(variablesRead(expression)).not.toContain("amount");
+  });
+
+  test("every expression-bearing field counts, as withRenamedReferences rewrites them", () => {
+    const read = readVariables(draft);
+    // amount is read by a condition, a formula, a selector, a case, a field,
+    // a binding and a source mapping; total and note by a field and a condition.
+    for (const name of ["amount", "total", "note"])
+      expect(read.has(name)).toBe(true);
+    expect(read.has("taxRate")).toBe(false);
+    expect(read.has("shaped")).toBe(false);
+    // A name each place alone reads is found there.
+    const only = (patch: Partial<Definition>): Set<string> =>
+      readVariables({ ...draft, ...patch });
+    const input = draft.inputs[1];
+    expect(only({ nodes: [], inputs: [input] }).has("amount")).toBe(true);
+    for (const node of draft.nodes.filter((item) => item.type !== "INPUT")) {
+      const renamed = withRenamedReferences(
+        { ...draft, nodes: [node], inputs: [] },
+        "amount",
+        "x",
+      );
+      expect(
+        only({ nodes: [node], inputs: [] }).has("amount"),
+        `${node.id} reads amount exactly when a rename rewrites it`,
+      ).toBe(renamed.nodes[0] !== node);
+    }
   });
 });

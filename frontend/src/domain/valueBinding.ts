@@ -96,6 +96,32 @@ export function comparisonBindingType(
   return inferred && inferred !== "NULL" ? inferred : "ANY";
 }
 
+const orderingOperators: readonly string[] = [">", ">=", "<", "<="];
+
+/**
+ * A comparison whose left side became an input of `type`: an ordering
+ * operator becomes Equals unless the input is a number, and a constant of
+ * another type is cleared (null stays), so choosing `destination` after
+ * `amount >= 100` does not leave `destination >= 100`. Variables and
+ * expressions on the right stay as written.
+ */
+export function retypedComparison<
+  Comparison extends { operator: string; right: string },
+>(comparison: Comparison, type: InputType): Comparison {
+  const constant = inferConstantType(comparison.right);
+  return {
+    ...comparison,
+    operator:
+      type !== "NUMBER" && orderingOperators.includes(comparison.operator)
+        ? "=="
+        : comparison.operator,
+    right:
+      constant && constant !== "NULL" && constant !== type
+        ? ""
+        : comparison.right,
+  };
+}
+
 /** Result types are determined at execution time; keep those variables selectable. */
 export function acceptsVariableType(
   binding: BindingType,

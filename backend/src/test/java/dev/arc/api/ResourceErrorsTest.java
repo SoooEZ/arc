@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.persistence.JdbcRuleRepository;
+import dev.arc.persistence.JdbcRuleTestCaseRepository;
 import dev.arc.persistence.JdbcSourceRepository;
 import dev.arc.persistence.JsonCodec;
 import dev.arc.rule.RuleDefinitionService;
@@ -51,6 +52,7 @@ class ResourceErrorsTest {
               new RuleController(
                   new RuleService(
                       new JdbcRuleRepository(jdbc, json),
+                      new JdbcRuleTestCaseRepository(jdbc, json),
                       new Validator(),
                       mock(RuleDefinitionService.class),
                       mock(Engine.class)),

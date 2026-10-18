@@ -37,4 +37,11 @@ public interface RuleTestCaseRepository {
   RuleTestCase update(String ruleId, long id, Content content);
 
   void delete(String ruleId, long id);
+
+  /**
+   * Copies every case of rule {@code from} to rule {@code to}, in their order and as stored, and
+   * returns how many it copied. Both rules exist and are held by the caller's transaction: the copy
+   * belongs to a rule's duplication, so it needs neither the count nor the size check again.
+   */
+  int copyCases(String from, String to);
 }

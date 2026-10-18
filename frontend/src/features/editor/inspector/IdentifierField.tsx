@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { TextField } from "@mui/material";
 import {
   acceptsIdentifierEdit,
@@ -41,12 +42,20 @@ export default function IdentifierField({
 }) {
   const edit = useRefusedEdit(value);
   const error = fieldError(value, optional, edit.refused);
+  // A field focused for the user (a new parameter's generated name) starts
+  // selected, so typing replaces the name instead of appending to it.
+  const selectOnFocus = useRef(autoFocus);
   return (
     <TextField
       label={label}
       value={value}
       disabled={disabled}
       autoFocus={autoFocus}
+      onFocus={(event) => {
+        if (!selectOnFocus.current) return;
+        selectOnFocus.current = false;
+        event.target.select();
+      }}
       error={!!error}
       helperText={error || helperText}
       onChange={(event) => {

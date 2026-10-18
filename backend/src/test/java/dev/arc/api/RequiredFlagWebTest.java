@@ -19,6 +19,7 @@ import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
 import dev.arc.rule.RuleService;
+import dev.arc.rule.RuleTestCaseRepository;
 import dev.arc.source.SourceAdapters;
 import dev.arc.source.SourceExecutionService;
 import dev.arc.source.SourceRepository;
@@ -57,6 +58,7 @@ import org.springframework.test.web.servlet.ResultActions;
 class RequiredFlagWebTest {
   @Autowired private MockMvc mvc;
   @MockitoBean private RuleRepository rules;
+  @MockitoBean private RuleTestCaseRepository testCases;
   @MockitoBean private RuleDefinitionService definitions;
   @MockitoBean private Engine engine;
   @MockitoBean private RuleExecutionService execution;

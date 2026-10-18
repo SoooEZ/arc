@@ -7,6 +7,7 @@ import {
   constantTextError,
   inferBindingMode,
   inferConstantType,
+  retypedComparison,
   undeclaredBindings,
   withBinding,
   withoutBindings,
@@ -203,4 +204,43 @@ test("undeclared mappings are the own keys a pinned version does not declare, in
   const remaining = withoutBindings(bindings, ["region", "__proto__"]);
   expect(Object.keys(remaining)).toEqual(["constructor", "key"]);
   expect(remaining.constructor).toBe("2");
+});
+
+test("choosing a left side of another type keeps only the comparison parts that fit it", () => {
+  const amount = { left: "destination", operator: ">=", right: "100" };
+  // Text and booleans compare for equality; a number constant no longer fits.
+  expect(retypedComparison(amount, "STRING")).toEqual({
+    left: "destination",
+    operator: "==",
+    right: "",
+  });
+  expect(
+    retypedComparison(
+      { left: "express", operator: "<", right: "1" },
+      "BOOLEAN",
+    ),
+  ).toEqual({ left: "express", operator: "==", right: "" });
+  // A number keeps its ordering; a constant of its type, null, a variable and
+  // an expression stay as written.
+  expect(
+    retypedComparison({ left: "weight", operator: ">", right: "10" }, "NUMBER"),
+  ).toEqual({ left: "weight", operator: ">", right: "10" });
+  expect(
+    retypedComparison(
+      { left: "tier", operator: "!=", right: '"gold"' },
+      "STRING",
+    ),
+  ).toEqual({ left: "tier", operator: "!=", right: '"gold"' });
+  for (const right of ["null", "limit", "limit * 2"])
+    expect(
+      retypedComparison({ left: "tier", operator: "==", right }, "STRING")
+        .right,
+    ).toBe(right);
+  // A quoted text compared with a number is cleared too.
+  expect(
+    retypedComparison(
+      { left: "weight", operator: "==", right: '"heavy"' },
+      "NUMBER",
+    ).right,
+  ).toBe("");
 });

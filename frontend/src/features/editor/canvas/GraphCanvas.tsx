@@ -511,9 +511,11 @@ export default function GraphCanvas({
           ARC engine
         </span>
         <span>
-          {definition.inputs.length} inputs
+          {definition.inputs.length}{" "}
+          {definition.inputs.length === 1 ? "input" : "inputs"}
           <span className="tiny-divider" />
-          {definition.edges.length} connections
+          {definition.edges.length}{" "}
+          {definition.edges.length === 1 ? "connection" : "connections"}
           <span className="tiny-divider" />
           <Code2 size={12} />
           Schema v{definition.schemaVersion}

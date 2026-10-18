@@ -2,6 +2,7 @@ package dev.arc.rule;
 
 import static dev.arc.support.GraphFixtures.calculation;
 import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.node;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
@@ -16,6 +17,8 @@ import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.Node;
 import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.Rule;
+import dev.arc.model.RuleCaller;
+import dev.arc.model.RuleCaller.Published;
 import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleRepository.Caller;
 import java.time.Instant;
@@ -23,15 +26,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class RuleServiceTest {
   private final RuleRepository repository = mock(RuleRepository.class);
+  private final RuleTestCaseRepository testCases = mock(RuleTestCaseRepository.class);
   private final RuleDefinitionService definitions = mock(RuleDefinitionService.class);
   private final Engine engine = mock(Engine.class);
   private final RuleService service =
-      new RuleService(repository, new Validator(), definitions, engine);
+      new RuleService(repository, testCases, new Validator(), definitions, engine);
   private final Rule draft =
       new Rule(
           "example", "Example", "", "FORMULA", calculation(), 3, 1, Instant.EPOCH, Instant.EPOCH);
@@ -398,5 +403,229 @@ class RuleServiceTest {
     assertThatThrownBy(
             () -> service.update("example", new RuleService.Update("Example", "", 3, tooMany)))
         .hasMessage("Too many or oversized comments");
+  }
+
+  /**
+   * A duplicate is a new rule with the original's kind, its saved draft, its description unless the
+   * request gives one, and its saved test cases. The original is held against deletion first, and
+   * the copy is checked and stored as a create stores a draft: with the rules it calls held.
+   */
+  @Test
+  void aDuplicateCopiesTheSavedDraftTheKindAndTheTestsAsANewRule() {
+    Node reference = nodeOf("tax", "REFERENCE", "Tax").rule("callee", 1).output("tax").build();
+    var calling = graphWith(reference);
+    var original =
+        new Rule(
+            "pricing",
+            "Pricing",
+            "Prices orders",
+            "DECISION_TREE",
+            calling,
+            7,
+            2,
+            Instant.EPOCH,
+            Instant.EPOCH);
+    var created =
+        new Rule(
+            "pricing-copy",
+            "Pricing (copy)",
+            "Prices orders",
+            "DECISION_TREE",
+            calling,
+            8,
+            null,
+            Instant.EPOCH,
+            Instant.EPOCH);
+    when(repository.lockForCopy("pricing")).thenReturn(original);
+    when(repository.create(
+            "pricing-copy",
+            "Pricing (copy)",
+            "Prices orders",
+            "DECISION_TREE",
+            calling,
+            Set.of("callee")))
+        .thenReturn(created);
+
+    Rule copy =
+        service.duplicate(
+            "pricing",
+            new RuleService.Duplicate("pricing-copy", "  Pricing (copy)  ", null, null, null));
+
+    assertThat(copy).isEqualTo(created);
+    var order = inOrder(repository, testCases);
+    order.verify(repository).lockForCopy("pricing");
+    order.verify(repository).lockCallees(Set.of("callee"));
+    order
+        .verify(repository)
+        .create(
+            "pricing-copy",
+            "Pricing (copy)",
+            "Prices orders",
+            "DECISION_TREE",
+            calling,
+            Set.of("callee"));
+    order.verify(testCases).copyCases("pricing", "pricing-copy");
+    verify(repository, never()).version(anyString(), anyInt());
+  }
+
+  /**
+   * A published version can be copied instead of the draft; a description given as "" is kept empty
+   * rather than replaced by the original's, and includeTests false copies no cases.
+   */
+  @Test
+  void aDuplicateCanCopyAPublishedVersionWithItsOwnDescriptionAndNoTests() {
+    var original =
+        new Rule(
+            "pricing",
+            "Pricing",
+            "Prices orders",
+            "FORMULA",
+            calculation(),
+            7,
+            2,
+            Instant.EPOCH,
+            Instant.EPOCH);
+    Definition published = graphWith(outputNode("out", "Version 1", "1"));
+    when(repository.lockForCopy("pricing")).thenReturn(original);
+    when(repository.version("pricing", 1))
+        .thenReturn(new dev.arc.model.RuleVersion("pricing", 1, published, Instant.EPOCH));
+
+    service.duplicate("pricing", new RuleService.Duplicate("v1-copy", "V1 copy", "", 1, false));
+
+    verify(repository).create("v1-copy", "V1 copy", "", "FORMULA", published, Set.of());
+    verifyNoInteractions(testCases);
+  }
+
+  /**
+   * An unknown original is named before the request's content (lesson B29), and a version it lacks
+   * is the version's 404; neither creates anything.
+   */
+  @Test
+  void anUnknownOriginalOrVersionIsNotFoundAndCreatesNothing() {
+    when(repository.lockForCopy("gone")).thenThrow(ArcException.notFound("Rule not found: gone"));
+    assertThatThrownBy(
+            () ->
+                service.duplicate(
+                    "gone", new RuleService.Duplicate("Bad ID", "", null, null, null)))
+        .hasMessage("Rule not found: gone");
+    when(repository.lockForCopy("pricing")).thenReturn(draft);
+    when(repository.version("pricing", 9))
+        .thenThrow(ArcException.notFound("Published rule version not found: pricing v9"));
+    assertThatThrownBy(
+            () ->
+                service.duplicate(
+                    "pricing", new RuleService.Duplicate("copy", "Copy", null, 9, null)))
+        .hasMessage("Published rule version not found: pricing v9");
+    verify(repository, never())
+        .create(anyString(), anyString(), anyString(), anyString(), any(), any());
+    verifyNoInteractions(testCases);
+  }
+
+  /** The new rule's ID, name and description are refused exactly as a create refuses them. */
+  @Test
+  void aDuplicateChecksItsIdNameAndDescriptionAsACreateDoes() {
+    when(repository.lockForCopy("example")).thenReturn(draft);
+    for (String id : Arrays.asList(null, "Rule", "1rule", "rule_id", "r" + "-1".repeat(40)))
+      assertThat(
+              catchThrowable(
+                  () ->
+                      service.duplicate(
+                          "example", new RuleService.Duplicate(id, "Name", null, null, null))))
+          .as(String.valueOf(id))
+          .hasMessage(
+              catchThrowable(
+                      () -> service.create(new RuleService.Create(id, "Name", "", "FORMULA", null)))
+                  .getMessage());
+    String tooLong = "d".repeat(Limits.MAX_DESCRIPTION_CHARACTERS + 1);
+    for (String name : Arrays.asList(null, "   ", "n".repeat(161), "bell\u0007"))
+      assertThat(
+              catchThrowable(
+                  () ->
+                      service.duplicate(
+                          "example", new RuleService.Duplicate("copy", name, null, null, null))))
+          .as(String.valueOf(name))
+          .isInstanceOf(ArcException.class)
+          .hasMessage(
+              catchThrowable(
+                      () ->
+                          service.create(new RuleService.Create("copy", name, "", "FORMULA", null)))
+                  .getMessage());
+    assertThat(
+            catchThrowable(
+                () ->
+                    service.duplicate(
+                        "example", new RuleService.Duplicate("copy", "Copy", tooLong, null, null))))
+        .hasMessage(
+            catchThrowable(
+                    () ->
+                        service.create(
+                            new RuleService.Create("copy", "Copy", tooLong, "FORMULA", null)))
+                .getMessage());
+    verify(repository, never())
+        .create(anyString(), anyString(), anyString(), anyString(), any(), any());
+    verifyNoInteractions(testCases);
+  }
+
+  /**
+   * Each caller lists the versions its saved draft and its latest published version pin, read from
+   * their definitions one at a time; a caller whose only calls are earlier versions is counted
+   * without a read, and an unpinned Reference names the rule with no version.
+   */
+  @Test
+  void callersListThePinsOfEachDraftAndLatestVersion() {
+    var page = new dev.arc.model.PageRequest(0, 20, "");
+    when(repository.callingRules("rates", page))
+        .thenReturn(
+            new dev.arc.model.CatalogPage<>(
+                List.of(
+                    new RuleRepository.CallingRule("checkout", "Checkout", 3, true, true, 2),
+                    new RuleRepository.CallingRule("drafts", "Drafts", null, true, false, 0),
+                    new RuleRepository.CallingRule("legacy", "Legacy", 4, false, false, 1)),
+                3,
+                0,
+                20));
+    Node v2 = nodeOf("tax", "REFERENCE", "Tax").rule("rates", 2).output("tax").build();
+    var draftDefinition =
+        new Definition(
+            1,
+            List.of(),
+            List.of(inputNode("in", "Input"), v2, node("calc", "FORMULA", "@rates:1(1)", "x")),
+            List.of());
+    Node v1 = nodeOf("tax", "REFERENCE", "Tax").rule("rates", 1).output("tax").build();
+    Node unpinned = nodeOf("tax", "REFERENCE", "Tax").rule("rates", null).output("tax").build();
+    when(repository.callingDefinition("checkout", null, "rates"))
+        .thenReturn(Optional.of(draftDefinition));
+    when(repository.callingDefinition("checkout", 3, "rates"))
+        .thenReturn(Optional.of(graphWith(v1)));
+    when(repository.callingDefinition("drafts", null, "rates"))
+        .thenReturn(Optional.of(graphWith(unpinned)));
+
+    var callers = service.callers("rates", page);
+
+    assertThat(callers.total()).isEqualTo(3);
+    assertThat(callers.items())
+        .containsExactly(
+            new RuleCaller("checkout", "Checkout", List.of(1, 2), new Published(3, List.of(1)), 2),
+            new RuleCaller("drafts", "Drafts", List.of(), null, 0),
+            new RuleCaller("legacy", "Legacy", null, null, 1));
+    verify(repository, never()).callingDefinition(eq("legacy"), any(), anyString());
+  }
+
+  /** A caller that stops calling the rule between the page and its reads shows no pins. */
+  @Test
+  void aCallerThatStopsCallingBetweenTheReadsHasNoPins() {
+    var page = new dev.arc.model.PageRequest(0, 20, "");
+    when(repository.callingRules("rates", page))
+        .thenReturn(
+            new dev.arc.model.CatalogPage<>(
+                List.of(new RuleRepository.CallingRule("checkout", "Checkout", 3, true, true, 0)),
+                1,
+                0,
+                20));
+    when(repository.callingDefinition(eq("checkout"), any(), eq("rates")))
+        .thenReturn(Optional.empty());
+
+    assertThat(service.callers("rates", page).items())
+        .containsExactly(new RuleCaller("checkout", "Checkout", null, null, 0));
   }
 }

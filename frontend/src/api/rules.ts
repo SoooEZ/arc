@@ -1,8 +1,11 @@
 import type {
+  Definition,
   Execution,
   ExecutionOptions,
   Kind,
   Rule,
+  RuleCaller,
+  RuleDuplicate,
   Version,
   Page,
   RuleSummary,
@@ -41,13 +44,33 @@ export const ruleApi = {
     http.get<RuleSummary>(`/rule-summaries/${pathId(id)}`, options),
   get: (id: string, options?: RequestOptions) =>
     http.get<Rule>(`/rules/${pathId(id)}`, options),
+  /** Creates a rule from its kind's template, or with `definition` as its draft. */
   create: (
     id: string,
     name: string,
     description: string,
     kind: Kind,
+    definition?: Definition,
     options?: RequestOptions,
-  ) => http.post<Rule>("/rules", { id, name, description, kind }, options),
+  ) =>
+    http.post<Rule>(
+      "/rules",
+      { id, name, description, kind, definition },
+      options,
+    ),
+  /** A new rule with another rule's saved draft or published version, and its saved tests. */
+  duplicate: (id: string, copy: RuleDuplicate, options?: RequestOptions) =>
+    http.post<Rule>(`/rules/${pathId(id)}/duplicate`, copy, options),
+  /** The rules whose draft or published versions call this rule, by rule ID. */
+  callers: (
+    id: string,
+    query: { offset?: number; limit?: number } = {},
+    options?: RequestOptions,
+  ) =>
+    http.get<Page<RuleCaller>>(
+      `/rules/${pathId(id)}/callers?${queryString(query)}`,
+      options,
+    ),
   save: (rule: Rule, options?: RequestOptions) =>
     http.put<Rule>(
       `/rules/${pathId(rule.id)}`,

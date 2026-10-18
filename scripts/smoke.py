@@ -557,6 +557,86 @@ try:
     request("GET", cases_path, expected=404)
     create("test-cases")
     assert request("GET", cases_path) == []
-    print(f"PASS: {checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, concurrent edits, and saved test cases.")
+
+    # The rules that call a rule list the versions of it that their draft and latest version pin,
+    # each rule once and ordered by ID, from the callee sets that deletions read.
+    target = publish(create("callers-target"))
+    target = publish(target)  # version 2, the same graph
+    def pinning(version, output="total"):
+        graph = copy.deepcopy(target["draft"])
+        graph["nodes"][1] = {"id": "calculate", "type": "REFERENCE", "label": "Target",
+            "position": {"x": 280, "y": 160}, "ruleId": target["id"], "version": version,
+            "bindings": {"amount": "amount"}, "output": "total"}
+        graph["nodes"][2]["expression"] = output
+        return graph
+    caller_a = publish(create("callers-a", "DECISION_TREE", pinning(2)))
+    caller_a["draft"] = pinning(1, "total + @" + target["id"] + ":2(0)")
+    caller_a = save(caller_a)
+    caller_b = create("callers-b", "DECISION_TREE", pinning(None))
+    caller_c = publish(create("callers-c", "DECISION_TREE", pinning(1)))
+    caller_c["draft"] = copy.deepcopy(target["draft"])
+    caller_c = publish(save(caller_c))
+    callers_path = "/api/rules/" + target["id"] + "/callers"
+    callers = request("GET", callers_path)
+    assert callers["total"] == 3 and callers["offset"] == 0 and callers["limit"] == 20, callers
+    assert callers["items"] == [
+        {"ruleId": caller_a["id"], "name": caller_a["name"], "draftPins": [1, 2],
+         "published": {"version": 1, "pins": [2]}, "earlierVersions": 0},
+        {"ruleId": caller_b["id"], "name": caller_b["name"], "draftPins": [],
+         "published": None, "earlierVersions": 0},
+        {"ruleId": caller_c["id"], "name": caller_c["name"], "draftPins": None,
+         "published": None, "earlierVersions": 1}], callers["items"]
+    second_page = request("GET", callers_path + "?offset=1&limit=1")
+    assert second_page["total"] == 3 and [item["ruleId"] for item in second_page["items"]] == [caller_b["id"]]
+    assert request("GET", callers_path + "?limit=101", expected=422)["message"] == \
+        "Use offset >= 0 and limit from 1 to 100"
+    assert request("GET", f"/api/rules/{PREFIX}-missing/callers", expected=404)["message"] == \
+        f"Rule not found: {PREFIX}-missing"
+    assert request("GET", "/api/rules/" + caller_b["id"] + "/callers")["items"] == []
+
+    # A duplicate is a new, unpublished rule with the original's kind and saved draft, or one of its
+    # versions, and its saved tests as stored; refused copies answer as creates and reads do.
+    original = create("dup-original")
+    original_cases = "/api/rules/" + original["id"] + "/test-cases"
+    status, text = raw_text_request("POST", original_cases,
+                                    '{"name":"Exact","inputs":{"amount":100},"expectedResult":90.00}')
+    assert status == 201, (status, text)
+    request("POST", original_cases, {"name": "Fails", "inputs": {}, "expectedError": "Missing"}, 201)
+    original = publish(original)
+    original["draft"]["nodes"][1]["expression"] = "amount * 0.5"
+    original = save(original)
+    duplicate_path = "/api/rules/" + original["id"] + "/duplicate"
+    copy_id = PREFIX + "-dup-copy"
+    copied = request("POST", duplicate_path, {"id": copy_id, "name": "  Copy  "}, 201)
+    created.append(copy_id)
+    assert copied["name"] == "Copy" and copied["kind"] == original["kind"], copied
+    assert copied["description"] == original["description"] and copied["publishedVersion"] is None, copied
+    assert copied["draft"]["nodes"][1]["expression"] == "amount * 0.5", copied["draft"]
+    status, text = raw_text_request("GET", f"/api/rules/{copy_id}/test-cases", "")
+    assert status == 200 and '"expectedResult":90.00' in text, (status, text)
+    copied_cases = json.loads(text)
+    assert [case["name"] for case in copied_cases] == ["Exact", "Fails"], copied_cases
+    assert {case["ruleId"] for case in copied_cases} == {copy_id}, copied_cases
+    assert copied_cases[1]["expectedError"] == "Missing" and copied_cases[1]["expectedResult"] is None
+    from_version = request("POST", duplicate_path, {"id": PREFIX + "-dup-v1", "name": "From v1",
+                           "description": "", "version": 1, "includeTests": False}, 201)
+    created.append(from_version["id"])
+    assert from_version["description"] == "" and from_version["publishedVersion"] is None, from_version
+    assert from_version["draft"]["nodes"][1]["expression"] == "amount * 0.9", from_version["draft"]
+    assert request("GET", f"/api/rules/{from_version['id']}/test-cases") == []
+    assert request("POST", duplicate_path, {"id": copy_id, "name": "Again"}, 409)["message"] == \
+        "This rule ID already exists"
+    assert request("POST", duplicate_path, {"id": PREFIX + "-dup-x", "name": "X", "version": 9}, 404)["message"] == \
+        f"Published rule version not found: {original['id']} v9"
+    assert request("POST", f"/api/rules/{PREFIX}-missing/duplicate", {"id": "Bad ID", "name": ""}, 404)["message"] == \
+        f"Rule not found: {PREFIX}-missing"
+    assert "Rule ID must start" in request("POST", duplicate_path, {"id": "Bad ID", "name": "X"}, 422)["message"]
+    request("POST", duplicate_path, {"id": PREFIX + "-dup-x", "name": "X", "includeTest": False}, 400)
+    request("GET", "/api/rules/" + PREFIX + "-dup-x", expected=404)
+    # The copy is independent: deleting it leaves the original and its cases.
+    delete(copy_id)
+    assert len(request("GET", original_cases)) == 2
+    assert request("GET", "/api/rules/" + original["id"])["revision"] == original["revision"]
+    print(f"PASS: {checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, concurrent edits, saved test cases, callers and duplicates.")
 finally:
     print("Created fixtures: " + ", ".join(created))

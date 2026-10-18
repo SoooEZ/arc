@@ -288,6 +288,14 @@
 .input-card-title .input-required-toggle {
   margin: 0;
 }
+.input-card-title .input-unused {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-badge);
+  color: var(--color-inspector-muted);
+  font-size: var(--text-xs);
+  cursor: default;
+}
 .input-card-title > strong {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -506,4 +514,11 @@
   > .MuiCollapse-root
   .MuiAccordionDetails-root {
   padding: 20px 24px 24px;
+}
+/* A pinned Reuse rule step with a newer version: the notice and its Use action. */
+.reference-newer .MuiAlert-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }

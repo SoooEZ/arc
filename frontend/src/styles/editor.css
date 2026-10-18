@@ -66,6 +66,10 @@
   min-height: 33px;
   padding: 6px 11px;
 }
+/* The wrapper that lets a disabled Publish show why keeps the button's box. */
+.editor-actions > span {
+  display: inline-flex;
+}
 .editor-actions .MuiIconButton-root {
   padding: 7px;
   color: #8d987f;
@@ -178,6 +182,52 @@
 .read-only-field code {
   font-size: var(--text-md);
   color: #667b50;
+}
+/* The rules that call this one: a link each, with the versions it runs. */
+.rule-callers {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: var(--text-sm);
+  color: #677a52;
+}
+.rule-callers ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rule-callers li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.rule-callers small {
+  color: var(--color-library-muted);
+  font-size: var(--text-sm);
+}
+.rule-callers-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.rule-callers-link:hover {
+  text-decoration: underline;
+}
+.rule-callers-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-library-muted);
 }
 /* Deleting the rule sits apart from the settings that Apply changes saves. */
 .rule-settings-danger {

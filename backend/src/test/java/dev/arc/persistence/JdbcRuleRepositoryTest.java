@@ -21,6 +21,7 @@ import dev.arc.model.Definition;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.PageRequest;
 import dev.arc.rule.RuleRepository.Caller;
+import dev.arc.rule.RuleRepository.CallingRule;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -280,6 +281,8 @@ class JdbcRuleRepositoryTest {
     assertThatThrownBy(() -> repository.lockForSave("a")).hasMessage("Rule not found: a");
     assertThatThrownBy(() -> repository.lockForPublication("a")).hasMessage("Rule not found: a");
     assertThatThrownBy(() -> repository.lockForDeletion("a")).hasMessage("Rule not found: a");
+    // A copy holds its original as the callers do: deletion waits for it, saves do not.
+    assertThatThrownBy(() -> repository.lockForCopy("a")).hasMessage("Rule not found: a");
     repository.lockCallees(List.of("b", "a"));
     repository.lockCallees(List.of());
     assertThat(statements)
@@ -287,6 +290,7 @@ class JdbcRuleRepositoryTest {
             "SELECT revision FROM rules WHERE id = ? FOR NO KEY UPDATE",
             "SELECT * FROM rules WHERE id = ? FOR NO KEY UPDATE",
             "SELECT revision FROM rules WHERE id = ? FOR UPDATE",
+            "SELECT * FROM rules WHERE id = ? FOR KEY SHARE",
             "SELECT id FROM rules WHERE id = ANY (?) ORDER BY id FOR KEY SHARE");
   }
 
@@ -539,5 +543,111 @@ class JdbcRuleRepositoryTest {
     assertThat(callers.getFirst().describe()).isEqualTo("checkout (draft)");
     assertThat(callers.getLast().describe()).isEqualTo("checkout v3");
     verify(draftRow, never()).getString("definition");
+  }
+
+  /**
+   * A page of callers comes from the stored callee sets alone, like a deletion's caller scan: the
+   * page statement reads no draft or definition, binds one argument per placeholder, and counts
+   * each calling rule once whether its draft, its latest version or earlier versions call.
+   */
+  @Test
+  void aPageOfCallingRulesReadsOnlyTheCalleeSets() throws Exception {
+    var statements = new ArrayList<String>();
+    var arguments = new ArrayList<List<Object>>();
+    when(jdbc.queryForObject(anyString(), eq(Boolean.class), any(Object[].class))).thenReturn(true);
+    when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              Object[] values = call.getArguments();
+              arguments.add(Arrays.asList(values).subList(2, values.length));
+              return 21L;
+            });
+    var row = mock(ResultSet.class);
+    when(row.getString("id")).thenReturn("checkout");
+    when(row.getString("name")).thenReturn("Checkout");
+    when(row.getObject("published_version", Integer.class)).thenReturn(3);
+    when(row.getBoolean("draft_calls")).thenReturn(true);
+    when(row.getBoolean("latest_calls")).thenReturn(false);
+    when(row.getInt("earlier_versions")).thenReturn(2);
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              Object[] values = call.getArguments();
+              arguments.add(Arrays.asList(values).subList(2, values.length));
+              return List.of(call.<RowMapper<Object>>getArgument(1).mapRow(row, 0));
+            });
+
+    var page = repository.callingRules("rates", new PageRequest(20, 10, ""));
+
+    assertThat(page.total()).isEqualTo(21);
+    assertThat(page.offset()).isEqualTo(20);
+    assertThat(page.limit()).isEqualTo(10);
+    assertThat(page.items())
+        .containsExactly(new CallingRule("checkout", "Checkout", 3, true, false, 2));
+    assertThat(statements).hasSize(2);
+    for (int index = 0; index < statements.size(); index++)
+      assertThat(placeholders(statements.get(index)))
+          .as(statements.get(index))
+          .isEqualTo(arguments.get(index).size());
+    assertThat(statements.getFirst()).startsWith("SELECT count(*) FROM (").contains("UNION");
+    assertThat(statements.getLast())
+        .contains(
+            "WHERE id <> ? AND callees @> ARRAY[?::text]",
+            "WHERE rule_id <> ? AND callees @> ARRAY[?::text]",
+            "ORDER BY rule_id LIMIT ? OFFSET ?",
+            "earlier.version < r.published_version")
+        .doesNotContain("r.draft", "v.definition", "SELECT *");
+    assertThat(arguments.getFirst()).containsExactly("rates", "rates", "rates", "rates");
+    assertThat(arguments.getLast())
+        .containsExactly("rates", "rates", "rates", "rates", 10, 20, "rates", "rates", "rates");
+  }
+
+  @Test
+  void callingRulesOfAMissingRuleIsNotFound() {
+    when(jdbc.queryForObject(anyString(), eq(Boolean.class), any(Object[].class)))
+        .thenReturn(false);
+    assertThatThrownBy(() -> repository.callingRules("gone", new PageRequest(0, 20, "")))
+        .hasMessage("Rule not found: gone");
+    verify(jdbc, never()).query(anyString(), any(RowMapper.class), any(Object[].class));
+  }
+
+  /**
+   * A caller's draft or version is read only while its stored callee set still names the rule, so a
+   * draft saved without the call since the page was read yields nothing rather than a stale pin.
+   */
+  @Test
+  void aCallingDefinitionIsReadOnlyWhileItsCalleeSetNamesTheRule() throws Exception {
+    var statements = new ArrayList<String>();
+    var arguments = new ArrayList<List<Object>>();
+    String stored =
+        "{\"schemaVersion\":1,\"inputs\":[],\"nodes\":[{\"id\":\"tax\",\"type\":\"REFERENCE\","
+            + "\"label\":\"Tax\",\"ruleId\":\"rates\",\"version\":2}],\"edges\":[]}";
+    var row = mock(ResultSet.class);
+    when(row.getString("draft")).thenReturn(stored);
+    when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              statements.add(call.getArgument(0));
+              Object[] values = call.getArguments();
+              arguments.add(Arrays.asList(values).subList(2, values.length));
+              if (statements.size() > 1) return List.of();
+              return List.of(call.<RowMapper<Object>>getArgument(1).mapRow(row, 0));
+            });
+
+    var draft = repository.callingDefinition("checkout", null, "rates");
+    var version = repository.callingDefinition("checkout", 3, "rates");
+
+    assertThat(draft).isPresent();
+    assertThat(draft.get().nodes().getFirst().version()).isEqualTo(2);
+    assertThat(version).isEmpty();
+    assertThat(statements)
+        .containsExactly(
+            "SELECT draft FROM rules WHERE id = ? AND callees @> ARRAY[?::text]",
+            "SELECT definition FROM rule_versions WHERE rule_id = ? AND version = ? AND callees @>"
+                + " ARRAY[?::text]");
+    assertThat(arguments)
+        .containsExactly(List.of("checkout", "rates"), List.of("checkout", 3, "rates"));
   }
 }

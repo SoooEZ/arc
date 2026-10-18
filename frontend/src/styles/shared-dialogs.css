@@ -26,18 +26,36 @@
   align-self: flex-start;
 }
 /* The publish dialog: the changes since the latest version, the note, a reminder. */
-.publish-review.MuiDialogContent-root {
+.publish-review.MuiDialogContent-root,
+.compare-versions.MuiDialogContent-root {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.publish-changes ul {
+/* The two compared states side by side: From → To. */
+.compare-sides {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+}
+.compare-sides .MuiTextField-root {
+  flex: 1;
+  min-width: 0;
+}
+.compare-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-library-muted);
+}
+.version-changes ul {
   margin: 6px 0 0;
   padding-left: 18px;
   line-height: 1.7;
 }
 /* A changed node's properties, each "Field: before → after". */
-.publish-changes .change-details {
+.version-changes .change-details {
   margin: 0 0 4px;
   padding-left: 16px;
   list-style: none;

@@ -243,8 +243,9 @@ test("the Reuse search waits for a pause in typing and keeps its cards until the
 
 // The pane dropped the edited rule from its cards but paged the server's
 // totals: once published, searching its own name showed "1–1 of 1" over no
-// cards, and a page could end with no cards at all.
-test("the Reuse pane shows the edited rule's own card disabled, counted by its pager", async ({
+// cards, and a page could end with no cards at all. A result that fits on one
+// page now shows no pager, so the card itself is what the search shows.
+test("the Reuse pane shows the edited rule's own card disabled", async ({
   page,
   request,
 }) => {
@@ -262,5 +263,8 @@ test("the Reuse pane shows the edited rule's own card disabled, counted by its p
   });
   await expect(card).toBeVisible();
   await expect(card).toBeDisabled();
-  await expect(page.getByText("1–1 of 1", { exact: true })).toBeVisible();
+  await expect(page.locator(".studio-library .snippet-card")).toHaveCount(1);
+  await expect(
+    page.getByRole("navigation", { name: "Reusable rules pages" }),
+  ).toHaveCount(0);
 });

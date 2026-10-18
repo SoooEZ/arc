@@ -425,6 +425,45 @@ class ValidatorTest {
   }
 
   /**
+   * The versions of one rule that a stored definition pins, for the callers list: every Reference
+   * version and well-formed call of that rule, in any node expression or source mapping, sorted and
+   * once each. A Reference that names the rule without a version, a malformed call, a call inside a
+   * string literal and the pins of other rules add none.
+   */
+  @Test
+  void pinnedVersionsListEveryVersionOfOneRuleThatADefinitionPins() {
+    var sourced =
+        new Input(
+            "amount",
+            "NUMBER",
+            true,
+            null,
+            new SourceBinding(
+                "rates", 1, Map.of("key", "$TO_STRING(@pricing:4(1))"), "/x", "FAIL"));
+    Node pinned = nodeOf("fee", "REFERENCE", "Fee").rule("pricing", 3).output("fee").build();
+    Node again = nodeOf("fee2", "REFERENCE", "Fee 2").rule("pricing", 3).output("fee2").build();
+    Node unpinned = nodeOf("tax", "REFERENCE", "Tax").rule("pricing", null).output("tax").build();
+    Node other = nodeOf("other", "REFERENCE", "Other").rule("other-rule", 9).output("o").build();
+    Node calling = node("calc", "FORMULA", "@pricing:1(amount) + @other-rule:7(amount)", "x");
+    Node quoted = node("text", "FORMULA", "\"@pricing:8(1)\"", "t");
+    Node malformed = node("draft", "FORMULA", "@pricing:6(", "y");
+    var definition =
+        new Definition(
+            1,
+            List.of(sourced),
+            List.of(pinned, again, unpinned, other, calling, quoted, malformed),
+            List.of());
+
+    assertThat(Validator.pinnedVersions(definition, "pricing")).containsExactly(1, 3, 4);
+    assertThat(Validator.pinnedVersions(definition, "other-rule")).containsExactly(7, 9);
+    assertThat(Validator.pinnedVersions(definition, "missing")).isEmpty();
+    var onlyUnpinned = new Definition(1, List.of(), List.of(unpinned), List.of());
+    assertThat(Validator.calledRuleIds(onlyUnpinned)).containsExactly("pricing");
+    assertThat(Validator.pinnedVersions(onlyUnpinned, "pricing")).isEmpty();
+    assertThat(Validator.pinnedVersions(new Definition(1, null, null, null), "pricing")).isEmpty();
+  }
+
+  /**
    * A stored row of another model shape, which draft shape would refuse today, is read as it is: an
    * unknown node type threw, and a missing list or a source without mappings was a 500 in the
    * deletion check and in a publish's callee hold.

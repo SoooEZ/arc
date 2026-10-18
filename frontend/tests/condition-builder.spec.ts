@@ -191,3 +191,56 @@ test("an operand that contains || is parenthesized, so the stored comparison mea
   // flag == (a || b) is false here; flag == a || b was true and took the Yes branch.
   expect((await run.json()).result).toBe(0);
 });
+
+test("choosing a When input of another type resets the operator and value that no longer fit", async ({
+  page,
+  request,
+}) => {
+  const rule = await createCondition(request, "amount >= 100", [
+    number("amount", 150),
+    {
+      name: "destination",
+      type: "STRING",
+      required: false,
+      defaultValue: "domestic",
+    },
+    number("weight", 3),
+  ]);
+  await page.goto(`/#/rules/${rule.id}?node=check`);
+  const when = page.getByLabel("When", { exact: true });
+  const operator = page.getByLabel("Operator", { exact: true });
+  await expect(operator).toHaveText("Greater than or equal");
+
+  // Text compares for equality, and the number 100 is not a text value.
+  await when.click();
+  await page.getByRole("option", { name: "destination", exact: true }).click();
+  await expect(operator).toHaveText("Equals");
+  await expect(page.locator(".expression-preview code")).toHaveText(
+    "destination ==",
+  );
+
+  // Another number keeps the comparison as it was.
+  await page.getByLabel("Comparison value · value source").click();
+  await page.getByRole("option", { name: "Constant", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Comparison value", exact: true })
+    .fill("domestic");
+  await when.click();
+  await page.getByRole("option", { name: "amount", exact: true }).click();
+  await expect(page.locator(".expression-preview code")).toHaveText(
+    "amount ==",
+  );
+  await operator.click();
+  await page.getByRole("option", { name: "Greater than", exact: true }).click();
+  await page.getByLabel("Comparison value · value source").click();
+  await page.getByRole("option", { name: "Constant", exact: true }).click();
+  await page.getByLabel("Comparison value", { exact: true }).fill("10");
+  await when.click();
+  await page.getByRole("option", { name: "weight", exact: true }).click();
+  await expect(page.locator(".expression-preview code")).toHaveText(
+    "weight > 10",
+  );
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(await savedCondition(request, rule.id)).toBe("weight > 10");
+});

@@ -16,8 +16,12 @@ import {
   Play,
   Terminal,
 } from "lucide-react";
+import type { TestCase } from "../../types";
 import { stringifyJson } from "../../domain/json";
+import { ruleIncarnation } from "../../domain/ruleIdentity";
+import type { TestRun } from "../../domain/testCases";
 import ApiReference from "./ApiReference";
+import { SavedTestComparison, SavedTestMenu } from "./PlaygroundSavedTests";
 import { pagePath } from "../../app/routing";
 import { usePublishedExecution } from "./usePublishedExecution";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
@@ -115,6 +119,29 @@ export default function ApiPage({
   );
 }
 
+/** A saved test whose inputs were loaded, as the text they were loaded as. */
+interface LoadedTest {
+  identity: string;
+  text: string;
+  test: TestCase;
+}
+
+/**
+ * What the shown response is for the loaded test: compared only while the
+ * inputs are still the test's own, for the rule it belongs to.
+ */
+function loadedRun(
+  loaded: LoadedTest | null,
+  current: { identity: string; inputs: string },
+  response: { result: unknown } | null,
+  executionError: string,
+): TestRun | null {
+  if (!loaded || loaded.identity !== current.identity) return null;
+  if (loaded.text !== current.inputs) return null;
+  if (response) return { result: response.result };
+  return executionError ? { error: executionError } : null;
+}
+
 /**
  * The playground's request builder: a published rule and version, its inputs
  * and options, and the response or the matching cURL command.
@@ -122,6 +149,7 @@ export default function ApiPage({
 function RequestConsole({ notify }: { notify: (s: string) => void }) {
   const request = usePublishedExecution(notify);
   const [inputView, setInputView] = useState<"json" | "form">("json");
+  const [loaded, setLoaded] = useState<LoadedTest | null>(null);
   const {
     published,
     id,
@@ -135,6 +163,14 @@ function RequestConsole({ notify }: { notify: (s: string) => void }) {
     loading,
     curl,
   } = request;
+  const rule = published.find((candidate) => candidate.id === id) ?? null;
+  const identity = rule ? ruleIncarnation(rule) : "";
+  const testRun = loadedRun(
+    loaded,
+    { identity, inputs },
+    result,
+    request.loadError ? "" : error,
+  );
   return (
     <section className="api-console">
       <div className="api-console-heading">
@@ -206,6 +242,15 @@ function RequestConsole({ notify }: { notify: (s: string) => void }) {
             <label className="field-label">
               Input parameters <span>application/json</span>
             </label>
+            <SavedTestMenu
+              rule={rule}
+              disabled={running || !definition}
+              onChoose={(test) => {
+                const text = stringifyJson(test.inputs, 2);
+                request.setInputs(text);
+                setLoaded({ identity, text, test });
+              }}
+            />
             <Tabs
               value={inputView}
               onChange={(_, view: "json" | "form") => setInputView(view)}
@@ -281,6 +326,9 @@ function RequestConsole({ notify }: { notify: (s: string) => void }) {
             >
               {error}
             </Alert>
+          )}
+          {loaded && testRun && (
+            <SavedTestComparison test={loaded.test} run={testRun} />
           )}
           {result && (
             <ExecutionTiming

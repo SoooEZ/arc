@@ -63,6 +63,7 @@ PURE_FRONTEND = {
     "domain/": ("types", "domain/"),
     "app/routing.ts": ("domain/",),
     "app/pinnedReads.ts": (),
+    "app/graphImport.ts": ("types", "domain/"),
     "features/editor/documentState.ts": ("types", "domain/"),
     "features/editor/editorCapabilities.ts": (),
     "features/editor/nodeFormDraft.ts": ("types", "domain/"),

@@ -8,7 +8,10 @@ import { comparisonText, simpleComparison } from "../../../domain/expressions";
 import { updateGraphNode } from "../../../domain/graph";
 import { shortId } from "../../../domain/ids";
 import { withBranchMode, withNewCase } from "../../../domain/switchBranches";
-import { comparisonBindingType } from "../../../domain/valueBinding";
+import {
+  comparisonBindingType,
+  retypedComparison,
+} from "../../../domain/valueBinding";
 import type { NodeFieldsProps } from "./types";
 import BranchModeField from "./BranchModeField";
 import InspectorSection from "./InspectorSection";
@@ -215,7 +218,19 @@ function ComparisonBuilder({
         onInputChange={(_, value, reason) => {
           if (reason === "input" || reason === "clear") edit({ left: value });
         }}
-        onChange={(_, value) => edit({ left: value ?? "" })}
+        onChange={(_, value) => {
+          const left = value ?? "";
+          const type = rule.draft.inputs.find(
+            (input) => input.name === left.trim(),
+          )?.type;
+          // Choosing an input of another type keeps only what still fits it;
+          // typing a name changes nothing else (lesson F13).
+          edit(
+            type && type !== declaredType
+              ? retypedComparison({ ...comparison, left }, type)
+              : { left },
+          );
+        }}
         renderInput={(params) => <TextField {...params} label="When" />}
       />
       <TextField

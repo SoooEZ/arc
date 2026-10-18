@@ -32,6 +32,7 @@ import { useNodeDialog } from "./useNodeDialog";
 import LazyNodeDialog from "./LazyNodeDialog";
 import { useNodeSelection } from "./useNodeSelection";
 import type { EditorProps, ReferenceTarget } from "./types";
+import type { ComparedState } from "./CompareVersions";
 import { rulePath } from "../../app/routing";
 import {
   setLayoutDirection,
@@ -41,6 +42,7 @@ const CodeStudio = lazy(() => import("../studio/CodeStudio"));
 const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
 const NodeEditDialog = lazy(() => import("./NodeEditDialog"));
 const PublishDialog = lazy(() => import("./PublishDialog"));
+const CompareVersions = lazy(() => import("./CompareVersions"));
 const noProblems: GraphProblem[] = [];
 const noErrors: string[] = [];
 
@@ -191,6 +193,11 @@ function EditorContent({
     useState<ReferenceTarget | null>(null);
   const [history, setHistory] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The two states the version comparison opens with, while it is open.
+  const [comparing, setComparing] = useState<{
+    from: ComparedState;
+    to: ComparedState;
+  } | null>(null);
   const codeRequest =
     activeDialog?.request.kind === "code" ? activeDialog.request : null;
   const { allProblems, graphProblems, nodeErrors } = useGraphProblems({
@@ -342,6 +349,7 @@ function EditorContent({
         navigate={navigate}
         switchView={switchView}
         showHistory={() => setHistory((value) => !value)}
+        onCompare={setComparing}
         setSettingsOpen={setSettingsOpen}
         action={action}
         onToggleTest={() => void toggleTest(preview)}
@@ -364,6 +372,7 @@ function EditorContent({
           ruleId={rule.id}
           publishedVersion={rule.publishedVersion}
           navigate={navigate}
+          onCompare={setComparing}
           onClose={() => setHistory(false)}
         />
       )}
@@ -509,10 +518,32 @@ function EditorContent({
           />
         </LazyBoundary>
       )}
+      {comparing && (
+        <LazyBoundary
+          label="version comparison"
+          onDismiss={() => setComparing(null)}
+        >
+          <CompareVersions
+            rule={rule}
+            // A shown version replaces the document's graph; the draft is the rule's own.
+            draft={readOnly ? initial.draft : rule.draft}
+            initial={comparing}
+            onClose={() => setComparing(null)}
+          />
+        </LazyBoundary>
+      )}
       {settingsOpen && (
         <RuleSettings
           rule={rule}
           readOnly={!can.edit}
+          dirty={dirty}
+          navigate={navigate}
+          onDuplicated={(copy, notice) => {
+            // As App opens a new rule: the library learns of it, then the copy opens.
+            onSaved(copy);
+            navigate(rulePath({ ruleId: copy.id }));
+            notify(notice);
+          }}
           onClose={() => setSettingsOpen(false)}
           onApply={editMetadata}
           onDelete={onDeleted && !readOnly ? deleteRule : undefined}

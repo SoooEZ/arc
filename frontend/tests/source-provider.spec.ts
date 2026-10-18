@@ -798,8 +798,9 @@ test("five inputs bound to one source read its pinned version once and no versio
 });
 
 // A binding reads its source's versions when the select first opens; until
-// then its pager said "0 results" for a source that has versions.
-test("a source binding's version pager shows once the versions are read", async ({
+// then its pager said "0 results" for a source that has versions. Versions
+// that fit on one page show no pager at all, before or after the read.
+test("a source binding's versions never show an empty pager", async ({
   page,
   request,
 }) => {
@@ -882,7 +883,9 @@ test("a source binding's version pager shows once the versions are read", async 
   await version.click();
   await expect(page.getByRole("option")).toHaveCount(2);
   await page.getByRole("option", { name: "v1", exact: true }).click();
-  await expect(pager).toContainText("1–2 of 2");
+  await expect(version).toHaveText("v1");
+  await expect(pager).toHaveCount(0);
+  await expect(page.getByText("0 results", { exact: true })).toHaveCount(0);
 });
 
 // A save that finished after its editor closed skipped forgetting the

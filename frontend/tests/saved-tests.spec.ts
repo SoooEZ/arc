@@ -56,11 +56,15 @@ test("a run saved as a test runs again, catches a change and goes to the publish
   await expect(dialog.getByLabel("Test name")).toHaveValue("amount 3");
   await expect(dialog.getByLabel("Expected result · JSON")).toHaveValue("6");
   await dialog.getByRole("button", { name: "Save test", exact: true }).click();
-  await expect(savedRows(page)).toHaveCount(1);
-  await expect(savedRows(page).first()).toContainText("Returns 6");
+  // Try inputs stays open for the next case; the saved run's action leads to the list.
+  await expect(
+    page.getByRole("button", { name: "Saved tests · 1", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Saved · View tests", exact: true }),
+  ).toBeVisible();
 
   // A failure becomes a test that expects the failure.
-  await page.getByRole("button", { name: "Try inputs", exact: true }).click();
   await page.getByRole("textbox", { name: "amount", exact: true }).fill("");
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.locator(".test-output .MuiAlert-root")).toContainText(
@@ -73,7 +77,15 @@ test("a run saved as a test runs again, catches a change and goes to the publish
   );
   await dialog.getByLabel("Test name").fill("No amount");
   await dialog.getByRole("button", { name: "Save test", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Saved · View tests", exact: true })
+    .click();
   await expect(savedRows(page)).toHaveCount(2);
+  await expect(savedRows(page).first()).toContainText("Returns 6");
+  // Each test was saved from a run of this graph, so it has passed already.
+  await expect(page.locator(".saved-tests-summary")).toHaveText(
+    "2 passed · 0 failed",
+  );
 
   const stored = (await (
     await request.get(`/api/rules/${rule.id}/test-cases`)
@@ -267,8 +279,14 @@ test("saving a test needs a name and JSON the server accepts", async ({
   await dialog.getByLabel("Expected result · JSON").fill("2.00");
   await save.click();
   await expect(dialog).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Saved · View tests", exact: true })
+    .click();
   await expect(savedRows(page)).toHaveCount(1);
-  // 2.00 and 2 are one value.
+  // 2.00 and 2 are one value: the run it was saved from passes it, and so does a new run.
+  await expect(page.locator(".saved-tests-summary")).toHaveText(
+    "1 passed · 0 failed",
+  );
   await page.getByRole("button", { name: "Run all", exact: true }).click();
   await expect(page.locator(".saved-tests-summary")).toHaveText(
     "1 passed · 0 failed",

@@ -1,6 +1,6 @@
 import { memo, useCallback, useState } from "react";
 import PagedAutocomplete from "../../../components/PagedAutocomplete";
-import { Alert, IconButton, Tooltip } from "@mui/material";
+import { Alert, Button, IconButton, Tooltip } from "@mui/material";
 import { ExternalLink } from "lucide-react";
 import type {
   Input,
@@ -83,6 +83,9 @@ export default function ReferenceFields({
   );
   const child = detail.data;
   const refError = selectedRule.error || detail.error;
+  // The rule's latest version, once its summary is read: a pin stays on its
+  // version, so a newer one is offered rather than taken.
+  const latest = identity?.publishedVersion ?? null;
   // Mappings for parameters the pinned version does not declare; validation rejects them.
   const undeclared = child
     ? undeclaredBindings(
@@ -184,6 +187,21 @@ export default function ReferenceFields({
                 patch({ version: version.version });
             }}
           />
+        )}
+        {node.version != null && latest !== null && node.version < latest && (
+          <Alert severity="info" className="reference-newer">
+            {identity?.name ?? node.ruleId} has a newer version, v{latest}. This
+            step keeps running v{node.version} until you choose another.
+            {!readOnly && (
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => patch({ version: latest })}
+              >
+                Use v{latest}
+              </Button>
+            )}
+          </Alert>
         )}
       </InspectorSection>
       {child && (

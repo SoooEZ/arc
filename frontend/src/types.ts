@@ -158,6 +158,34 @@ export type TestCaseWrite = Pick<
   "name" | "inputs" | "expectedResult" | "expectedError"
 >;
 
+/**
+ * Another rule that calls this one, from `GET /rules/{id}/callers`: which
+ * versions of this rule its saved draft and its latest published version pin.
+ */
+export interface RuleCaller {
+  ruleId: string;
+  name: string;
+  /** The versions the caller's saved draft pins; null when the draft does not call the rule. */
+  draftPins: number[] | null;
+  /** The caller's latest published version, when it calls the rule, and the versions it pins. */
+  published: { version: number; pins: number[] } | null;
+  /** How many earlier published versions of the caller call the rule. */
+  earlierVersions: number;
+}
+
+/**
+ * `POST /rules/{id}/duplicate`: a new rule with the saved draft, or published
+ * `version`, of another. An omitted description copies the original's, and
+ * its saved tests are copied unless `includeTests` is false.
+ */
+export interface RuleDuplicate {
+  id: string;
+  name: string;
+  description?: string | null;
+  version?: number | null;
+  includeTests?: boolean;
+}
+
 export interface SourceBinding {
   id: string;
   version: number;

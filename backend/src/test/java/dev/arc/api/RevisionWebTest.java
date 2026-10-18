@@ -21,6 +21,7 @@ import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
 import dev.arc.rule.RuleService;
+import dev.arc.rule.RuleTestCaseRepository;
 import dev.arc.source.SourceExecutionService;
 import dev.arc.source.SourceRepository;
 import dev.arc.source.SourceService;
@@ -46,6 +47,7 @@ class RevisionWebTest {
               new RuleController(
                   new RuleService(
                       rules,
+                      mock(RuleTestCaseRepository.class),
                       new Validator(),
                       mock(RuleDefinitionService.class),
                       mock(Engine.class)),

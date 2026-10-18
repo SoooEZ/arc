@@ -9,6 +9,7 @@ import {
   createRule,
   deleteRule,
   publishRule,
+  readRule,
   uniqueId,
   uniqueStamp,
 } from "./helpers/api";
@@ -675,4 +676,29 @@ test("a child created again under its ID with other inputs shows the new paramet
   await expect(
     page.getByRole("group", { name: "Parameter amount" }),
   ).toHaveCount(0);
+});
+
+test("a pin to an older version offers the latest one without taking it", async ({
+  page,
+  request,
+}) => {
+  const { parent, child } = await fixture(request);
+  await page.goto(`/#/rules/${parent.id}?node=ref`);
+  const notice = sidebar(page).locator(".reference-newer");
+  await expect(notice).toContainText(
+    `${child.name} has a newer version, v2. This step keeps running v1 until you choose another.`,
+  );
+  await notice.getByRole("button", { name: "Use v2", exact: true }).click();
+  await expect(
+    sidebar(page).getByLabel("Pinned version", { exact: true }),
+  ).toHaveValue("Version 2");
+  await expect(notice).toHaveCount(0);
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  // The step's mappings stay with the new pin.
+  expect(
+    (await readRule(request, parent.id)).draft.nodes.find(
+      (node) => node.id === "ref",
+    ),
+  ).toMatchObject({ version: 2, bindings: { amount: "7" } });
 });

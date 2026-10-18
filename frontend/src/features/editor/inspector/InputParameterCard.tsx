@@ -30,6 +30,7 @@ export default memo(function InputParameterCard({
   readOnly,
   variables,
   focusName,
+  unused,
   onChange,
   onRename,
   onRemove,
@@ -44,6 +45,8 @@ export default memo(function InputParameterCard({
   variables: VariableOption[];
   /** Focus the name field as the card appears: Add parameter just added it. */
   focusName: boolean;
+  /** No expression, mapping or source binding of the rule reads the parameter. */
+  unused: boolean;
   onChange: (rowId: string, patch: Partial<Input>) => void;
   /** Renames the parameter and the expressions that read it. */
   onRename: (rowId: string, name: string) => void;
@@ -64,6 +67,13 @@ export default memo(function InputParameterCard({
     <div className="input-schema-card">
       <div className="input-card-title">
         <strong>{input.name || `Parameter ${index + 1}`}</strong>
+        {unused && (
+          <Tooltip
+            title={`No step reads ${input.name} yet. Use it in an expression or a mapping, or remove it.`}
+          >
+            <span className="input-unused">Not used</span>
+          </Tooltip>
+        )}
         <FormControlLabel
           className="input-required-toggle"
           control={

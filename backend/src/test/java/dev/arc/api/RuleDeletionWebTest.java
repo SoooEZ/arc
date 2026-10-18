@@ -17,6 +17,7 @@ import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
 import dev.arc.rule.RuleRepository.Caller;
 import dev.arc.rule.RuleService;
+import dev.arc.rule.RuleTestCaseRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,7 +31,11 @@ class RuleDeletionWebTest {
       MockMvcBuilders.standaloneSetup(
               new RuleController(
                   new RuleService(
-                      rules, new Validator(), mock(RuleDefinitionService.class), engine),
+                      rules,
+                      mock(RuleTestCaseRepository.class),
+                      new Validator(),
+                      mock(RuleDefinitionService.class),
+                      engine),
                   mock(RuleExecutionService.class)))
           .setControllerAdvice(new Errors())
           .build();

@@ -209,4 +209,23 @@ class JdbcRuleTestCaseRepositoryTest {
             any(RowMapper.class),
             eq("gone"));
   }
+
+  /**
+   * A duplicated rule's cases are copied in one statement, in their order and as stored, so their
+   * JSON never passes through the codec; the copy reports how many cases it made.
+   */
+  @Test
+  void casesAreCopiedToAnotherRuleInOneStatementAsStored() {
+    when(jdbc.update(anyString(), any(Object[].class))).thenReturn(3);
+
+    assertThat(repository.copyCases("pricing", "pricing-copy")).isEqualTo(3);
+
+    verify(jdbc)
+        .update(
+            "INSERT INTO rule_test_cases (rule_id, name, inputs, expected_result, expected_error)"
+                + " SELECT ?, name, inputs, expected_result, expected_error FROM rule_test_cases"
+                + " WHERE rule_id = ? ORDER BY id",
+            "pricing-copy",
+            "pricing");
+  }
 }

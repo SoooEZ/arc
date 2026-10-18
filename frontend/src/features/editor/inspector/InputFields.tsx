@@ -1,9 +1,11 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Button, Tooltip } from "@mui/material";
 import { Plus } from "lucide-react";
 import type { Definition } from "../../../types";
 import { inputVariables, type VariableOption } from "../../../domain/variables";
 import { canAddInput, MAX_INPUTS } from "../../../domain/limits";
+import { isIdentifier } from "../../../domain/identifiers";
+import { readVariables } from "../../../domain/variableRename";
 import InputParameterCard from "./InputParameterCard";
 import { useInputParameterRows } from "./useInputParameterRows";
 import { sameVariableOptions } from "./useNodeVariables";
@@ -29,6 +31,8 @@ export default function InputFields({
 }: NodeFieldsProps) {
   const allVariables = useInputVariables(rule.draft);
   const parameters = useInputParameterRows(rule.draft, onDefinitionChange);
+  // What the graph reads: a parameter nothing reads is marked Not used.
+  const read = useMemo(() => readVariables(rule.draft), [rule.draft]);
   // The parameter Add parameter appended, whose name field takes the focus.
   const [added, setAdded] = useState<number | null>(null);
   const onValidity = useCallback(
@@ -53,6 +57,7 @@ export default function InputFields({
           // leaves it alone (lesson F39).
           variables={input.source ? allVariables : noVariables}
           focusName={index === added}
+          unused={isIdentifier(input.name) && !read.has(input.name)}
           onChange={parameters.change}
           onRename={parameters.rename}
           onRemove={parameters.remove}

@@ -3,6 +3,7 @@ import {
   Clock3,
   Code2,
   GitBranch,
+  GitCompare,
   Play,
   Save,
   Settings,
@@ -19,6 +20,7 @@ import {
 } from "./editorCapabilities";
 import type { Publication } from "./usePublication";
 import RestoreVersion from "./RestoreVersion";
+import type { ComparedState } from "./CompareVersions";
 
 /** How the draft relates to what is saved, shown beside the rule kind. */
 function saveStatus(dirty: boolean, readOnly: boolean): string {
@@ -85,6 +87,8 @@ interface Props {
   navigate: (path: string) => void;
   switchView: () => Promise<void>;
   showHistory: () => void;
+  /** Opens the version comparison with these two states. */
+  onCompare: (states: { from: ComparedState; to: ComparedState }) => void;
   setSettingsOpen: (open: boolean) => void;
   action: (type: "save" | "validate" | "publish") => Promise<void>;
   onToggleTest: () => void;
@@ -103,6 +107,7 @@ export default function EditorHeader({
   navigate,
   switchView,
   showHistory,
+  onCompare,
   setSettingsOpen,
   action,
   onToggleTest,
@@ -176,18 +181,42 @@ export default function EditorHeader({
             >
               {busy === "save" ? "Saving…" : "Save draft"}
             </Button>
-            <Button
-              startIcon={<Upload size={15} />}
-              variant="contained"
-              onClick={() => action("publish")}
-              disabled={!can.publish}
+            <Tooltip
+              title={
+                publication.state === "current"
+                  ? `Nothing to publish: the draft is version ${publication.version} as published.`
+                  : ""
+              }
             >
-              {publishLabel(busy)}
-            </Button>
+              <span>
+                <Button
+                  startIcon={<Upload size={15} />}
+                  variant="contained"
+                  onClick={() => action("publish")}
+                  // Publishing the latest version again is refused, so it is not offered.
+                  disabled={!can.publish || publication.state === "current"}
+                >
+                  {publishLabel(busy)}
+                </Button>
+              </span>
+            </Tooltip>
           </>
         )}
         {readOnly && !embedded && requestedVersion !== null && (
           <>
+            <Button
+              startIcon={<GitCompare size={15} />}
+              onClick={() =>
+                // What this version changed, or for the first, what changed since.
+                onCompare(
+                  requestedVersion > 1
+                    ? { from: requestedVersion - 1, to: requestedVersion }
+                    : { from: requestedVersion, to: "draft" },
+                )
+              }
+            >
+              Compare
+            </Button>
             <RestoreVersion
               rule={rule}
               version={requestedVersion}

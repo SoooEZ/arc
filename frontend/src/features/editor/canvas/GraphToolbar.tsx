@@ -78,7 +78,9 @@ export default function GraphToolbar({
       <div className="graph-view-label">
         <GitBranch size={16} />
         <strong>Decision canvas</strong>
-        <span>{nodeCount} nodes</span>
+        <span>
+          {nodeCount} {nodeCount === 1 ? "node" : "nodes"}
+        </span>
       </div>
       <div className="graph-tools">
         {!readOnly && (

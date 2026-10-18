@@ -91,7 +91,8 @@ test("a draft allows editing and commands until a save holds the document", asyn
     "Code editor": "enabled",
     "Test rule": "enabled",
     "Save draft": "disabled",
-    Publish: "enabled",
+    // The draft is the published version as it is, so there is nothing to publish.
+    Publish: "disabled",
     "Edit draft": "absent",
     "Arrange graph": "enabled",
     Validate: "enabled",
@@ -101,7 +102,7 @@ test("a draft allows editing and commands until a save holds the document", asyn
   await expectCanvasEditable(page, true);
 
   await name.fill("Calculate twice");
-  await expectButtons(page, { "Save draft": "enabled" });
+  await expectButtons(page, { "Save draft": "enabled", Publish: "enabled" });
 
   let release = () => {};
   const held = new Promise<void>((resolve) => {

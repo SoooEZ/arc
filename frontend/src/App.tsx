@@ -7,6 +7,8 @@ import ApiPage from "./features/execution/ApiPage";
 import SourcesPage from "./features/sources/SourcesPage";
 import Sidebar from "./app/Sidebar";
 import CreateRuleDialog from "./app/CreateRuleDialog";
+import GettingStartedDialog from "./app/GettingStartedDialog";
+import { useHelpShortcut } from "./app/useHelpShortcut";
 import { RecoverableBoundary } from "./app/RecoverableBoundary";
 import { LazyBoundary } from "./components/LazyBoundary";
 import { pagePath, parseRoute, rulePath, type RuleRoute } from "./app/routing";
@@ -75,11 +77,19 @@ export default function App() {
     [],
   );
   const [createOpen, setCreateOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const showHelp = useCallback(() => setHelpOpen(true), []);
+  useHelpShortcut(showHelp);
   const chunkFailed = useChunkLoadFailed();
   const newRule = () => setCreateOpen(true);
   // Stable, so the library's memoized cards skip the renders its search causes.
   const openRule = useCallback(
     (rule: RuleSummary) => navigate(rulePath({ ruleId: rule.id })),
+    [navigate],
+  );
+  const openRuleCode = useCallback(
+    (rule: RuleSummary) =>
+      navigate(rulePath({ ruleId: rule.id, mode: "code" })),
     [navigate],
   );
   const ruleId = view.page === "rule" ? view.ruleId : null;
@@ -103,6 +113,12 @@ export default function App() {
   const acknowledgeSave = (rule: Rule) => {
     setSavedRule(rule);
     library.markChanged();
+  };
+  /** A rule just created, imported or copied: open it and say how it was made. */
+  const openNewRule = (rule: Rule, notice: string) => {
+    acknowledgeSave(rule);
+    navigate(rulePath({ ruleId: rule.id }));
+    notify(notice);
   };
   const codeStudio = useCodeStudioTarget({
     route,
@@ -186,7 +202,9 @@ export default function App() {
           <Library
             library={library}
             onOpen={openRule}
+            onOpenCode={openRuleCode}
             onCreate={newRule}
+            onDuplicated={openNewRule}
             onDocs={() => navigate(pagePath("docs"))}
           />
         );
@@ -201,6 +219,7 @@ export default function App() {
         route={view}
         navigate={navigate}
         openCodeStudio={() => void codeStudio.open()}
+        openHelp={showHelp}
       />
       <main className={`main-content ${selected ? "editor-main" : ""}`}>
         <WorkspaceHeader
@@ -216,18 +235,25 @@ export default function App() {
       {createOpen && (
         <CreateRuleDialog
           onClose={() => setCreateOpen(false)}
-          onCreated={(rule) => {
-            acknowledgeSave(rule);
+          onCreated={(rule, notice) => {
             setCreateOpen(false);
-            navigate(rulePath({ ruleId: rule.id }));
-            notify("Rule created. Make it yours.");
+            openNewRule(rule, notice);
           }}
+        />
+      )}
+      {helpOpen && (
+        <GettingStartedDialog
+          onClose={() => setHelpOpen(false)}
+          onCreate={newRule}
+          onNavigate={(page) => navigate(pagePath(page))}
         />
       )}
       <Snackbar
         key={notice?.id}
         open={notice !== null}
         autoHideDuration={4000}
+        // Bottom left would cover the canvas zoom controls and the Test panel's first field.
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         // Only the timeout or Escape closes a notice: MUI also reports any click elsewhere
         // as "clickaway", which made error notices vanish at once.
         onClose={(_event, reason) => {

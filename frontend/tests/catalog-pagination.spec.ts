@@ -346,3 +346,19 @@ test("a filter or search round trip starts at page 1, and the filters expose the
   await search.fill("");
   await expect(cards.first()).toContainText("Catalog rule 0");
 });
+
+test("a catalog that fits on one page shows no pager, and an empty one still says so", async ({
+  page,
+}) => {
+  await mocks(page);
+  await page.goto("/#/library");
+  const pager = page.getByRole("navigation", { name: "Library rules pages" });
+  await expect(pager).toContainText("1–20 of 45");
+  await page.getByLabel("Search rules", { exact: true }).fill("Catalog rule 4");
+  // Rules 4 and 40 to 44: every match is in view, so there is nothing to page.
+  await expect(page.locator(".rule-card")).toHaveCount(6);
+  await expect(pager).toHaveCount(0);
+  await page.getByLabel("Search rules", { exact: true }).fill("no such rule");
+  await expect(page.getByText("No rules match this view")).toBeVisible();
+  await expect(pager).toHaveText("0 results");
+});
