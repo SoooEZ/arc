@@ -102,6 +102,18 @@ const expressionConfiguration: monaco.languages.LanguageConfiguration = {
   },
 };
 const comment: monaco.languages.IMonarchLanguageRule = [/\/\/.*$/, "comment"];
+/**
+ * Where a card is drawn (`at (310.0, 150.0)`) and a connection's ID
+ * (`edge "tier-true-premium"`) keep a graph's layout and identities through
+ * the code, but say nothing about its logic, so they are painted quietly.
+ */
+const layoutClauses: monaco.languages.IMonarchLanguageRule[] = [
+  [
+    /at\s*\(\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\s*,\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\s*\)/,
+    "layout",
+  ],
+  [/edge\s+"(?:[^"\\]|\\.)*"/, "layout"],
+];
 const expressionTokens: monaco.languages.IMonarchLanguage = {
   keywords: [
     "schema",
@@ -200,7 +212,7 @@ monaco.languages.setMonarchTokensProvider(arcScriptLanguage, {
   ...expressionTokens,
   tokenizer: {
     ...expressionTokens.tokenizer,
-    root: [comment, ...expressionTokens.tokenizer.root],
+    root: [comment, ...layoutClauses, ...expressionTokens.tokenizer.root],
   },
 });
 /**
@@ -247,6 +259,7 @@ monaco.editor.defineTheme("arc-light", {
     },
     { token: "variable.local", foreground: "52665D" },
     { token: "comment", foreground: "8C9792" },
+    { token: "layout", foreground: "8C9792" },
     { token: "string", foreground: "277B61" },
   ],
   colors: {

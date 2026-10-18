@@ -206,6 +206,8 @@ test("Switch scalar controls keep array/null literals as expressions and offer o
       exact: true,
     }),
   ).toHaveText("Expression");
+  // Inline editors mount near the visible part of the inspector.
+  await nullable.scrollIntoViewIfNeeded();
   await expect(
     editorLines(nullable.getByLabel("Case 2 value", { exact: true })),
   ).toHaveText("null");

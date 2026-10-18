@@ -72,6 +72,10 @@ export interface FlowNodeInputs {
   sizes: NodeSizes;
   onExpression: (id: string) => void;
   canOpenCode: boolean;
+  onAddAfter: FlowNode["data"]["onAddAfter"];
+  canAddAfter: boolean;
+  /** Each node's connected exits (connectedExits). */
+  connectedExits: ReadonlyMap<string, string>;
   direction: LayoutDirection;
 }
 
@@ -90,6 +94,9 @@ export function flowNodes(
       errors: inputs.errors.get(model.id) ?? noErrors,
       onExpression: inputs.onExpression,
       canOpenCode: inputs.canOpenCode,
+      onAddAfter: inputs.onAddAfter,
+      canAddAfter: inputs.canAddAfter,
+      connectedExits: inputs.connectedExits.get(model.id) ?? "",
       direction: inputs.direction,
     };
     const earlier = previous.get(model.id);
@@ -103,6 +110,9 @@ export function flowNodes(
       earlier.data.errors === data.errors &&
       earlier.data.onExpression === data.onExpression &&
       earlier.data.canOpenCode === data.canOpenCode &&
+      earlier.data.onAddAfter === data.onAddAfter &&
+      earlier.data.canAddAfter === data.canAddAfter &&
+      earlier.data.connectedExits === data.connectedExits &&
       earlier.data.direction === data.direction
     )
       return earlier;
@@ -116,6 +126,21 @@ export function flowNodes(
       data,
     };
   });
+}
+
+/** Each node's connected exits, one handle per line in the order of the draft's connections. */
+export function connectedExits(
+  edges: Definition["edges"],
+): Map<string, string> {
+  const exits = new Map<string, Set<string>>();
+  for (const edge of edges) {
+    const handles = exits.get(edge.source) ?? new Set<string>();
+    handles.add(edge.sourceHandle);
+    exits.set(edge.source, handles);
+  }
+  return new Map(
+    [...exits].map(([node, handles]) => [node, [...handles].join("\n")]),
+  );
 }
 
 /** Branches taken at the top level of a traced run, as `${nodeId} ${branch}`. */

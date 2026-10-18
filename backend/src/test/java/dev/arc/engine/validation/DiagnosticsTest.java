@@ -203,7 +203,7 @@ class DiagnosticsTest {
         .extracting(Validator.Problem::message)
         .containsExactly(
             "rate source / key: Variables unavailable on every incoming path: missing",
-            "Every node must be reachable from Input; connect or remove unused nodes");
+            "extra: not reachable from Input; connect it or remove it");
   }
 
   /**
@@ -306,13 +306,13 @@ class DiagnosticsTest {
             node("out", "OUTPUT", "1", null),
             node("lost", "OUTPUT", "2", null));
     var definition = new Definition(1, cyclicInputs(), nodes, List.of());
-    String unreachable = "Every node must be reachable from Input; connect or remove unused nodes";
+    String unreachable = ": not reachable from Input; connect it or remove it";
     assertThat(validator.diagnose(definition, noRules).problems())
         .containsExactly(
             atInput("Circular source parameter dependency: zeta"),
-            atInput("input: connect [next]"),
-            new Validator.Problem(unreachable, at("out", "out")),
-            new Validator.Problem(unreachable, at("lost", "lost")));
+            atInput("input: connect it to a next step"),
+            new Validator.Problem("out" + unreachable, at("out", "out")),
+            new Validator.Problem("lost" + unreachable, at("lost", "lost")));
     assertThatThrownBy(() -> validator.validate(definition, noRules))
         .hasMessage("Circular source parameter dependency: zeta");
   }
@@ -440,7 +440,10 @@ class DiagnosticsTest {
     assertThat(problems).anyMatch(problem -> problem.message().contains("cycles"));
     assertThat(problems).containsAll(expected);
     assertThat(problems)
-        .contains(new Validator.Problem("out: connect no outgoing branches", at("out", "out")));
+        .contains(
+            new Validator.Problem(
+                "out: remove its outgoing connections, since an Output ends the path",
+                at("out", "out")));
   }
 
   @Test
@@ -462,17 +465,17 @@ class DiagnosticsTest {
                 edge("c1", "c2", "true"),
                 edge("c2", "c3", "true"),
                 edge("c3", "out1", "true")));
-    String unreachable = "Every node must be reachable from Input; connect or remove unused nodes";
+    String unreachable = ": not reachable from Input; connect it or remove it";
     // Only c1's problem was reported before, so the editor marked one node at a time.
     assertThat(validator.diagnose(definition, noRules).problems())
         .containsExactlyInAnyOrder(
-            new Validator.Problem("c1: connect [true, false]", at("c1", "c1")),
-            new Validator.Problem("c2: connect [true, false]", at("c2", "c2")),
-            new Validator.Problem("c3: connect [true, false]", at("c3", "c3")),
-            new Validator.Problem(unreachable, at("out2", "out2")),
-            new Validator.Problem(unreachable, at("out3", "out3")));
+            new Validator.Problem("c1: connect the False exit", at("c1", "c1")),
+            new Validator.Problem("c2: connect the False exit", at("c2", "c2")),
+            new Validator.Problem("c3: connect the False exit", at("c3", "c3")),
+            new Validator.Problem("out2" + unreachable, at("out2", "out2")),
+            new Validator.Problem("out3" + unreachable, at("out3", "out3")));
     // Executable validation still stops at the first problem.
     assertThatThrownBy(() -> validator.validate(definition, noRules))
-        .hasMessage("c1: connect [true, false]");
+        .hasMessage("c1: connect the False exit");
   }
 }

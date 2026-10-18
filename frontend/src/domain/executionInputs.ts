@@ -59,6 +59,36 @@ export function shownInputs(
   return edited?.target === target ? edited.text : sample;
 }
 
+/** How a declared input appears in an input buffer: left out, explicitly null, or a value. */
+export type InputEntry =
+  { kind: "omitted" } | { kind: "null" } | { kind: "value"; value: unknown };
+
+/** The entry of input `name` in the parsed inputs. */
+export function inputEntry(
+  inputs: Record<string, unknown>,
+  name: string,
+): InputEntry {
+  if (!Object.hasOwn(inputs, name)) return { kind: "omitted" };
+  const value = inputs[name];
+  return value === null ? { kind: "null" } : { kind: "value", value };
+}
+
+/**
+ * The buffer with input `name` set to `entry`, every other key kept in its
+ * place. A form edit rewrites the buffer as formatted JSON; an untouched buffer
+ * is never rewritten. The buffer must hold a JSON object.
+ */
+export function withInputEntry(
+  text: string,
+  name: string,
+  entry: InputEntry,
+): string {
+  const inputs = new Map(Object.entries(parseExecutionInputs(text)));
+  if (entry.kind === "omitted") inputs.delete(name);
+  else inputs.set(name, entry.kind === "null" ? null : entry.value);
+  return stringifyJson(Object.fromEntries(inputs), 2);
+}
+
 /** Reads an input buffer without rounding numbers; anything but a JSON object throws. */
 export function parseExecutionInputs(text: string): Record<string, unknown> {
   return parseJsonObject(text, "Inputs must be a JSON object.");

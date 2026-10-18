@@ -3,8 +3,6 @@ import {
   Button,
   CircularProgress,
   IconButton,
-  Menu,
-  MenuItem,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
@@ -19,13 +17,14 @@ import {
   LayoutGrid,
   ListTree,
   Plus,
+  Redo2,
+  Undo2,
 } from "lucide-react";
-import { NodeIcon } from "../../../components/Icons";
 import type { NodeType } from "../../../types";
 import { MAX_NODES } from "../../../domain/limits";
-import { addableNodeTypes, nodeKinds } from "../../../domain/nodeKinds";
 import type { LayoutDirection } from "../../../domain/nodePorts";
 import type { EditorCapabilities } from "../editorCapabilities";
+import NodeKindMenu from "./NodeKindMenu";
 
 /** The drawing directions in toolbar order, with their names and icons. */
 const directions = [
@@ -47,6 +46,10 @@ export default function GraphToolbar({
   onExport,
   onValidate,
   onAddNode,
+  undoable,
+  redoable,
+  onUndo,
+  onRedo,
 }: {
   nodeCount: number;
   /** False once the draft holds the maximum number of nodes. */
@@ -63,6 +66,11 @@ export default function GraphToolbar({
   onExport: () => void;
   onValidate: () => Promise<void>;
   onAddNode: (type: NodeType) => void;
+  /** Undo or Redo has a step to take now. */
+  undoable: boolean;
+  redoable: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }) {
   const [addAnchor, setAddAnchor] = useState<HTMLElement | null>(null);
   return (
@@ -73,6 +81,33 @@ export default function GraphToolbar({
         <span>{nodeCount} nodes</span>
       </div>
       <div className="graph-tools">
+        {!readOnly && (
+          <>
+            <Tooltip title="Undo · ⌘/Ctrl Z">
+              <span>
+                <IconButton
+                  aria-label="Undo"
+                  disabled={!undoable}
+                  onClick={onUndo}
+                >
+                  <Undo2 size={16} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Redo · ⌘/Ctrl Shift Z">
+              <span>
+                <IconButton
+                  aria-label="Redo"
+                  disabled={!redoable}
+                  onClick={onRedo}
+                >
+                  <Redo2 size={16} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <span className="tool-divider" />
+          </>
+        )}
         <Tooltip title="Node outline">
           <IconButton
             aria-label="Node outline"
@@ -154,27 +189,13 @@ export default function GraphToolbar({
           </Tooltip>
         )}
       </div>
-      <Menu
-        anchorEl={addAnchor}
-        open={!!addAnchor}
+      <NodeKindMenu
+        anchor={addAnchor}
+        label="Node kinds"
+        disabled={!can.edit}
+        onChoose={onAddNode}
         onClose={() => setAddAnchor(null)}
-      >
-        {addableNodeTypes.map((type) => (
-          <MenuItem
-            key={type}
-            disabled={!can.edit}
-            onClick={() => {
-              onAddNode(type);
-              setAddAnchor(null);
-            }}
-          >
-            <span className={`node-icon ${nodeKinds[type].className}`}>
-              <NodeIcon type={type} />
-            </span>
-            <span style={{ marginLeft: 10 }}>{nodeKinds[type].label}</span>
-          </MenuItem>
-        ))}
-      </Menu>
+      />
     </div>
   );
 }

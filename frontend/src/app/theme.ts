@@ -7,7 +7,7 @@ export const theme = createTheme({
     primary: { main: "#19735b", dark: "#10553f", light: "#e5f3ec" },
     secondary: { main: "#5f648d" },
     background: { default: "#f7f8fa", paper: "#ffffff" },
-    text: { primary: "#192b28", secondary: "#77817f" },
+    text: { primary: "#192b28", secondary: "#6d7675" },
     divider: "#e7ebe9",
   },
   typography: {
@@ -22,7 +22,7 @@ export const theme = createTheme({
   components: {
     MuiAlert: {
       styleOverrides: {
-        root: { fontSize: 11 },
+        root: { fontSize: 13 },
         message: { overflowWrap: "anywhere" },
       },
     },
@@ -45,11 +45,11 @@ export const theme = createTheme({
       },
     },
     MuiChip: {
-      styleOverrides: { root: { height: 25, fontSize: 11, fontWeight: 550 } },
+      styleOverrides: { root: { height: 25, fontSize: 12, fontWeight: 550 } },
     },
     MuiDialog: { styleOverrides: { paper: { borderRadius: 14 } } },
     MuiDialogActions: { styleOverrides: { root: { padding: "16px 24px" } } },
-    MuiMenuItem: { styleOverrides: { root: { fontSize: 12 } } },
+    MuiMenuItem: { styleOverrides: { root: { fontSize: 13 } } },
     MuiTooltip: { defaultProps: { arrow: true } },
   },
 });

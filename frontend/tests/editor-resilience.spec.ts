@@ -286,6 +286,8 @@ test("a code editor or JSON editor that cannot load keeps the editor and the dra
   await page.getByRole("button", { name: "Graph view", exact: true }).click();
   await expect(nodeName(page)).toHaveValue("Kept through failures");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  // The panel opens on its input form; the JSON view loads the editor.
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await expect(
     page
       .getByRole("alert")

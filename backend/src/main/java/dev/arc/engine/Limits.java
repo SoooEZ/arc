@@ -82,6 +82,9 @@ public final class Limits {
   /** Rule descriptions. */
   public static final int MAX_DESCRIPTION_CHARACTERS = 2_000;
 
+  /** The note a publisher writes with a rule version. */
+  public static final int MAX_RELEASE_NOTE_CHARACTERS = 500;
+
   // Expression and ARC Script source
 
   /** Every stored expression: node, selector, case, field, binding and source mapping. */

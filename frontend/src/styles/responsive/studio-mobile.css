@@ -26,11 +26,11 @@
   .sources-page {
     padding: 18px;
   }
-  .sources-heading {
+  .sources-page .page-heading {
     align-items: start;
     gap: 10px;
   }
-  .sources-heading h1 {
+  .sources-page .page-heading h1 {
     font-size: 26px;
   }
   .source-detail {

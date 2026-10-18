@@ -1,4 +1,4 @@
-import { editorLines, setEditorText } from "./helpers/editor";
+import { editorLines, publishDraft, setEditorText } from "./helpers/editor";
 import {
   expect,
   test,
@@ -129,6 +129,7 @@ for (const scenario of [
       .getByLabel("Default return value", { exact: true })
       .fill("No match");
     await page.getByRole("button", { name: "Test rule", exact: true }).click();
+    await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
     await page.getByRole("button", { name: "Run test", exact: true }).click();
     await expect(page.getByTestId("test-result")).toHaveText('"matched"');
     // The Switch step shows the case it took by its label, and Default as the fallback.
@@ -174,7 +175,7 @@ for (const scenario of [
     await expect(
       page.getByRole("combobox", { name: "Branches", exact: true }),
     ).toHaveText("Match a value");
-    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    await publishDraft(page);
     await expect(
       page.getByText("Version 1 published and ready to call"),
     ).toBeVisible();
@@ -234,7 +235,7 @@ test("range cases and a staged Default return survive cancel, apply, code round 
     editorLines(page.getByLabel("ARC code editor", { exact: true })),
   ).toContainText("return 3;");
   await page.getByRole("button", { name: "Graph view", exact: true }).click();
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();

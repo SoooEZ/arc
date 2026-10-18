@@ -396,20 +396,24 @@ class JdbcRuleRepositoryTest {
               return List.of(call.<RowMapper<Object>>getArgument(1).mapRow(row, 0));
             });
 
-    var published = repository.publish(locked, new LinkedHashSet<>(List.of("b", "a")));
+    var published =
+        repository.publish(locked, new LinkedHashSet<>(List.of("b", "a")), "Adds tiers");
 
     assertThat(statements)
         .containsExactly(
-            "INSERT INTO rule_versions (rule_id, version, definition, callees) SELECT id, ?, draft,"
-                + " ? FROM rules WHERE id = ?",
+            "INSERT INTO rule_versions (rule_id, version, definition, callees, note) SELECT id, ?,"
+                + " draft, ?, ? FROM rules WHERE id = ?",
             "UPDATE rules SET published_version = ?, callees = ?, revision ="
                 + " nextval('rule_revisions'), updated_at = now() WHERE id = ? RETURNING id, name,"
                 + " description, kind, revision, published_version, created_at, updated_at");
     for (List<Object> bound : arguments) {
       assertThat(bound.get(0)).isEqualTo(3);
       assertThat((String[]) bound.get(1)).containsExactly("b", "a");
-      assertThat(bound.get(2)).isEqualTo("a");
+      assertThat(bound.getLast()).isEqualTo("a");
     }
+    // The version stores its note; the rule row has none.
+    assertThat(arguments.get(0).get(2)).isEqualTo("Adds tiers");
+    assertThat(arguments.get(1)).hasSize(3);
     verify(row, never()).getString("draft");
     assertThat(published.draft()).isSameAs(draft);
     assertThat(published.revision()).isEqualTo(9);

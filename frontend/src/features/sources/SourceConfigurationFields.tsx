@@ -1,5 +1,5 @@
-import type { ComponentType } from "react";
-import { TextField } from "@mui/material";
+import { useState, type ComponentType } from "react";
+import { TextField, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import type { SourceConfig } from "../../types";
 import { sourceParameterBufferError, type SourceBuffers } from "./model";
 import {
@@ -9,6 +9,7 @@ import {
 } from "./httpSourcePolicy";
 import { sourceProviders, type SourceKind } from "./sourceProviders";
 import { identifierGuidance } from "../../domain/identifiers";
+import LookupTableEditor from "./LookupTableEditor";
 
 interface SectionProps {
   configuration: SourceConfig;
@@ -81,12 +82,59 @@ function HttpPayload({ buffers, disabled, onBuffer }: SectionProps) {
   );
 }
 
+const entriesHelp =
+  'Map keys to values or records. Example: {"US":{"rate":0.07}}';
+
+type EntriesView = "table" | "json";
+// The view chosen last on this page: another source or version opens in it too.
+let lastEntriesView: EntriesView = "table";
+
 /**
- * The table is a native textarea: MUI's autosizing one laid out the whole
+ * The entries as a table to edit cell by cell, or as their JSON text. Both
+ * edit the one entries buffer; the table writes it whole on every change.
+ */
+function LookupPayload(props: SectionProps) {
+  const [view, setView] = useState<EntriesView>(() => lastEntriesView);
+  const { buffers, disabled, onBuffer } = props;
+  return (
+    <div className="lookup-entries">
+      <div className="lookup-entries-heading">
+        <span>Lookup entries</span>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={view}
+          aria-label="Lookup entries view"
+          onChange={(_, chosen: EntriesView | null) => {
+            if (!chosen) return;
+            lastEntriesView = chosen;
+            setView(chosen);
+          }}
+        >
+          <ToggleButton value="table">Table</ToggleButton>
+          <ToggleButton value="json">JSON</ToggleButton>
+        </ToggleButtonGroup>
+      </div>
+      {view === "table" ? (
+        <LookupTableEditor
+          entries={buffers.entries}
+          disabled={disabled}
+          onChange={(text) => onBuffer("entries", text)}
+        />
+      ) : (
+        <LookupEntriesJson {...props} />
+      )}
+      <p className="studio-hint">{entriesHelp}</p>
+    </div>
+  );
+}
+
+/**
+ * The JSON view is a native textarea: MUI's autosizing one laid out the whole
  * table text again on every render of the form, a lag per keystroke on a
  * large table, while sources.css pins the field's height anyway.
  */
-function LookupPayload({ buffers, disabled, onBuffer }: SectionProps) {
+function LookupEntriesJson({ buffers, disabled, onBuffer }: SectionProps) {
   return (
     <TextField
       label="Lookup entries · JSON object"
@@ -95,9 +143,11 @@ function LookupPayload({ buffers, disabled, onBuffer }: SectionProps) {
       value={buffers.entries}
       disabled={disabled}
       onChange={(event) => onBuffer("entries", event.target.value)}
-      helperText='Map keys to values or records. Example: {"US":{"rate":0.07}}'
       slotProps={{
-        input: { className: "json-input", inputComponent: "textarea" },
+        input: {
+          className: "json-input json-table-input",
+          inputComponent: "textarea",
+        },
         // A textarea has no type attribute; MUI would pass the field's "text".
         htmlInput: { type: undefined },
       }}

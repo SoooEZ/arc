@@ -1,8 +1,9 @@
 import type { Ref } from "react";
 import { IconButton, Tooltip } from "@mui/material";
-import { Code2, Info, Trash2 } from "lucide-react";
+import { CircleAlert, Code2, Info, Trash2 } from "lucide-react";
 import { canRemoveGraphNode } from "../../../domain/graph";
 import { nodeKinds } from "../../../domain/nodeKinds";
+import { messageForNode } from "../../../domain/text";
 import InspectorProblems from "./InspectorProblems";
 import NodeIdentity from "./NodeIdentity";
 import NodeForm, { type NodeFormProps } from "./NodeForm";
@@ -71,13 +72,46 @@ export default function Inspector({
         </div>
       </div>
       <NodeForm {...form} />
-      <div className="inspector-footer">
-        <Info size={13} />
-        {published
-          ? "Published versions are read-only"
-          : "Changes are saved when you save the draft"}
-      </div>
+      <InspectorFooter
+        problem={errors[0] && messageForNode(errors[0], node.label)}
+        more={errors.length - 1}
+        published={published}
+      />
     </aside>
+  );
+}
+
+/**
+ * The inspector's last line: the node's first problem when it has one, which
+ * stays in view while the form scrolls and never moves the form, otherwise
+ * how the draft's changes are kept. The header lists every problem.
+ */
+function InspectorFooter({
+  problem,
+  more,
+  published,
+}: {
+  problem: string | undefined;
+  more: number;
+  published: boolean;
+}) {
+  if (problem)
+    return (
+      <div className="inspector-footer inspector-footer-problem" role="status">
+        <CircleAlert size={13} />
+        <span>{problem}</span>
+        {more > 0 && (
+          <span className="inspector-footer-more">+{more} more</span>
+        )}
+      </div>
+    );
+  return (
+    <div className="inspector-footer">
+      <Info size={13} />
+      {published
+        ? "Published versions are read-only"
+        : "Changes are saved when you save the draft"}
+    </div>
   );
 }
 

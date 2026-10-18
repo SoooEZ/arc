@@ -82,13 +82,17 @@ export async function createRule(
   return (await response.json()) as Rule;
 }
 
-/** Posts a publication and returns the response, for tests that expect a refusal. */
+/** Posts a publication, with an optional note, and returns the response, for tests that expect a refusal. */
 export function publishRuleResponse(
   request: APIRequestContext,
   rule: Pick<Rule, "id" | "revision">,
+  note?: string,
 ): Promise<APIResponse> {
   return request.post(`/api/rules/${rule.id}/publish`, {
-    data: { revision: rule.revision },
+    data:
+      note === undefined
+        ? { revision: rule.revision }
+        : { revision: rule.revision, note },
   });
 }
 

@@ -15,12 +15,13 @@ public final class RuleTemplates {
 
   /**
    * The valid template a new rule of the kind starts from: a Condition with two Outputs for a RULE,
-   * and one calculation for a FORMULA or DECISION_TREE (a tree grows from the calculation by hand).
+   * one calculation for a FORMULA, and a branch with a calculation on one side for a DECISION_TREE.
    */
   public static Definition blank(RuleKind kind) {
     return switch (kind) {
       case RULE -> conditionTemplate();
-      case FORMULA, DECISION_TREE -> calculationTemplate();
+      case FORMULA -> calculationTemplate();
+      case DECISION_TREE -> decisionTemplate();
     };
   }
 
@@ -49,6 +50,24 @@ public final class RuleTemplates {
             node("result", OUTPUT, "Return total", 280, 320, "total", null)),
         List.of(
             edge("input", "calculate", Handles.NEXT), edge("calculate", "result", Handles.NEXT)));
+  }
+
+  /** A decision tree's first branch: large orders get 10% off, the others pay the full amount. */
+  private static Definition decisionTemplate() {
+    return new Definition(
+        1,
+        List.of(new Input("amount", "NUMBER", true, 100)),
+        List.of(
+            node("input", INPUT, "Inputs", 300, 0, null, null),
+            node("condition", CONDITION, "Large order?", 300, 160, "amount >= 100", null),
+            node("discount", FORMULA, "Apply 10% off", 100, 340, "amount * 0.9", "total"),
+            node("full", OUTPUT, "Full price", 500, 340, "amount", null),
+            node("result", OUTPUT, "Discounted total", 100, 520, "total", null)),
+        List.of(
+            edge("input", "condition", Handles.NEXT),
+            edge("condition", "discount", Handles.TRUE),
+            edge("condition", "full", Handles.FALSE),
+            edge("discount", "result", Handles.NEXT)));
   }
 
   /**

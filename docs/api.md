@@ -47,9 +47,9 @@ Kinds: `DECISION_TREE`, `FORMULA`, `RULE`. Omit `definition` to start from a val
 
 `GET /rules` lists full rule resources. `GET /rules/{id}` returns one. Each includes `draft`, integer `revision`, nullable `publishedVersion`, `createdAt`, and `updatedAt`.
 
-For catalogs, use `GET /rule-summaries?offset=0&limit=20&search=tax&kind=FORMULA&publishedOnly=false`. It returns `{items,total,offset,limit}`. Each item contains rule metadata plus `nodeCount`, `inputCount`, and `referenceCount`, without `draft`. Search matches rule ID/name/description; surrounding whitespace is ignored, so a whitespace-only search returns the unfiltered page. `kind` and `publishedOnly` are optional filters. `offset` must be nonnegative (default 0) and `limit` between 1 and 100 (default 20). Every search is trimmed first and may then have at most 200 characters. Pages use a deterministic order; separate page requests do not form a frozen snapshot during concurrent edits. `GET /rule-summaries/{id}` returns one rule's item, with the same fields and without `draft`, or `404` for a missing rule; the editor reads it for the current name and incarnation of a rule another rule calls.
+For catalogs, use `GET /rule-summaries?offset=0&limit=20&search=tax&kind=FORMULA&publishedOnly=false`. It returns `{items,total,offset,limit}`. Each item contains rule metadata plus `nodeCount`, `inputCount`, `referenceCount` and `draftChanged` (the saved draft differs from the latest published version), without `draft`. Search matches rule ID/name/description; surrounding whitespace is ignored, so a whitespace-only search returns the unfiltered page. `kind` and `publishedOnly` are optional filters. `offset` must be nonnegative (default 0) and `limit` between 1 and 100 (default 20). Every search is trimmed first and may then have at most 200 characters. Pages use a deterministic order; separate page requests do not form a frozen snapshot during concurrent edits. `GET /rule-summaries/{id}` returns one rule's item, with the same fields and without `draft`, or `404` for a missing rule; the editor reads it for the current name and incarnation of a rule another rule calls.
 
-Version pickers should use `GET /rules/{id}/version-summaries?offset=0&limit=20`, whose items contain `ruleId`, `version`, and `publishedAt`, newest first. Optional `search` (at most 200 characters) matches a trimmed literal substring of the version number: `search=2` matches versions 2, 12 and 20. An empty search returns all versions; `total` counts only matching versions, and pagination applies after filtering. Fetch the selected definition with `GET /rules/{id}/versions/{version}`. The legacy full `/rules` and `/rules/{id}/versions` endpoints remain compatible but are unbounded; workspace callers use the paginated summaries and on-demand details.
+Version pickers should use `GET /rules/{id}/version-summaries?offset=0&limit=20`, whose items contain `ruleId`, `version`, `publishedAt` and the version's `note` (null for none), newest first. Optional `search` (at most 200 characters) matches a trimmed literal substring of the version number: `search=2` matches versions 2, 12 and 20. An empty search returns all versions; `total` counts only matching versions, and pagination applies after filtering. Fetch the selected definition with `GET /rules/{id}/versions/{version}`. The legacy full `/rules` and `/rules/{id}/versions` endpoints remain compatible but are unbounded; workspace callers use the paginated summaries and on-demand details.
 
 Data sources use the same page envelope and bounds: `GET /source-summaries?offset=0&limit=20&search=tax` returns `{id,name,version,kind}` items; `GET /sources/{id}/version-summaries` returns `{id,version,createdAt}` items. Load a selected configuration through `GET /sources/{id}/versions/{version}`. Legacy full source lists/history remain available for existing clients; `GET /sources/{id}/versions` returns `404` for an unknown source, like the other version reads.
 
@@ -84,7 +84,7 @@ Supply the most recently read `revision`. A successful save advances it. A stale
 
 ## Publish and inspect versions
 
-`POST /rules/{id}/publish` accepts `{"revision":2}`. It validates the current saved draft, creates a new immutable version, advances the edit revision, and returns the updated rule. Publishing invalid drafts never changes the live version.
+`POST /rules/{id}/publish` accepts `{"revision":2}` and an optional `"note"` of at most 500 characters saying what the version changes (blank is none; a longer note is `422` "Release note exceeds 500 characters"). It validates the current saved draft, creates a new immutable version with the note, advances the edit revision, and returns the updated rule. Publishing invalid drafts never changes the live version. The server publishes a draft identical to the latest version as a new version; the editor's publish dialog shows the changes since that version and refuses an unchanged draft.
 
 - `GET /rules/{id}/versions`: version objects, newest first.
 - `GET /rules/{id}/versions/{version}`: one immutable snapshot.
@@ -127,6 +127,15 @@ The current release has no batch endpoint, run-history storage, or authenticatio
 ## Code studio and external parameters
 
 See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults. Entries appear in read order: an input's source dependencies are read first, in declaration order.
+
+## Behavior changes from the 2026-10-17 usability work
+
+Graph JSON, ARC Script, stored versions and pins are unchanged. Two optional fields are new, and validation messages read as sentences.
+
+- `POST /rules/{id}/publish` accepts an optional `note` (at most 500 characters), stored with the version by migration V6; `GET /rules/{id}/version-summaries` returns it as `note`, null for none and for versions published earlier.
+- `GET /rule-summaries` and `GET /rule-summaries/{id}` return `draftChanged`: the saved draft differs from the latest published version (always false before the first). The library marks such rules "Unpublished changes".
+- A missing connection names only the exits still missing, by their captions: "Check: connect the False exit", "Route: connect the Gold and Default exits", "Calc: connect it to a next step". It listed every handle ID ("Check: connect [true, false]"), connected or not. An Output with outgoing connections reports "Out: remove its outgoing connections, since an Output ends the path" (was "Out: connect no outgoing branches"), and an unreachable node "Lost: not reachable from Input; connect it or remove it" (was "Every node must be reachable from Input; connect or remove unused nodes", without its label).
+- A new Decision tree starts from a branch (an amount of at least 100 gets 10% off, otherwise the full amount) instead of the Formula's single calculation. Formula and Condition rule templates are unchanged.
 
 ## Behavior changes from the 2026-10-11 full review
 

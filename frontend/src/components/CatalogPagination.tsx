@@ -15,15 +15,7 @@ export default function CatalogPagination({
   label?: string;
 }) {
   return (
-    <nav
-      aria-label={`${label} pages`}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        flexWrap: "wrap",
-      }}
-    >
+    <nav aria-label={`${label} pages`} className="catalog-pagination">
       <Button
         size="small"
         disabled={loading || offset === 0}

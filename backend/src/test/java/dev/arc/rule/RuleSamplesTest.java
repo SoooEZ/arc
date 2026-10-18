@@ -47,7 +47,7 @@ class RuleSamplesTest {
     verify(store, never()).list();
     verify(transactions).commit(any());
     for (String id : new String[] {"apply-discount", "order-pricing", "free-shipping"})
-      verify(service).publish(id, 1);
+      verify(service).publish(id, 1, "The sample's first version.");
     verify(store)
         .create(eq("apply-discount"), anyString(), anyString(), eq("FORMULA"), any(), eq(Set.of()));
     // The pricing sample calls the discount formula; the stored set is what a deletion reads.

@@ -6,7 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import { editorLines, setEditorText } from "./helpers/editor";
+import { editorLines, publishDraft, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
 
 const definition: Definition = {
@@ -219,7 +219,7 @@ test("named Outputs survive graph/code and staged edits, preserve null and publi
   await form.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(alias).toHaveValue("payable");
   await save(page);
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();
@@ -233,7 +233,7 @@ test("named Outputs survive graph/code and staged edits, preserve null and publi
   expect(await execute(1)).toEqual({ payable: 40 });
   await alias.fill("");
   await save(page);
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 2 published and ready to call"),
   ).toBeVisible();

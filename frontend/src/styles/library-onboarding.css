@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   padding: 8px 0 8px 5px;
-  color: #88a472;
+  color: #637c50;
   flex-shrink: 0;
 }
 .getting-visual > svg {
@@ -34,13 +34,13 @@
   background: #e9eedf;
   display: grid;
   place-items: center;
-  color: #8fa574;
+  color: #677b4f;
   font-size: var(--text-xl);
 }
 .getting-started .eyebrow {
   font-size: var(--text-2xs);
   letter-spacing: 1.4px;
-  color: #8a9c7b;
+  color: #697a5b;
 }
 .getting-started h3 {
   font-size: 14px;
@@ -62,7 +62,7 @@
 .library-footer {
   display: flex;
   justify-content: space-between;
-  color: #8e9a83;
+  color: #6d7962;
   font-size: var(--text-xs);
   letter-spacing: 0.3px;
   margin-top: 40px;
@@ -76,7 +76,7 @@
   border: 1px dashed #dbe4d5;
   border-radius: 10px;
   padding: 65px 20px;
-  color: #899780;
+  color: #6c7963;
 }
 .empty-library h3 {
   color: #4e6543;

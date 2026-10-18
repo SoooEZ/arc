@@ -96,7 +96,7 @@ test("Add case on a True / False Condition, and Branches in the node dialog, con
   await expect(captions).toHaveText(["Case 1", "Case 2", "Default"]);
   await page.getByRole("button", { name: "Validate", exact: true }).click();
   // Case 2 has no connection yet; Case 1 and Default kept theirs.
-  await expect(page.getByText(/connect \[case:/).first()).toBeVisible();
+  await expect(page.getByText(/connect the Case 2 exit/).first()).toBeVisible();
   await page
     .getByRole("button", { name: "Remove case 2", exact: true })
     .click();

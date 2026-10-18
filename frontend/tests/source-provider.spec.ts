@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { lookupEntriesJson } from "./helpers/sources";
 import type { DataSource, Rule } from "../src/types";
 import { createRule, uniqueStamp } from "./helpers/api";
 
@@ -648,9 +649,7 @@ test("source manager creates, versions and tests providers without losing the pa
   await expect(page).toHaveURL(new RegExp(`#/rules/${ruleId}\\?node=input$`));
   const renamed = `Updated ${sourceName}`;
   await manager.getByLabel("Name", { exact: true }).fill(renamed);
-  await manager
-    .getByLabel("Lookup entries · JSON object", { exact: true })
-    .fill('{"US":12}');
+  await (await lookupEntriesJson(manager)).fill('{"US":12}');
   page.once("dialog", (dialog) => dialog.dismiss());
   await manager
     .getByRole("button", { name: "Close data sources", exact: true })
@@ -1109,9 +1108,7 @@ test("a source renamed from another card's manager shows its new name on the car
   );
   const renamed = `Renamed second ${stamp}`;
   await manager.getByLabel("Name", { exact: true }).fill(renamed);
-  await manager
-    .getByLabel("Lookup entries · JSON object", { exact: true })
-    .fill('{"US":2}');
+  await (await lookupEntriesJson(manager)).fill('{"US":2}');
   await manager
     .getByRole("button", { name: "Save new version", exact: true })
     .click();

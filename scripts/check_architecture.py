@@ -86,6 +86,8 @@ PURE_FRONTEND = {
     "features/language/cssColor.ts": (),
     "features/editor/canvas/edgeRouting.ts": (),
     "features/editor/canvas/graphGeometry.ts": ("types", "domain/"),
+    "features/editor/canvas/nodePlacement.ts": ("types", "domain/", "features/editor/canvas/graphGeometry"),
+    "features/sources/lookupTable.ts": ("domain/",),
 }
 # HTTP clients may use the lossless JSON codec, but no other domain logic.
 TRANSPORT_FRONTEND = ("types", "api/", "domain/json")

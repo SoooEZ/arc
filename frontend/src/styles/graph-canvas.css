@@ -22,8 +22,16 @@
   align-items: center;
   gap: 6px;
   font-size: var(--text-md);
-  color: #71816a;
+  color: #6a7963;
   font-weight: 500;
+}
+.node-type-problem {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #a3372f;
 }
 .node-header-actions {
   display: flex;
@@ -38,7 +46,7 @@
 .node-expression-button {
   padding: 3px;
   display: flex;
-  color: #728375;
+  color: #69786b;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -90,7 +98,7 @@
 .node-detail {
   font-family: var(--font-mono);
   font-size: var(--text-md);
-  color: #6c7e62;
+  color: #687a5f;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -159,7 +167,7 @@
   color: #529770;
 }
 .node-link-icon {
-  color: #b5a3c7;
+  color: #a28bb9;
 }
 /* React Flow's stylesheet loads after the application styles, so rules for
    its own elements need !important where both set a property. */
@@ -178,7 +186,7 @@
   position: absolute;
   bottom: -16px;
   font-size: var(--text-2xs);
-  color: #7ca174;
+  color: #5c7e55;
   background: var(--color-canvas);
   padding: 0 4px;
   pointer-events: none;
@@ -198,7 +206,37 @@
   transform: translateY(-120%);
 }
 .handle-fallback {
-  color: #ac957a;
+  color: #877055;
+}
+/* An exit without a connection offers its next step where the connection
+   would leave: below the caption top to bottom, beside it left to right. */
+.exit-add {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #93ad8a;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: #4f7f5b;
+  cursor: pointer;
+}
+.exit-add:hover,
+.exit-add:focus-visible {
+  border-style: solid;
+  background: #edf5ea;
+  color: #2d6741;
+}
+.exit-add-below {
+  bottom: -46px;
+  transform: translateX(-50%);
+}
+.exit-add-side {
+  left: calc(100% + 30px);
+  transform: translateY(-50%);
 }
 .react-flow__controls {
   left: 12px !important;
@@ -210,7 +248,7 @@
 }
 .react-flow__controls-button {
   border-bottom: 1px solid #e9eee7 !important;
-  color: #94a58a !important;
+  color: #879a7c !important;
   width: 27px !important;
   height: 27px !important;
 }
@@ -237,7 +275,7 @@
   bottom: 12px;
   left: 57px;
   font-size: var(--text-xs);
-  color: #a3af99;
+  color: #6b795f;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -249,7 +287,7 @@
   background: var(--color-surface);
   border-radius: 3px;
   padding: 0 3px;
-  color: #8e9e80;
+  color: #6a7a5d;
   line-height: 1.4;
 }
 .editor-status {
@@ -261,7 +299,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: var(--text-xs);
-  color: #9ba98f;
+  color: #6a7a5d;
   flex-shrink: 0;
 }
 .editor-status > span {

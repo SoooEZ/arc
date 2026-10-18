@@ -161,6 +161,7 @@ export default function ReferenceFields({
                     ruleId: node.ruleId,
                     version: node.version,
                     publishedAt: "",
+                    note: null,
                   }
                 : null
             }

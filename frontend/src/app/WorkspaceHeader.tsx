@@ -1,4 +1,5 @@
 import { ChevronRight, Radio } from "lucide-react";
+import { Tooltip } from "@mui/material";
 import { pagePath, type WorkspacePage, type WorkspaceRoute } from "./routing";
 
 interface Crumb {
@@ -52,10 +53,12 @@ export default function WorkspaceHeader({
         )}
       </div>
       <div className="topbar-right">
-        <span className="open-access">
-          <Radio size={13} />
-          Open API
-        </span>
+        <Tooltip title="This development setup accepts every API call without authentication.">
+          <span className="open-access" tabIndex={0}>
+            <Radio size={13} />
+            No authentication
+          </span>
+        </Tooltip>
         <span className="topbar-divider" />
         <span className="user-avatar">A</span>
       </div>

@@ -225,6 +225,7 @@ paths:
               required: [revision]
               properties:
                 revision: {type: integer, minimum: 1, description: 'The revision the client read; a stale one is a 409, a missing or null one a 422 "Revision is required"'}
+                note: {type: string, nullable: true, maxLength: 500, description: 'What the version changes, stored with it and returned by version summaries; blank or omitted is none, a longer one a 422 "Release note exceeds 500 characters"'}
       responses:
         '200':
           description: Rule with incremented revision and publishedVersion
@@ -775,12 +776,14 @@ components:
         nodeCount: {type: integer}
         inputCount: {type: integer}
         referenceCount: {type: integer}
+        draftChanged: {type: boolean, description: The saved draft differs from the latest published version; false for a rule never published}
     VersionSummary:
       type: object
       properties:
         ruleId: {type: string}
         version: {type: integer}
         publishedAt: {type: string, format: date-time}
+        note: {type: string, nullable: true, description: The note published with the version; null for none and for versions published before notes existed}
     SourceSummary:
       type: object
       properties:

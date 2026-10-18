@@ -307,6 +307,8 @@ flowchart TB
 - **排版**：[`arrangeGraph`](../frontend/src/features/editor/canvas/graphLayout.ts) 在 Web Worker（[`layoutInWorker`](../frontend/src/features/editor/canvas/graphLayoutWorker.ts)）里跑 ELK，结果通过 `graph/arranged` 应用。
 - **显示方向**：工具栏的方向切换写全局偏好 [`layoutDirection`](../frontend/src/app/layoutDirection.ts)。从上到下画草稿里存的坐标；从左到右由 [`useHorizontalLayout`](../frontend/src/features/editor/canvas/useHorizontalLayout.ts) 另排一份只用于显示的坐标，拖动和 Arrange 停用，草稿不变。
 - **分支方式**：Condition 的 Branches 选项（[`BranchModeField`](../frontend/src/features/editor/inspector/BranchModeField.tsx)）调 [`withBranchMode`](../frontend/src/domain/switchBranches.ts)，在 CONDITION 和 SWITCH 之间换类型，连线跟着改出口名。
+- **撤销与快捷键**：草稿的每次修改都经过 [`documentState`](../frontend/src/features/editor/documentState.ts) 记进 [`draftHistory`](../frontend/src/domain/draftHistory.ts)；工具栏和 [`useCanvasShortcuts`](../frontend/src/features/editor/canvas/useCanvasShortcuts.ts) 调 `undo`/`redo`，Delete/Backspace 删除选中的连线或卡片。
+- **出口加下一步**：没连线的出口显示 “+”，[`addNodeAfter`](../frontend/src/features/editor/canvas/useGraphCommands.ts) 在出口下方的空位（[`nodePlacement`](../frontend/src/features/editor/canvas/nodePlacement.ts)）加一个连好线的节点。
 
 ### 保存和发布
 
@@ -314,7 +316,7 @@ flowchart TB
 2. [`runTask`](../frontend/src/features/editor/useRuleDocument.ts) 拿命令锁：已有命令在跑就直接返回。失败时显示错误，并把服务器给的位置标到节点上。
 3. [`buildCode`](../frontend/src/features/editor/useRuleDocument.ts)：没有未构建的代码就直接返回 `rule.draft`。只用画布时总是这样，不会碰到 ARC Script。
 4. [`ruleApi`](../frontend/src/api/rules.ts) 的 `save`：`PUT /api/rules/{id}`，请求体是 name、description、revision 和 definition。
-5. 发布：先 `POST /api/validate`；有未保存的改动就先保存；再 `POST /api/rules/{id}/publish`。
+5. 发布分两步。审阅（`reviewPublication`，命令名 `review`）：`POST /api/validate`，再读最新版本，用 [`versionChanges`](../frontend/src/domain/versionChanges.ts) 比较，弹出 [`PublishDialog`](../frontend/src/features/editor/PublishDialog.tsx)。确认（`confirmPublication`）：审阅后草稿变了就拒绝；有未保存的改动先保存，再 `POST /api/rules/{id}/publish`，请求体带 revision 和可选的 note。和最新版本完全一样的草稿在弹窗里就不能发布。
 6. [`acknowledgeSave`](../frontend/src/features/editor/documentState.ts)（`rule/saved`）：推进 revision 和 baseline。请求期间用户又改了什么，这些改动保留；服务器回显和本地等价时，保留本地草稿对象。
 7. [`pendingWriteWarning`](../frontend/src/features/editor/editorCapabilities.ts)：保存或发布进行中，离开这条规则会先确认，因为请求可能已经到了服务器。
 
@@ -464,20 +466,21 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
 | [libraryOrder.ts](../frontend/src/features/library/libraryOrder.ts) | 卡片按 updatedAt 的时间先后排序（比较时刻，不比较文本） | [library-order.spec.ts](../frontend/tests/unit/library-order.spec.ts) |
-| [LibraryPage.tsx](../frontend/src/features/library/LibraryPage.tsx) | 规则库页：统计、类型筛选、搜索、卡片网格、分页、空状态；每张卡片套自己的 RecoverableBoundary，一张渲染失败不影响整页 |  |
+| [LibraryPage.tsx](../frontend/src/features/library/LibraryPage.tsx) | 规则库页：标题、类型筛选、搜索、卡片网格、分页、空状态（以前按当前页统计的三张统计卡已去掉，卡片在第一屏就能看到）；每张卡片套自己的 RecoverableBoundary，一张渲染失败不影响整页 |  |
 | [previewCache.ts](../frontend/src/features/library/previewCache.ts) | 按规则化身 + revision 缓存卡片预览用的完整规则，最多 40 条，先进先出；删除规则时 forgetPreview 清掉它的条目 | [library-previews.spec.ts](../frontend/tests/unit/library-previews.spec.ts) |
 | [previewLayout.ts](../frontend/src/features/library/previewLayout.ts) | 规则库缩略图：按拓扑分层算节点坐标和连线（从上到下按行，从左到右按列），容忍环和悬空连线 | [rule-preview.spec.ts](../frontend/tests/unit/rule-preview.spec.ts) |
-| [RuleCard.tsx](../frontend/src/features/library/RuleCard.tsx) | 规则卡片：读取完整规则画缩略图（有缓存和重试），点击打开画布；memo 组件，搜索框打字时不重新渲染 |  |
-| [RulePreview.tsx](../frontend/src/features/library/RulePreview.tsx) | 用 SVG 画草稿的分层缩略图，按显示方向排列，并显示无效连线数 |  |
+| [RuleCard.tsx](../frontend/src/features/library/RuleCard.tsx) | 规则卡片：读取完整规则画缩略图（有缓存和重试），点击打开画布；草稿和最新版本不同时显示 “Unpublished changes”；memo 组件，搜索框打字时不重新渲染 |  |
+| [RulePreview.tsx](../frontend/src/features/library/RulePreview.tsx) | 用 SVG 画草稿的分层缩略图，按显示方向排列，并显示无效连线数；小图显示全部名字和分支标签，中等大小的图放大并截断名字，大图只画类型色块 |  |
 
 ### `features/editor/`：编辑器
 
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
-| [documentState.ts](../frontend/src/features/editor/documentState.ts) | 文档 reducer：草稿、代码缓冲、诊断的原子状态转换，以及保存确认 | [document.spec.ts](../frontend/tests/unit/document.spec.ts) |
+| [documentState.ts](../frontend/src/features/editor/documentState.ts) | 文档 reducer：草稿、代码缓冲、诊断的原子状态转换，保存确认，以及撤销/重做历史（graph/undo、graph/redo；有未构建的代码时不撤销） | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[draft-history.spec.ts](../frontend/tests/unit/draft-history.spec.ts) |
 | [Editor.tsx](../frontend/src/features/editor/Editor.tsx) | 编辑器根组件：组装文档状态、选择、画布、检查器、对话框和测试面板 |  |
 | [editorCapabilities.ts](../frontend/src/features/editor/editorCapabilities.ts) | 由只读、运行中的命令、版本就绪、是否有改动推导能做什么，以及显示哪个视图 | [editor-capabilities.spec.ts](../frontend/tests/unit/editor-capabilities.spec.ts) |
-| [EditorHeader.tsx](../frontend/src/features/editor/EditorHeader.tsx) | 编辑器页眉：规则名、草稿或版本标签、视图切换、测试、保存、发布 |  |
+| [EditorHeader.tsx](../frontend/src/features/editor/EditorHeader.tsx) | 编辑器页眉：规则名、草稿或版本标签、视图切换、测试、保存、发布（检查时显示 Checking…，发布时显示 Publishing…） |  |
+| [PublishDialog.tsx](../frontend/src/features/editor/PublishDialog.tsx) | 发布确认弹窗：和最新版本相比改了什么、可选的发布说明；和最新版本完全一样时不能发布 | [publish-review.spec.ts](../frontend/tests/publish-review.spec.ts) |
 | [exportDefinition.ts](../frontend/src/features/editor/exportDefinition.ts) | 把 Definition 序列化成 JSON 文件并下载 |  |
 | [LazyNodeDialog.tsx](../frontend/src/features/editor/LazyNodeDialog.tsx) | 懒加载节点对话框的外壳：加载中可取消、失败可关闭，都会释放检查器锁 |  |
 | [NodeEditDialog.tsx](../frontend/src/features/editor/NodeEditDialog.tsx) | 节点编辑对话框：在草稿副本上用 NodeForm 编辑，Apply 时合并回图 |  |
@@ -493,9 +496,9 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [useNodeDialog.ts](../frontend/src/features/editor/useNodeDialog.ts) | 唯一的节点对话框请求（编辑或代码）；节点消失时自动丢弃 |  |
 | [useNodeExpressionDraft.ts](../frontend/src/features/editor/useNodeExpressionDraft.ts) | 节点代码缓冲：渲染、防抖检查、Apply 时构建、离开前确认 |  |
 | [useNodeSelection.ts](../frontend/src/features/editor/useNodeSelection.ts) | 选中状态的唯一所有者：按草稿推导节点和连线，默认值无效时拒绝切换 |  |
-| [usePreviewExecution.ts](../frontend/src/features/editor/usePreviewExecution.ts) | 测试会话：面板开关、输入缓冲、选项，按语义键请求 /preview |  |
-| [useRuleDocument.ts](../frontend/src/features/editor/useRuleDocument.ts) | 文档核心：编辑门控，保存、校验、发布、构建、排版、删除，视图切换；命令锁来自 commandRunner.ts，删除来自 ruleDeletion.ts |  |
-| [VersionHistory.tsx](../frontend/src/features/editor/VersionHistory.tsx) | 已发布版本列表：分页显示，点击打开只读版本 |  |
+| [usePreviewExecution.ts](../frontend/src/features/editor/usePreviewExecution.ts) | 测试会话：面板开关、输入视图（表单、Input JSON、cURL，默认表单）、输入缓冲、选项，按语义键请求 /preview |  |
+| [useRuleDocument.ts](../frontend/src/features/editor/useRuleDocument.ts) | 文档核心：编辑门控，保存、校验、发布、构建、排版、删除、撤销/重做，视图切换；发布先审阅（构建、校验、和最新版本比较，结果是 publishReview），在弹窗里确认后带说明发布（confirmPublication，审阅后草稿变了就拒绝）；命令锁来自 commandRunner.ts，删除来自 ruleDeletion.ts |  |
+| [VersionHistory.tsx](../frontend/src/features/editor/VersionHistory.tsx) | 已发布版本列表：分页显示，每个版本带发布说明，点击打开只读版本 |  |
 
 ### `features/editor/canvas/`：画布
 
@@ -507,12 +510,15 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [graphGeometry.ts](../frontend/src/features/editor/canvas/graphGeometry.ts) | 卡片尺寸（实测值，否则按显示方向的默认值）和中心点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts) |
 | [graphLayout.ts](../frontend/src/features/editor/canvas/graphLayout.ts) | ELK 分层排版：稳定排序，只改节点坐标；Arrange 从上到下排，横向视图从左到右排 | [graph-layout.spec.ts](../frontend/tests/unit/graph-layout.spec.ts) |
 | [graphLayoutWorker.ts](../frontend/src/features/editor/canvas/graphLayoutWorker.ts) | ELK Web Worker：懒创建，出错时拒绝，空闲 60 秒后释放 |  |
-| [GraphNode.tsx](../frontend/src/features/editor/canvas/GraphNode.tsx) | 节点卡片：图标、类型、名称、摘要、错误标记、代码按钮和连接句柄（从上到下在上下两边，从左到右在左右两边） |  |
+| [GraphNode.tsx](../frontend/src/features/editor/canvas/GraphNode.tsx) | 节点卡片：图标、类型、名称、摘要、第一条问题（去掉节点名前缀，悬停看全部）、代码按钮和连接句柄（从上到下在上下两边，从左到右在左右两边）；没连线的出口显示 “+”，点开类型菜单加下一步 |  |
 | [GraphOutline.tsx](../frontend/src/features/editor/canvas/GraphOutline.tsx) | 节点大纲：按文档顺序列出节点，点击后聚焦 |  |
-| [GraphToolbar.tsx](../frontend/src/features/editor/canvas/GraphToolbar.tsx) | 画布工具栏：大纲、显示方向切换、排版（只在从上到下时可用）、导出、校验、添加节点菜单 |  |
+| [GraphToolbar.tsx](../frontend/src/features/editor/canvas/GraphToolbar.tsx) | 画布工具栏：撤销/重做、大纲、显示方向切换、排版（只在从上到下时可用）、导出、校验、添加节点菜单（NodeKindMenu） |  |
 | [RoutedEdge.tsx](../frontend/src/features/editor/canvas/RoutedEdge.tsx) | 自定义连线：读取路由上下文、按显示方向决定进出的边、缓存路线（在 effect 里写缓存，不在渲染期间写 ref）、报告被挡住的连线；拖拽连线时的预览线 |  |
 | [useGraphCanvas.ts](../frontend/src/features/editor/canvas/useGraphCanvas.ts) | 画布状态：尺寸测量、拖拽与连线处理、路由上下文、测试路径高亮；从左到右时画显示坐标，不把它写回草稿 |  |
-| [useGraphCommands.ts](../frontend/src/features/editor/canvas/useGraphCommands.ts) | 图命令：修改、添加、删除节点，排版（懒加载 ELK），都经过 edit 门控 |  |
+| [useGraphCommands.ts](../frontend/src/features/editor/canvas/useGraphCommands.ts) | 图命令：修改、添加、删除节点，在出口后加一个连好线的节点（addNodeAfter），排版（懒加载 ELK），都经过 edit 门控；新节点用 nodePlacement 找空位，落在视野外时平移过去 |  |
+| [nodePlacement.ts](../frontend/src/features/editor/canvas/nodePlacement.ts) | 纯函数：新节点的落点，离其他卡片留出间距；工具栏加的节点在视野中间附近，出口加的在出口下方，先往出口那一侧找 | [node-placement.spec.ts](../frontend/tests/unit/node-placement.spec.ts) |
+| [NodeKindMenu.tsx](../frontend/src/features/editor/canvas/NodeKindMenu.tsx) | 可添加节点类型的菜单，工具栏的 Add node 和出口的 “+” 共用 |  |
+| [useCanvasShortcuts.ts](../frontend/src/features/editor/canvas/useCanvasShortcuts.ts) | 画布快捷键：⌘/Ctrl Z 撤销，⌘/Ctrl Shift Z 或 Ctrl Y 重做，Delete/Backspace 删除选中的连线或卡片；焦点在输入框、检查器或弹窗里时不处理 | [editor-history.spec.ts](../frontend/tests/editor-history.spec.ts) |
 | [useGraphFocus.ts](../frontend/src/features/editor/canvas/useGraphFocus.ts) | 聚焦节点：视口居中；深链接和测试结果的跳转等节点测量完、而且图视图真的在屏幕上（`shownView`，不是路由）再执行 |  |
 | [useHorizontalLayout.ts](../frontend/src/features/editor/canvas/useHorizontalLayout.ts) | 从左到右视图的显示坐标：节点、出口、尺寸或连线变化后用 ELK 重新排版，只用于显示，不改也不弄脏草稿；只采用最新一次请求的结果，失败时报告原因 | [routing.spec.ts](../frontend/tests/routing.spec.ts) |
 
@@ -521,13 +527,13 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
 | [BranchModeField.tsx](../frontend/src/features/editor/inspector/BranchModeField.tsx) | Condition 的 Branches 选项：在 True / False（CONDITION）、按条件的多分支和按值匹配（SWITCH）之间转换，连线跟着改出口名 | [switch.spec.ts](../frontend/tests/unit/switch.spec.ts) |
-| [ConditionFields.tsx](../frontend/src/features/editor/inspector/ConditionFields.tsx) | 两路 Condition（CONDITION）：比较构建器和表达式编辑可以互切，显示 True/False 说明；Add case 把它变成多分支 |  |
+| [ConditionFields.tsx](../frontend/src/features/editor/inspector/ConditionFields.tsx) | 两路 Condition（CONDITION）：比较构建器和表达式编辑可以互切，还没有比较的条件（新节点的 true）也在构建器里打开；显示 True/False 说明；Add case 把它变成多分支 |  |
 | [FormulaFields.tsx](../frontend/src/features/editor/inspector/FormulaFields.tsx) | Formula 节点：一个表达式字段 |  |
 | [IdentifierField.tsx](../frontend/src/features/editor/inspector/IdentifierField.tsx) | 标识符输入框：拒绝非法输入并提示命名规则 |  |
 | [InputDefaultValue.tsx](../frontend/src/features/editor/inspector/InputDefaultValue.tsx) | 按参数类型选默认值控件（JSON、布尔、数字、文本） |  |
 | [InputFields.tsx](../frontend/src/features/editor/inspector/InputFields.tsx) | Input 节点：参数卡片列表和“添加参数”；卡片是 memo 组件，回调按行身份固定，在一张卡片里打字不重绘其他卡片 |  |
 | [InputParameterCard.tsx](../frontend/src/features/editor/inspector/InputParameterCard.tsx) | 单个参数卡片：必填、名称、类型、默认值、数据源绑定 |  |
-| [Inspector.tsx](../frontend/src/features/editor/inspector/Inspector.tsx) | 右侧检查器：节点名、错误、代码和删除按钮、NodeForm、页脚 |  |
+| [Inspector.tsx](../frontend/src/features/editor/inspector/Inspector.tsx) | 右侧检查器：节点名、错误、代码和删除按钮、NodeForm、页脚；节点有问题时页脚显示第一条问题（固定一行，不推动表单） |  |
 | [InspectorProblems.tsx](../frontend/src/features/editor/inspector/InspectorProblems.tsx) | 节点错误图标：悬停显示提示，点击弹出列表 |  |
 | [InspectorSection.tsx](../frontend/src/features/editor/inspector/InspectorSection.tsx) | 可折叠分节：标题、帮助、计数、操作按钮 |  |
 | [NodeForm.tsx](../frontend/src/features/editor/inspector/NodeForm.tsx) | 按节点类型分发表单组件的穷举注册表，附结果名和未用属性 |  |
@@ -552,9 +558,9 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
 | [apiEndpoints.json](../frontend/src/features/execution/apiEndpoints.json) | API 文档页的端点表数据（方法、路径、摘要） |  |
-| [ApiPage.tsx](../frontend/src/features/execution/ApiPage.tsx) | API 文档和 Playground 页：选已发布规则和版本，编辑输入，执行，显示响应或 cURL |  |
+| [ApiPage.tsx](../frontend/src/features/execution/ApiPage.tsx) | API 文档和 Playground 页：Playground 选已发布规则和版本，编辑输入，执行，显示响应或 cURL；文档页只放一个打开 Playground 的入口和接口参考，不再重复请求面板 |  |
 | [ApiReference.tsx](../frontend/src/features/execution/ApiReference.tsx) | API 文档：基础 URL、端点表，以及版本、trace、错误码说明 |  |
-| [ExecutionError.tsx](../frontend/src/features/execution/ExecutionError.tsx) | 执行失败的提示：定位到本图节点，打开被引用的规则，修改测试输入 | [execution-error.spec.ts](../frontend/tests/unit/execution-error.spec.ts) |
+| [ExecutionError.tsx](../frontend/src/features/execution/ExecutionError.tsx) | 执行失败的提示：定位到本图节点，打开被引用的规则，修改测试输入；被拒绝的运行下面列出图里其他问题，每条可以跳到节点 | [execution-error.spec.ts](../frontend/tests/unit/execution-error.spec.ts) |
 | [executionOptions.ts](../frontend/src/features/execution/executionOptions.ts) | 执行选项的默认值（开 trace、30000ms）和超时档位 | [execution.spec.ts](../frontend/tests/unit/execution.spec.ts) |
 | [ExecutionOptionsFields.tsx](../frontend/src/features/execution/ExecutionOptionsFields.tsx) | trace 开关和超时下拉框 |  |
 | [ExecutionResult.tsx](../frontend/src/features/execution/ExecutionResult.tsx) | 测试结果：返回值、耗时、数据源读取、trace 步骤和分支标记 | [trace-badges.spec.ts](../frontend/tests/unit/trace-badges.spec.ts) |
@@ -563,7 +569,8 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [LazyInputJsonEditor.tsx](../frontend/src/features/execution/LazyInputJsonEditor.tsx) | InputJsonEditor 的懒加载包装 |  |
 | [publishedCurl.ts](../frontend/src/features/execution/publishedCurl.ts) | 用输入缓冲生成已发布接口的 cURL；缓冲不是对象时发送空输入 |  |
 | [publishedSelection.ts](../frontend/src/features/execution/publishedSelection.ts) | 纯函数：Playground 选中的规则和最新发布版本，按规则化身区分 | [published-selection.spec.ts](../frontend/tests/unit/published-selection.spec.ts) |
-| [TestPanel.tsx](../frontend/src/features/execution/TestPanel.tsx) | 编辑器的测试面板：JSON 和 cURL 标签、运行按钮、结果或错误 |  |
+| [TestPanel.tsx](../frontend/src/features/execution/TestPanel.tsx) | 编辑器的测试面板：表单（InputForm）、Input JSON 和 cURL 标签、运行按钮、结果或错误 |  |
+| [InputForm.tsx](../frontend/src/features/execution/InputForm.tsx) | 测试输入表单：每个声明的输入一行，按类型给控件，选择传值、null 或不传；和 Input JSON 编辑同一个缓冲区，只在字段改动时重写 | [test-input-form.spec.ts](../frontend/tests/test-input-form.spec.ts) |
 | [TraceNotices.tsx](../frontend/src/features/execution/TraceNotices.tsx) | trace 被关闭或被截断时的提示 |  |
 | [useExecutionOptions.ts](../frontend/src/features/execution/useExecutionOptions.ts) | 一次执行会话的 trace 和超时设置 |  |
 | [useExecutionRequest.ts](../frontend/src/features/execution/useExecutionRequest.ts) | 按 key 归属的执行请求：换 key 或重跑就中止，丢弃过期响应，并计时 |  |
@@ -578,7 +585,9 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [SourceBindingEditor.tsx](../frontend/src/features/sources/SourceBindingEditor.tsx) | 检查器里输入参数的数据源绑定：来源、版本、参数映射、JSON 指针、失败策略 |  |
 | [sourceBindings.ts](../frontend/src/features/sources/sourceBindings.ts) | SourceBinding 纯函数：换版本时去掉未声明的映射，增删单个映射 | [source-bindings.spec.ts](../frontend/tests/unit/source-bindings.spec.ts) |
 | [sourceCatalog.ts](../frontend/src/features/sources/sourceCatalog.ts) | 把本次会话保存的数据源合进目录页，直到目录刷新确认 | [source-catalog.spec.ts](../frontend/tests/unit/source-catalog.spec.ts) |
-| [SourceConfigurationFields.tsx](../frontend/src/features/sources/SourceConfigurationFields.tsx) | 按提供者渲染连接、参数、负载字段 |  |
+| [SourceConfigurationFields.tsx](../frontend/src/features/sources/SourceConfigurationFields.tsx) | 按提供者渲染连接、参数、负载字段；查找表条目可以用表格（LookupTableEditor）或 JSON 编辑，页面记住上次选的视图 |  |
+| [LookupTableEditor.tsx](../frontend/src/features/sources/LookupTableEditor.tsx) | 查找表条目的表格编辑：增删行、列，改键名（重复键名留在输入框并提示），单元格逐个编辑后整体写回 JSON | [lookup-table.spec.ts](../frontend/tests/lookup-table.spec.ts) |
+| [lookupTable.ts](../frontend/src/features/sources/lookupTable.ts) | 纯函数：把条目读成表格（记录按字段分列，否则一列值），单元格文本和值互转（像 JSON 的按 JSON 读，否则当文本），写回格式化的 JSON | [lookup-table.spec.ts](../frontend/tests/unit/lookup-table.spec.ts) |
 | [SourceDetail.tsx](../frontend/src/features/sources/SourceDetail.tsx) | 当前打开的数据源：ID、名称、提供者、版本，配置、保存、测试 |  |
 | [httpSourcePolicy.ts](../frontend/src/features/sources/httpSourcePolicy.ts) | 镜像服务器的 HTTP 数据源策略：超时范围和提示、URL 长度、httpUrlProblem（按 java.net.URI 的规则读主机名） | [http-source-policy.spec.ts](../frontend/tests/unit/http-source-policy.spec.ts) |
 | [sourceDocument.ts](../frontend/src/features/sources/sourceDocument.ts) | 数据源文档的纯状态和 reducer：脏检查、保存和测试的请求守卫、历史版本 | [source-document.spec.ts](../frontend/tests/unit/source-document.spec.ts)、[source-providers.spec.ts](../frontend/tests/unit/source-providers.spec.ts)、[sources.spec.ts](../frontend/tests/unit/sources.spec.ts) |
@@ -612,7 +621,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
 | [arcCompletion.ts](../frontend/src/features/language/arcCompletion.ts) | 补全辅助：是否在字符串或注释里（读 model 的 token 缓存，不重新分词）、取光标处的词、插入片段、刷新已打开的建议 |  |
-| [arcLanguage.ts](../frontend/src/features/language/arcLanguage.ts) | 注册 arc 语言（Monarch 词法、括号和缩进规则）、worker 和 arc-light 主题；按名字加载 ARC 用到的 Monaco 功能，而不是全部 64 个 |  |
+| [arcLanguage.ts](../frontend/src/features/language/arcLanguage.ts) | 注册 arc 语言（Monarch 词法、括号和缩进规则）、worker 和 arc-light 主题；卡片坐标 `at (x, y)` 和连线 ID `edge "..."` 用注释色淡化；按名字加载 ARC 用到的 Monaco 功能，而不是全部 64 个 |  |
 | [cssColor.ts](../frontend/src/features/language/cssColor.ts) | 把 CSS token 颜色转成 Monaco 能用的 #rrggbb | [css-color.spec.ts](../frontend/tests/unit/css-color.spec.ts) |
 | [ExpressionColorKey.tsx](../frontend/src/features/language/ExpressionColorKey.tsx) | 符号颜色图例：$函数、@公式、输入、节点结果 |  |
 | [formulaCalls.ts](../frontend/src/features/language/formulaCalls.ts) | 生成 @id:version 调用名、签名、参数说明，以及带默认值或占位参数的片段 | [formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts) |
@@ -657,7 +666,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
-| [CatalogPagination.tsx](../frontend/src/components/CatalogPagination.tsx) | 目录分页条：上一页、下一页和“起–止 of 总数” |  |
+| [CatalogPagination.tsx](../frontend/src/components/CatalogPagination.tsx) | 目录分页条：上一页、下一页和“起–止 of 总数”，样式统一在 base.css 的 .catalog-pagination |  |
 | [Icons.tsx](../frontend/src/components/Icons.tsx) | 规则类型、节点类型的图标映射，以及 ARC 标志 |  |
 | [JsonField.tsx](../frontend/src/components/JsonField.tsx) | JSON 多行输入：无损解析、可选校验，经文本缓冲回写 |  |
 | [LazyBoundary.tsx](../frontend/src/components/LazyBoundary.tsx) | Suspense + 局部错误边界：懒加载或渲染失败只替换这一块，可重试或关闭 |  |
@@ -670,7 +679,8 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
 | [definitionEchoes.ts](../frontend/src/domain/definitionEchoes.ts) | 区分服务器回显（键序、显式 null、数字写法、缺坐标）和真实改动，尽量保留本地对象 | [document.spec.ts](../frontend/tests/unit/document.spec.ts) |
-| [executionInputs.ts](../frontend/src/domain/executionInputs.ts) | 测试输入：按默认值生成示例 JSON，解析输入缓冲区，生成 cURL 命令 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[input-buffer.spec.ts](../frontend/tests/unit/input-buffer.spec.ts) |
+| [draftHistory.ts](../frontend/src/domain/draftHistory.ts) | 撤销/重做的草稿历史：每次修改记一步，同一种修改（同一节点的同一字段、拖动同一批卡片）一秒内连续发生合成一步；最多 100 步 | [draft-history.spec.ts](../frontend/tests/unit/draft-history.spec.ts) |
+| [executionInputs.ts](../frontend/src/domain/executionInputs.ts) | 测试输入：按默认值生成示例 JSON，解析输入缓冲区，读写单个输入（inputEntry、withInputEntry：不传、null 或值），生成 cURL 命令 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[input-buffer.spec.ts](../frontend/tests/unit/input-buffer.spec.ts) |
 | [expressions.ts](../frontend/src/domain/expressions.ts) | 与服务器分词一致的字面量规则：字符串引号与解码、数字和数组字面量、比较式拼装与拆解 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[expressions.spec.ts](../frontend/tests/unit/expressions.spec.ts)、[placeholder-literals.spec.ts](../frontend/tests/unit/placeholder-literals.spec.ts) |
 | [expressionSymbols.ts](../frontend/src/domain/expressionSymbols.ts) | 高亮用的轻量词法：把名字分成函数、@公式、参数、结果、局部变量 | [expression-symbols.spec.ts](../frontend/tests/unit/expression-symbols.spec.ts)、[formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[script-variable-names.spec.ts](../frontend/tests/unit/script-variable-names.spec.ts) |
 | [graph.ts](../frontend/src/domain/graph.ts) | 图的纯函数：新建、修改、删除节点，连线校验，脏检查快照，语义键和作用域键 | [branches.spec.ts](../frontend/tests/unit/branches.spec.ts)、[canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[document.spec.ts](../frontend/tests/unit/document.spec.ts)、[graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts)、[inspector-variables.spec.ts](../frontend/tests/unit/inspector-variables.spec.ts)、[limits.spec.ts](../frontend/tests/unit/limits.spec.ts)、[node-form.spec.ts](../frontend/tests/unit/node-form.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts)、[switch.spec.ts](../frontend/tests/unit/switch.spec.ts) |
@@ -680,7 +690,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [inputTypes.ts](../frontend/src/domain/inputTypes.ts) | 五种输入类型的描述表、菜单顺序，以及不区分大小写的类型名解析 | [input-types.spec.ts](../frontend/tests/unit/input-types.spec.ts) |
 | [json.ts](../frontend/src/domain/json.ts) | 无损 JSON 编解码：double 保不住的数字存成 DecimalNumber，按原文写回 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[json.spec.ts](../frontend/tests/unit/json.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts)、[source-buffers.spec.ts](../frontend/tests/unit/source-buffers.spec.ts) |
 | [formulaReferences.ts](../frontend/src/domain/formulaReferences.ts) | `@id:version` 引用的唯一语法出处：由 resourceIds 的 ID 语法和服务器的版本语法组成，版本上限是 int；expressionSymbols、arcLanguage、useFormulaSupport、formulaCalls 和路由都从这里读 | [formula-references.spec.ts](../frontend/tests/unit/formula-references.spec.ts) |
-| [limits.ts](../frontend/src/domain/limits.ts) | 后端 Limits.java 的镜像：节点、连线、参数、$OBJECT 字段数、JSON 指针长度等上限，以及“还能不能再加”；规则名称/描述的校验（只含不换行空格或全角空格等 Unicode 空白的名称同样拒绝）；JSON 指针字段的规则（sourcePointerProblem） | [limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
+| [limits.ts](../frontend/src/domain/limits.ts) | 后端 Limits.java 的镜像：节点、连线、参数、$OBJECT 字段数、JSON 指针长度、发布说明长度等上限，以及“还能不能再加”；规则名称/描述的校验（只含不换行空格或全角空格等 Unicode 空白的名称同样拒绝）；JSON 指针字段的规则（sourcePointerProblem） | [limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
 | [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) | 七种节点的描述表（SWITCH 在界面上就是带多个分支的 Condition，不在添加菜单里）：出口、是否存结果、能否被连入、允许的属性、新建默认值、卡片摘要；`entryInputNode` 找服务器当作入口的 Input 节点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [nodePorts.ts](../frontend/src/domain/nodePorts.ts) | 连接句柄的唯一出处：按节点类型算出口端口（ID、标签、位置、兜底），以及按显示方向的卡片宽度和最小高度 | [branches.spec.ts](../frontend/tests/unit/branches.spec.ts)、[document.spec.ts](../frontend/tests/unit/document.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [numericDefaults.ts](../frontend/src/domain/numericDefaults.ts) | 解析 NUMBER 默认值并保留写法的位数；超出服务器精度就拒绝 | [input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts) |
@@ -692,9 +702,10 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [ruleKinds.ts](../frontend/src/domain/ruleKinds.ts) | 三种规则类型（DECISION_TREE、FORMULA、RULE）的界面文案表 |  |
 | [serverText.ts](../frontend/src/domain/serverText.ts) | 按 Java 的语义处理文本：`trimAsServer`（String.trim）和 `isBlankAsServer`（String.isBlank，认得 U+3000 等空白） | [expressions.spec.ts](../frontend/tests/unit/expressions.spec.ts)、[limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
 | [switchBranches.ts](../frontend/src/domain/switchBranches.ts) | Condition 的分支：True / False 和多分支之间的转换（`withBranchMode`，连线跟着改出口名）；多分支的默认返回（找到只经 Default 到达的 Output，或新建 Output 和连线），以及分支列表的增、改、删、移动 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[switch.spec.ts](../frontend/tests/unit/switch.spec.ts) |
-| [text.ts](../frontend/src/domain/text.ts) | 把名字列表拼成英文列举（"a, b and c"）；`markdownText` 转义用户文本，供编辑器悬浮提示的 Markdown 使用 | [markdown-text.spec.ts](../frontend/tests/unit/markdown-text.spec.ts) |
+| [text.ts](../frontend/src/domain/text.ts) | 把名字列表拼成英文列举（"a, b and c"）；`messageForNode` 去掉问题开头的节点名，读成一句话；`markdownText` 转义用户文本，供编辑器悬浮提示的 Markdown 使用 | [markdown-text.spec.ts](../frontend/tests/unit/markdown-text.spec.ts)、[node-messages.spec.ts](../frontend/tests/unit/node-messages.spec.ts) |
 | [transformFields.ts](../frontend/src/domain/transformFields.ts) | Transform 字段：新字段起一个不冲突的名字，把字段映射写成一个 `$OBJECT` 表达式 | [transform-fields.spec.ts](../frontend/tests/unit/transform-fields.spec.ts) |
 | [valueBinding.ts](../frontend/src/domain/valueBinding.ts) | 值来源模式（变量、常量、表达式、默认）的推断，常量类型兼容，参数映射增删 | [value-binding.spec.ts](../frontend/tests/unit/value-binding.spec.ts) |
+| [versionChanges.ts](../frontend/src/domain/versionChanges.ts) | 草稿和最新发布版本的差别：按名字列出新增、删除、修改的节点和输入，统计连线和只移动的卡片；`changeLines` 生成发布弹窗里的列表 | [version-changes.spec.ts](../frontend/tests/unit/version-changes.spec.ts) |
 | [variables.ts](../frontend/src/domain/variables.ts) | 表达式能读的变量：输入参数和上游节点结果，按服务器返回的作用域过滤 | [document.spec.ts](../frontend/tests/unit/document.spec.ts)、[expression-symbols.spec.ts](../frontend/tests/unit/expression-symbols.spec.ts) |
 
 ### `api/`：HTTP 客户端
@@ -703,7 +714,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | --- | --- | --- |
 | [errors.ts](../frontend/src/api/errors.ts) | ApiError（状态码、图中位置、issues）以及错误消息、详情的提取 | [http.spec.ts](../frontend/tests/unit/http.spec.ts) |
 | [http.ts](../frontend/src/api/http.ts) | 传输层：/api 基址的 fetch 封装，无损 JSON 编解码，失败时抛出 ApiError | [http.spec.ts](../frontend/tests/unit/http.spec.ts) |
-| [rules.ts](../frontend/src/api/rules.ts) | 规则接口：目录、按 ID 取摘要（不含草稿，引用节点和 Formula 悬停用它取名称）、详情、创建、保存、发布、删除、执行、版本 | [http.spec.ts](../frontend/tests/unit/http.spec.ts) |
+| [rules.ts](../frontend/src/api/rules.ts) | 规则接口：目录、按 ID 取摘要（不含草稿，引用节点和 Formula 悬停用它取名称）、详情、创建、保存、发布（可带说明）、删除、执行、版本 | [http.spec.ts](../frontend/tests/unit/http.spec.ts) |
 | [sources.ts](../frontend/src/api/sources.ts) | 数据源接口：目录、版本列表与详情、创建、保存、测试 |  |
 | [studio.ts](../frontend/src/api/studio.ts) | 编辑辅助接口：表达式检查、诊断、变量、校验、预览、函数目录、ARC Script 渲染与构建 |  |
 

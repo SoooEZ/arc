@@ -135,12 +135,12 @@ test("a rule editor chunk that fails to load leaves the workspace usable", async
 test("a page that throws while rendering shows a recoverable error and navigation still works", async ({
   page,
 }) => {
-  // Any render error inside a page: here a catalog answer without a total,
-  // which the library's stats cannot print. (A rule kind the library does not
-  // know fails its own card alone; see library-overview.spec.ts.)
+  // Any render error inside a page: here a catalog answer without its items,
+  // which the library cannot count. (A rule kind the library does not know
+  // fails its own card alone; see library-overview.spec.ts.)
   await page.route("**/api/rule-summaries?*", (route) =>
     route.fulfill({
-      json: { items: [], total: null, offset: 0, limit: 20 },
+      json: { items: null, total: 0, offset: 0, limit: 20 },
     }),
   );
   const uncaught: string[] = [];

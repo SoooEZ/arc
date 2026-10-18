@@ -1,4 +1,4 @@
-import { setEditorText } from "./helpers/editor";
+import { publishDraft, setEditorText } from "./helpers/editor";
 import { expect, test } from "@playwright/test";
 import { uniqueStamp } from "./helpers/api";
 
@@ -23,6 +23,7 @@ test("library, graph preview, reference navigation, and published API execution"
     page.getByRole("button", { name: "Save draft", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   // Results keep the decimal places the server computes (100 * 1.20).
   await expect(page.getByTestId("test-result")).toHaveText("120.00");
@@ -110,7 +111,7 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
   await expect(
     page.getByText("All changes saved", { exact: false }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();
@@ -215,7 +216,7 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
   await page
     .getByRole("option", { name: /^finalPrice \[result\] from .+$/ })
     .click();
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 2 published and ready to call"),
   ).toBeVisible();

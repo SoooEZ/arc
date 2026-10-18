@@ -4,6 +4,7 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
+import { lookupEntriesJson } from "./helpers/sources";
 import type { Definition } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRuleResponse, uniqueId, uniqueStamp } from "./helpers/api";
@@ -115,9 +116,7 @@ test("an API-created lookup source saves a new version without rounding its entr
   await page.getByLabel("Search data sources", { exact: true }).fill(name);
   await page.locator(".source-list > button").filter({ hasText: name }).click();
   await expect(page.getByLabel("Source ID", { exact: true })).toHaveValue(id);
-  const shown = await page
-    .getByLabel("Lookup entries · JSON object", { exact: true })
-    .inputValue();
+  const shown = await (await lookupEntriesJson(page)).inputValue();
   for (const token of [
     longInteger,
     longDecimal,
@@ -172,6 +171,7 @@ test("preview sends exact inputs and shows every digit of defaults and results",
   await createRule(request, id, definition);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   const input = page.getByLabel("Test input JSON", { exact: true });
   await expect(editorLines(input)).toContainText(`"limit": ${longInteger}`);
   const inputs = `{"id":${beyondDouble},"limit":${longInteger},"price":${scaledPrice}}`;

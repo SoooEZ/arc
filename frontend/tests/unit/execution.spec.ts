@@ -1,11 +1,13 @@
 import { expect, test } from "@playwright/test";
 import {
   curlExample,
+  inputEntry,
   parseExecutionInputs,
   sampleInputs,
   sampleInputsJson,
   sampleValue,
   tryParseExecutionInputs,
+  withInputEntry,
 } from "../../src/domain/executionInputs";
 import { DecimalNumber, stringifyJson } from "../../src/domain/json";
 import { referenceSnippet } from "../../src/features/language/snippets";
@@ -187,4 +189,25 @@ test("the offered execution timeouts include the default both surfaces start fro
     defaultExecutionOptions.timeoutMs,
   );
   expect(defaultExecutionOptions).toEqual({ trace: true, timeoutMs: 30_000 });
+});
+
+test("the input form reads an input as left out, null or a value, and edits one key in place", () => {
+  const buffer = '{"amount": 12.50, "tier": null, "extra": [1]}';
+  const inputs = parseExecutionInputs(buffer);
+  expect(inputEntry(inputs, "missing")).toEqual({ kind: "omitted" });
+  expect(inputEntry(inputs, "tier")).toEqual({ kind: "null" });
+  expect(stringifyJson(inputEntry(inputs, "amount"))).toBe(
+    '{"kind":"value","value":12.50}',
+  );
+  // An inherited name is no input of the buffer (lesson F22).
+  expect(inputEntry(inputs, "constructor")).toEqual({ kind: "omitted" });
+  expect(withInputEntry(buffer, "tier", { kind: "value", value: "gold" })).toBe(
+    '{\n  "amount": 12.50,\n  "tier": "gold",\n  "extra": [\n    1\n  ]\n}',
+  );
+  expect(withInputEntry(buffer, "amount", { kind: "omitted" })).toBe(
+    '{\n  "tier": null,\n  "extra": [\n    1\n  ]\n}',
+  );
+  expect(withInputEntry("{}", "amount", { kind: "null" })).toBe(
+    '{\n  "amount": null\n}',
+  );
 });

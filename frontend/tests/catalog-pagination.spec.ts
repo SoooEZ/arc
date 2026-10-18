@@ -13,6 +13,7 @@ const summaries: RuleSummary[] = Array.from({ length: 45 }, (_, index) => ({
   nodeCount: 2,
   inputCount: 0,
   referenceCount: 0,
+  draftChanged: false,
 }));
 const detail = (index: number): Rule => ({
   ...summaries[index],

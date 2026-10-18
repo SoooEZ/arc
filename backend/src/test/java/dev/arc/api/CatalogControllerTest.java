@@ -28,7 +28,7 @@ class CatalogControllerTest {
   void ruleCatalogUsesBoundedMetadataAndPassesSearchFilters() throws Exception {
     var summary =
         new RuleSummary(
-            "example", "Example", "", "FORMULA", 2, 1, Instant.EPOCH, Instant.EPOCH, 3, 1, 0);
+            "example", "Example", "", "FORMULA", 2, 1, Instant.EPOCH, Instant.EPOCH, 3, 1, 0, true);
     when(rules.catalog(new PageRequest(20, 10, "Example"), "FORMULA", true))
         .thenReturn(new CatalogPage<>(List.of(summary), 21, 20, 10));
     mvc.perform(
@@ -42,6 +42,7 @@ class CatalogControllerTest {
         .andExpect(jsonPath("$.total").value(21))
         .andExpect(jsonPath("$.items[0].id").value("example"))
         .andExpect(jsonPath("$.items[0].nodeCount").value(3))
+        .andExpect(jsonPath("$.items[0].draftChanged").value(true))
         .andExpect(jsonPath("$.items[0].draft").doesNotExist());
     verify(rules).catalog(new PageRequest(20, 10, "Example"), "FORMULA", true);
     verifyNoMoreInteractions(rules);
@@ -51,7 +52,7 @@ class CatalogControllerTest {
   void aRuleSummaryIsReadByIdWithoutTheDraft() throws Exception {
     var summary =
         new RuleSummary(
-            "example", "Example", "", "FORMULA", 2, 1, Instant.EPOCH, Instant.EPOCH, 3, 1, 0);
+            "example", "Example", "", "FORMULA", 2, 1, Instant.EPOCH, Instant.EPOCH, 3, 1, 0, true);
     when(rules.summary("example")).thenReturn(summary);
     when(rules.summary("missing"))
         .thenThrow(new dev.arc.error.ArcException(404, "Rule not found: missing"));
@@ -105,7 +106,10 @@ class CatalogControllerTest {
     when(rules.versionSummaries("example", new PageRequest(0, 20, "")))
         .thenReturn(
             new CatalogPage<>(
-                List.of(new RuleVersionSummary("example", 2, Instant.EPOCH)), 2, 0, 20));
+                List.of(new RuleVersionSummary("example", 2, Instant.EPOCH, "Adds tiers")),
+                2,
+                0,
+                20));
     mvc.perform(get("/api/source-summaries"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].kind").value("LOOKUP"))
@@ -117,6 +121,7 @@ class CatalogControllerTest {
     mvc.perform(get("/api/rules/example/version-summaries"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].version").value(2))
+        .andExpect(jsonPath("$.items[0].note").value("Adds tiers"))
         .andExpect(jsonPath("$.items[0].definition").doesNotExist());
     verify(rules).versionSummaries("example", new PageRequest(0, 20, ""));
     when(rules.list()).thenReturn(List.of());
@@ -133,7 +138,8 @@ class CatalogControllerTest {
     var published = Instant.parse("2026-09-26T12:00:00Z");
     when(rules.versionSummaries("example", new PageRequest(1, 1, "2")))
         .thenReturn(
-            new CatalogPage<>(List.of(new RuleVersionSummary("example", 12, published)), 3, 1, 1));
+            new CatalogPage<>(
+                List.of(new RuleVersionSummary("example", 12, published, null)), 3, 1, 1));
     mvc.perform(
             get("/api/rules/example/version-summaries")
                 .param("search", " 2 ")

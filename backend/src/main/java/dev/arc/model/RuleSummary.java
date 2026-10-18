@@ -11,4 +11,6 @@ public record RuleSummary(
     java.time.Instant updatedAt,
     int nodeCount,
     int inputCount,
-    int referenceCount) {}
+    int referenceCount,
+    /** The draft differs from the latest published version; false for a rule never published. */
+    boolean draftChanged) {}

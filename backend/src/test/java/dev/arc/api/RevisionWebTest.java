@@ -75,7 +75,7 @@ class RevisionWebTest {
           "{\"name\":\"Country tax\"," + revision + "\"definition\":" + lookup + "}");
     }
     verify(rules, never()).update(anyString(), anyString(), anyString(), any(), any());
-    verify(rules, never()).publish(any(), any());
+    verify(rules, never()).publish(any(), any(), any());
     verify(sources, never()).appendVersion(anyString(), anyString(), anyInt(), any());
   }
 

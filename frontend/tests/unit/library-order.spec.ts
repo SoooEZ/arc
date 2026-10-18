@@ -14,6 +14,7 @@ const summary = (id: string, updatedAt: string): RuleSummary => ({
   nodeCount: 2,
   inputCount: 0,
   referenceCount: 0,
+  draftChanged: false,
 });
 
 // The server writes as many fraction digits as an instant has: compared as

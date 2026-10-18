@@ -275,6 +275,7 @@ test("changing a pinned source version removes obsolete mappings and retains com
   await page.getByRole("option", { name: "Constant", exact: true }).click();
   await page.getByLabel("Source accountId", { exact: true }).fill("account-1");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   // Caller override keeps this contract regression independent of external HTTP services.
   await setEditorText(
     page,

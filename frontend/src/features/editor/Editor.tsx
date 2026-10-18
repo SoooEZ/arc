@@ -4,6 +4,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import type { GraphProblem } from "../../api/errors";
 import { LazyBoundary } from "../../components/LazyBoundary";
 import { isCurrentGraphLocation, semanticGraphKey } from "../../domain/graph";
+import { canAddEdge, canAddNode } from "../../domain/limits";
 import { entryInputNode } from "../../domain/nodeKinds";
 import {
   applyNodeFragment,
@@ -17,7 +18,7 @@ import { useRuleDocument } from "./useRuleDocument";
 import { useGraphCanvas } from "./canvas/useGraphCanvas";
 import { useGraphProblems } from "./useGraphProblems";
 import EditorHeader from "./EditorHeader";
-import GraphCanvas from "./canvas/GraphCanvas";
+import GraphCanvas, { type ExitMenu } from "./canvas/GraphCanvas";
 import VersionHistory from "./VersionHistory";
 import { useGraphCommands } from "./canvas/useGraphCommands";
 import { useGraphFocus } from "./canvas/useGraphFocus";
@@ -35,8 +36,24 @@ import {
 const CodeStudio = lazy(() => import("../studio/CodeStudio"));
 const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
 const NodeEditDialog = lazy(() => import("./NodeEditDialog"));
+const PublishDialog = lazy(() => import("./PublishDialog"));
 const noProblems: GraphProblem[] = [];
 const noErrors: string[] = [];
+
+/**
+ * Validate and Publish stop at the first problem; the cards and the inspector
+ * show the others, which this note counts.
+ */
+function MoreProblems({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span className="alert-more">
+      {count === 1
+        ? " 1 more problem is marked on the canvas."
+        : ` ${count} more problems are marked on the canvas.`}
+    </span>
+  );
+}
 
 /** Located failures of the current preview result and of the last command. */
 function runtimeProblems(...problems: (GraphProblem | null)[]) {
@@ -101,11 +118,18 @@ function EditorContent({
     versionUnavailable,
     retryVersion,
     edit,
+    undoable,
+    redoable,
+    undo,
+    redo,
     editMetadata,
     editSource,
     build,
     switchView,
     action,
+    publishReview,
+    confirmPublication,
+    cancelPublication,
     toggleTest,
     deleteRule,
   } = document;
@@ -142,7 +166,7 @@ function EditorContent({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const codeRequest =
     activeDialog?.request.kind === "code" ? activeDialog.request : null;
-  const { allProblems, nodeErrors } = useGraphProblems({
+  const { allProblems, graphProblems, nodeErrors } = useGraphProblems({
     rule,
     graphKey,
     version: requestedVersion,
@@ -155,6 +179,13 @@ function EditorContent({
     onError: setError,
   });
   const direction = useLayoutDirection();
+  // A card's add button opens the kind menu for its exit.
+  const [exitMenu, setExitMenu] = useState<ExitMenu | null>(null);
+  const openExitMenu = useCallback(
+    (source: string, handle: string, anchor: HTMLElement) =>
+      setExitMenu({ source, handle, anchor }),
+    [],
+  );
   const canvas = useGraphCanvas({
     definition: rule.draft,
     selected,
@@ -162,6 +193,8 @@ function EditorContent({
     setSelectedEdge,
     onExpression: openNodeCode,
     canOpenCode: can.validate,
+    onAddAfter: openExitMenu,
+    canAddAfter: can.edit && canAddNode(rule.draft) && canAddEdge(rule.draft),
     trace: preview.result,
     nodeErrors,
     edit,
@@ -169,15 +202,17 @@ function EditorContent({
     direction,
   });
   const { measurements, requestFit } = canvas;
-  const { patchNode, addNode, removeNode, arrange } = useGraphCommands({
-    definition: rule.draft,
-    measurements,
-    edit,
-    arrange: document.arrange,
-    selectNode,
-    mayChangeSelection,
-    requestFit,
-  });
+  const { patchNode, addNode, addNodeAfter, removeNode, arrange } =
+    useGraphCommands({
+      definition: rule.draft,
+      measurements,
+      edit,
+      arrange: document.arrange,
+      selectNode,
+      mayChangeSelection,
+      requestFit,
+      direction,
+    });
   const { focusNode, jumpToNode, focusPending } = useGraphFocus({
     // Focus centres a card where the canvas draws it.
     definition: canvas.shown,
@@ -237,6 +272,7 @@ function EditorContent({
       publishedVersion={requestedVersion ?? rule.publishedVersion}
       buildPending={sourceDirty}
       inputNodeId={entryInputNode(rule.draft)?.id ?? null}
+      graphProblems={graphProblems}
       onOpenReference={openReference}
       onNode={jumpToNode}
     />
@@ -284,6 +320,14 @@ function EditorContent({
       {error && (
         <Alert severity="error" onClose={() => setError("")}>
           {error}
+          {commandProblem && (
+            <MoreProblems
+              count={
+                graphProblems.filter((problem) => problem.message !== error)
+                  .length
+              }
+            />
+          )}
         </Alert>
       )}
       {history && (
@@ -346,6 +390,13 @@ function EditorContent({
             }
             action={action}
             onAddNode={addNode}
+            exitMenu={exitMenu}
+            onCloseExitMenu={() => setExitMenu(null)}
+            onAddAfter={addNodeAfter}
+            undoable={undoable}
+            redoable={redoable}
+            onUndo={undo}
+            onRedo={redo}
             onEditNode={openNodeEditor}
             onRenameNode={renameNode}
             onDeleteNode={removeNode}
@@ -418,6 +469,15 @@ function EditorContent({
             onClose={nodeDialog.close}
           />
         </LazyNodeDialog>
+      )}
+      {publishReview && (
+        <LazyBoundary label="publish dialog" onDismiss={cancelPublication}>
+          <PublishDialog
+            review={publishReview}
+            onConfirm={(note) => void confirmPublication(note)}
+            onCancel={cancelPublication}
+          />
+        </LazyBoundary>
       )}
       {settingsOpen && (
         <RuleSettings

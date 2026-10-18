@@ -145,7 +145,7 @@
   align-items: center;
   gap: 12px;
   font-size: var(--text-lg);
-  color: #929a95;
+  color: #6e7771;
   min-width: 0;
 }
 .breadcrumbs .breadcrumb-current {
@@ -171,7 +171,7 @@
   gap: 21px;
 }
 .open-access {
-  color: #657c6d;
+  color: #63796b;
   display: flex;
   align-items: center;
   gap: 6px;

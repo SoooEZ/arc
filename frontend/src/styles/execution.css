@@ -18,18 +18,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #8ca377;
+  color: #667b53;
 }
 .test-panel-heading strong {
   font-size: var(--text-md);
-  color: #6f8b56;
+  color: #627b4c;
   font-weight: 550;
 }
 .test-badge {
   font-size: var(--text-xs);
   border: 1px solid #e4eadc;
   background: #f5f8ef;
-  color: #9fb38a;
+  color: #667b50;
   border-radius: 3px;
   padding: 2px 6px;
 }
@@ -60,7 +60,7 @@
   padding: 0 13px;
   font-size: var(--text-sm);
   text-transform: none;
-  color: #a0b68a;
+  color: #647b4d;
 }
 .execution-json-editor {
   height: 190px;
@@ -98,13 +98,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #88a96b;
+  color: #617d48;
 }
 .test-result > strong {
   font-size: 17px;
   font-weight: 550;
   letter-spacing: -0.5px;
-  color: #688d44;
+  color: #5d7e3d;
   overflow-wrap: anywhere;
   min-width: 0;
 }
@@ -118,7 +118,7 @@
   align-items: center;
   font-size: var(--text-md);
   padding: 4px 0;
-  color: #74866f;
+  color: #697965;
 }
 .source-reads strong {
   font-size: var(--text-sm);
@@ -140,7 +140,7 @@
 .trace-label span {
   font-size: var(--text-xs);
   letter-spacing: 0;
-  color: #b4c69e;
+  color: #647b48;
 }
 .trace-list {
   display: flex;
@@ -180,12 +180,12 @@
 }
 .trace-list small {
   font-size: var(--text-2xs);
-  color: #acbf94;
+  color: #657b49;
 }
 .trace-number {
   width: 12px;
   font-size: var(--text-2xs);
-  color: #b6c99f;
+  color: #647c46;
   flex-shrink: 0;
 }
 .trace-branch {
@@ -193,10 +193,10 @@
   border-radius: 3px;
   padding: 1px 4px;
   background: #eff6e8;
-  color: #8cad6c;
+  color: #617d46;
 }
 .trace-branch.fallback {
-  color: #b79b75;
+  color: #8c7049;
   background: #faf5eb;
 }
 .test-empty {
@@ -206,7 +206,7 @@
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  color: #bbcca5;
+  color: #647b46;
   gap: 7px;
   text-align: center;
 }
@@ -224,18 +224,37 @@
 .test-empty strong {
   font-size: var(--text-lg);
   font-weight: 500;
-  color: #7d906d;
+  color: #69795b;
 }
 .test-empty p {
   font-size: var(--text-sm);
   line-height: 1.7;
-  color: #7d906d;
+  color: #69795b;
 }
 .error-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
+}
+/* A refused run names one problem; the graph's others follow it. */
+.execution-other-problems {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0c7c3;
+}
+.execution-other-problems ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 120px;
+  overflow: auto;
+}
+.execution-other-problems li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 .curl-preview {
   padding: 10px 13px;
@@ -245,12 +264,78 @@
 }
 .curl-preview pre {
   font-size: var(--text-xs);
-  color: #9ab381;
+  color: #637c4b;
   line-height: 1.8;
   margin: 0 0 10px;
 }
 .curl-preview small,
 .curl-preview > span {
   font-size: var(--text-xs);
-  color: #b0c298;
+  color: #657b49;
+}
+/* Trace and timeout above the inputs. MUI pulls a switch's label 11px left to
+   align the switch's own padding, which put half the switch under the
+   sidebar where the Test panel starts at the canvas edge. */
+.execution-options {
+  padding: 0 12px;
+}
+.execution-options .MuiFormControlLabel-root {
+  margin-left: 0;
+}
+.execution-options .MuiFormControlLabel-label {
+  font-size: var(--text-md);
+  color: #4f6a45;
+}
+.execution-options .MuiInputBase-root,
+.input-form .MuiInputBase-root {
+  font-size: var(--text-lg);
+}
+/* The test inputs as a form: a row per declared input. */
+.input-form {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.input-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.input-form-name {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: var(--text-md);
+  color: #4f6a45;
+}
+.input-form-name > span {
+  font-size: var(--text-xs);
+  color: var(--color-test-muted);
+}
+.input-form-name > .input-form-required {
+  color: #a3372f;
+}
+.input-form-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 8px;
+}
+.input-form-code {
+  font-family: var(--font-mono);
+}
+.input-form-help {
+  font-size: var(--text-xs);
+  color: var(--color-test-muted);
+}
+.input-form-help:empty {
+  display: none;
+}
+.input-form-notice {
+  padding: 12px;
+  font-size: var(--text-md);
+  color: var(--color-test-muted);
 }

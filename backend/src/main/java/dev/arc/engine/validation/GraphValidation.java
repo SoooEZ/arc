@@ -5,6 +5,7 @@ import dev.arc.engine.graph.GraphPlan;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
+import dev.arc.model.Handles;
 import dev.arc.model.NodeKind;
 import java.util.*;
 import java.util.function.Consumer;
@@ -178,7 +179,10 @@ final class GraphValidation {
       List<String> expected = node.handles();
       if (expected.isEmpty()) {
         if (!edges.isEmpty())
-          problems.accept(problem(node.label() + ": connect no outgoing branches", node));
+          problems.accept(
+              problem(
+                  node.label() + ": remove its outgoing connections, since an Output ends the path",
+                  node));
         continue;
       }
       // An exit the node does not have is named: "connect [true, false]" read as a missing
@@ -195,8 +199,10 @@ final class GraphValidation {
                     + String.join(", ", stray)
                     + ", which this node does not have",
                 node));
-      if (!handles.containsAll(expected))
-        problems.accept(problem(node.label() + ": connect " + expected, node));
+      var missing = new ArrayList<>(expected);
+      missing.removeAll(handles);
+      if (!missing.isEmpty())
+        problems.accept(problem(node.label() + ": " + connectExits(node, missing), node));
     }
     Set<String> connections = new HashSet<>();
     for (Edge e : definition.edges())
@@ -220,8 +226,42 @@ final class GraphValidation {
     for (Node node : definition.nodes())
       if (!reached.contains(node.id()))
         problems.accept(
-            problem(
-                "Every node must be reachable from Input; connect or remove unused nodes", node));
+            problem(node.label() + ": not reachable from Input; connect it or remove it", node));
+  }
+
+  /**
+   * Asks for the missing exits by the names the canvas shows them with, in canvas order: "connect
+   * the True and False exits", "connect the Gold and Default exits", or "connect it to a next step"
+   * for the single unnamed exit of a Formula, Transform, Reference or Input.
+   */
+  private static String connectExits(Node node, List<String> missing) {
+    if (missing.equals(List.of(Handles.NEXT))) return "connect it to a next step";
+    var names = new ArrayList<String>();
+    for (String handle : missing) names.add(exitName(node, handle));
+    return "connect the " + listed(names) + (names.size() == 1 ? " exit" : " exits");
+  }
+
+  /** An exit's caption. The shape check, which runs first, has made sure every case has a label. */
+  private static String exitName(Node node, String handle) {
+    return switch (handle) {
+      case Handles.TRUE -> "True";
+      case Handles.FALSE -> "False";
+      case Handles.DEFAULT -> "Default";
+      default -> caseLabel(node, handle);
+    };
+  }
+
+  private static String caseLabel(Node node, String handle) {
+    if (node.cases() != null)
+      for (BranchCase option : node.cases())
+        if (Handles.forCase(option.id()).equals(handle)) return option.label();
+    return handle;
+  }
+
+  /** "A", "A and B", "A, B and C". */
+  private static String listed(List<String> names) {
+    if (names.size() == 1) return names.getFirst();
+    return String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
   }
 
   /**
@@ -237,8 +277,7 @@ final class GraphValidation {
     writers.sort(Comparator.comparingInt(node -> conflict.writers().indexOf(node.id())));
     var labels = new ArrayList<String>();
     for (Node writer : writers) labels.add(writer.label());
-    String named =
-        String.join(", ", labels.subList(0, labels.size() - 1)) + " and " + labels.getLast();
+    String named = listed(labels);
     ArcException error =
         ArcException.invalid(
                 "Conflicting upstream values for '"

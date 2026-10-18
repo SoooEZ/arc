@@ -26,6 +26,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** The sample rules a new workspace starts with, seeded once per workspace ({@link #run}). */
 @Component
 public class RuleSamples implements ApplicationRunner {
+  /** The note of every sample's first version. */
+  private static final String SAMPLE_NOTE = "The sample's first version.";
+
   private static final Logger LOG = LoggerFactory.getLogger(RuleSamples.class);
 
   private final RuleRepository store;
@@ -103,7 +106,7 @@ public class RuleSamples implements ApplicationRunner {
             RuleKind.FORMULA.name(),
             discount,
             Validator.calledRuleIds(discount));
-    service.publish(formula.id(), formula.revision());
+    service.publish(formula.id(), formula.revision(), SAMPLE_NOTE);
     Definition pricing =
         new Definition(
             1,
@@ -148,7 +151,7 @@ public class RuleSamples implements ApplicationRunner {
             RuleKind.DECISION_TREE.name(),
             pricing,
             Validator.calledRuleIds(pricing));
-    service.publish(tree.id(), tree.revision());
+    service.publish(tree.id(), tree.revision(), SAMPLE_NOTE);
     var eligibility =
         store.create(
             "free-shipping",
@@ -157,6 +160,6 @@ public class RuleSamples implements ApplicationRunner {
             RuleKind.RULE.name(),
             RuleTemplates.blank(RuleKind.RULE),
             Set.of());
-    service.publish(eligibility.id(), eligibility.revision());
+    service.publish(eligibility.id(), eligibility.revision(), SAMPLE_NOTE);
   }
 }

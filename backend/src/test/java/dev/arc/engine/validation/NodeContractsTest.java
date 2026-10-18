@@ -36,8 +36,13 @@ class NodeContractsTest {
     return new Definition(1, List.of(), nodes, edges);
   }
 
+  /**
+   * A missing connection names only the exits still missing, by the captions the canvas shows, in
+   * canvas order: the message listed every handle ID ("connect [true, false]") although True was
+   * connected.
+   */
   @Test
-  void missingConnectionsNameTheExpectedHandlesInCanvasOrder() {
+  void missingConnectionsNameTheMissingExitsByTheirCaptionsInCanvasOrder() {
     var condition =
         graph(
             List.of(
@@ -63,10 +68,34 @@ class NodeContractsTest {
                 node("in", "INPUT", null), node("out", "OUTPUT", "1"), node("more", "OUTPUT", "2")),
             List.of(edge("in", "out", "next"), edge("out", "more", "next")));
 
-    assertConnectionProblem(condition, "CHECK: connect [true, false]", "check");
-    assertConnectionProblem(route, "ROUTE: connect [case:a, case:b, default]", "route");
-    assertConnectionProblem(formula, "CALC: connect [next]", "calc");
-    assertConnectionProblem(output, "OUT: connect no outgoing branches", "out");
+    assertConnectionProblem(condition, "CHECK: connect the False exit", "check");
+    assertConnectionProblem(route, "ROUTE: connect the B and Default exits", "route");
+    assertConnectionProblem(formula, "CALC: connect it to a next step", "calc");
+    assertConnectionProblem(
+        output, "OUT: remove its outgoing connections, since an Output ends the path", "out");
+  }
+
+  @Test
+  void anUnconnectedConditionAsksForBothExitsAndAMissingCaseByItsLabel() {
+    var condition =
+        graph(
+            List.of(node("in", "INPUT", null), node("check", "CONDITION", "true")),
+            List.of(edge("in", "check", "next")));
+    var cases =
+        List.of(new BranchCase("a", "Gold", "true"), new BranchCase("b", "Silver", "false"));
+    var route =
+        graph(
+            List.of(
+                node("in", "INPUT", null),
+                nodeOf("route", "SWITCH", "ROUTE").cases(cases).build(),
+                node("out", "OUTPUT", "1")),
+            List.of(
+                edge("in", "route", "next"),
+                edge("route", "out", "case:a"),
+                edge("route", "out", "default")));
+
+    assertConnectionProblem(condition, "CHECK: connect the True and False exits", "check");
+    assertConnectionProblem(route, "ROUTE: connect the Silver exit", "route");
   }
 
   /**

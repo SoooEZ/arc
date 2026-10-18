@@ -73,11 +73,15 @@ export interface RuleSummary extends Omit<Rule, "draft"> {
   nodeCount: number;
   inputCount: number;
   referenceCount: number;
+  /** The draft differs from the latest published version; false when never published. */
+  draftChanged: boolean;
 }
 export interface VersionSummary {
   ruleId: string;
   version: number;
   publishedAt: string;
+  /** What its publisher wrote about the version, or null. */
+  note: string | null;
 }
 export interface SourceSummary {
   id: string;

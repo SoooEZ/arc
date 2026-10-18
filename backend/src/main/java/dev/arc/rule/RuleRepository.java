@@ -86,9 +86,10 @@ public interface RuleRepository extends RuleResolver {
 
   /**
    * Stores the locked rule's draft as its next version, with {@code callees} as the version's and
-   * the draft's callee set, and returns the rule with the draft as read under the lock.
+   * the draft's callee set and {@code note} (null for none) as the version's note, and returns the
+   * rule with the draft as read under the lock.
    */
-  Rule publish(Rule rule, Set<String> callees);
+  Rule publish(Rule rule, Set<String> callees, String note);
 
   /** Newest first; missing rules return 404. */
   List<RuleVersion> versions(String id);

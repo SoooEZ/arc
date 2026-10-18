@@ -385,10 +385,14 @@ test("dotted paths take no keyword, type or constant color while standalone word
   await expectColor(script, "case", colors.keyword);
   await expectColor(script, "NUMBER", colors.type);
   // A keyword before a parenthesis was painted as a function call: `at (300, 0)`.
+  // A card's position and a connection's ID are layout, painted like comments.
   expect((await paintedColors(script, "at (")).slice(0, 2)).toEqual([
-    colors.keyword,
-    colors.keyword,
+    colors.comment,
+    colors.comment,
   ]);
+  expect((await paintedColors(script, "edge ")).slice(0, 4)).toEqual(
+    Array<string>(4).fill(colors.comment),
+  );
   // A declared type follows a colon; an identifier spelled like one is plain.
   await expect
     .poll(() => paintedColors(script, "number"))

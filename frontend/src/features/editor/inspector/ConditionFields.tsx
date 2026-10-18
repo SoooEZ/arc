@@ -39,11 +39,26 @@ function parseComparison(expression: string): Comparison | null {
   return { left, operator, right };
 }
 
+/** A condition that compares nothing yet: a new node's `true`, `false`, or no text. */
+function comparesNothing(expression: string): boolean {
+  return ["", "true", "false"].includes(expression.trim());
+}
+
+const blankComparison: Comparison = { left: "", operator: "==", right: "" };
+
+/** What a condition that compares nothing does meanwhile. */
+function comparesNothingNote(expression: string): string {
+  const text = expression.trim();
+  if (!text) return "Choose what to compare.";
+  return `Until you choose what to compare, the condition is always ${text}.`;
+}
+
 /**
- * A single comparison opens in the builder, anything else in the expression
- * editor. Editing keeps the chosen editor even when the text passes through
- * another shape ("or >= 100" while typing order_total); only the toggle or a
- * change made elsewhere chooses again.
+ * A single comparison opens in the builder, and so does a condition that
+ * compares nothing yet, with blank operands; anything else opens in the
+ * expression editor. Editing keeps the chosen editor even when the text passes
+ * through another shape ("or >= 100" while typing order_total); only the
+ * toggle or a change made elsewhere chooses again.
  */
 export default function ConditionFields({
   rule,
@@ -56,7 +71,9 @@ export default function ConditionFields({
 }: NodeFieldsProps) {
   const expression = node.expression ?? "";
   const [editing, keepEditor] = useEditingPin<ConditionEditor>(expression);
-  const parsed = parseComparison(expression);
+  const parsed =
+    parseComparison(expression) ??
+    (comparesNothing(expression) ? blankComparison : null);
   const editor: ConditionEditor =
     editing ??
     (parsed ? { kind: "builder", comparison: parsed } : { kind: "expression" });
@@ -162,8 +179,7 @@ export default function ConditionFields({
         Add case
       </Button>
       <p className="muted-copy">
-        More cases branch more than two ways: this condition becomes Case 1 and
-        False becomes Default, with their connections.
+        Adds a second case: True becomes Case 1 and False becomes Default.
       </p>
     </InspectorSection>
   );
@@ -229,6 +245,9 @@ function ComparisonBuilder({
       />
       <div className="expression-preview">
         <code>{expression}</code>
+        {comparesNothing(expression) && (
+          <span>{comparesNothingNote(expression)}</span>
+        )}
       </div>
       <div className="expression-input">
         <ExpressionDialogButton

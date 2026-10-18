@@ -68,6 +68,7 @@ test("preview inputs, options and result survive view switches and unbuilt code"
 }) => {
   const id = await openRule(page, request, "preview-views");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await setEditorText(page, inputJson(page), '{"amount": 3}');
   await traceSwitch(page).uncheck();
   await timeout(page).click();
@@ -125,6 +126,7 @@ test("moving a card keeps the preview result and its trace until the graph chang
 }) => {
   await openRule(page, request, "preview-drag");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(result(page)).toHaveText("20");
   await expect(page.locator(".node-visited")).toHaveCount(3);
@@ -158,6 +160,7 @@ test("saving keeps typed test inputs and the current result; an untouched sample
 }) => {
   await openRule(page, request, "preview-save");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await expect(editorLines(inputJson(page))).toHaveText(/"amount":\s*10/);
   // A parameter added in the browser has no `source` field; the saved
   // response lists it as null.
@@ -193,6 +196,7 @@ test("Hide test closes the panel without building, even over unbuildable code", 
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await expect(inputJson(page)).toBeVisible();
   const code = page.getByRole("textbox", {
     name: "ARC code editor",
@@ -226,6 +230,7 @@ test("applying unchanged node code keeps the draft clean and its preview result"
     ((await (await request.get(`/api/rules/${id}`)).json()) as Rule).revision;
   const created = await revision();
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await setEditorText(page, inputJson(page), '{"amount": 4}');
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(result(page)).toHaveText("8");

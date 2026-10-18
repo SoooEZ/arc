@@ -21,6 +21,7 @@ export default function ExecutionOptionsFields({
       direction="row"
       useFlexGap
       spacing={1}
+      className="execution-options"
       sx={{ my: 1, alignItems: "center", flexWrap: "wrap" }}
     >
       <FormControlLabel

@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   CircleHelp,
+  FileCode2,
   Layers3,
   PanelLeftClose,
   PanelLeftOpen,
-  Terminal,
+  Send,
   Workflow,
 } from "lucide-react";
 import { Tooltip, useMediaQuery } from "@mui/material";
@@ -54,6 +55,7 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
     if (mobile) toggleExpanded(false);
   };
   const ruleMode = route.page === "rule" ? route.mode : null;
+  // Authoring first, then calling the API; each item has its own icon.
   const links = [
     {
       label: "Rule library",
@@ -62,20 +64,8 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
       action: () => open(pagePath("library")),
     },
     {
-      label: "API playground",
-      icon: Terminal,
-      active: route.page === "playground",
-      action: () => open(pagePath("playground")),
-    },
-    {
-      label: "API reference",
-      icon: BookOpen,
-      active: route.page === "docs",
-      action: () => open(pagePath("docs")),
-    },
-    {
       label: "Code studio",
-      icon: Terminal,
+      icon: FileCode2,
       active: ruleMode === "code",
       action: () => {
         openCodeStudio();
@@ -87,6 +77,18 @@ export default function Sidebar({ route, navigate, openCodeStudio }: Props) {
       icon: Workflow,
       active: route.page === "sources",
       action: () => open(pagePath("sources")),
+    },
+    {
+      label: "API playground",
+      icon: Send,
+      active: route.page === "playground",
+      action: () => open(pagePath("playground")),
+    },
+    {
+      label: "API reference",
+      icon: BookOpen,
+      active: route.page === "docs",
+      action: () => open(pagePath("docs")),
     },
   ];
   return (

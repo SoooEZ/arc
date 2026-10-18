@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, IconButton, Tab, Tabs } from "@mui/material";
 import { Hammer, Play, Terminal, X } from "lucide-react";
 import type { Definition } from "../../types";
+import type { GraphProblem } from "../../api/errors";
 import type {
   PreviewExecution,
   PreviewInputView,
@@ -11,6 +12,7 @@ import ExecutionError from "./ExecutionError";
 import ExecutionResult from "./ExecutionResult";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
 import LazyInputJsonEditor from "./LazyInputJsonEditor";
+import InputForm from "./InputForm";
 import { publishedCurl } from "./publishedCurl";
 
 interface Props {
@@ -26,6 +28,8 @@ interface Props {
   buildPending: boolean;
   /** The shown graph's Input node, where caller-input failures surface. */
   inputNodeId: string | null;
+  /** Every static problem of the shown graph; a refused run names only the first. */
+  graphProblems: GraphProblem[];
   onOpenReference: (target: ReferenceTarget) => void;
   onNode: (id: string) => void;
 }
@@ -39,6 +43,7 @@ export default function TestPanel({
   publishedVersion,
   buildPending,
   inputNodeId,
+  graphProblems,
   onOpenReference,
   onNode,
 }: Props) {
@@ -80,17 +85,26 @@ export default function TestPanel({
             value={preview.inputView}
             onChange={(_, view: PreviewInputView) => preview.setInputView(view)}
           >
+            <Tab value="form" label="Form" />
             <Tab value="json" label="Input JSON" />
             <Tab value="curl" label="cURL" />
           </Tabs>
-          {preview.inputView === "json" ? (
+          {preview.inputView === "form" && (
+            <InputForm
+              inputs={definition.inputs}
+              text={preview.input}
+              onChange={preview.changeInput}
+            />
+          )}
+          {preview.inputView === "json" && (
             <LazyInputJsonEditor
               label="Test input JSON"
               value={preview.input}
               onChange={preview.changeInput}
               focusRequest={inputFocusRequest}
             />
-          ) : (
+          )}
+          {preview.inputView === "curl" && (
             <div className="curl-preview">
               {!publishedVersion && (
                 <span>Publish this rule to enable its endpoint.</span>
@@ -116,6 +130,7 @@ export default function TestPanel({
             definition={definition}
             shown={{ ruleId, version }}
             inputNodeId={inputNodeId}
+            graphProblems={graphProblems}
             buildPending={buildPending}
             onNode={onNode}
             onOpenReference={onOpenReference}
@@ -135,6 +150,7 @@ function PreviewOutput({
   definition,
   shown,
   inputNodeId,
+  graphProblems,
   buildPending,
   onNode,
   onOpenReference,
@@ -144,6 +160,7 @@ function PreviewOutput({
   definition: Definition;
   shown: { ruleId: string; version: number | null };
   inputNodeId: string | null;
+  graphProblems: GraphProblem[];
   buildPending: boolean;
   onNode: (id: string) => void;
   onOpenReference: (target: ReferenceTarget) => void;
@@ -168,6 +185,9 @@ function PreviewOutput({
       <ExecutionError
         error={preview.error}
         problem={preview.problem}
+        others={graphProblems.filter(
+          (problem) => problem.message !== preview.error,
+        )}
         shown={shown}
         inputNodeId={inputNodeId}
         onNode={onNode}

@@ -1,4 +1,4 @@
-import { editorLines } from "./helpers/editor";
+import { editorLines, publishDraft } from "./helpers/editor";
 import {
   expect,
   test,
@@ -207,7 +207,7 @@ test("Switch and Transform survive Graph/code edits, case reordering and version
       .map((edge) => edge.sourceHandle)
       .sort(),
   ).toEqual(["case:premium", "case:standard", "default"]);
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();

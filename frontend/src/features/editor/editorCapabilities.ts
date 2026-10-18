@@ -2,6 +2,8 @@
 export type EditorTask =
   | "save"
   | "validate"
+  /** Publish's first step: build, validate and compare with the latest version. */
+  | "review"
   | "publish"
   | "build"
   | "switch"

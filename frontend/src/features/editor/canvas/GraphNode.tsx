@@ -6,11 +6,12 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import { Fragment, memo, useEffect, useRef } from "react";
-import { AlertCircle, Check, Code2, ExternalLink } from "lucide-react";
+import { AlertCircle, Check, Code2, ExternalLink, Plus } from "lucide-react";
 import { Tooltip } from "@mui/material";
 import type { NodeType, RuleNode } from "../../../types";
 import { NodeIcon } from "../../../components/Icons";
 import { nodeKinds } from "../../../domain/nodeKinds";
+import { messageForNode } from "../../../domain/text";
 import {
   hasTargetPort,
   nodeMinHeight,
@@ -29,6 +30,12 @@ export type FlowNode = Node<
     onExpression: (id: string) => void;
     /** False while a document command runs, like the context menu's actions. */
     canOpenCode: boolean;
+    /** Offers the kinds to add after exit `handle` of node `id`, anchored at its button. */
+    onAddAfter: (id: string, handle: string, anchor: HTMLElement) => void;
+    /** The draft is editable and has room for a node and a connection. */
+    canAddAfter: boolean;
+    /** The exits with a connection, one handle per line (text, so an unchanged card keeps its data). */
+    connectedExits: string;
     /** Top to bottom: enters at the top, exits along the bottom; left to right: enters left, exits right. */
     direction: LayoutDirection;
   },
@@ -43,6 +50,8 @@ const handlePlaces: Record<
     source: Position;
     offset: "left" | "top";
     captionClass: string;
+    /** Places an exit's add button past its caption. */
+    addClass: string;
   }
 > = {
   vertical: {
@@ -50,12 +59,14 @@ const handlePlaces: Record<
     source: Position.Bottom,
     offset: "left",
     captionClass: "",
+    addClass: "exit-add-below",
   },
   horizontal: {
     target: Position.Left,
     source: Position.Right,
     offset: "top",
     captionClass: "handle-caption-side",
+    addClass: "exit-add-side",
   },
 };
 /**
@@ -70,6 +81,7 @@ function GraphNode({ data, selected }: NodeProps<FlowNode>) {
   const kind = nodeKinds[n.type];
   const ports = sourcePorts(n);
   const place = handlePlaces[data.direction];
+  const connected = new Set(data.connectedExits.split("\n"));
   // Handles move when the exits or the drawing direction change.
   const portKey = `${data.direction}:${ports.map((port) => port.id).join(",")}`;
   const updateInternals = useUpdateNodeInternals();
@@ -95,7 +107,16 @@ function GraphNode({ data, selected }: NodeProps<FlowNode>) {
         <span className={`node-icon ${kind.className}`}>
           <NodeIcon type={n.type} size={14} />
         </span>
-        <span>{kind.label}</span>
+        {/* The first problem takes the kind's place (the icon still names
+            the kind): the card keeps its size and its summary, and the
+            badge stays clear of the incoming handle. */}
+        {data.errors.length ? (
+          <span className="node-type-problem">
+            {messageForNode(data.errors[0], n.label)}
+          </span>
+        ) : (
+          <span>{kind.label}</span>
+        )}
         <div className="node-header-actions">
           <Tooltip title="View or edit the whole node expression">
             <button
@@ -128,7 +149,11 @@ function GraphNode({ data, selected }: NodeProps<FlowNode>) {
         >
           <div className="node-error-message" role="status">
             <AlertCircle size={13} />
-            <span>Error</span>
+            <span>
+              {data.errors.length === 1
+                ? "Error"
+                : `${data.errors.length} errors`}
+            </span>
           </div>
         </Tooltip>
       )}
@@ -149,6 +174,20 @@ function GraphNode({ data, selected }: NodeProps<FlowNode>) {
             >
               {port.label}
             </span>
+          )}
+          {data.canAddAfter && !connected.has(port.id) && (
+            <button
+              className={`exit-add nodrag nopan ${place.addClass}`}
+              style={{ [place.offset]: `${port.ratio * 100}%` }}
+              aria-label={`Add after ${n.label} · ${port.label || "Next"}`}
+              title={`Add a step after ${port.label || n.label}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onAddAfter(n.id, port.id, event.currentTarget);
+              }}
+            >
+              <Plus size={12} />
+            </button>
           )}
         </Fragment>
       ))}

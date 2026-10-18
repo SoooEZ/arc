@@ -19,21 +19,6 @@
   max-width: 1600px;
   margin: auto;
 }
-.sources-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-.sources-heading h1 {
-  font-size: 32px;
-  letter-spacing: -1.2px;
-  margin: 10px 0;
-}
-.sources-heading p {
-  font-size: var(--text-2xl);
-  color: #849186;
-}
 .source-explainer {
   display: flex;
   align-items: center;
@@ -42,7 +27,7 @@
   background: #f0f5ef;
   border: 1px solid #e2e9df;
   border-radius: 9px;
-  color: #718268;
+  color: #6a7a61;
   font-size: var(--text-lg);
   margin-bottom: 28px;
   flex-wrap: wrap;
@@ -52,7 +37,7 @@
   grid-template-columns: 240px minmax(0, 1fr);
   gap: 28px;
 }
-.source-list button {
+.source-list > button {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -67,11 +52,11 @@
   margin-bottom: 7px;
   cursor: pointer;
 }
-.source-list button:focus-visible {
+.source-list > button:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-.source-list button.active {
+.source-list > button.active {
   background: #eaf1e9;
   color: #2c6746;
 }
@@ -79,11 +64,11 @@
   display: block;
   font-size: var(--text-sm);
   margin-top: 6px;
-  color: #8c9b8d;
+  color: #69796a;
 }
 .source-list p {
   font-size: var(--text-lg);
-  color: #96a195;
+  color: #6b786a;
   line-height: 1.8;
   padding: 12px;
 }
@@ -127,12 +112,16 @@
 .json-input .MuiOutlinedInput-notchedOutline {
   border: 0 !important;
 }
-/* !important: MUI sizes the textarea with inline styles. */
 .json-input textarea {
   font-family: var(--font-mono);
   line-height: 1.75;
   color: var(--color-code-text);
   font-size: var(--text-md);
+}
+/* The lookup table is a plain textarea of fixed height (SourceConfigurationFields):
+   !important, because MUI sizes textareas with inline styles. The other JSON
+   fields keep MUI's autosizing, which a pinned height hid behind two rows. */
+.json-table-input textarea {
   height: 100% !important;
   overflow: auto !important;
 }
@@ -161,7 +150,7 @@
 }
 .source-test p {
   font-size: var(--text-lg);
-  color: #8a978b;
+  color: #6b796c;
   margin: 0;
 }
 .source-test > .MuiButton-root {
@@ -174,16 +163,11 @@
   max-width: none;
   padding: 8px 4px;
 }
-.source-manager-dialog .sources-heading h1 {
+.source-manager-dialog .page-heading h1 {
   font-size: 26px;
 }
 .source-manager-dialog .sources-layout {
   grid-template-columns: 240px minmax(0, 1fr);
-}
-.source-manager-dialog .source-list nav button {
-  width: auto;
-  padding: 6px 8px;
-  margin: 0;
 }
 .source-manager-dialog .source-detail-heading > div {
   min-width: 0;
@@ -201,4 +185,93 @@
 .source-manager-dialog .MuiDialogActions-root [role="status"] {
   color: #657869;
   font-size: var(--text-xl);
+}
+/* Lookup entries: a heading with the Table / JSON switch, then either view. */
+.lookup-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lookup-entries-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: #4f6a57;
+}
+.lookup-table {
+  border: 1px solid #e2e8e0;
+  border-radius: 8px;
+}
+.lookup-table-scroll {
+  max-height: 360px;
+  overflow: auto;
+}
+.lookup-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-lg);
+}
+.lookup-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f4f7f3;
+  color: #4f6a57;
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8e0;
+  white-space: nowrap;
+}
+.lookup-table th > span:first-child {
+  margin-right: 2px;
+}
+.lookup-table td {
+  padding: 2px 4px;
+  border-bottom: 1px solid #eef2ed;
+}
+.lookup-cell {
+  width: 100%;
+  min-width: 80px;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  color: var(--color-code-text);
+}
+.lookup-cell:hover:not(:disabled) {
+  border-color: #dfe7dc;
+}
+.lookup-cell:focus {
+  outline: none;
+  border-color: var(--color-focus-ring);
+  background: var(--color-surface);
+}
+.lookup-key {
+  font-weight: 600;
+}
+.lookup-cell-invalid {
+  border-color: var(--color-danger);
+}
+.lookup-table-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px;
+  border-top: 1px solid #e2e8e0;
+  font-size: var(--text-sm);
+  color: var(--color-library-muted);
+}
+.lookup-table-actions > span:last-child {
+  margin-left: auto;
+}
+.lookup-add-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }

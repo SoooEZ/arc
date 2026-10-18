@@ -124,7 +124,8 @@ class SwitchTransformTest {
   void completeSwitchRequiresEveryCaseDefaultAndStableUniqueIds() {
     var source = script.render(choice());
     var missing = ScriptParsing.parse(source.replaceAll("(?m)^  default ->.*\\n", ""));
-    assertThatThrownBy(() -> validator.validate(missing, noRefs)).hasMessageContaining("default");
+    assertThatThrownBy(() -> validator.validate(missing, noRefs))
+        .hasMessageContaining("connect the Default exit");
     var stale = ScriptParsing.parse(source.replace("case:VIP ->", "case:missing ->"));
     assertThatThrownBy(() -> validator.validate(stale, noRefs)).hasMessageContaining("connect");
     assertThat(script.build(source.replace("case \"standard\"", "case \"VIP\"")).diagnostics())

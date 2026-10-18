@@ -100,6 +100,7 @@ test("multiple Output previews use variable names and aliases as top-level field
     '{ "amount": amount, … }',
   ]);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await run(page, '{"amount":100,"total":72.00}');
   await page.getByLabel("Output name", { exact: true }).fill("original_amount");
   await expect(preview.locator("code")).toHaveText([
@@ -154,6 +155,7 @@ test("constant, dotted and computed Output expressions fall back to the node ID 
     .click();
   await page.getByRole("option", { name: "Expression", exact: true }).click();
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   const preview = page.getByLabel("Return value preview", { exact: true });
   for (const [expression, value] of [
     ["42", "42"],
@@ -193,6 +195,7 @@ test("duplicate reached Output fields fail with both node locations and recover 
   const id = await create(request, definition);
   await page.goto(`/#/rules/${id}?node=node-dfe76b5c`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   const response = page.waitForResponse(
     (received) =>
       received.url().endsWith("/api/preview") &&
@@ -288,6 +291,7 @@ test("mutually exclusive Outputs can share an alias and retain single-Output wra
     '{ "value": amount * 2, … }',
   ]);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await run(page, { value: 100 });
   await setEditorText(
     page,

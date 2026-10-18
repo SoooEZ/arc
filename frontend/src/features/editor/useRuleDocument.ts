@@ -14,6 +14,10 @@ import { leavesRuleDocument, rulePath } from "../../app/routing";
 import type { Definition, Rule } from "../../types";
 import { ruleSnapshot, type DefinitionChange } from "../../domain/graph";
 import { editableDraft } from "../../domain/definitionEchoes";
+import {
+  versionChanges,
+  type VersionChanges,
+} from "../../domain/versionChanges";
 import { documentReducer, initialDocument } from "./documentState";
 import {
   acceptsEdits,
@@ -47,6 +51,16 @@ type VersionLoad =
   | { status: "loading" }
   | { status: "ready" }
   | { status: "failed"; message: string };
+
+/** A publication waiting for its confirmation: what it publishes and changes. */
+export interface PublishReview {
+  /** The version number publishing creates. */
+  version: number;
+  /** The latest version and the draft's changes against it; null before the first. */
+  previous: { version: number; changes: VersionChanges } | null;
+  /** ruleSnapshot of the reviewed rule: confirming publishes that rule only. */
+  snapshot: string;
+}
 
 /** Computes positions for the draft it receives, e.g. with the ELK layout. */
 export type DraftLayout = (draft: Definition) => Promise<Definition>;
@@ -90,6 +104,10 @@ export function useRuleDocument({
   >({});
   const hasInvalidDefaults = Object.values(invalidDefaults).some(Boolean);
   const [busy, setBusy] = useState<EditorTask | "">("");
+  // The publication waiting for its confirmation (reviewPublication).
+  const [publishReview, setPublishReview] = useState<PublishReview | null>(
+    null,
+  );
   const [error, setError] = useState("");
   const [versionLoad, setVersionLoad] = useState<VersionLoad>({
     status: requestedVersion ? "loading" : "ready",
@@ -201,12 +219,33 @@ export function useRuleDocument({
   const edit = useCallback(
     (change: DefinitionChange): boolean => {
       if (!acceptsEditsNow()) return false;
-      dispatch({ type: "graph/change", change });
+      dispatch({ type: "graph/change", change, at: Date.now() });
       setError("");
       return true;
     },
     [acceptsEditsNow],
   );
+  /**
+   * Steps the draft back (Undo) or forward (Redo) through its history; reports
+   * whether it did. Like an edit it waits for the running command, and an
+   * invalid parameter default holds it, because the step could remove the
+   * input whose form keeps the unsaved text.
+   */
+  const step = useCallback(
+    (direction: "undo" | "redo"): boolean => {
+      const { history } = latestState.current;
+      const steps = direction === "undo" ? history.past : history.future;
+      if (!steps.length || !acceptsEditsNow()) return false;
+      if (blockedByInvalidDefault(direction === "undo" ? "undoing" : "redoing"))
+        return false;
+      dispatch({ type: direction === "undo" ? "graph/undo" : "graph/redo" });
+      setError("");
+      return true;
+    },
+    [acceptsEditsNow, blockedByInvalidDefault],
+  );
+  const undo = useCallback(() => step("undo"), [step]);
+  const redo = useCallback(() => step("redo"), [step]);
   /** Applies rule settings to the draft (Save draft persists them); reports whether it did. */
   const editMetadata = (patch: Pick<Rule, "name" | "description">) => {
     if (!acceptsEditsNow()) return false;
@@ -389,6 +428,10 @@ export function useRuleDocument({
   const action = async (type: "save" | "validate" | "publish") => {
     // Commands are also called by keyboard actions, outside the hidden toolbar.
     if (readOnly && type !== "validate") return;
+    if (type === "publish") {
+      await reviewPublication();
+      return;
+    }
     await runTask(type, async (signal) => {
       const candidate = { ...rule, draft: await buildCode() };
       signal.throwIfAborted();
@@ -401,10 +444,56 @@ export function useRuleDocument({
       }
       await studioApi.validate(candidate.draft, { signal });
       signal.throwIfAborted();
-      if (type === "validate") {
-        notify("Graph is valid. All paths lead to a result.");
-        return;
+      notify("Graph is valid. All paths lead to a result.");
+    });
+  };
+  /**
+   * Publishing starts with a review that writes nothing: the built draft must
+   * validate, and the dialog then shows what it changes against the latest
+   * version. The user confirms (confirmPublication) or cancels.
+   */
+  const reviewPublication = async () => {
+    await runTask("review", async (signal) => {
+      const candidate = { ...rule, draft: await buildCode() };
+      signal.throwIfAborted();
+      await studioApi.validate(candidate.draft, { signal });
+      signal.throwIfAborted();
+      const latest = rule.publishedVersion;
+      let previous: PublishReview["previous"] = null;
+      if (latest !== null) {
+        const version = await ruleApi.version(rule.id, latest, { signal });
+        signal.throwIfAborted();
+        previous = {
+          version: latest,
+          changes: versionChanges(
+            editableDraft(version.definition),
+            candidate.draft,
+          ),
+        };
       }
+      setPublishReview({
+        version: (latest ?? 0) + 1,
+        previous,
+        snapshot: ruleSnapshot(candidate),
+      });
+    });
+  };
+  /**
+   * Publishes the reviewed draft with the note, saving it first when it has
+   * unsaved changes. A draft that changed after its review is refused, so a
+   * version is always the one its publisher saw compared.
+   */
+  const confirmPublication = async (note: string) => {
+    const review = publishReview;
+    setPublishReview(null);
+    if (readOnly || !review) return;
+    await runTask("publish", async (signal) => {
+      const candidate = { ...rule, draft: await buildCode() };
+      signal.throwIfAborted();
+      if (ruleSnapshot(candidate) !== review.snapshot)
+        throw new Error(
+          "The draft changed after its review. Publish again to review the changes.",
+        );
       let submitted = candidate;
       if (ruleSnapshot(candidate) !== baseline) {
         const saved = await ruleApi.save(candidate, { signal });
@@ -415,6 +504,7 @@ export function useRuleDocument({
       const published = await ruleApi.publish(
         submitted.id,
         submitted.revision,
+        note.trim() ? note : null,
         { signal },
       );
       signal.throwIfAborted();
@@ -498,9 +588,17 @@ export function useRuleDocument({
     versionUnavailable,
     retryVersion,
     edit,
+    /** Whether Undo or Redo has a step to take while the draft is editable. */
+    undoable: capabilities.edit && state.history.past.length > 0,
+    redoable: capabilities.edit && state.history.future.length > 0,
+    undo,
+    redo,
     editMetadata,
     editSource,
     action,
+    publishReview,
+    confirmPublication,
+    cancelPublication: () => setPublishReview(null),
     build,
     switchView,
     arrange,

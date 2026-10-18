@@ -48,6 +48,7 @@ const summaries: RuleSummary[] = Array.from({ length: 45 }, (_, index) => ({
   nodeCount: 3,
   inputCount: 1,
   referenceCount: 0,
+  draftChanged: false,
 }));
 
 async function catalog(route: Route) {

@@ -5,16 +5,7 @@ import {
   InputAdornment,
   TextField,
 } from "@mui/material";
-import {
-  ArrowDown,
-  ArrowRight,
-  Braces,
-  Check,
-  Layers3,
-  Plus,
-  Search,
-  Workflow,
-} from "lucide-react";
+import { ArrowDown, ArrowRight, Plus, Search, Workflow } from "lucide-react";
 import type { Kind, RuleSummary } from "../../types";
 import { kinds, ruleKinds } from "../../domain/ruleKinds";
 import type { useRuleLibrary } from "../../app/useRuleLibrary";
@@ -79,8 +70,6 @@ export default function Library({
     kind: filter,
     setKind: setFilter,
   } = library;
-  const published = rules.filter((r) => r.publishedVersion).length;
-  const references = rules.reduce((sum, r) => sum + r.referenceCount, 0);
   return (
     <div className="library-page">
       <div className="page-heading">
@@ -99,41 +88,6 @@ export default function Library({
         >
           Create rule
         </Button>
-      </div>
-      <div className="stats-row">
-        <div className="stat">
-          <span className="stat-icon">
-            <Layers3 size={19} />
-          </span>
-          <div>
-            <span>Matching rules</span>
-            <strong>{library.total.toString().padStart(2, "0")}</strong>
-          </div>
-          <small>Matching current filters</small>
-        </div>
-        <div className="stat">
-          <span className="stat-icon green">
-            <Check size={19} />
-          </span>
-          <div>
-            <span>Published on page</span>
-            <strong>{published.toString().padStart(2, "0")}</strong>
-          </div>
-          <small>
-            <span className="status-dot published" />
-            On this page
-          </small>
-        </div>
-        <div className="stat">
-          <span className="stat-icon purple">
-            <Braces size={19} />
-          </span>
-          <div>
-            <span>References on page</span>
-            <strong>{references.toString().padStart(2, "0")}</strong>
-          </div>
-          <small>On this page</small>
-        </div>
       </div>
       <div className="library-toolbar">
         <div className="filter-tabs" role="group" aria-label="Rule kind">

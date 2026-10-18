@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { stringifyJson } from "../../domain/json";
 import ApiReference from "./ApiReference";
+import { pagePath } from "../../app/routing";
 import { usePublishedExecution } from "./usePublishedExecution";
 import ExecutionOptionsFields from "./ExecutionOptionsFields";
 import ExecutionTiming from "./ExecutionTiming";
@@ -21,24 +22,12 @@ import { paginationProps } from "../../hooks/usePagedResource";
 export default function ApiPage({
   mode,
   notify,
+  navigate,
 }: {
   mode: "docs" | "playground";
   notify: (s: string) => void;
+  navigate: (path: string) => void;
 }) {
-  const request = usePublishedExecution(notify);
-  const {
-    published,
-    id,
-    versions,
-    version,
-    definition,
-    inputs,
-    result,
-    running,
-    error,
-    loading,
-    curl,
-  } = request;
   return (
     <div className="api-page">
       <div className="page-heading">
@@ -88,161 +77,199 @@ export default function ApiPage({
           </div>
         </div>
       )}
-      <section className="api-console">
-        <div className="api-console-heading">
-          <Terminal size={18} />
-          <strong>
-            {mode === "docs" ? "Try a live request" : "Request builder"}
-          </strong>
-          <span>Published rules only</span>
-        </div>
-        <div className="api-console-body">
-          <div className="api-request">
-            <TextField
-              size="small"
-              label="Find published rules"
-              value={request.search}
-              onChange={(event) => request.setSearch(event.target.value)}
-            />
-            <CatalogPagination
-              label="Published rules"
-              {...paginationProps(request.catalog)}
-            />
-            <div className="api-select-row">
-              <TextField
-                select
-                label="Rule"
-                value={id}
-                onChange={(e) => request.selectRule(e.target.value)}
-                disabled={
-                  running || request.catalog.loading || !published.length
-                }
-              >
-                {published.map((r) => (
-                  <MenuItem key={r.id} value={r.id}>
-                    {r.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <PagedVersionSelect
-                label="Version"
-                value={version}
-                versions={versions}
-                disabled={running || request.history.loading || !id}
-                onChange={request.selectVersion}
-              />
+      {mode === "docs" ? (
+        <>
+          <section className="api-try">
+            <Terminal size={18} />
+            <div>
+              <strong>Try a live request</strong>
+              <p>
+                Choose a published rule, edit its inputs and see the complete
+                response with a matching cURL command.
+              </p>
             </div>
-            <CatalogPagination
-              label="Published versions"
-              {...paginationProps(request.history)}
-              loading={request.history.loading || !id}
-            />
-            {!request.catalog.loading &&
-              !request.catalog.error &&
-              !published.length && (
-                <Alert severity="info">
-                  {request.search
-                    ? "No published rules match your search."
-                    : "Publish a rule in the library to make your first API call."}
-                </Alert>
-              )}
-            <div className="endpoint">
-              <strong>POST</strong>
-              <code>{request.endpointPath}</code>
-            </div>
-            <label className="field-label">
-              Input parameters <span>application/json</span>
-            </label>
-            <LazyInputJsonEditor
-              key={JSON.stringify([id, version])}
-              label="API input JSON"
-              value={inputs}
-              onChange={request.setInputs}
-            />
-            {definition && (
-              <div className="parameter-chips">
-                {definition.inputs.map((p) => (
-                  <span key={p.name}>
-                    <code>{p.name}</code>
-                    <small>
-                      {p.type.toLowerCase()}
-                      {p.required ? " · required" : ""}
-                    </small>
-                  </span>
-                ))}
-              </div>
-            )}
-            <ExecutionOptionsFields
-              value={request.options}
-              onChange={request.changeOptions}
-            />
             <Button
-              variant="contained"
-              startIcon={<Play size={14} />}
-              onClick={request.run}
-              disabled={running || loading || !definition || version === null}
+              variant="outlined"
+              endIcon={<ArrowRight size={15} />}
+              onClick={() => navigate(pagePath("playground"))}
             >
-              {running ? "Executing…" : "Execute rule"}
+              Open the API playground
             </Button>
-          </div>
-          <div className="api-response">
-            <div className="code-panel-heading">
-              <span>{result ? "Response" : "cURL request"}</span>
-              {result ? (
-                <Chip size="small" label="200 OK" className="published-chip" />
-              ) : (
-                <Button
-                  size="small"
-                  startIcon={<Copy size={13} />}
-                  onClick={request.copy}
-                >
-                  Copy
-                </Button>
-              )}
-            </div>
-            {!result && !error && !request.inputsAreObject && (
-              <Alert severity="warning">
-                Input parameters must be a JSON object. The cURL example sends
-                empty inputs until the JSON is fixed.
-              </Alert>
-            )}
-            {error && (
-              <Alert
-                severity="error"
-                action={
-                  request.loadError ? (
-                    <Button
-                      color="inherit"
-                      size="small"
-                      onClick={request.retry}
-                    >
-                      Retry loading
-                    </Button>
-                  ) : undefined
-                }
-              >
-                {error}
-              </Alert>
-            )}
-            {result && (
-              <ExecutionTiming
-                result={result}
-                requestDurationMs={request.requestDurationMs}
-              />
-            )}
-            {result && <TraceNotices result={result} />}
-            <pre data-testid="api-response">
-              {result ? stringifyJson(result, 2) : curl}
-            </pre>
-            {result && (
-              <button className="text-link" onClick={request.clear}>
-                Show cURL request <ArrowRight size={13} />
-              </button>
-            )}
-          </div>
-        </div>
-      </section>
-      {mode === "docs" && <ApiReference />}
+          </section>
+          <ApiReference />
+        </>
+      ) : (
+        <RequestConsole notify={notify} />
+      )}
     </div>
+  );
+}
+
+/**
+ * The playground's request builder: a published rule and version, its inputs
+ * and options, and the response or the matching cURL command.
+ */
+function RequestConsole({ notify }: { notify: (s: string) => void }) {
+  const request = usePublishedExecution(notify);
+  const {
+    published,
+    id,
+    versions,
+    version,
+    definition,
+    inputs,
+    result,
+    running,
+    error,
+    loading,
+    curl,
+  } = request;
+  return (
+    <section className="api-console">
+      <div className="api-console-heading">
+        <Terminal size={18} />
+        <strong>Request builder</strong>
+        <span>Published rules only</span>
+      </div>
+      <div className="api-console-body">
+        <div className="api-request">
+          <TextField
+            size="small"
+            label="Find published rules"
+            value={request.search}
+            onChange={(event) => request.setSearch(event.target.value)}
+          />
+          <CatalogPagination
+            label="Published rules"
+            {...paginationProps(request.catalog)}
+          />
+          <div className="api-select-row">
+            <TextField
+              select
+              label="Rule"
+              value={id}
+              onChange={(e) => request.selectRule(e.target.value)}
+              disabled={running || request.catalog.loading || !published.length}
+            >
+              {published.map((r) => (
+                <MenuItem key={r.id} value={r.id}>
+                  {r.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <PagedVersionSelect
+              label="Version"
+              value={version}
+              versions={versions}
+              disabled={running || request.history.loading || !id}
+              onChange={request.selectVersion}
+            />
+          </div>
+          <CatalogPagination
+            label="Published versions"
+            {...paginationProps(request.history)}
+            loading={request.history.loading || !id}
+          />
+          {!request.catalog.loading &&
+            !request.catalog.error &&
+            !published.length && (
+              <Alert severity="info">
+                {request.search
+                  ? "No published rules match your search."
+                  : "Publish a rule in the library to make your first API call."}
+              </Alert>
+            )}
+          <div className="endpoint">
+            <strong>POST</strong>
+            <code>{request.endpointPath}</code>
+          </div>
+          <label className="field-label">
+            Input parameters <span>application/json</span>
+          </label>
+          <LazyInputJsonEditor
+            key={JSON.stringify([id, version])}
+            label="API input JSON"
+            value={inputs}
+            onChange={request.setInputs}
+          />
+          {definition && (
+            <div className="parameter-chips">
+              {definition.inputs.map((p) => (
+                <span key={p.name}>
+                  <code>{p.name}</code>
+                  <small>
+                    {p.type.toLowerCase()}
+                    {p.required ? " · required" : ""}
+                  </small>
+                </span>
+              ))}
+            </div>
+          )}
+          <ExecutionOptionsFields
+            value={request.options}
+            onChange={request.changeOptions}
+          />
+          <Button
+            variant="contained"
+            startIcon={<Play size={14} />}
+            onClick={request.run}
+            disabled={running || loading || !definition || version === null}
+          >
+            {running ? "Executing…" : "Execute rule"}
+          </Button>
+        </div>
+        <div className="api-response">
+          <div className="code-panel-heading">
+            <span>{result ? "Response" : "cURL request"}</span>
+            {result ? (
+              <Chip size="small" label="200 OK" className="published-chip" />
+            ) : (
+              <Button
+                size="small"
+                startIcon={<Copy size={13} />}
+                onClick={request.copy}
+              >
+                Copy
+              </Button>
+            )}
+          </div>
+          {!result && !error && !request.inputsAreObject && (
+            <Alert severity="warning">
+              Input parameters must be a JSON object. The cURL example sends
+              empty inputs until the JSON is fixed.
+            </Alert>
+          )}
+          {error && (
+            <Alert
+              severity="error"
+              action={
+                request.loadError ? (
+                  <Button color="inherit" size="small" onClick={request.retry}>
+                    Retry loading
+                  </Button>
+                ) : undefined
+              }
+            >
+              {error}
+            </Alert>
+          )}
+          {result && (
+            <ExecutionTiming
+              result={result}
+              requestDurationMs={request.requestDurationMs}
+            />
+          )}
+          {result && <TraceNotices result={result} />}
+          <pre data-testid="api-response">
+            {result ? stringifyJson(result, 2) : curl}
+          </pre>
+          {result && (
+            <button className="text-link" onClick={request.clear}>
+              Show cURL request <ArrowRight size={13} />
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

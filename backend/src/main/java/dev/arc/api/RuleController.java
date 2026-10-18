@@ -73,7 +73,7 @@ public class RuleController {
 
   @PostMapping("/rules/{id}/publish")
   public Rule publish(@PathVariable String id, @RequestBody Publish request) {
-    return rules.publish(id, request.revision());
+    return rules.publish(id, request.revision(), request.note());
   }
 
   @GetMapping("/rules/{id}/versions")

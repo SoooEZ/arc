@@ -9,8 +9,8 @@ import { useExecutionOptions } from "../execution/useExecutionOptions";
 import { useExecutionRequest } from "../execution/useExecutionRequest";
 import { useInputBuffer } from "../execution/useInputBuffer";
 
-/** The Test panel shows the input buffer or the equivalent cURL request. */
-export type PreviewInputView = "json" | "curl";
+/** The Test panel shows the inputs as a form or JSON, or the equivalent cURL request. */
+export type PreviewInputView = "form" | "json" | "curl";
 
 /**
  * The editor's preview session. The Test panel only presents it, so its input
@@ -25,7 +25,7 @@ export type PreviewInputView = "json" | "curl";
  */
 export function usePreviewExecution(definition: Definition, graphKey: string) {
   const [open, setOpen] = useState(false);
-  const [inputView, setInputView] = useState<PreviewInputView>("json");
+  const [inputView, setInputView] = useState<PreviewInputView>("form");
   // One target: once edited, the buffer stays for the whole editor session.
   const inputBuffer = useInputBuffer("preview", sampleInputsJson(definition));
   const { options, change: changeOptions } = useExecutionOptions();

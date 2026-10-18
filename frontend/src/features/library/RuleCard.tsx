@@ -41,15 +41,24 @@ export default memo(function RuleCard({
         <span className={`kind-icon ${rule.kind.toLowerCase()}`}>
           <KindIcon kind={rule.kind} />
         </span>
-        <Chip
-          size="small"
-          className={rule.publishedVersion ? "published-chip" : "draft-chip"}
-          label={
-            rule.publishedVersion
-              ? `Published · v${rule.publishedVersion}`
-              : "Draft"
-          }
-        />
+        <span className="rule-card-status">
+          {rule.draftChanged && (
+            <Chip
+              size="small"
+              className="changed-chip"
+              label="Unpublished changes"
+            />
+          )}
+          <Chip
+            size="small"
+            className={rule.publishedVersion ? "published-chip" : "draft-chip"}
+            label={
+              rule.publishedVersion
+                ? `Published · v${rule.publishedVersion}`
+                : "Draft"
+            }
+          />
+        </span>
       </div>
       <div className="rule-card-title">
         <h3>{rule.name}</h3>

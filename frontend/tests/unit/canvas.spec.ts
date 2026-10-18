@@ -54,6 +54,7 @@ const definition: Definition = {
   ],
 };
 const onExpression = () => {};
+const onAddAfter = () => {};
 const inputs = (overrides: Partial<FlowNodeInputs> = {}): FlowNodeInputs => ({
   selected: "check",
   visited: new Set(),
@@ -62,6 +63,9 @@ const inputs = (overrides: Partial<FlowNodeInputs> = {}): FlowNodeInputs => ({
   sizes: new Map(),
   onExpression,
   canOpenCode: true,
+  onAddAfter,
+  canAddAfter: true,
+  connectedExits: new Map(),
   direction: "vertical",
   ...overrides,
 });

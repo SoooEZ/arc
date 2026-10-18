@@ -132,7 +132,7 @@ export default function EditorHeader({
               onClick={() => action("publish")}
               disabled={!can.publish}
             >
-              {busy === "publish" ? "Publishing…" : "Publish"}
+              {publishLabel(busy)}
             </Button>
           </>
         )}
@@ -147,4 +147,11 @@ export default function EditorHeader({
       </div>
     </div>
   );
+}
+
+/** The Publish button while its review or its publication runs. */
+function publishLabel(busy: EditorTask | ""): string {
+  if (busy === "review") return "Checking…";
+  if (busy === "publish") return "Publishing…";
+  return "Publish";
 }

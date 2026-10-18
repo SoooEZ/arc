@@ -66,27 +66,6 @@
     font-size: var(--text-2xs);
     letter-spacing: 1px;
   }
-  .stats-row {
-    padding: 15px 0;
-    margin-bottom: 25px;
-  }
-  .stat {
-    padding: 0 10px;
-    min-height: 64px;
-  }
-  .stat-icon {
-    display: none;
-  }
-  .stat > div > span {
-    font-size: var(--text-xs);
-  }
-  .stat strong {
-    font-size: 23px;
-  }
-  .stat small {
-    left: 10px;
-    font-size: var(--text-2xs);
-  }
   .rule-grid {
     grid-template-columns: 1fr;
   }
@@ -123,8 +102,8 @@
   }
   .filter-tabs {
     width: 100%;
-    gap: 0;
-    justify-content: space-between;
+    gap: 2px;
+    flex-wrap: wrap;
   }
   .filter-tabs button {
     font-size: var(--text-sm);
@@ -162,13 +141,18 @@
     height: 730px;
     flex: auto;
   }
+  /* Undo, Redo and the tools wrap onto a second row rather than past the screen. */
   .graph-toolbar {
-    height: 47px;
+    height: auto;
+    min-height: 47px;
+    padding-block: 4px;
     justify-content: center;
   }
   .graph-tools {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+    row-gap: 2px;
   }
   .flow-container {
     min-height: 370px;

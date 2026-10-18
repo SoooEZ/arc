@@ -59,8 +59,18 @@ export const ruleApi = {
       },
       options,
     ),
-  publish: (id: string, revision: number, options?: RequestOptions) =>
-    http.post<Rule>(`/rules/${pathId(id)}/publish`, { revision }, options),
+  /** Publishes the draft at `revision` as the next version, with an optional note about it. */
+  publish: (
+    id: string,
+    revision: number,
+    note: string | null,
+    options?: RequestOptions,
+  ) =>
+    http.post<Rule>(
+      `/rules/${pathId(id)}/publish`,
+      { revision, note },
+      options,
+    ),
   /**
    * Deletes the draft and every published version of the rule at `revision`. A 409
    * names the rules that still call it, or reports that the rule changed since.

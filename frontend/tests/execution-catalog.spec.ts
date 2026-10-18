@@ -22,6 +22,7 @@ function summary(
     nodeCount: 2,
     inputCount: 1,
     referenceCount: 0,
+    draftChanged: false,
   };
 }
 
@@ -628,7 +629,8 @@ test("the empty-catalog notice waits for a settled, successful catalog read", as
 test("a direct visit reads the published catalog once and never disables the Rule selector again", async ({
   page,
 }) => {
-  for (const route of ["/#/playground", "/#/docs"]) {
+  // The API reference links to the playground instead of repeating its console.
+  for (const route of ["/#/playground"]) {
     // A direct visit: a fresh document, not a hash change of the open one.
     await page.goto("about:blank");
     const state = await mockCatalog(page, true, 1);

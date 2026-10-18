@@ -8,14 +8,16 @@
   --font-sans: "Inter Variable", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  /* The dense workspace type scale. Headings (14px and up) use literal sizes. */
-  --text-2xs: 7px;
-  --text-xs: 8px;
-  --text-sm: 9px;
-  --text-md: 10px;
-  --text-lg: 11px;
-  --text-xl: 12px;
-  --text-2xl: 13px;
+  /* The workspace type scale. Headings (16px and up) use literal sizes. The
+     smallest steps were 7 to 10px, too small to read in helper text, the
+     canvas status line and the trace; 10px is now the floor for running text. */
+  --text-2xs: 8px;
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-md: 12px;
+  --text-lg: 13px;
+  --text-xl: 14px;
+  --text-2xl: 15px;
 
   --color-brand: #19735b;
   --color-ink: #192b28;
@@ -33,13 +35,13 @@
   --color-code-text: #486f42;
   /* Count and type badges in inspector and function-library headings. */
   --color-badge: #edf2ee;
-  --color-library-muted: #7a8671;
+  --color-library-muted: #6d7865;
   --color-inspector-border: #e2e8de;
   --color-inspector-strong: #526e60;
-  --color-inspector-muted: #778770;
-  --color-test-muted: #718963;
+  --color-inspector-muted: #6b7964;
+  --color-test-muted: #657a58;
   --color-api-strong: #657e56;
-  --color-api-muted: #77876f;
+  --color-api-muted: #6b7963;
   --color-studio-border: #e4eae6;
   --color-studio-border-strong: #dde5df;
   /* Editor sub-panels: mapping cards, the node code layout and the

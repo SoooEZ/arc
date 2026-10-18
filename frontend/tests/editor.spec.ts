@@ -1,4 +1,4 @@
-import { editorLines, setEditorText } from "./helpers/editor";
+import { editorLines, publishDraft, setEditorText } from "./helpers/editor";
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
 import { createRule, publishRule, uniqueId, uniqueStamp } from "./helpers/api";
@@ -331,7 +331,7 @@ test("condition string builder quotes text and graph connections retain multiple
   await expect(page.getByTestId("test-result")).toHaveText(
     '{"shipping":5.00,"tax":10.0}',
   );
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();

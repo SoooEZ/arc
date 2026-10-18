@@ -164,6 +164,7 @@ test("typed equality retains both visible characters through save, reload and ex
   await page.reload();
   await expect(editorLines(condition)).toHaveText("hello.a == 1");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.getByTestId("test-result")).toHaveText("1");
 });
@@ -461,6 +462,7 @@ test("typing in Code studio with the Test panel open flips no editor option", as
   });
   await expect(code).toBeVisible();
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   await expect(
     page.getByLabel("Test input JSON", { exact: true }),
   ).toBeVisible();

@@ -685,6 +685,7 @@ const scenarios: Scenario[] = [
     setup: async (page) => {
       await openEditor(page, `/rules/${sourceReads.id}`, 2);
       await button(page, "Test rule").click();
+      await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
       await setEditorText(
         page,
         page.getByLabel("Test input JSON", { exact: true }),
@@ -700,6 +701,7 @@ const scenarios: Scenario[] = [
     setup: async (page) => {
       await openEditor(page, "/rules/free-shipping", 4);
       await button(page, "Test rule").click();
+      await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
       await setEditorText(
         page,
         page.getByLabel("Test input JSON", { exact: true }),

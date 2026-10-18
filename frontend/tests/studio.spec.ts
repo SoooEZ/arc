@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { lookupEntriesJson } from "./helpers/sources";
 import type { Definition, Rule } from "../src/types";
-import { caretLineText, editorLines, setEditorText } from "./helpers/editor";
+import {
+  caretLineText,
+  editorLines,
+  publishDraft,
+  setEditorText,
+} from "./helpers/editor";
 import {
   createRule,
   inputToOutput,
@@ -262,7 +268,7 @@ node zero OUTPUT "Below minimum" { return 0; }
   await expect(page.locator(".view-lines")).toContainText(
     "$ROUND(amount * 2, 2)",
   );
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();
@@ -311,14 +317,14 @@ test("data source UI creates, tests and versions a lookup table", async ({
   const id = uniqueId("source-e2e");
   await page.goto("/#/sources");
   await expect(
-    page.getByRole("heading", { name: "Data sources." }),
+    page.getByRole("heading", { name: "Data sources", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "New source", exact: true }).click();
   await page.getByLabel("Source ID", { exact: true }).fill(id);
   await page.getByLabel("Name", { exact: true }).fill("Exchange table");
-  await page
-    .getByLabel("Lookup entries · JSON object", { exact: true })
-    .fill('{"US":{"rate":1.1},"GB":{"rate":1.3}}');
+  await (
+    await lookupEntriesJson(page)
+  ).fill('{"US":{"rate":1.1},"GB":{"rate":1.3}}');
   await page
     .getByRole("button", { name: "Create source", exact: true })
     .click();
@@ -327,9 +333,7 @@ test("data source UI creates, tests and versions a lookup table", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Fetch sample", exact: true }).click();
   await expect(page.getByTestId("source-result")).toContainText('"rate": 1.1');
-  await page
-    .getByLabel("Lookup entries · JSON object", { exact: true })
-    .fill('{"US":{"rate":2.2}}');
+  await (await lookupEntriesJson(page)).fill('{"US":{"rate":2.2}}');
   await page
     .getByRole("button", { name: "Save new version", exact: true })
     .click();
@@ -368,7 +372,7 @@ test("code studio and sources adapt to a narrow viewport", async ({ page }) => {
   ).toBeLessThanOrEqual(392);
   await page.goto("/#/sources");
   await expect(
-    page.getByRole("heading", { name: "Data sources." }),
+    page.getByRole("heading", { name: "Data sources", exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
@@ -435,8 +439,7 @@ const commands = {
     notice: "Code built. Graph is valid.",
   },
   Publish: {
-    run: (page: import("@playwright/test").Page) =>
-      page.getByRole("button", { name: "Publish", exact: true }).click(),
+    run: (page: import("@playwright/test").Page) => publishDraft(page),
     notice: /published and ready to call/,
   },
 };

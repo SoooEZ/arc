@@ -28,6 +28,7 @@ export const MAX_LABEL_CHARACTERS = 160;
 export const MAX_NAME_CHARACTERS = 160;
 /** UTF-16 units of a rule description. */
 export const MAX_DESCRIPTION_CHARACTERS = 2_000;
+export const MAX_RELEASE_NOTE_CHARACTERS = 500;
 /** Characters of a parameter, result or field identifier. */
 export const MAX_IDENTIFIER_CHARACTERS = 64;
 /** Characters of a rule or source ID (the API slug). */

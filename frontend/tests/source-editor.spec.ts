@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { lookupEntriesJson } from "./helpers/sources";
 import type { DataSource } from "../src/types";
 
 function source(id: string, name: string): DataSource {
@@ -105,7 +106,7 @@ test("saving A preserves the selection and edits of B when A completes", async (
       .filter({ hasText: "Source B" })
       .click();
     await page.getByLabel("Name", { exact: true }).fill("Unsaved B");
-    await page.getByLabel("Lookup entries · JSON object").fill('{"US":42}');
+    await (await lookupEntriesJson(page)).fill('{"US":42}');
     gate.release();
     await expect.poll(() => delivered).toBe(true);
     await expect(
@@ -115,9 +116,7 @@ test("saving A preserves the selection and edits of B when A completes", async (
     await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
       "Unsaved B",
     );
-    await expect(page.getByLabel("Lookup entries · JSON object")).toHaveValue(
-      '{"US":42}',
-    );
+    await expect(await lookupEntriesJson(page)).toHaveValue('{"US":42}');
     await expect(
       page.getByRole("button", { name: "Save new version" }),
     ).toBeEnabled();
@@ -656,9 +655,7 @@ for (const provider of ["HTTP", "LOOKUP"] as const) {
       exact: true,
     });
     if (provider === "HTTP") {
-      await page
-        .getByLabel("Lookup entries · JSON object")
-        .fill("{unfinished lookup");
+      await (await lookupEntriesJson(page)).fill("{unfinished lookup");
       await providerField.click();
       await page
         .getByRole("option", { name: "HTTP GET · JSON response" })
@@ -678,9 +675,7 @@ for (const provider of ["HTTP", "LOOKUP"] as const) {
         .fill("{unfinished headers");
       await providerField.click();
       await page.getByRole("option", { name: "Local lookup table" }).click();
-      await page
-        .getByLabel("Lookup entries · JSON object")
-        .fill('{"US": false}');
+      await (await lookupEntriesJson(page)).fill('{"US": false}');
     }
     await page.getByRole("button", { name: "Save new version" }).click();
     await expect.poll(() => saved?.version).toBe(3);
@@ -832,7 +827,7 @@ test("a new draft that takes a pending create's ID stays its own and receives th
     // A second New source while the create is pending: unrelated content, the same ID.
     await page.getByRole("button", { name: "New source" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Other table");
-    await page.getByLabel("Lookup entries · JSON object").fill('{"FR":1}');
+    await (await lookupEntriesJson(page)).fill('{"FR":1}');
     await page.getByLabel("Source ID").fill("held-create");
     // The pending create belongs to the discarded draft, not to this one.
     await expect(page.getByLabel("Source ID")).toBeEnabled();

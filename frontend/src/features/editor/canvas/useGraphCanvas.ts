@@ -11,6 +11,7 @@ import type { FlowNode } from "./GraphNode";
 import type { NodeSize, NodeSizes } from "./graphGeometry";
 import {
   cardBounds,
+  connectedExits,
   dragStartBounds,
   flowEdges,
   flowNodes,
@@ -36,6 +37,10 @@ interface Options {
   onExpression: (id: string) => void;
   /** Whether a card's node-code button opens now; a running command disables it. */
   canOpenCode: boolean;
+  /** Offers the kinds to add after a card's exit (GraphNode). */
+  onAddAfter: FlowNode["data"]["onAddAfter"];
+  /** Whether unconnected exits offer to add the next step now. */
+  canAddAfter: boolean;
   trace: Execution | null;
   nodeErrors: NodeErrors;
   /** The document's gated edit; dragging and connecting follow its rules. */
@@ -52,6 +57,8 @@ export function useGraphCanvas({
   setSelectedEdge,
   onExpression,
   canOpenCode,
+  onAddAfter,
+  canAddAfter,
   trace,
   nodeErrors,
   edit,
@@ -127,6 +134,10 @@ export function useGraphCanvas({
     [trace],
   );
   const taken = useMemo(() => takenBranches(trace), [trace]);
+  const exits = useMemo(
+    () => connectedExits(definition.edges),
+    [definition.edges],
+  );
   const previousNodes = useRef<ReadonlyMap<string, FlowNode>>(new Map());
   const nodes = useMemo(
     () =>
@@ -140,6 +151,9 @@ export function useGraphCanvas({
           sizes: measurements,
           onExpression,
           canOpenCode,
+          onAddAfter,
+          canAddAfter,
+          connectedExits: exits,
           direction,
         },
         previousNodes.current,
@@ -153,6 +167,9 @@ export function useGraphCanvas({
       measurements,
       onExpression,
       canOpenCode,
+      onAddAfter,
+      canAddAfter,
+      exits,
       direction,
     ],
   );

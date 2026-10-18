@@ -80,7 +80,7 @@ class RequestJsonWebTest {
         .andExpect(status().isBadRequest());
     send("/api/rules/pricing/publish", "{\"revision\":5.99}").andExpect(status().isBadRequest());
     verify(execution, never()).execute(anyString(), any());
-    verify(rules, never()).publish(anyString(), any());
+    verify(rules, never()).publish(anyString(), any(), any());
   }
 
   private ResultActions send(String path, String body) throws Exception {

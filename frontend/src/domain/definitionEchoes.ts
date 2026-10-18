@@ -57,7 +57,8 @@ function isEmptyCollection(value: unknown): boolean {
   return isJsonObject(value) && Object.keys(value).length === 0;
 }
 
-const sameJson = (left: unknown, right: unknown) =>
+/** Compares two parts of drafts (nodes, inputs, positions) as sameDefinition compares drafts. */
+export const sameJson = (left: unknown, right: unknown) =>
   canonicalJson(left) === canonicalJson(right);
 
 /**

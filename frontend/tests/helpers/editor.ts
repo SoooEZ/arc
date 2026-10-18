@@ -55,3 +55,16 @@ export async function setEditorText(
     );
   }, source);
 }
+
+/**
+ * Publishes the open draft through the editor: Publish reviews the draft and
+ * opens the confirmation, whose button publishes it with the optional note.
+ */
+export async function publishDraft(page: Page, note?: string) {
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: /^Publish version \d+$/ });
+  await expect(dialog).toBeVisible();
+  if (note) await dialog.getByLabel("Release note (optional)").fill(note);
+  await dialog.getByRole("button", { name: /^Publish v\d+$/ }).click();
+  await expect(dialog).toHaveCount(0);
+}

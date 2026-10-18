@@ -37,9 +37,18 @@ public class JdbcRuleRepository implements RuleRepository {
         jsonb_array_length(r.draft->'nodes') AS node_count,
         jsonb_array_length(r.draft->'inputs') AS input_count,
         jsonb_array_length(
-          jsonb_path_query_array(r.draft, '$.nodes[*] ? (@.type == "%s")')) AS reference_count
+          jsonb_path_query_array(r.draft, '$.nodes[*] ? (@.type == "%s")')) AS reference_count,
+        COALESCE(r.published_version IS NOT NULL AND r.draft <> v.definition, false)
+          AS draft_changed
       """
           .formatted(NodeKind.REFERENCE.name());
+
+  /**
+   * The latest published version beside its rule, for {@code draft_changed}: the publication copied
+   * the draft as stored, so the two stay equal until the draft is saved with a change.
+   */
+  private static final String LATEST_VERSION =
+      "LEFT JOIN rule_versions v ON v.rule_id = r.id AND v.version = r.published_version";
 
   /**
    * Chooses the page's IDs before reading drafts. PostgreSQL would otherwise compute the JSONB
@@ -52,14 +61,14 @@ public class JdbcRuleRepository implements RuleRepository {
         ORDER BY updated_at DESC, id
         LIMIT ? OFFSET ?)
       SELECT %s
-      FROM page JOIN rules r ON r.id = page.id
+      FROM page JOIN rules r ON r.id = page.id %s
       ORDER BY r.updated_at DESC, r.id
       """
-          .formatted(CATALOG_FILTER, SUMMARY_COLUMNS);
+          .formatted(CATALOG_FILTER, SUMMARY_COLUMNS, LATEST_VERSION);
 
   /** One rule's catalog item, as a catalog page writes it. */
   private static final String SUMMARY =
-      "SELECT %s FROM rules r WHERE r.id = ?".formatted(SUMMARY_COLUMNS);
+      "SELECT %s FROM rules r %s WHERE r.id = ?".formatted(SUMMARY_COLUMNS, LATEST_VERSION);
 
   private static final String VERSION_FILTER =
       " WHERE rule_id = ? AND (? = '' OR strpos(version::text, ?) > 0)";
@@ -104,12 +113,16 @@ public class JdbcRuleRepository implements RuleRepository {
               instant(row, "updated_at"),
               row.getInt("node_count"),
               row.getInt("input_count"),
-              row.getInt("reference_count"));
+              row.getInt("reference_count"),
+              row.getBoolean("draft_changed"));
 
   private static final RowMapper<RuleVersionSummary> VERSION_SUMMARY_MAPPER =
       (row, index) ->
           new RuleVersionSummary(
-              row.getString("rule_id"), row.getInt("version"), instant(row, "published_at"));
+              row.getString("rule_id"),
+              row.getInt("version"),
+              instant(row, "published_at"),
+              row.getString("note"));
 
   private final JdbcTemplate jdbc;
   private final JsonCodec json;
@@ -174,7 +187,7 @@ public class JdbcRuleRepository implements RuleRepository {
     return CatalogPages.read(
         jdbc,
         "SELECT count(*) FROM rule_versions" + VERSION_FILTER,
-        "SELECT rule_id, version, published_at FROM rule_versions"
+        "SELECT rule_id, version, published_at, note FROM rule_versions"
             + VERSION_FILTER
             + " ORDER BY version DESC LIMIT ? OFFSET ?",
         VERSION_SUMMARY_MAPPER,
@@ -321,13 +334,15 @@ public class JdbcRuleRepository implements RuleRepository {
    * records before. Neither path applies the editable-size limit, which belongs to saves.
    */
   @Override
-  public Rule publish(Rule rule, Set<String> callees) {
+  public Rule publish(Rule rule, Set<String> callees, String note) {
+    StoredText.requireStorable(note);
     int version = rule.publishedVersion() == null ? 1 : rule.publishedVersion() + 1;
     int inserted =
         jdbc.update(
-            "INSERT INTO rule_versions (rule_id, version, definition, callees) SELECT id, ?, draft, ? FROM rules WHERE id = ?",
+            "INSERT INTO rule_versions (rule_id, version, definition, callees, note) SELECT id, ?, draft, ?, ? FROM rules WHERE id = ?",
             version,
             textArray(callees),
+            note,
             rule.id());
     if (inserted == 0) throw notFound(rule.id());
     RowMapper<Rule> withLockedDraft =

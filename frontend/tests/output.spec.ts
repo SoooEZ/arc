@@ -1,4 +1,4 @@
-import { editorLines, setEditorText } from "./helpers/editor";
+import { editorLines, publishDraft, setEditorText } from "./helpers/editor";
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
@@ -156,7 +156,7 @@ test("Output selects values of any type and round-trips typed constants through 
   await page.getByLabel("Return value", { exact: true }).fill("");
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await run("");
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();

@@ -1,6 +1,13 @@
 import type { Definition, Diagnostic, Rule } from "../../types";
 import { ruleSnapshot, type DefinitionChange } from "../../domain/graph";
 import { editableDraft, sameDefinition } from "../../domain/definitionEchoes";
+import {
+  noHistory,
+  recordEdit,
+  steppedBack,
+  steppedForward,
+  type DraftHistory,
+} from "../../domain/draftHistory";
 
 export interface DocumentState {
   rule: Rule;
@@ -8,6 +15,8 @@ export interface DocumentState {
   source: string | null;
   sourceDirty: boolean;
   diagnostics: Diagnostic[];
+  /** The drafts Undo and Redo step to; graph edits and code builds record them. */
+  history: DraftHistory;
 }
 export function initialDocument(rule: Rule): DocumentState {
   const opened = { ...rule, draft: editableDraft(rule.draft) };
@@ -17,10 +26,14 @@ export function initialDocument(rule: Rule): DocumentState {
     source: null,
     sourceDirty: false,
     diagnostics: [],
+    history: noHistory,
   };
 }
 export type DocumentAction =
-  | { type: "graph/change"; change: DefinitionChange }
+  /** `at` (ms) lets a quick repeat of the same edit join one Undo step. */
+  | { type: "graph/change"; change: DefinitionChange; at?: number }
+  | { type: "graph/undo" }
+  | { type: "graph/redo" }
   | { type: "graph/arranged"; before: Definition; definition: Definition }
   | { type: "version/loaded"; definition: Definition }
   | { type: "rule/metadata"; patch: Pick<Rule, "name" | "description"> }
@@ -45,11 +58,25 @@ export function documentReducer(
       const draft = action.change(state.rule.draft);
       if (draft === state.rule.draft) return state;
       return {
-        ...state,
-        rule: { ...state.rule, draft },
-        source: null,
-        sourceDirty: false,
-        diagnostics: [],
+        ...withDraft(state, draft),
+        history: recordEdit(state.history, state.rule.draft, draft, action.at),
+      };
+    }
+    // Unbuilt code is not part of the draft, so stepping would discard it.
+    case "graph/undo": {
+      const previous = state.history.past.at(-1);
+      if (!previous || state.sourceDirty) return state;
+      return {
+        ...withDraft(state, previous),
+        history: steppedBack(state.history, state.rule.draft),
+      };
+    }
+    case "graph/redo": {
+      const next = state.history.future.at(-1);
+      if (!next || state.sourceDirty) return state;
+      return {
+        ...withDraft(state, next),
+        history: steppedForward(state.history, state.rule.draft),
       };
     }
     case "graph/arranged":
@@ -63,6 +90,7 @@ export function documentReducer(
       return {
         ...state,
         rule: { ...state.rule, draft: editableDraft(action.definition) },
+        history: noHistory,
       };
     case "rule/metadata":
       return { ...state, rule: { ...state.rule, ...action.patch } };
@@ -81,20 +109,37 @@ export function documentReducer(
       return state.source === null && state.rule.draft === action.before
         ? { ...state, source: action.source }
         : state;
-    case "source/built":
+    case "source/built": {
       if (state.source !== action.before) return state;
+      const built = editableDraft(action.definition);
       return {
         ...state,
-        rule: { ...state.rule, draft: editableDraft(action.definition) },
+        rule: { ...state.rule, draft: built },
         source: action.source,
         sourceDirty: false,
         diagnostics: [],
+        // Code that leaves the graph as it was is no step to undo.
+        history: sameDefinition(state.rule.draft, built)
+          ? state.history
+          : recordEdit(state.history, state.rule.draft, built),
       };
+    }
     case "source/diagnostics":
       return state.source === action.before
         ? { ...state, diagnostics: action.diagnostics }
         : state;
   }
+}
+
+/** The document showing `draft`: the code view renders it again. */
+function withDraft(state: DocumentState, draft: Definition): DocumentState {
+  return {
+    ...state,
+    rule: { ...state.rule, draft },
+    source: null,
+    sourceDirty: false,
+    diagnostics: [],
+  };
 }
 
 /**

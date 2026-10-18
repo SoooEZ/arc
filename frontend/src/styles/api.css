@@ -18,13 +18,13 @@
   border-radius: 9px;
   padding: 22px;
   position: relative;
-  color: #7f9a66;
+  color: #667b52;
 }
 .api-intro-cards > div > span {
   position: absolute;
   right: 20px;
   font-size: var(--text-md);
-  color: #b6c2a6;
+  color: #697953;
 }
 .api-intro-cards h3 {
   font-size: var(--text-2xl);
@@ -49,12 +49,12 @@
   gap: 10px;
   padding: 17px 22px;
   border-bottom: 1px solid #e5ecd9;
-  color: #8ba471;
+  color: #667c4f;
 }
 .api-console-heading strong {
   font-size: var(--text-xl);
   font-weight: 550;
-  color: #647f4d;
+  color: #627c4b;
 }
 .api-console-heading > span {
   margin-left: auto;
@@ -103,7 +103,7 @@
 }
 .endpoint > strong {
   font-size: var(--text-xs);
-  color: #7da859;
+  color: #5d7d42;
   padding: 2px 4px;
   border-radius: 3px;
   background: #e8f2df;
@@ -126,7 +126,7 @@
 .field-label > span {
   font-size: var(--text-xs);
   font-weight: 400;
-  color: #afc096;
+  color: #677b4a;
 }
 .api-request > .MuiButton-root {
   align-self: flex-start;
@@ -172,7 +172,7 @@
 }
 .code-panel-heading > .MuiButton-root {
   font-size: var(--text-sm);
-  color: #a8bd8b;
+  color: #657b46;
   min-height: 26px;
 }
 .api-response pre {
@@ -189,7 +189,7 @@
   gap: 6px;
   background: none;
   border: 0;
-  color: #88ab65;
+  color: #607d44;
   font-size: var(--text-sm);
   padding: 12px 0;
 }
@@ -239,21 +239,21 @@
   padding: 3px 4px;
   border-radius: 3px;
   background: #edf3fa;
-  color: #8da8c4;
+  color: #52779e;
   text-align: center;
   font-weight: 550;
 }
 .method-post {
   background: #eef5e7;
-  color: #93b577;
+  color: #5e7d44;
 }
 .method-put {
   background: #faf4e6;
-  color: #b9a675;
+  color: #857243;
 }
 .method-delete {
   background: #f9eeec;
-  color: #c08a84;
+  color: #aa6058;
 }
 .api-notes {
   display: grid;
@@ -274,5 +274,25 @@
 }
 .api-notes code {
   font-size: var(--text-sm);
-  color: #8fae71;
+  color: #617c47;
+}
+/* The reference page links to the playground instead of repeating its console. */
+.api-try {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  margin-bottom: 33px;
+  border: 1px solid #dfe8dc;
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: #4f6a57;
+}
+.api-try > div {
+  flex: 1;
+}
+.api-try p {
+  margin-top: 4px;
+  font-size: var(--text-lg);
+  color: var(--color-api-muted);
 }

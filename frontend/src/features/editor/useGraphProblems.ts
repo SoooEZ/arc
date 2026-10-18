@@ -113,5 +113,6 @@ export function useGraphProblems({
     errors,
     JSON.stringify([...errors]),
   );
-  return { allProblems, nodeErrors };
+  /** The current draft's static problems, every one of them. */
+  return { allProblems, graphProblems, nodeErrors };
 }

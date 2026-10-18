@@ -43,10 +43,13 @@ export default function VersionHistory({
           versions.map((v) => (
             <button
               key={v.version}
+              className="version-chip"
+              title={v.note ?? undefined}
               onClick={() => navigate(rulePath({ ruleId, version: v.version }))}
             >
               v{v.version}
               <small>{new Date(v.publishedAt).toLocaleDateString()}</small>
+              {v.note && <span className="version-note">{v.note}</span>}
             </button>
           ))
         ) : (
@@ -55,11 +58,13 @@ export default function VersionHistory({
             stable API.
           </span>
         ))}
-      <CatalogPagination
-        label="Rule versions"
-        {...paginationProps(page)}
-        loading={loading}
-      />
+      {page.data.total > 0 && (
+        <CatalogPagination
+          label="Rule versions"
+          {...paginationProps(page)}
+          loading={loading}
+        />
+      )}
       <IconButton aria-label="Close history" onClick={() => onClose()}>
         <X size={15} />
       </IconButton>

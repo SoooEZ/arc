@@ -8,12 +8,30 @@ import {
   previewNodeWidth,
 } from "./previewLayout";
 
+/**
+ * How much a preview shows: every label and branch caption while the graph
+ * fits at its own scale, node names enlarged to stay readable (and shortened)
+ * while it shrinks moderately, and kind marks alone for a large graph.
+ */
+function previewDetail(shrink: number): "labels" | "names" | "overview" {
+  if (shrink <= 1) return "labels";
+  if (shrink <= 1.6) return "names";
+  return "overview";
+}
+
 export default function RulePreview({ rule }: { rule: Rule }) {
   const direction = useLayoutDirection();
   const graph = rulePreview(rule.draft, direction);
   const markerId = useId().replaceAll(":", "");
-  // At the smallest card width, text must still render at roughly 10px.
-  const readable = graph.width <= 380 && graph.height <= 280;
+  // At the smallest card width, text at its own size renders at roughly 10px
+  // while the graph fits 380 × 280; a larger graph is drawn smaller.
+  const shrink = Math.max(graph.width / 380, graph.height / 280);
+  const detail = previewDetail(shrink);
+  const readable = detail === "labels";
+  // Shortened names are drawn larger, so they shrink back to a readable size.
+  const labelStyle = readable
+    ? undefined
+    : { fontSize: `calc(var(--text-xl) * ${shrink})` };
   return (
     <div className="rule-preview">
       <div className="mini-graph">
@@ -27,7 +45,7 @@ export default function RulePreview({ rule }: { rule: Rule }) {
             }}
             role="img"
             aria-label={`${rule.name}: complete graph overview, ${graph.nodes.length} ${graph.nodes.length === 1 ? "node" : "nodes"}, ${graph.connections.length} ${graph.connections.length === 1 ? "connection" : "connections"}`}
-            data-detail={readable ? "labels" : "overview"}
+            data-detail={detail}
             data-direction={direction}
           >
             <defs>
@@ -71,11 +89,13 @@ export default function RulePreview({ rule }: { rule: Rule }) {
                   height={previewNodeHeight}
                   rx="7"
                 />
-                {readable ? (
+                {detail !== "overview" ? (
                   <>
                     <circle cx="12" cy="20" r="3" />
-                    <foreignObject x="22" y="10" width="100" height="20">
-                      <div className="preview-node-label">{node.label}</div>
+                    <foreignObject x="20" y="4" width="108" height="32">
+                      <div className="preview-node-label" style={labelStyle}>
+                        {node.label}
+                      </div>
                     </foreignObject>
                   </>
                 ) : (
@@ -97,9 +117,9 @@ export default function RulePreview({ rule }: { rule: Rule }) {
       </div>
       <div className="rule-preview-caption">
         <span>
-          {readable
-            ? "Complete draft graph"
-            : "Draft overview · open to explore"}
+          {detail === "overview"
+            ? "Draft overview · open to explore"
+            : "Complete draft graph"}
         </span>
         {graph.missingConnections > 0 && (
           <span className="preview-warning">

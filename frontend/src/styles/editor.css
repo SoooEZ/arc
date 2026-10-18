@@ -49,7 +49,7 @@
 .editor-title > div > span {
   display: block;
   font-size: var(--text-sm);
-  color: #98a08f;
+  color: #6f7866;
   margin-top: 5px;
   white-space: nowrap;
 }
@@ -66,7 +66,7 @@
 }
 .editor-actions .MuiIconButton-root {
   padding: 7px;
-  color: #a0a994;
+  color: #8d987f;
 }
 .editor-body {
   display: flex;
@@ -95,7 +95,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #94a18a;
+  color: #6b7961;
   white-space: nowrap;
 }
 .graph-view-label strong {
@@ -105,7 +105,7 @@
 }
 .graph-view-label > span {
   font-size: var(--text-sm);
-  color: #9aa68e;
+  color: #6c795f;
   margin-left: 5px;
 }
 .graph-tools {
@@ -119,8 +119,20 @@
   padding: 4px 10px;
 }
 .graph-tools .MuiIconButton-root {
-  color: #9aaa8c;
+  color: #889b77;
   padding: 6px;
+}
+.tool-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--color-editor-border);
+}
+.node-kind-option {
+  margin-left: 10px;
+}
+.alert-more {
+  font-weight: 600;
 }
 /* The class pair outranks the rounded corners of MUI's Alert. */
 .routing-warning.MuiAlert-root {
@@ -156,11 +168,11 @@
   flex-direction: column;
   gap: 7px;
   font-size: var(--text-sm);
-  color: #a0b28d;
+  color: #677a52;
 }
 .read-only-field code {
   font-size: var(--text-md);
-  color: #8fa676;
+  color: #667b50;
 }
 /* Deleting the rule sits apart from the settings that Apply changes saves. */
 .rule-settings-danger {

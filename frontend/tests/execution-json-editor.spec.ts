@@ -78,6 +78,7 @@ test("preview JSON supports indentation and preserves unfinished text across cUR
   const id = await createRule(request);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   const input = page.getByLabel("Test input JSON", { exact: true });
   await indentation(page, input);
   const sent = page.waitForRequest((outgoing) =>
@@ -176,6 +177,7 @@ test("cURL examples show only object inputs and keep every digit of the buffer",
   const id = await createRule(request, true);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   const input = page.getByLabel("Test input JSON", { exact: true });
   const inputTab = page.getByRole("tab", { name: "Input JSON", exact: true });
   const curlTab = page.getByRole("tab", { name: "cURL", exact: true });
@@ -213,6 +215,7 @@ test("a failure at the Input node offers both the node and editing the test inpu
   const id = await createRule(request);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   const input = page.getByLabel("Test input JSON", { exact: true });
   const editInputs = page.getByRole("button", {
     name: "Edit test inputs",

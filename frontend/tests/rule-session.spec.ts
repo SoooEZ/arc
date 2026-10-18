@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { publishDraft } from "./helpers/editor";
 import type { Definition, Rule } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
 
@@ -139,7 +140,7 @@ test("returning from a published version refreshes the draft while graph/code sw
   });
   await page.goto(`/#/rules/${id}?node=input`);
   await page.getByLabel("Default value (optional)").fill("2");
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(page.getByText("All changes saved")).toBeVisible();
   await page.evaluate((ruleId) => {
     window.location.hash = `/rules/${ruleId}?version=1&node=input`;

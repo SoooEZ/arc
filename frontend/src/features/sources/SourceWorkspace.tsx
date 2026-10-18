@@ -14,12 +14,13 @@ export default function SourceWorkspace({ editor }: { editor: SourceEditor }) {
   const { catalog, document, versions, commands } = editor;
   return (
     <div className="sources-page">
-      <div className="page-eyebrow">CONNECTED INPUTS</div>
-      <div className="sources-heading">
+      <div className="page-heading">
         <div>
-          <h1>
-            Data sources<span className="heading-dot">.</span>
-          </h1>
+          <div className="eyebrow">
+            <span />
+            CONNECTED INPUTS
+          </div>
+          <h1>Data sources</h1>
           <p>Give your rules the context they need, when they need it.</p>
         </div>
         <Button

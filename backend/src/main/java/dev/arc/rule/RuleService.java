@@ -26,7 +26,8 @@ public class RuleService {
   /** A save names the revision its client read; without one it is refused, never taken as 0. */
   public record Update(String name, String description, Integer revision, Definition definition) {}
 
-  public record Publish(Integer revision) {}
+  /** A publication names the revision its client reviewed, and may say what the version changes. */
+  public record Publish(Integer revision, String note) {}
 
   /** How many callers a refused deletion names in its message; `issues` lists them all. */
   private static final int NAMED_CALLERS = 5;
@@ -137,12 +138,24 @@ public class RuleService {
   }
 
   @Transactional
-  public Rule publish(String id, Integer revision) {
+  public Rule publish(String id, Integer revision, String note) {
     Rule rule = store.lockForPublication(id);
+    String kept = releaseNote(note);
     requireRevision(rule.revision(), revision);
     Set<String> callees = holdCallees(rule.draft());
     definitions.validateForPublication(rule.draft());
-    return store.publish(rule, callees);
+    return store.publish(rule, callees, kept);
+  }
+
+  /** A version's note as stored: as written, none when blank, within its limit. */
+  private static String releaseNote(String note) {
+    if (note == null || note.isBlank()) return null;
+    if (note.length() > Limits.MAX_RELEASE_NOTE_CHARACTERS)
+      throw ArcException.invalid(
+          "Release note exceeds "
+              + Limits.format(Limits.MAX_RELEASE_NOTE_CHARACTERS)
+              + " characters");
+    return note;
   }
 
   /**

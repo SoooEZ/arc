@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   Alert,
   Button,
@@ -25,16 +32,35 @@ import {
 } from "../../../domain/graph";
 import { canAddNode } from "../../../domain/limits";
 import { nodeKinds } from "../../../domain/nodeKinds";
-import type { LayoutDirection } from "../../../domain/nodePorts";
+import { sourcePort, type LayoutDirection } from "../../../domain/nodePorts";
 import type { useGraphCanvas } from "./useGraphCanvas";
 import type { EditorCapabilities } from "../editorCapabilities";
 import GraphToolbar from "./GraphToolbar";
 import GraphOutline from "./GraphOutline";
+import NodeKindMenu from "./NodeKindMenu";
+import { useCanvasShortcuts } from "./useCanvasShortcuts";
 const nodeTypes = { arc: GraphNode };
 const edgeTypes = { routed: RoutedEdge };
 const initialFit = { padding: 0.18 };
 const arrangedFit = { padding: 0.15, duration: 0 };
 const proOptions = { hideAttribution: true };
+
+/** The exit whose add button opened the kind menu. */
+export interface ExitMenu {
+  source: string;
+  handle: string;
+  anchor: HTMLElement;
+}
+
+/** Names the exit menu after the exit it adds to, e.g. "Add after Check · True". */
+function exitMenuLabel(definition: Definition, menu: ExitMenu | null): string {
+  if (!menu) return "Add after";
+  const node = definition.nodes.find(
+    (candidate) => candidate.id === menu.source,
+  );
+  const port = node && sourcePort(node, menu.handle);
+  return `Add after ${node?.label ?? ""} · ${port?.label || "Next"}`;
+}
 
 function minimapColor(node: FlowNode): string {
   if (node.data.errors.length) return "#d15a52";
@@ -62,6 +88,15 @@ interface Props {
   exportJson: () => void;
   action: (type: "validate") => Promise<void>;
   onAddNode: (type: NodeType) => void;
+  /** The exit menu a card's add button opened, if any. */
+  exitMenu: ExitMenu | null;
+  onCloseExitMenu: () => void;
+  onAddAfter: (type: NodeType, source: string, handle: string) => void;
+  /** Undo or Redo has a step to take now. */
+  undoable: boolean;
+  redoable: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
   onEditNode: (id: string) => void;
   onRenameNode: (id: string) => void;
   onDeleteNode: (id: string) => void;
@@ -88,6 +123,13 @@ export default function GraphCanvas({
   exportJson,
   action,
   onAddNode,
+  exitMenu,
+  onCloseExitMenu,
+  onAddAfter,
+  undoable,
+  redoable,
+  onUndo,
+  onRedo,
   onEditNode,
   onRenameNode,
   onDeleteNode,
@@ -145,6 +187,44 @@ export default function GraphCanvas({
     endDrag,
   } = canvas;
   const flow = useReactFlow<FlowNode>();
+  const canvasArea = useRef<HTMLDivElement>(null);
+  // Keys read the latest selection and commands through a ref, so the
+  // document listener stays registered while the selection changes.
+  const deletion = useRef({
+    can,
+    definition,
+    selected,
+    selectedEdge,
+    removeEdge,
+    onDeleteNode,
+  });
+  deletion.current = {
+    can,
+    definition,
+    selected,
+    selectedEdge,
+    removeEdge,
+    onDeleteNode,
+  };
+  const deleteSelection = useCallback((cards: boolean) => {
+    const latest = deletion.current;
+    if (!latest.can.edit) return false;
+    if (latest.selectedEdge) {
+      latest.removeEdge(latest.selectedEdge);
+      return true;
+    }
+    if (!cards || !canRemoveGraphNode(latest.definition, latest.selected))
+      return false;
+    latest.onDeleteNode(latest.selected);
+    return true;
+  }, []);
+  useCanvasShortcuts({
+    workspace: canvasArea,
+    enabled: !readOnly,
+    undo: onUndo,
+    redo: onRedo,
+    deleteSelection,
+  });
   // A drag the previous canvas was reporting ended with it: the settled graph
   // routes fully again instead of waiting for a drag end that never comes.
   useEffect(() => {
@@ -244,6 +324,10 @@ export default function GraphCanvas({
         onExport={exportJson}
         onValidate={() => action("validate")}
         onAddNode={onAddNode}
+        undoable={undoable}
+        redoable={redoable}
+        onUndo={onUndo}
+        onRedo={onRedo}
       />
       {layoutError && (
         <Alert severity="warning" className="routing-warning">
@@ -270,7 +354,10 @@ export default function GraphCanvas({
           ))}
         </Alert>
       )}
-      <div className={`flow-container ${layoutReady ? "" : "flow-laying-out"}`}>
+      <div
+        ref={canvasArea}
+        className={`flow-container ${layoutReady ? "" : "flow-laying-out"}`}
+      >
         <RoutingContext.Provider value={routing}>
           <ReactFlow
             nodes={nodes}
@@ -372,6 +459,15 @@ export default function GraphCanvas({
             <ListItemText>Delete</ListItemText>
           </MenuItem>
         </Menu>
+        <NodeKindMenu
+          anchor={exitMenu?.anchor ?? null}
+          label={exitMenuLabel(definition, exitMenu)}
+          disabled={!can.edit}
+          onChoose={(type) => {
+            if (exitMenu) onAddAfter(type, exitMenu.source, exitMenu.handle);
+          }}
+          onClose={onCloseExitMenu}
+        />
         {outline && (
           <GraphOutline
             nodes={definition.nodes}

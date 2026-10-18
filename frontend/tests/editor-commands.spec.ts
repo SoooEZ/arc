@@ -6,7 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { createRule as createApiRule, readRule, uniqueId } from "./helpers/api";
-import { editorLines } from "./helpers/editor";
+import { editorLines, publishDraft } from "./helpers/editor";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -97,6 +97,12 @@ for (const step of ["validate", "save", "publish"] as const) {
     const pending = await holdRequest(page, target.url, target.method);
     try {
       await page.getByRole("button", { name: "Publish", exact: true }).click();
+      // Validation is the review before the dialog; the writes follow the confirmation.
+      if (step !== "validate")
+        await page
+          .getByRole("dialog", { name: /^Publish version \d+$/ })
+          .getByRole("button", { name: /^Publish v\d+$/ })
+          .click();
       await expect.poll(() => pending.state.held).toBe(true);
       // Confirm leaving: unsaved changes, or the pending write itself.
       page.on("dialog", (dialog) => void dialog.accept());
@@ -144,7 +150,7 @@ test("an open version history lists a version published while it is open", async
     .click();
   const history = page.locator(".version-bar");
   await expect(history).toContainText("No published versions yet");
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await publishDraft(page);
   await expect(
     page.getByText("Version 1 published and ready to call"),
   ).toBeVisible();

@@ -85,6 +85,7 @@ function summary(rule: Rule): RuleSummary {
     nodeCount: rule.draft.nodes.length,
     inputCount: rule.draft.inputs.length,
     referenceCount: 0,
+    draftChanged: false,
   };
 }
 async function mockLibrary(page: Page, rules: Rule[] = [complex, simple]) {

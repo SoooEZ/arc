@@ -180,7 +180,7 @@ export default function App() {
         return <SourcesPage notify={notify} />;
       case "playground":
       case "docs":
-        return <ApiPage mode={view.page} notify={notify} />;
+        return <ApiPage mode={view.page} notify={notify} navigate={navigate} />;
       case "library":
         return (
           <Library

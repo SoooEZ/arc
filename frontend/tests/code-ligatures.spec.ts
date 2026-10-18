@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { lookupEntriesJson } from "./helpers/sources";
 import { createRule, uniqueId, uniqueStamp } from "./helpers/api";
 
 /**
@@ -104,7 +105,7 @@ test("canvas expressions and JSON fields draw every operator character", async (
     .locator(".source-list > button")
     .filter({ hasText: sourceName })
     .click();
-  const entries = page.getByLabel("Lookup entries · JSON object");
+  const entries = await lookupEntriesJson(page);
   await expect(entries).toHaveValue(/a == b -> c != d/);
   await page.getByRole("heading", { name: sourceName }).click();
   expect(await ligatureRendering(entries)).toEqual({

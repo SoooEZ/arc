@@ -21,13 +21,6 @@
   .rule-card-title h3 {
     font-size: var(--text-2xl);
   }
-  .stat {
-    padding: 0 17px;
-    gap: 10px;
-  }
-  .stat small {
-    left: 67px;
-  }
   .inspector {
     width: 260px;
   }

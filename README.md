@@ -283,7 +283,8 @@ The result is `120`, alongside the executed version, phase timing, and a bounded
 
 - Create a decision tree, formula, or condition rule from a working template.
 - Define number, string, and boolean inputs, with required flags and defaults.
-- Add formula, condition, reusable-rule, and output nodes on a zoomable canvas.
+- Add formula, condition, reusable-rule, and output nodes on a zoomable canvas. An exit without a connection offers **+** to add the next step already connected below it; new cards land clear of the others.
+- Undo and redo graph edits with the toolbar or ⌘/Ctrl Z and ⌘/Ctrl Shift Z (a burst of typing or a drag is one step); Delete or Backspace removes the selected card or connection.
 - Connect one result to multiple downstream nodes by dragging from the same handle; select an edge to remove it.
 - Connections route around node cards automatically, including while moving nodes or dragging a new connection. Covered handles show a warning with links to the affected connections; move nodes apart or use **Arrange graph** to restore a clear path.
 - Use the condition builder or write an expression, including compound conditions. A Condition branches True/False, or through ordered first-match cases plus Default: its **Branches** setting switches between True / False, cases checked as conditions, and matching a value, and keeps the node's connections (True becomes the first case and False becomes Default).
@@ -291,11 +292,11 @@ The result is `120`, alongside the executed version, phase timing, and a bounded
 - Navigate with the node outline, minimap, auto-layout, or links to referenced rules. Arrange graph accounts for the fixed True/False exits and reorders branches to reduce crossings.
 - Draw graphs top to bottom or left to right with the direction switch in the canvas toolbar. The choice is a preference of this browser for every graph, including saved versions, referenced rules and library previews. Left to right lays the graph out for display only: drafts keep their saved top-to-bottom positions, which you move and arrange top to bottom.
 - Map parameters using connected upstream variables, typed constants, or expressions, and pin an exact published version. String constants need no manual quotation marks.
-- Open a node’s **Node expression** editor to change its calculations, mappings and connections together. Syntax and scope errors mark their owning nodes red; runtime failures also mark the calling reference.
+- Open a node’s **Node expression** editor to change its calculations, mappings and connections together. Syntax and scope errors mark their owning nodes red, and each card and the inspector state the node's first problem as a sentence ("Connect the True and False exits"); runtime failures also mark the calling reference.
 - Browse referenced versions in one modal with **Back** and **Close all**, preserving the parent draft.
-- Test the current graph without saving; inspect results and a highlighted execution path. Error actions jump to the affected node, including failures inside referenced rules.
+- Test the current graph without saving, entering inputs in a form built from their declared types (an input can be left out or sent as null) or as JSON; inspect results and a highlighted execution path. Error actions jump to the affected node, including failures inside referenced rules, and a refused run lists every problem of the graph.
 - Edit the rule name and description with the gear beside the current rule name.
-- Save incomplete drafts, validate complete graphs, and publish immutable versions.
+- Save incomplete drafts, validate complete graphs, and publish immutable versions. Publishing shows what changed since the latest version and takes an optional release note, which the version history lists; a draft identical to the latest version cannot be published again, and the library marks rules with unpublished changes.
 - Inspect historical versions, export graph JSON, and execute releases in the API playground.
 - Call the service using HTTP/cURL from any origin. Authentication is deliberately deferred.
 
@@ -319,7 +320,7 @@ Every executable artifact uses the same graph schema. `kind` is an organizationa
 | Condition rule | Decide whether a condition is met | `amount >= 100` → true/false |
 | Decision tree | Combine branching decisions and calculations | Choose a discount by customer tier and order total |
 
-All types support the same nodes, references, fan-out, and output values. Currently new Formula and Decision tree artifacts share the basic calculation template; Condition rule starts with a boolean branching template. Existing graphs are never constrained by their category.
+All types support the same nodes, references, fan-out, and output values. A new Formula starts with one calculation, a Decision tree with a branch whose True side calculates a discount, and a Condition rule with a boolean branching template. Existing graphs are never constrained by their category.
 
 ```text
 Rule (stable ID)
@@ -404,6 +405,6 @@ GitHub Actions runs module-boundary and native startup diagnostics checks, Java 
 
 ### Code studio and data sources
 
-Use the separate **Code studio** page for Monaco editing, function chips grouped by purpose with expandable categories, search and hover help, reusable module insertion, and bidirectional graph editing. **Data sources** supplies missing inputs from versioned lookup tables or HTTP JSON APIs. See [the studio guide](docs/studio.md) for syntax, examples, compatibility boundaries, source configuration, and endpoints.
+Use the separate **Code studio** page for Monaco editing, function chips grouped by purpose with expandable categories, search and hover help, reusable module insertion, and bidirectional graph editing. **Data sources** supplies missing inputs from versioned lookup tables, edited as a table or as JSON, or HTTP JSON APIs. See [the studio guide](docs/studio.md) for syntax, examples, compatibility boundaries, source configuration, and endpoints.
 
 Graph expressions also offer **Functions & editor**, with the same catalog, completion, variable insertion and validation. Condition nodes with cases provide ordered, first-match cases plus Default (stored and scripted as a `SWITCH`, while a True/False Condition stays a `CONDITION`); **Transform** nodes provide field mappings or whole object/array expressions for data cleaning, conversion and reshaping. Both round-trip through Code studio and use the normal save, publish and reuse workflow. Existing graphs and published versions keep both node types and their behavior.

@@ -46,6 +46,7 @@ async function openRule(page: Page, request: APIRequestContext) {
   });
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
   return id;
 }
 async function holdPreview(page: Page) {

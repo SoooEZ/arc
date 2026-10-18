@@ -94,6 +94,7 @@ const summary = (index: number): RuleSummary => ({
   nodeCount: 2,
   inputCount: 0,
   referenceCount: 0,
+  draftChanged: false,
 });
 const deferred = () => {
   let release!: () => void;

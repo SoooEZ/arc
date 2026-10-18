@@ -25,6 +25,7 @@ function summary(
     nodeCount: 2,
     inputCount: 1,
     referenceCount: 0,
+    draftChanged: false,
   };
 }
 

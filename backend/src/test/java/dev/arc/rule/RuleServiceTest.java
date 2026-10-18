@@ -7,6 +7,7 @@ import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import dev.arc.engine.Limits;
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
@@ -99,10 +100,10 @@ class RuleServiceTest {
             () -> service.update("example", new RuleService.Update("New", "", 2, draft.draft())))
         .isInstanceOf(ArcException.class)
         .hasMessageContaining("changed in another editor");
-    assertThatThrownBy(() -> service.publish("example", 2))
+    assertThatThrownBy(() -> service.publish("example", 2, null))
         .hasMessageContaining("changed in another editor");
     verify(repository, never()).update(anyString(), anyString(), anyString(), any(), any());
-    verify(repository, never()).publish(any(), any());
+    verify(repository, never()).publish(any(), any(), any());
     verifyNoInteractions(definitions);
   }
 
@@ -112,20 +113,35 @@ class RuleServiceTest {
     doThrow(ArcException.invalid("Missing source mapping"))
         .when(definitions)
         .validateForPublication(draft.draft());
-    assertThatThrownBy(() -> service.publish("example", 3))
+    assertThatThrownBy(() -> service.publish("example", 3, null))
         .hasMessageContaining("Missing source mapping");
-    verify(repository, never()).publish(any(), any());
+    verify(repository, never()).publish(any(), any(), any());
   }
 
   @Test
   void publicationLocksAndValidatesBeforeSnapshotting() {
     when(repository.lockForPublication("example")).thenReturn(draft);
-    when(repository.publish(draft, Set.of())).thenReturn(draft);
-    assertThat(service.publish("example", 3)).isSameAs(draft);
+    when(repository.publish(draft, Set.of(), "Adds tiers")).thenReturn(draft);
+    assertThat(service.publish("example", 3, "Adds tiers")).isSameAs(draft);
     var order = inOrder(repository, definitions);
     order.verify(repository).lockForPublication("example");
     order.verify(definitions).validateForPublication(draft.draft());
-    order.verify(repository).publish(draft, Set.of());
+    order.verify(repository).publish(draft, Set.of(), "Adds tiers");
+  }
+
+  /** A blank note is no note, and a note over its limit publishes nothing. */
+  @Test
+  void aReleaseNoteIsKeptAsWrittenWithinItsLimit() {
+    when(repository.lockForPublication("example")).thenReturn(draft);
+    when(repository.publish(draft, Set.of(), null)).thenReturn(draft);
+    service.publish("example", 3, "   ");
+    verify(repository).publish(draft, Set.of(), null);
+    String tooLong = "x".repeat(Limits.MAX_RELEASE_NOTE_CHARACTERS + 1);
+    assertThatThrownBy(() -> service.publish("example", 3, tooLong))
+        .isInstanceOfSatisfying(
+            ArcException.class, error -> assertThat(error.status()).isEqualTo(422))
+        .hasMessage("Release note exceeds 500 characters");
+    verify(repository, never()).publish(draft, Set.of(), tooLong);
   }
 
   @Test
@@ -282,14 +298,14 @@ class RuleServiceTest {
         new Rule("example", "Example", "", "RULE", calling, 3, null, Instant.EPOCH, Instant.EPOCH);
     when(repository.lockForPublication("example")).thenReturn(callingDraft);
     when(repository.lockForSave("example")).thenReturn(callingDraft.revision());
-    when(repository.publish(callingDraft, Set.of("callee"))).thenReturn(callingDraft);
+    when(repository.publish(callingDraft, Set.of("callee"), null)).thenReturn(callingDraft);
 
-    service.publish("example", 3);
+    service.publish("example", 3, null);
     var publication = inOrder(repository, definitions);
     publication.verify(repository).lockForPublication("example");
     publication.verify(repository).lockCallees(Set.of("callee"));
     publication.verify(definitions).validateForPublication(calling);
-    publication.verify(repository).publish(callingDraft, Set.of("callee"));
+    publication.verify(repository).publish(callingDraft, Set.of("callee"), null);
 
     service.update("example", new RuleService.Update("Example", "", 3, calling));
     var save = inOrder(repository);

@@ -22,6 +22,7 @@ export function offersInputEditing(
 export default function ExecutionError({
   error,
   problem,
+  others,
   shown,
   inputNodeId,
   onNode,
@@ -30,6 +31,8 @@ export default function ExecutionError({
 }: {
   error: string;
   problem: GraphProblem | null;
+  /** The graph's other current problems: a refused run reports only its first. */
+  others: GraphProblem[];
   /** The rule version the editor shows; null version for the draft. */
   shown: { ruleId: string; version: number | null };
   /** The shown graph's Input node, or null when the draft has none. */
@@ -86,6 +89,52 @@ export default function ExecutionError({
           </Button>
         )}
       </div>
+      {!!others.length && (
+        <OtherProblems problems={others} shown={shown} onNode={onNode} />
+      )}
     </Alert>
+  );
+}
+
+/** The graph's other problems, each with a way to its node. */
+function OtherProblems({
+  problems,
+  shown,
+  onNode,
+}: {
+  problems: GraphProblem[];
+  shown: { ruleId: string; version: number | null };
+  onNode: (id: string) => void;
+}) {
+  return (
+    <div className="execution-other-problems">
+      <strong>
+        {problems.length === 1
+          ? "1 more problem in this graph"
+          : `${problems.length} more problems in this graph`}
+      </strong>
+      <ul>
+        {problems.map((other, index) => {
+          const at = other.locations.find((location) =>
+            isCurrentGraphLocation(location, shown),
+          );
+          return (
+            <li key={index}>
+              <span>{other.message}</span>
+              {at && (
+                <Button
+                  size="small"
+                  color="inherit"
+                  aria-label={`Show ${at.label}`}
+                  onClick={() => onNode(at.nodeId)}
+                >
+                  Show
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
