@@ -1,6 +1,6 @@
 import { Button } from "@mui/material";
 import { ArrowRight, Plus } from "lucide-react";
-import { createSourceDraft } from "./model";
+import { createSourceDraft } from "./sourceBuffers";
 import type { SourceEditor } from "./useSourceEditor";
 import SourceDetail from "./SourceDetail";
 import SourceList from "./SourceList";

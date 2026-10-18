@@ -169,8 +169,32 @@
 .rule-settings-content {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 24px;
   padding-top: 12px !important;
+}
+/* Its sections: Details, About this rule, Used by, Copy or delete. */
+.rule-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rule-settings-section + .rule-settings-section {
+  padding-top: 20px;
+  border-top: 1px solid var(--color-editor-border);
+}
+.rule-settings-heading {
+  margin: 0;
+  color: var(--color-inspector-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.rule-settings-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
 }
 .read-only-field {
   display: flex;
@@ -185,9 +209,6 @@
 }
 /* The rules that call this one: a link each, with the versions it runs. */
 .rule-callers {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
   font-size: var(--text-sm);
   color: #677a52;
 }
@@ -229,14 +250,13 @@
   gap: 8px;
   color: var(--color-library-muted);
 }
-/* Deleting the rule sits apart from the settings that Apply changes saves. */
+/* Confirming a deletion takes the whole row under Duplicate rule…. */
 .rule-settings-danger {
   display: flex;
+  flex-basis: 100%;
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
-  padding-top: 18px;
-  border-top: 1px solid var(--color-editor-border);
 }
 .rule-settings-danger > .MuiAlert-root {
   align-self: stretch;

@@ -13,12 +13,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class CatalogControllerTest {
-  private final RuleRepository rules = mock(RuleRepository.class);
+  private final RuleCatalog rules = mock(RuleCatalog.class);
   private final SourceRepository sources = mock(SourceRepository.class);
   private final org.springframework.test.web.servlet.MockMvc mvc =
       MockMvcBuilders.standaloneSetup(
               new RuleController(
-                  new RuleService(rules, null, null, null, null), mock(RuleExecutionService.class)),
+                  new RuleService(null, null, null, null, null),
+                  new RuleCatalogService(rules),
+                  mock(RuleExecutionService.class)),
               new SourceController(
                   new SourceService(sources, null), mock(SourceExecutionService.class)))
           .setControllerAdvice(new Errors())
@@ -96,10 +98,10 @@ class CatalogControllerTest {
   @Test
   void sourceAndVersionSummariesExcludeConfigurationWhileLegacyDetailsStayAvailable()
       throws Exception {
-    when(sources.catalog(0, 20, ""))
+    when(sources.catalog(new PageRequest(0, 20, "")))
         .thenReturn(
             new CatalogPage<>(List.of(new SourceSummary("table", "Table", 3, "LOOKUP")), 1, 0, 20));
-    when(sources.versionSummaries("table", 0, 20))
+    when(sources.versionSummaries("table", new PageRequest(0, 20, "")))
         .thenReturn(
             new CatalogPage<>(
                 List.of(new SourceVersionSummary("table", 3, Instant.EPOCH)), 3, 0, 20));
@@ -160,8 +162,7 @@ class CatalogControllerTest {
   void catalogSearchesIgnoreSurroundingWhitespaceLikeVersionSearch() throws Exception {
     when(rules.catalog(any(), any(), anyBoolean()))
         .thenReturn(new CatalogPage<>(List.of(), 0, 0, 20));
-    when(sources.catalog(anyInt(), anyInt(), any()))
-        .thenReturn(new CatalogPage<>(List.of(), 0, 0, 20));
+    when(sources.catalog(any())).thenReturn(new CatalogPage<>(List.of(), 0, 0, 20));
     String longest = "a".repeat(200);
     for (String search : List.of("  tax  ", "   ", " " + longest + "  ")) {
       mvc.perform(get("/api/rule-summaries").param("search", search)).andExpect(status().isOk());
@@ -169,7 +170,7 @@ class CatalogControllerTest {
     }
     for (String trimmed : List.of("tax", "", longest)) {
       verify(rules).catalog(new PageRequest(0, 20, trimmed), "", false);
-      verify(sources).catalog(0, 20, trimmed);
+      verify(sources).catalog(new PageRequest(0, 20, trimmed));
     }
     verifyNoMoreInteractions(rules, sources);
   }

@@ -26,12 +26,12 @@ public class SourceService {
   }
 
   public CatalogPage<SourceSummary> catalog(PageRequest page) {
-    return repository.catalog(page.offset(), page.limit(), page.search());
+    return repository.catalog(page);
   }
 
   /** Version histories are not searchable; the page's search is ignored. */
   public CatalogPage<SourceVersionSummary> versionSummaries(String id, PageRequest page) {
-    return repository.versionSummaries(id, page.offset(), page.limit());
+    return repository.versionSummaries(id, page);
   }
 
   public List<DataSource> list() {

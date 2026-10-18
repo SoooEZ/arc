@@ -4,7 +4,7 @@ import {
   createSourceDraft,
   providerParameterTemplate,
   sourceCandidate,
-} from "../../src/features/sources/model";
+} from "../../src/features/sources/sourceBuffers";
 import {
   openSource,
   sourceDocumentReducer,

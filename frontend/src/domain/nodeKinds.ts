@@ -5,6 +5,7 @@ import type {
   RuleNode,
   TransformField,
 } from "../types";
+import { counted } from "./text";
 
 /**
  * Outgoing connection handles of a node kind. `domain/nodePorts` turns them
@@ -122,8 +123,7 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
     properties: [],
     minimapColor: neutralMinimap,
     newNodeFields: () => ({}),
-    summary: (_node, inputCount) =>
-      `${inputCount} input parameter${inputCount === 1 ? "" : "s"}`,
+    summary: (_node, inputCount) => counted(inputCount, "input parameter"),
   },
   FORMULA: {
     label: "Formula",

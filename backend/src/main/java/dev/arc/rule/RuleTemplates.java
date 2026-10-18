@@ -8,6 +8,7 @@ import dev.arc.model.Handles;
 import dev.arc.model.NodeKind;
 import dev.arc.model.RuleKind;
 import java.util.List;
+import java.util.Map;
 
 /** The graphs new rules start from, and the node builders the sample rules share. */
 public final class RuleTemplates {
@@ -91,6 +92,35 @@ public final class RuleTemplates {
         null,
         null,
         null,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * A Reference at a canvas position: the pinned rule and version, what it passes to each input and
+   * the result variable it stores.
+   */
+  static Node reference(
+      String id,
+      String label,
+      double x,
+      double y,
+      String ruleId,
+      int version,
+      Map<String, String> bindings,
+      String output) {
+    return new Node(
+        id,
+        REFERENCE.name(),
+        label,
+        new Position(x, y),
+        null,
+        output,
+        ruleId,
+        version,
+        bindings,
         null,
         null,
         null,

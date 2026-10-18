@@ -9,6 +9,7 @@ import dev.arc.model.CatalogPage;
 import dev.arc.model.DataSource;
 import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.SourceBinding;
+import dev.arc.model.PageRequest;
 import dev.arc.model.SourceDefinition;
 import dev.arc.model.SourceSummary;
 import dev.arc.model.SourceVersionSummary;
@@ -185,12 +186,12 @@ class SourceConfigurationConsistencyTest {
     }
 
     @Override
-    public CatalogPage<SourceSummary> catalog(int offset, int limit, String search) {
+    public CatalogPage<SourceSummary> catalog(PageRequest page) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public CatalogPage<SourceVersionSummary> versionSummaries(String id, int offset, int limit) {
+    public CatalogPage<SourceVersionSummary> versionSummaries(String id, PageRequest page) {
       throw new UnsupportedOperationException();
     }
 

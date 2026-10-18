@@ -6,14 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  Alert,
-  Button,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-} from "@mui/material";
+import { Alert, Button } from "@mui/material";
 import {
   Background,
   BackgroundVariant,
@@ -22,7 +15,7 @@ import {
   ReactFlow,
   useReactFlow,
 } from "@xyflow/react";
-import { Code2, Pencil, TextCursorInput, Trash2 } from "lucide-react";
+import { Code2, Trash2 } from "lucide-react";
 import type { Definition, NodeType } from "../../../types";
 import GraphNode, { type FlowNode } from "./GraphNode";
 import RoutedEdge, { RoutedConnectionLine, RoutingContext } from "./RoutedEdge";
@@ -34,11 +27,13 @@ import { canAddNode } from "../../../domain/limits";
 import { nodeKinds } from "../../../domain/nodeKinds";
 import { sourcePort, type LayoutDirection } from "../../../domain/nodePorts";
 import type { useGraphCanvas } from "./useGraphCanvas";
-import type { EditorCapabilities } from "../editorCapabilities";
+import type { EditorCapabilities } from "../document/editorCapabilities";
 import GraphToolbar from "./GraphToolbar";
 import GraphOutline from "./GraphOutline";
 import NodeKindMenu from "./NodeKindMenu";
+import CanvasContextMenu, { type CanvasMenuTarget } from "./CanvasContextMenu";
 import { useCanvasShortcuts } from "./useCanvasShortcuts";
+import { counted } from "../../../domain/text";
 const nodeTypes = { arc: GraphNode };
 const edgeTypes = { routed: RoutedEdge };
 const initialFit = { padding: 0.18 };
@@ -139,28 +134,7 @@ export default function GraphCanvas({
   children,
 }: Props) {
   const [outline, setOutline] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{
-    kind: "node" | "edge";
-    id: string;
-    left: number;
-    top: number;
-  } | null>(null);
-  const menuNode =
-    contextMenu?.kind === "node"
-      ? definition.nodes.find((node) => node.id === contextMenu.id)
-      : undefined;
-  const menuEdge =
-    contextMenu?.kind === "edge"
-      ? definition.edges.find((edge) => edge.id === contextMenu.id)
-      : undefined;
-  const menuTargetRemovable = menuNode
-    ? canRemoveGraphNode(definition, menuNode.id)
-    : !!menuEdge;
-  const deleteMenuTarget = () => {
-    setContextMenu(null);
-    if (menuNode) onDeleteNode(menuNode.id);
-    else if (menuEdge) removeEdge(menuEdge.id);
-  };
+  const [contextMenu, setContextMenu] = useState<CanvasMenuTarget | null>(null);
   // The selection follows the draft: a removed connection is no longer selected.
   const removeEdge = (id: string) => {
     edit((current) => {
@@ -403,62 +377,16 @@ export default function GraphCanvas({
             />
           </ReactFlow>
         </RoutingContext.Provider>
-        <Menu
-          open={!!contextMenu && (!!menuNode || !!menuEdge)}
+        <CanvasContextMenu
+          target={contextMenu}
+          definition={definition}
+          canEdit={can.edit}
           onClose={() => setContextMenu(null)}
-          anchorReference="anchorPosition"
-          anchorPosition={
-            contextMenu
-              ? { left: contextMenu.left, top: contextMenu.top }
-              : undefined
-          }
-          slotProps={{
-            list: {
-              "aria-label":
-                contextMenu?.kind === "edge"
-                  ? "Connection actions"
-                  : "Node actions",
-            },
-          }}
-        >
-          {menuNode && (
-            <MenuItem
-              disabled={!can.edit}
-              onClick={() => {
-                setContextMenu(null);
-                onRenameNode(menuNode.id);
-              }}
-            >
-              <ListItemIcon>
-                <TextCursorInput size={16} />
-              </ListItemIcon>
-              <ListItemText>Rename</ListItemText>
-            </MenuItem>
-          )}
-          {menuNode && (
-            <MenuItem
-              disabled={!can.edit}
-              onClick={() => {
-                setContextMenu(null);
-                onEditNode(menuNode.id);
-              }}
-            >
-              <ListItemIcon>
-                <Pencil size={16} />
-              </ListItemIcon>
-              <ListItemText>Edit</ListItemText>
-            </MenuItem>
-          )}
-          <MenuItem
-            disabled={!can.edit || !menuTargetRemovable}
-            onClick={deleteMenuTarget}
-          >
-            <ListItemIcon>
-              <Trash2 size={16} />
-            </ListItemIcon>
-            <ListItemText>Delete</ListItemText>
-          </MenuItem>
-        </Menu>
+          onRenameNode={onRenameNode}
+          onEditNode={onEditNode}
+          onDeleteNode={onDeleteNode}
+          onDeleteEdge={removeEdge}
+        />
         <NodeKindMenu
           anchor={exitMenu?.anchor ?? null}
           label={exitMenuLabel(definition, exitMenu)}
@@ -511,11 +439,9 @@ export default function GraphCanvas({
           ARC engine
         </span>
         <span>
-          {definition.inputs.length}{" "}
-          {definition.inputs.length === 1 ? "input" : "inputs"}
+          {counted(definition.inputs.length, "input")}
           <span className="tiny-divider" />
-          {definition.edges.length}{" "}
-          {definition.edges.length === 1 ? "connection" : "connections"}
+          {counted(definition.edges.length, "connection")}
           <span className="tiny-divider" />
           <Code2 size={12} />
           Schema v{definition.schemaVersion}

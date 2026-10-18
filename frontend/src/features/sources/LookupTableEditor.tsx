@@ -14,6 +14,7 @@ import {
   readLookupTable,
   type LookupRow,
 } from "./lookupTable";
+import { counted } from "../../domain/text";
 
 /**
  * Lookup entries as an editable table (lookupTable.ts): a row per key, a
@@ -143,9 +144,7 @@ export default function LookupTableEditor({
             onAdd={(field) => setNewFields((current) => [...current, field])}
           />
         )}
-        <span>
-          {rows.length} {rows.length === 1 ? "entry" : "entries"}
-        </span>
+        <span>{counted(rows.length, "entry", "entries")}</span>
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ import {
   shownView,
   viewToggleLabel,
   type EditorTask,
-} from "../../src/features/editor/editorCapabilities";
+} from "../../src/features/editor/document/editorCapabilities";
 
 const tasks: (EditorTask | "")[] = [
   "",

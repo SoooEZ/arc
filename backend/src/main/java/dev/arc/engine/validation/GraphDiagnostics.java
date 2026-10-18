@@ -25,7 +25,7 @@ final class GraphDiagnostics {
     GraphValidation.Pass pass = graphValidation.check(definition, pins, problems::add);
     if (!pass.shaped()) return new Validator.Diagnosis(problems.list(), false, List.of());
     var dependencies =
-        NodeValidation.dependencies(definition, pass.expressions()::formulaCalls).stream()
+        RuleCalls.dependencies(definition, pass.expressions()::formulaCalls).stream()
             .filter(dependency -> !pins.rejected(dependency))
             .toList();
     return new Validator.Diagnosis(problems.list(), true, dependencies);
@@ -36,7 +36,7 @@ final class GraphDiagnostics {
    * a later source-contract check must not resolve and report them again.
    */
   private static final class RejectedPins implements RuleResolver {
-    private record Pin(String ruleId, int version, Validator.Dependency.Call call) {}
+    private record Pin(String ruleId, int version, RuleCalls.Dependency.Call call) {}
 
     private final RuleResolver delegate;
     private final Set<Pin> rejected = new HashSet<>();
@@ -50,7 +50,7 @@ final class GraphDiagnostics {
       try {
         return delegate.resolve(id, version);
       } catch (ArcException error) {
-        rejected.add(new Pin(id, version, Validator.Dependency.Call.REFERENCE));
+        rejected.add(new Pin(id, version, RuleCalls.Dependency.Call.REFERENCE));
         throw error;
       }
     }
@@ -60,12 +60,12 @@ final class GraphDiagnostics {
       try {
         return delegate.resolveFormula(id, version);
       } catch (ArcException error) {
-        rejected.add(new Pin(id, version, Validator.Dependency.Call.FORMULA));
+        rejected.add(new Pin(id, version, RuleCalls.Dependency.Call.FORMULA));
         throw error;
       }
     }
 
-    boolean rejected(Validator.Dependency dependency) {
+    boolean rejected(RuleCalls.Dependency dependency) {
       return rejected.contains(
           new Pin(dependency.ruleId(), dependency.version(), dependency.call()));
     }

@@ -15,6 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.DataSource;
+import dev.arc.rule.RuleCatalog;
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
@@ -47,6 +49,7 @@ import org.springframework.test.web.servlet.ResultActions;
 @WebMvcTest({RuleController.class, SourceController.class})
 @Import({
   RuleService.class,
+  RuleCatalogService.class,
   Validator.class,
   SourceService.class,
   SourceValidator.class,
@@ -58,6 +61,7 @@ import org.springframework.test.web.servlet.ResultActions;
 class RequiredFlagWebTest {
   @Autowired private MockMvc mvc;
   @MockitoBean private RuleRepository rules;
+  @MockitoBean private RuleCatalog catalog;
   @MockitoBean private RuleTestCaseRepository testCases;
   @MockitoBean private RuleDefinitionService definitions;
   @MockitoBean private Engine engine;

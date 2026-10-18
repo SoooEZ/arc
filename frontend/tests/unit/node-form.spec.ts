@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { Definition } from "../../src/types";
 import { patchGraphNode } from "../../src/domain/graph";
 import { withBranchMode } from "../../src/domain/switchBranches";
-import { applyNodeFormDraft } from "../../src/features/editor/nodeFormDraft";
+import { applyNodeFormDraft } from "../../src/features/editor/dialogs/nodeFormDraft";
 
 const definition = (): Definition => ({
   schemaVersion: 1,

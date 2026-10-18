@@ -5,7 +5,7 @@ import { MAX_SOURCE_PARAMETERS } from "../../src/domain/limits";
 import {
   sourceBuffers,
   sourceParameterBufferError,
-} from "../../src/features/sources/model";
+} from "../../src/features/sources/sourceBuffers";
 import {
   isLookupKey,
   newParameterRow,

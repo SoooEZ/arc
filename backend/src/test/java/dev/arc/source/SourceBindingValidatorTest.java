@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dev.arc.engine.RuleResolver;
-import dev.arc.engine.validation.Validator;
+import dev.arc.engine.validation.RuleCalls;
 import dev.arc.error.ArcException;
 import dev.arc.error.ArcException.Location;
 import dev.arc.model.DataSource;
@@ -165,7 +165,7 @@ class SourceBindingValidatorTest {
             List.of(mapped),
             List.of(inputNode("in", "Inputs"), reported, walked, outputNode("out", "Out", "1")),
             List.of());
-    var unreported = List.of(Validator.dependencies(withPins).get(1));
+    var unreported = List.of(RuleCalls.dependencies(withPins).get(1));
     assertThat(unreported.getFirst().ruleId()).isEqualTo("good");
     validator.validateRemainingPins(withPins, counting, unreported, CalleeCheck.NONE);
     assertThat(resolved).containsExactly("good@1");

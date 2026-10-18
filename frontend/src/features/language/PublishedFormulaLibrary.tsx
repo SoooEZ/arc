@@ -4,6 +4,7 @@ import { ruleApi } from "../../api/rules";
 import { useAutocompletePages } from "../../hooks/useAutocompletePages";
 import type { RuleSummary } from "../../types";
 import { useLibraryInsertion } from "./useLibraryInsertion";
+import { counted } from "../../domain/text";
 
 function catalogStatus(catalog: {
   loading: boolean;
@@ -13,7 +14,7 @@ function catalogStatus(catalog: {
 }): string {
   if (catalog.loading) return "Loading formulas…";
   if (catalog.items.length)
-    return `${catalog.items.length} of ${catalog.total} ${catalog.total === 1 ? "formula" : "formulas"}`;
+    return `${catalog.items.length} of ${counted(catalog.total, "formula")}`;
   return catalog.error ? "" : "No matching published formulas.";
 }
 
@@ -80,7 +81,7 @@ export default function PublishedFormulaLibrary({
           <Tooltip
             key={rule.id}
             describeChild
-            title={`${rule.id} · version ${rule.publishedVersion} · ${rule.inputCount} ${rule.inputCount === 1 ? "parameter" : "parameters"}`}
+            title={`${rule.id} · version ${rule.publishedVersion} · ${counted(rule.inputCount, "parameter")}`}
           >
             <span className="published-formula-item">
               <button

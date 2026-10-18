@@ -64,7 +64,7 @@ final class NodeValidation {
             scope,
             expressions,
             resolver,
-            unavailable -> unavailableAtNode(unavailable, definition));
+            unavailable -> ScopeMessages.unavailableAtNode(unavailable, definition));
       if (kind.uses(Property.RULE)) checkPinnedRule(node, resolver);
 
       if (kind.storesResult()) {
@@ -107,86 +107,6 @@ final class NodeValidation {
     } catch (ArcException error) {
       throw error.withContext(expression.label());
     }
-  }
-
-  /**
-   * Why a node's expression cannot read some variables, in words that say what to do. A name that
-   * no input or result variable of the graph declares is told apart from one that some step sets
-   * but not every path into this node: renaming an input left its old name in every expression that
-   * read it, which the scope plan alone reported as unavailable on an incoming path. A single
-   * undeclared name that closely matches a declared one asks whether that one was meant ({@link
-   * NameSuggestions}).
-   */
-  static String unavailableAtNode(SortedSet<String> unknown, Definition definition) {
-    // Declaration order, which breaks ties between equally close suggestions.
-    var declared = new LinkedHashSet<String>();
-    for (Input input : definition.inputs()) declared.add(input.name());
-    for (Node node : definition.nodes())
-      if (node.storesResult() && node.resultName() != null) declared.add(node.resultName());
-    var undeclared = new ArrayList<String>();
-    var unset = new ArrayList<String>();
-    for (String name : unknown) {
-      if (declared.contains(name)) unset.add(name);
-      else undeclared.add(name);
-    }
-    var sentences = new ArrayList<String>();
-    if (undeclared.size() == 1) {
-      String name = undeclared.getFirst();
-      String meant = NameSuggestions.closest(name, declared);
-      sentences.add(
-          "uses "
-              + name
-              + ", which no input or result variable provides; "
-              + (meant == null
-                  ? "correct the name or add an input named " + name + "."
-                  : "did you mean " + meant + "?"));
-    } else if (!undeclared.isEmpty())
-      sentences.add(
-          "uses "
-              + GraphValidation.listed(undeclared)
-              + ", which no input or result variable provides; correct the names or add inputs"
-              + " with those names.");
-    if (!unset.isEmpty())
-      sentences.add(
-          (undeclared.isEmpty() ? "uses " : "It also uses ")
-              + GraphValidation.listed(unset)
-              + (unset.size() == 1 ? ", which is not set" : ", which are not set")
-              + " on every path into this step; set "
-              + (unset.size() == 1 ? "it" : "them")
-              + " on each path that leads here.");
-    return withoutFinalPeriod(String.join(" ", sentences));
-  }
-
-  /**
-   * Why a source mapping cannot read some names: it reads the rule's declared inputs alone. A
-   * single name that closely matches an input asks whether that input was meant.
-   */
-  static String unavailableToSourceMapping(SortedSet<String> unknown, Definition definition) {
-    if (unknown.size() == 1) {
-      var inputs = new ArrayList<String>();
-      for (Input input : definition.inputs()) inputs.add(input.name());
-      String meant = NameSuggestions.closest(unknown.first(), inputs);
-      if (meant != null)
-        return "uses "
-            + unknown.first()
-            + ", which is not an input of this rule; did you mean "
-            + meant
-            + "?";
-    }
-    return "uses "
-        + GraphValidation.listed(new ArrayList<>(unknown))
-        + (unknown.size() == 1
-            ? ", which is not an input of this rule"
-            : ", which are not inputs of this rule")
-        + "; a source mapping reads only inputs";
-  }
-
-  /**
-   * Problems end without a period, as every other validation message does, so only a question keeps
-   * its mark.
-   */
-  private static String withoutFinalPeriod(String message) {
-    return message.endsWith(".") ? message.substring(0, message.length() - 1) : message;
   }
 
   /**
@@ -291,102 +211,6 @@ final class NodeValidation {
       mappings.put(input.name(), owned);
     }
     return mappings;
-  }
-
-  /**
-   * Rules a graph calls: complete Reference pins in node order, then {@code @id:version} calls in
-   * node order, with Input source mappings at the Input node. {@code formulaCalls} lists the calls
-   * of one expression.
-   */
-  static List<Validator.Dependency> dependencies(
-      Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
-    var dependencies = new ArrayList<Validator.Dependency>();
-    for (Node node : pinningNodes(definition))
-      if (node.ruleId() != null && node.version() != null)
-        dependencies.add(Validator.Dependency.reference(node));
-    for (Node node : definition.nodes()) {
-      var owned = new ArrayList<>(expressions(node));
-      if (node.kind() == NodeKind.INPUT)
-        for (var mappings : sourceMappings(definition).values()) owned.addAll(mappings);
-      try {
-        for (OwnedExpression expression : owned)
-          for (var call : formulaCalls.apply(expression.source()))
-            dependencies.add(Validator.Dependency.formula(node, call));
-      } catch (ArcException error) {
-        throw error.atNode(null, null, node.id(), node.label());
-      }
-    }
-    return List.copyOf(dependencies);
-  }
-
-  /**
-   * A rule that a stored definition names: a node's pinned rule with its version, null while a
-   * Reference has chosen the rule but not its version, or an {@code @id:version} call.
-   */
-  record NamedCall(String ruleId, Integer version) {}
-
-  /** See {@link Validator#calledRuleIds}: the IDs of {@link #namedCalls}, in their order. */
-  static Set<String> calledRuleIds(
-      Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
-    var ids = new LinkedHashSet<String>();
-    for (NamedCall call : namedCalls(definition, formulaCalls)) ids.add(call.ruleId());
-    return ids;
-  }
-
-  /**
-   * Every rule the definition names: node pins in node order, then the calls of the Input source
-   * mappings and of the nodes' expressions. A stored row is read as it is, so a deletion check or a
-   * publish never answers 500 for a row of another model shape: a missing input or node list, a
-   * null node, a node of a type this model does not know (which keeps the pin and the expressions
-   * it carries) and a source without mappings call nothing more. Every expression field is read
-   * whatever the node's type, which for a shaped row is exactly what {@link #expressions}
-   * enumerates.
-   */
-  static List<NamedCall> namedCalls(
-      Definition definition, Function<String, List<Expressions.FormulaCall>> formulaCalls) {
-    var calls = new ArrayList<NamedCall>();
-    List<Node> nodes = definition.nodes() == null ? List.of() : definition.nodes();
-    for (Node node : nodes)
-      if (node != null && node.ruleId() != null)
-        calls.add(new NamedCall(node.ruleId(), node.version()));
-    var sources = new ArrayList<String>();
-    if (definition.inputs() != null)
-      for (Input input : definition.inputs())
-        if (input != null && input.source() != null && input.source().bindings() != null)
-          sources.addAll(input.source().bindings().values());
-    for (Node node : nodes) if (node != null) sources.addAll(expressionTexts(node));
-    for (String source : sources)
-      for (var call : formulaCalls.apply(source))
-        calls.add(new NamedCall(call.id(), call.version()));
-    return calls;
-  }
-
-  /** Every expression text a node may hold, whatever its type; unset ones are null. */
-  private static List<String> expressionTexts(Node node) {
-    var texts = new ArrayList<String>();
-    texts.add(node.expression());
-    texts.add(node.selector());
-    if (node.cases() != null)
-      for (BranchCase option : node.cases()) if (option != null) texts.add(option.expression());
-    if (node.fields() != null)
-      for (Field field : node.fields()) if (field != null) texts.add(field.expression());
-    if (node.bindings() != null) texts.addAll(node.bindings().values());
-    return texts;
-  }
-
-  /**
-   * The nodes that pin a rule, chosen by the {@link Property#RULE} fact rather than by kind: a new
-   * kind that pins a rule is then held against the callee's deletion like a Reference.
-   */
-  private static List<Node> pinningNodes(Definition definition) {
-    return definition.nodes().stream().filter(node -> node.kind().uses(Property.RULE)).toList();
-  }
-
-  /** Calls of one expression; a malformed expression fails, located at its node by the caller. */
-  static List<Expressions.FormulaCall> formulaCallsOf(String source) {
-    return source == null || !source.contains("@")
-        ? List.of()
-        : Expressions.compile(source).formulaCalls();
   }
 
   private static void require(boolean condition, String message) {

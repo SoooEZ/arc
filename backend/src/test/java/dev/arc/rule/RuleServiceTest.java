@@ -17,8 +17,6 @@ import dev.arc.model.Definition.Input;
 import dev.arc.model.Definition.Node;
 import dev.arc.model.Definition.SourceBinding;
 import dev.arc.model.Rule;
-import dev.arc.model.RuleCaller;
-import dev.arc.model.RuleCaller.Published;
 import dev.arc.model.RuleKind;
 import dev.arc.rule.RuleRepository.Caller;
 import java.time.Instant;
@@ -26,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +56,7 @@ class RuleServiceTest {
 
   /** Payloads keep the kind as text; an unknown one is refused with the choice, never a 400. */
   @Test
-  void unknownKindsAreRefusedByCreateAndByTheCatalogFilter() {
+  void unknownKindsAreRefusedByCreate() {
     for (String kind : Arrays.asList(null, "", "formula", "Formula", "LOOP"))
       assertThatThrownBy(
               () -> service.create(new RuleService.Create("valid-id", "Name", "", kind, null)))
@@ -70,22 +67,8 @@ class RuleServiceTest {
                 assertThat(error.status()).isEqualTo(422);
                 assertThat(error.getMessage()).isEqualTo("Choose DECISION_TREE, FORMULA, or RULE");
               });
-    var page = new dev.arc.model.PageRequest(0, 20, "");
-    for (String kind : List.of("formula", "LOOP"))
-      assertThatThrownBy(() -> service.catalog(page, kind, false))
-          .as(kind)
-          .isInstanceOfSatisfying(
-              ArcException.class,
-              error -> {
-                assertThat(error.status()).isEqualTo(422);
-                assertThat(error.getMessage()).isEqualTo("Unknown rule kind");
-              });
-    verify(repository, never()).catalog(any(), anyString(), anyBoolean());
     verify(repository, never())
         .create(anyString(), anyString(), anyString(), anyString(), any(), any());
-    for (RuleKind kind : RuleKind.values()) service.catalog(page, kind.name(), false);
-    service.catalog(page, "", true);
-    verify(repository).catalog(page, "", true);
     service.create(new RuleService.Create("tree", "Tree", "", "DECISION_TREE", null));
     verify(repository)
         .create(
@@ -564,68 +547,5 @@ class RuleServiceTest {
     verify(repository, never())
         .create(anyString(), anyString(), anyString(), anyString(), any(), any());
     verifyNoInteractions(testCases);
-  }
-
-  /**
-   * Each caller lists the versions its saved draft and its latest published version pin, read from
-   * their definitions one at a time; a caller whose only calls are earlier versions is counted
-   * without a read, and an unpinned Reference names the rule with no version.
-   */
-  @Test
-  void callersListThePinsOfEachDraftAndLatestVersion() {
-    var page = new dev.arc.model.PageRequest(0, 20, "");
-    when(repository.callingRules("rates", page))
-        .thenReturn(
-            new dev.arc.model.CatalogPage<>(
-                List.of(
-                    new RuleRepository.CallingRule("checkout", "Checkout", 3, true, true, 2),
-                    new RuleRepository.CallingRule("drafts", "Drafts", null, true, false, 0),
-                    new RuleRepository.CallingRule("legacy", "Legacy", 4, false, false, 1)),
-                3,
-                0,
-                20));
-    Node v2 = nodeOf("tax", "REFERENCE", "Tax").rule("rates", 2).output("tax").build();
-    var draftDefinition =
-        new Definition(
-            1,
-            List.of(),
-            List.of(inputNode("in", "Input"), v2, node("calc", "FORMULA", "@rates:1(1)", "x")),
-            List.of());
-    Node v1 = nodeOf("tax", "REFERENCE", "Tax").rule("rates", 1).output("tax").build();
-    Node unpinned = nodeOf("tax", "REFERENCE", "Tax").rule("rates", null).output("tax").build();
-    when(repository.callingDefinition("checkout", null, "rates"))
-        .thenReturn(Optional.of(draftDefinition));
-    when(repository.callingDefinition("checkout", 3, "rates"))
-        .thenReturn(Optional.of(graphWith(v1)));
-    when(repository.callingDefinition("drafts", null, "rates"))
-        .thenReturn(Optional.of(graphWith(unpinned)));
-
-    var callers = service.callers("rates", page);
-
-    assertThat(callers.total()).isEqualTo(3);
-    assertThat(callers.items())
-        .containsExactly(
-            new RuleCaller("checkout", "Checkout", List.of(1, 2), new Published(3, List.of(1)), 2),
-            new RuleCaller("drafts", "Drafts", List.of(), null, 0),
-            new RuleCaller("legacy", "Legacy", null, null, 1));
-    verify(repository, never()).callingDefinition(eq("legacy"), any(), anyString());
-  }
-
-  /** A caller that stops calling the rule between the page and its reads shows no pins. */
-  @Test
-  void aCallerThatStopsCallingBetweenTheReadsHasNoPins() {
-    var page = new dev.arc.model.PageRequest(0, 20, "");
-    when(repository.callingRules("rates", page))
-        .thenReturn(
-            new dev.arc.model.CatalogPage<>(
-                List.of(new RuleRepository.CallingRule("checkout", "Checkout", 3, true, true, 0)),
-                1,
-                0,
-                20));
-    when(repository.callingDefinition(eq("checkout"), any(), eq("rates")))
-        .thenReturn(Optional.empty());
-
-    assertThat(service.callers("rates", page).items())
-        .containsExactly(new RuleCaller("checkout", "Checkout", null, null, 0));
   }
 }

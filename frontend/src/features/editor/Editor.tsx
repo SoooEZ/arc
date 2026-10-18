@@ -11,38 +11,40 @@ import {
   editableDraft,
 } from "../../domain/definitionEchoes";
 import Inspector from "./inspector/Inspector";
-import TestPanel from "../execution/TestPanel";
-import RuleSettings from "./RuleSettings";
+import TestPanel from "../execution/testPanel/TestPanel";
+import RuleSettings from "./settings/RuleSettings";
 import ReferenceDialog from "./ReferenceDialog";
-import { useRuleDocument } from "./useRuleDocument";
+import { useRuleDocument } from "./document/useRuleDocument";
 import { useGraphCanvas } from "./canvas/useGraphCanvas";
 import { useGraphProblems } from "./useGraphProblems";
 import EditorHeader from "./EditorHeader";
 import GraphCanvas, { type ExitMenu } from "./canvas/GraphCanvas";
-import VersionHistory from "./VersionHistory";
+import VersionHistory from "./versions/VersionHistory";
 import { useGraphCommands } from "./canvas/useGraphCommands";
 import { useGraphFocus } from "./canvas/useGraphFocus";
-import { exportDefinition } from "./exportDefinition";
-import { usePreviewExecution } from "./usePreviewExecution";
-import { useSavedTests } from "../execution/useSavedTests";
-import { usePublication } from "./usePublication";
+import { exportDefinition } from "../library/exportDefinition";
+import { usePreviewExecution } from "../execution/testPanel/usePreviewExecution";
+import { useSavedTests } from "../execution/testPanel/useSavedTests";
+import { usePublication } from "./versions/usePublication";
 import { useSaveShortcut } from "./useSaveShortcut";
-import { takeRestore } from "./draftRestore";
-import { useNodeDialog } from "./useNodeDialog";
-import LazyNodeDialog from "./LazyNodeDialog";
+import { takeRestore } from "./versions/draftRestore";
+import { useNodeDialog } from "./dialogs/useNodeDialog";
+import LazyNodeDialog from "./dialogs/LazyNodeDialog";
 import { useNodeSelection } from "./useNodeSelection";
 import type { EditorProps, ReferenceTarget } from "./types";
-import type { ComparedState } from "./CompareVersions";
+import type { ComparedState } from "./versions/CompareVersions";
 import { rulePath } from "../../app/routing";
 import {
   setLayoutDirection,
   useLayoutDirection,
 } from "../../app/layoutDirection";
 const CodeStudio = lazy(() => import("../studio/CodeStudio"));
-const NodeExpressionDialog = lazy(() => import("./NodeExpressionDialog"));
-const NodeEditDialog = lazy(() => import("./NodeEditDialog"));
-const PublishDialog = lazy(() => import("./PublishDialog"));
-const CompareVersions = lazy(() => import("./CompareVersions"));
+const NodeExpressionDialog = lazy(
+  () => import("./dialogs/NodeExpressionDialog"),
+);
+const NodeEditDialog = lazy(() => import("./dialogs/NodeEditDialog"));
+const PublishDialog = lazy(() => import("./versions/PublishDialog"));
+const CompareVersions = lazy(() => import("./versions/CompareVersions"));
 const noProblems: GraphProblem[] = [];
 const noErrors: string[] = [];
 

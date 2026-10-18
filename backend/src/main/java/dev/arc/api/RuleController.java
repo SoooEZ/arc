@@ -1,6 +1,7 @@
 package dev.arc.api;
 
 import dev.arc.model.*;
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleExecutionService.*;
 import dev.arc.rule.RuleService;
@@ -13,16 +14,19 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 public class RuleController {
   private final RuleService rules;
+  private final RuleCatalogService catalog;
   private final RuleExecutionService execution;
 
-  public RuleController(RuleService rules, RuleExecutionService execution) {
+  public RuleController(
+      RuleService rules, RuleCatalogService catalog, RuleExecutionService execution) {
     this.rules = rules;
+    this.catalog = catalog;
     this.execution = execution;
   }
 
   @GetMapping("/rules")
   public List<Rule> list() {
-    return rules.list();
+    return catalog.list();
   }
 
   @GetMapping("/rule-summaries")
@@ -32,12 +36,12 @@ public class RuleController {
       @RequestParam(required = false) String search,
       @RequestParam(defaultValue = "") String kind,
       @RequestParam(defaultValue = "false") boolean publishedOnly) {
-    return rules.catalog(PageParameters.page(offset, limit, search), kind, publishedOnly);
+    return catalog.catalog(PageParameters.page(offset, limit, search), kind, publishedOnly);
   }
 
   @GetMapping("/rule-summaries/{id}")
   public RuleSummary summary(@PathVariable String id) {
-    return rules.summary(id);
+    return catalog.summary(id);
   }
 
   @GetMapping("/rules/{id}/version-summaries")
@@ -46,7 +50,7 @@ public class RuleController {
       @RequestParam(required = false) Integer offset,
       @RequestParam(required = false) Integer limit,
       @RequestParam(required = false) String search) {
-    return rules.versionSummaries(id, PageParameters.page(offset, limit, search));
+    return catalog.versionSummaries(id, PageParameters.page(offset, limit, search));
   }
 
   @GetMapping("/rules/{id}/callers")
@@ -54,7 +58,7 @@ public class RuleController {
       @PathVariable String id,
       @RequestParam(required = false) Integer offset,
       @RequestParam(required = false) Integer limit) {
-    return rules.callers(id, PageParameters.page(offset, limit, null));
+    return catalog.callers(id, PageParameters.page(offset, limit, null));
   }
 
   @PostMapping("/rules")

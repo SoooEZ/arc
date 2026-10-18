@@ -4,7 +4,7 @@ import {
   newestKnownRelease,
   noRelease,
   selectionAfterCatalogPage,
-} from "../../src/features/execution/publishedSelection";
+} from "../../src/features/playground/publishedSelection";
 import { ruleIncarnation, sameRule } from "../../src/domain/ruleIdentity";
 import type { RuleSummary } from "../../src/types";
 

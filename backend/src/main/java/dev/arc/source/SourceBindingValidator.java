@@ -2,6 +2,7 @@ package dev.arc.source;
 
 import dev.arc.engine.Limits;
 import dev.arc.engine.RuleResolver;
+import dev.arc.engine.validation.RuleCalls;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
@@ -47,7 +48,7 @@ public final class SourceBindingValidator {
   public void validatePinnedContracts(
       Definition definition, RuleResolver resolver, CalleeCheck calleeCheck) {
     new Walk(resolver, pinnedSources(), calleeCheck)
-        .visit(definition, Validator.dependencies(definition), 0);
+        .visit(definition, RuleCalls.dependencies(definition), 0);
   }
 
   /**
@@ -57,7 +58,7 @@ public final class SourceBindingValidator {
   public void validateForExecution(
       Definition definition, RuleResolver resolver, SourceConfigurations session) {
     new Walk(resolver, session, CalleeCheck.NONE)
-        .visit(definition, Validator.dependencies(definition), 0);
+        .visit(definition, RuleCalls.dependencies(definition), 0);
   }
 
   /**
@@ -67,7 +68,7 @@ public final class SourceBindingValidator {
   public void validateRemainingPins(
       Definition definition,
       RuleResolver resolver,
-      List<Validator.Dependency> unreported,
+      List<RuleCalls.Dependency> unreported,
       CalleeCheck calleeCheck) {
     new Walk(resolver, pinnedSources(), calleeCheck).visit(definition, unreported, 0);
   }
@@ -102,7 +103,7 @@ public final class SourceBindingValidator {
       this.calleeCheck = calleeCheck;
     }
 
-    void visit(Definition definition, List<Validator.Dependency> dependencies, int depth) {
+    void visit(Definition definition, List<RuleCalls.Dependency> dependencies, int depth) {
       if (depth > Limits.MAX_NESTING_DEPTH)
         throw ArcException.invalid("Rule nesting exceeds " + Limits.MAX_NESTING_DEPTH + " levels");
       for (Input input : definition.inputs())
@@ -114,7 +115,7 @@ public final class SourceBindingValidator {
           Definition callee = dependency.resolve(resolver);
           if (checked.add(pin))
             calleeCheck.check(dependency.ruleId(), dependency.version(), callee);
-          visit(callee, Validator.dependencies(callee), depth + 1);
+          visit(callee, RuleCalls.dependencies(callee), depth + 1);
         } catch (ArcException error) {
           throw error
               .inRule(dependency.ruleId(), dependency.version())

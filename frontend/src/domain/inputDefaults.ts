@@ -41,6 +41,31 @@ export function inputDefaultProblem(
   return valueBoundProblem(value);
 }
 
+/** A default as its field shows it: no default is empty text. */
+export function defaultText(value: unknown): string {
+  return value == null ? "" : String(value);
+}
+
+/**
+ * A STRING default typed as text. Empty text is no default; text the server
+ * would refuse (over 2,000 characters, a NUL, an unpaired surrogate) keeps the
+ * server's reason, so the field holds it instead of the save failing.
+ */
+export function parseStringDefault(
+  raw: string,
+): { valid: true; value: string | null } | { valid: false; error: string } {
+  if (raw === "") return { valid: true, value: null };
+  const problem = inputDefaultProblem("STRING", raw);
+  return problem
+    ? { valid: false, error: problem }
+    : { valid: true, value: raw };
+}
+
+/** Whether a STRING default arriving from outside is the field's own value. */
+export function sameStringDefault(left: unknown, right: unknown): boolean {
+  return left === right;
+}
+
 function hasJsonType(type: InputType, value: unknown): boolean {
   if (type === "ARRAY") return Array.isArray(value);
   if (type === "OBJECT") return isJsonObject(value);

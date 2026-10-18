@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleService;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import org.springframework.test.web.servlet.ResultActions;
 class RequestJsonWebTest {
   @Autowired private MockMvc mvc;
   @MockitoBean private RuleService rules;
+  @MockitoBean private RuleCatalogService catalog;
   @MockitoBean private RuleExecutionService execution;
 
   /**

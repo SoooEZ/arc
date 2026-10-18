@@ -4,12 +4,8 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
-import dev.arc.model.Definition.Node;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 import org.springframework.stereotype.Component;
 
 /** Coordinates draft shape, executable graph checks and editor diagnostics. */
@@ -56,46 +52,6 @@ public class Validator {
     return graphDiagnostics.diagnose(definition, resolver);
   }
 
-  /**
-   * Rules a graph calls, including Formula calls in Input source mappings. A malformed expression
-   * fails at its node, so pass only published or validated graphs.
-   */
-  public static List<Dependency> dependencies(Definition definition) {
-    return NodeValidation.dependencies(definition, NodeValidation::formulaCallsOf);
-  }
-
-  /**
-   * The IDs of every rule a stored draft or version names: each well-formed {@code @id:version}
-   * call in any node or input source mapping, and each Reference's rule with or without a version.
-   * Unlike {@link #dependencies}, an unfinished draft counts in full: a Reference may have chosen
-   * its rule before its version, source mappings call rules even while the draft has no Input node,
-   * and a malformed expression calls nothing instead of failing. A stored row of another model
-   * shape (an unknown node type, a missing list, a source without mappings) is read as it is.
-   */
-  public static Set<String> calledRuleIds(Definition definition) {
-    return NodeValidation.calledRuleIds(definition, Validator::wellFormedFormulaCalls);
-  }
-
-  /**
-   * The versions of {@code ruleId} that a stored draft or version pins, read as leniently as {@link
-   * #calledRuleIds}: each Reference's version and each well-formed {@code @id:version} call. A
-   * Reference that has chosen the rule but not yet its version names the rule and pins none.
-   */
-  public static SortedSet<Integer> pinnedVersions(Definition definition, String ruleId) {
-    var versions = new TreeSet<Integer>();
-    for (var call : NodeValidation.namedCalls(definition, Validator::wellFormedFormulaCalls))
-      if (call.ruleId().equals(ruleId) && call.version() != null) versions.add(call.version());
-    return versions;
-  }
-
-  private static List<Expressions.FormulaCall> wellFormedFormulaCalls(String source) {
-    try {
-      return NodeValidation.formulaCallsOf(source);
-    } catch (ArcException malformed) {
-      return List.of();
-    }
-  }
-
   public static void validateFormulaCalls(Expressions.Compiled expression, RuleResolver resolver) {
     FormulaCallValidation.validate(expression, resolver);
   }
@@ -118,31 +74,9 @@ public class Validator {
   /**
    * A diagnostics result. {@code shaped} tells whether the draft passed shape validation, which
    * later static checks need. {@code dependencies} lists the rules that the graph's well-formed
-   * expressions and Reference nodes call, except pins the graph checks rejected: those problems are
-   * already among {@code problems}.
+   * expressions and Reference nodes call ({@link RuleCalls}), except pins the graph checks
+   * rejected: those problems are already among {@code problems}.
    */
-  public record Diagnosis(List<Problem> problems, boolean shaped, List<Dependency> dependencies) {}
-
-  /** A published rule that a node calls, through a Reference or an {@code @id:version} call. */
-  public record Dependency(String nodeId, String label, String ruleId, int version, Call call) {
-    public enum Call {
-      REFERENCE,
-      FORMULA
-    }
-
-    static Dependency reference(Node node) {
-      return new Dependency(node.id(), node.label(), node.ruleId(), node.version(), Call.REFERENCE);
-    }
-
-    static Dependency formula(Node node, Expressions.FormulaCall call) {
-      return new Dependency(node.id(), node.label(), call.id(), call.version(), Call.FORMULA);
-    }
-
-    /** Resolves the pin as execution does: a direct call must reach a published Formula. */
-    public Definition resolve(RuleResolver resolver) {
-      return call == Call.FORMULA
-          ? resolver.resolveFormula(ruleId, version)
-          : resolver.resolve(ruleId, version);
-    }
-  }
+  public record Diagnosis(
+      List<Problem> problems, boolean shaped, List<RuleCalls.Dependency> dependencies) {}
 }

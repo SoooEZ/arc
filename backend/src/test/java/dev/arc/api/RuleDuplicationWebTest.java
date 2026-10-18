@@ -18,6 +18,8 @@ import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Rule;
 import dev.arc.model.RuleVersion;
+import dev.arc.rule.RuleCatalog;
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
@@ -41,12 +43,13 @@ import org.springframework.test.web.servlet.ResultActions;
  * (lesson B29), create's own ID, name and conflict outcomes, and the copied tests.
  */
 @WebMvcTest(RuleController.class)
-@Import({RuleService.class, Validator.class})
+@Import({RuleService.class, RuleCatalogService.class, Validator.class})
 class RuleDuplicationWebTest {
   private static final String DUPLICATE = "/api/rules/pricing/duplicate";
 
   @Autowired private MockMvc mvc;
   @MockitoBean private RuleRepository rules;
+  @MockitoBean private RuleCatalog catalog;
   @MockitoBean private RuleTestCaseRepository testCases;
   @MockitoBean private RuleDefinitionService definitions;
   @MockitoBean private Engine engine;

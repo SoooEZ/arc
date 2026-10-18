@@ -14,7 +14,7 @@ import {
   sourceParameterBufferError,
   sourceSample,
   type SourceBuffers,
-} from "./model";
+} from "./sourceBuffers";
 import { secretHeaderAliases, sourceProviders } from "./sourceProviders";
 
 export interface SourceDocument {

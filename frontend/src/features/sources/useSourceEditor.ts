@@ -10,7 +10,7 @@ import {
   parseSourceTestInputs,
   sourceCandidate,
   type SourceBuffers,
-} from "./model";
+} from "./sourceBuffers";
 import {
   canRunSourceTest,
   displayedConfiguration,

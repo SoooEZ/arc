@@ -17,6 +17,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Rule;
+import dev.arc.rule.RuleCatalog;
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
@@ -51,6 +53,7 @@ class RevisionWebTest {
                       new Validator(),
                       mock(RuleDefinitionService.class),
                       mock(Engine.class)),
+                  new RuleCatalogService(mock(RuleCatalog.class)),
                   mock(RuleExecutionService.class)),
               new SourceController(
                   new SourceService(sources, mock(SourceValidator.class)),

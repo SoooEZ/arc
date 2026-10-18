@@ -16,7 +16,7 @@ import { errorMessage } from "../../api/errors";
 import ResourceIdField from "../../components/ResourceIdField";
 import PagedAutocomplete from "../../components/PagedAutocomplete";
 import { ruleIncarnation } from "../../domain/ruleIdentity";
-import { useRuleNaming } from "../../app/useRuleNaming";
+import { useRuleNaming } from "./useRuleNaming";
 import type { Rule, RuleSummary } from "../../types";
 
 /** The rule to copy, as a library card or the editor knows it. */

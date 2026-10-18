@@ -76,11 +76,7 @@ public class RuleTestCaseService {
       if (error.isBlank())
         throw ArcException.invalid(
             "Expected error must contain text; send null to expect a result instead");
-      if (error.length() > Limits.MAX_EXPECTED_ERROR_CHARACTERS)
-        throw ArcException.invalid(
-            "Expected error exceeds "
-                + Limits.format(Limits.MAX_EXPECTED_ERROR_CHARACTERS)
-                + " characters");
+      Limits.requireAtMost("Expected error", error, Limits.MAX_EXPECTED_ERROR_CHARACTERS);
       String unstorable = StorableText.problem(error);
       if (unstorable != null) throw ArcException.invalid(unstorable);
     }

@@ -14,6 +14,7 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.Rule;
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleExecutionService.ExecutionResponse;
 import dev.arc.rule.RuleExecutionService.Timing;
@@ -39,6 +40,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class PayloadSnapshotTest {
   @Autowired private MockMvc mvc;
   @MockitoBean private RuleService rules;
+  @MockitoBean private RuleCatalogService catalog;
   @MockitoBean private RuleExecutionService execution;
 
   @Test

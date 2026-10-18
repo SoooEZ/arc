@@ -1,5 +1,6 @@
 package dev.arc.engine;
 
+import dev.arc.error.ArcException;
 import java.util.Locale;
 
 /**
@@ -181,6 +182,23 @@ public final class Limits {
   /** Shows a limit as messages always have ("2,000"), independent of the JVM default locale. */
   public static String format(long limit) {
     return String.format(Locale.ROOT, "%,d", limit);
+  }
+
+  /**
+   * The message of a value over its limit, the limit written as {@link #format} writes it: {@code
+   * exceeds("Description", 2_000, "characters")} is "Description exceeds 2,000 characters".
+   */
+  public static String exceeds(String subject, long limit, String unit) {
+    return subject + " exceeds " + format(limit) + " " + unit;
+  }
+
+  /**
+   * Refuses a text longer than {@code max} characters with {@link #exceeds}' message; a missing
+   * text has no length to refuse.
+   */
+  public static void requireAtMost(String subject, String text, int max) {
+    if (text != null && text.length() > max)
+      throw ArcException.invalid(exceeds(subject, max, "characters"));
   }
 
   /**

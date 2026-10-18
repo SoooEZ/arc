@@ -3,8 +3,9 @@ package dev.arc.rule;
 import static dev.arc.model.NodeKind.*;
 import static dev.arc.rule.RuleTemplates.edge;
 import static dev.arc.rule.RuleTemplates.node;
+import static dev.arc.rule.RuleTemplates.reference;
 
-import dev.arc.engine.validation.Validator;
+import dev.arc.engine.validation.RuleCalls;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
@@ -45,20 +46,15 @@ public class RuleSamples implements ApplicationRunner {
 
   /** The pricing sample's call of the published discount formula at one rate. */
   private static Node discount(String id, String label, double x, double y, String rate) {
-    return new Node(
+    return reference(
         id,
-        REFERENCE.name(),
         label,
-        new Position(x, y),
-        null,
-        "price",
+        x,
+        y,
         "apply-discount",
         1,
         Map.of("amount", "orderTotal", "rate", rate),
-        null,
-        null,
-        null,
-        null);
+        "price");
   }
 
   /**
@@ -105,7 +101,7 @@ public class RuleSamples implements ApplicationRunner {
             "A reusable formula for percentage discounts, rounded to two decimal places.",
             RuleKind.FORMULA.name(),
             discount,
-            Validator.calledRuleIds(discount));
+            RuleCalls.calledRuleIds(discount));
     service.publish(formula.id(), formula.revision(), SAMPLE_NOTE);
     Definition pricing =
         new Definition(
@@ -150,7 +146,7 @@ public class RuleSamples implements ApplicationRunner {
             "Reward premium customers and larger orders with the right discount.",
             RuleKind.DECISION_TREE.name(),
             pricing,
-            Validator.calledRuleIds(pricing));
+            RuleCalls.calledRuleIds(pricing));
     service.publish(tree.id(), tree.revision(), SAMPLE_NOTE);
     var eligibility =
         store.create(

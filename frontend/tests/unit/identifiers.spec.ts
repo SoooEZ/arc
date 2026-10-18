@@ -8,7 +8,7 @@ import {
   sourceBuffers,
   sourceCandidate,
   sourceParameterBufferError,
-} from "../../src/features/sources/model";
+} from "../../src/features/sources/sourceBuffers";
 
 test("identifier editing permits keyword prefixes and clearing, but rejects invalid syntax intact", () => {
   for (const name of ["", "a", "_", "true", "trueValue", "SUM", "a".repeat(64)])

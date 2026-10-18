@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { readGraphFile, suggestedImportName } from "../../src/app/graphImport";
+import {
+  readGraphFile,
+  suggestedImportName,
+} from "../../src/features/library/graphImport";
 import { isDecimalNumber, stringifyJson } from "../../src/domain/json";
 
 const graph = {

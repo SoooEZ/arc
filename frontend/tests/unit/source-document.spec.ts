@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { DataSource, SourceConfig } from "../../src/types";
-import { createSourceDraft } from "../../src/features/sources/model";
+import { createSourceDraft } from "../../src/features/sources/sourceBuffers";
 import { parseHttpTimeout } from "../../src/features/sources/httpSourcePolicy";
 import {
   canRunSourceTest,

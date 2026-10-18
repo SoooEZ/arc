@@ -1,7 +1,10 @@
 import type { ComponentType } from "react";
 import { TextField } from "@mui/material";
 import type { SourceConfig } from "../../types";
-import { sourceParameterBufferError, type SourceBuffers } from "./model";
+import {
+  sourceParameterBufferError,
+  type SourceBuffers,
+} from "./sourceBuffers";
 import {
   httpTimeoutGuidance,
   httpUrlProblem,

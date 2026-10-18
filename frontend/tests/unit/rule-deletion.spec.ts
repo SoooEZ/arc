@@ -3,11 +3,11 @@ import { ApiError } from "../../src/api/errors";
 import {
   createCommandRunner,
   type CommandRunner,
-} from "../../src/features/editor/commandRunner";
+} from "../../src/features/editor/document/commandRunner";
 import {
   deleteRuleCommand,
   deletionDeclined,
-} from "../../src/features/editor/ruleDeletion";
+} from "../../src/features/editor/document/ruleDeletion";
 
 /** A runner over an open session that records what it tells its host. */
 function runner(events: string[], session = new AbortController()) {

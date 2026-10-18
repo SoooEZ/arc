@@ -8,6 +8,7 @@ import {
   MAX_SECRET_HEADERS,
 } from "./httpSourcePolicy";
 import { secretHeaderAliases } from "./sourceProviders";
+import { counted } from "../../domain/text";
 
 interface HeaderRow {
   name: string;
@@ -161,9 +162,7 @@ export default function SecretHeadersEditor({
             </Button>
           </span>
         </Tooltip>
-        <span>
-          {rows.length} {rows.length === 1 ? "header" : "headers"}
-        </span>
+        <span>{counted(rows.length, "header")}</span>
       </div>
     </div>
   );

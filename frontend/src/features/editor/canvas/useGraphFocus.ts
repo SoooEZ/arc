@@ -4,7 +4,7 @@ import type { Definition } from "../../../types";
 import type { FlowNode } from "./GraphNode";
 import { cardCenter, type NodeSizes } from "./graphGeometry";
 import type { LayoutDirection } from "../../../domain/nodePorts";
-import type { EditorView } from "../editorCapabilities";
+import type { EditorView } from "../document/editorCapabilities";
 import { rulePath } from "../../../app/routing";
 
 interface Options {

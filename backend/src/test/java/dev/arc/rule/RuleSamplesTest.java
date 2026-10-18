@@ -44,7 +44,8 @@ class RuleSamplesTest {
     when(store.create(anyString(), anyString(), anyString(), anyString(), any(), any()))
         .thenAnswer(RuleSamplesTest::created);
     samples.run(null);
-    verify(store, never()).list();
+    // Stored rules are never loaded: the full list is a RuleCatalog read, which seeding has no
+    // access to, so the old verify(store, never()).list() is now guaranteed by the type.
     verify(transactions).commit(any());
     for (String id : new String[] {"apply-discount", "order-pricing", "free-shipping"})
       verify(service).publish(id, 1, "The sample's first version.");

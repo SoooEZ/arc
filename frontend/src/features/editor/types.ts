@@ -1,9 +1,9 @@
 import type { Rule } from "../../types";
 import type { GraphProblem } from "../../api/errors";
-export interface ReferenceTarget {
-  ruleId: string;
-  version: number;
-  nodeId?: string;
+import type { ReferenceLocation } from "../execution/types";
+
+/** A referenced rule to open: the location execution reports, and how to show it. */
+export interface ReferenceTarget extends ReferenceLocation {
   mode?: "graph" | "code";
   problems?: GraphProblem[];
 }

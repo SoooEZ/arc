@@ -6,7 +6,7 @@ import "@fontsource/jetbrains-mono/400.css";
 import "./styles/index.css";
 import App from "./App";
 import { theme } from "./app/theme";
-import { RecoverableBoundary } from "./app/RecoverableBoundary";
+import { RecoverableBoundary } from "./components/RecoverableBoundary";
 import { watchChunkLoadFailures } from "./app/chunkLoadFailures";
 
 watchChunkLoadFailures(window);

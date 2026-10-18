@@ -23,8 +23,9 @@ import {
 import type { NodeType } from "../../../types";
 import { MAX_NODES } from "../../../domain/limits";
 import type { LayoutDirection } from "../../../domain/nodePorts";
-import type { EditorCapabilities } from "../editorCapabilities";
+import type { EditorCapabilities } from "../document/editorCapabilities";
 import NodeKindMenu from "./NodeKindMenu";
+import { counted } from "../../../domain/text";
 
 /** The drawing directions in toolbar order, with their names and icons. */
 const directions = [
@@ -78,9 +79,7 @@ export default function GraphToolbar({
       <div className="graph-view-label">
         <GitBranch size={16} />
         <strong>Decision canvas</strong>
-        <span>
-          {nodeCount} {nodeCount === 1 ? "node" : "nodes"}
-        </span>
+        <span>{counted(nodeCount, "node")}</span>
       </div>
       <div className="graph-tools">
         {!readOnly && (

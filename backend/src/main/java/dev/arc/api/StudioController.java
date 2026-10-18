@@ -4,6 +4,7 @@ import dev.arc.engine.expression.Functions;
 import dev.arc.engine.script.ArcScript;
 import dev.arc.model.Definition;
 import dev.arc.rule.RuleDefinitionService;
+import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,7 +41,7 @@ public class StudioController {
   }
 
   @GetMapping("/functions")
-  public java.util.List<Functions.Entry> functions() {
+  public List<Functions.Entry> functions() {
     return Functions.catalog();
   }
 

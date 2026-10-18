@@ -4,7 +4,7 @@ import {
   documentReducer,
   initialDocument,
   type DocumentState,
-} from "../../src/features/editor/documentState";
+} from "../../src/features/editor/document/documentState";
 import {
   editGroup,
   noHistory,

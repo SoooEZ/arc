@@ -20,8 +20,12 @@ final class DefinitionShape {
   private static final Pattern CASE_ID = Pattern.compile(Identifiers.CASE_ID_SYNTAX);
   private static final Pattern CASE_HANDLE =
       Pattern.compile(Handles.CASE_PREFIX + Identifiers.CASE_ID_SYNTAX);
-  private static final String EXPRESSION_LIMIT =
-      Limits.format(Limits.MAX_EXPRESSION_CHARACTERS) + " characters";
+  private static final String EXPRESSION_TOO_LONG = expressionTooLong("Expression");
+  private static final String SELECTOR_TOO_LONG = expressionTooLong("Selector expression");
+  private static final String CASE_TOO_LONG_OR_MISSING =
+      expressionTooLong("Case expression") + " or is missing";
+  private static final String FIELD_TOO_LONG_OR_MISSING =
+      expressionTooLong("Field expression") + " or is missing";
   private static final Document DOCUMENT = new Document();
 
   /**
@@ -176,7 +180,7 @@ final class DefinitionShape {
     require(
         node.expression() == null || node.expression().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
         declaration,
-        "Expression exceeds " + EXPRESSION_LIMIT);
+        EXPRESSION_TOO_LONG);
     // Empty names are unset in an unfinished draft; a supplied name follows the identifier policy.
     require(
         node.resultName() == null || Identifiers.isValid(node.resultName()),
@@ -189,7 +193,7 @@ final class DefinitionShape {
     require(
         node.selector() == null || node.selector().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
         declaration,
-        "Selector expression exceeds " + EXPRESSION_LIMIT);
+        SELECTOR_TOO_LONG);
   }
 
   private void checkPin(Node node) {
@@ -244,7 +248,7 @@ final class DefinitionShape {
           option.expression() != null
               && option.expression().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
           switchCase,
-          "Case expression exceeds " + EXPRESSION_LIMIT + " or is missing");
+          CASE_TOO_LONG_OR_MISSING);
     }
   }
 
@@ -272,7 +276,7 @@ final class DefinitionShape {
           field.expression() != null
               && field.expression().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
           transformField,
-          "Field expression exceeds " + EXPRESSION_LIMIT + " or is missing");
+          FIELD_TOO_LONG_OR_MISSING);
     }
     require(
         node.fields().isEmpty() || node.expression() == null,
@@ -340,11 +344,12 @@ final class DefinitionShape {
   private static String belongsTo(Property property) {
     var owners = new ArrayList<String>();
     for (NodeKind kind : NodeKind.values()) if (kind.uses(property)) owners.add(title(kind));
-    String names =
-        owners.size() == 1
-            ? owners.getFirst()
-            : String.join(", ", owners.subList(0, owners.size() - 1)) + " and " + owners.getLast();
-    return plural(property) + " belong to " + names + " nodes";
+    return plural(property) + " belong to " + Wording.listed(owners) + " nodes";
+  }
+
+  /** "Expression exceeds 2,000 characters", as expression compilation also says it. */
+  private static String expressionTooLong(String subject) {
+    return Limits.exceeds(subject, Limits.MAX_EXPRESSION_CHARACTERS, "characters");
   }
 
   private static String plural(Property property) {

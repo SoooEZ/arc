@@ -1,6 +1,7 @@
 package dev.arc.persistence;
 
 import dev.arc.model.CatalogPage;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -47,10 +48,29 @@ final class CatalogPages {
       int offset,
       int limit,
       Object... filterArguments) {
+    return read(jdbc, countSql, pageSql, rows, offset, limit, filterArguments, new Object[0]);
+  }
+
+  /**
+   * A page whose statement goes on after choosing its rows: {@code pageSql} takes {@code
+   * filterArguments}, then the page size and the offset ({@code LIMIT ? OFFSET ?}), then {@code
+   * selectArguments} for the columns it computes for the chosen rows alone.
+   */
+  static <T> CatalogPage<T> read(
+      JdbcTemplate jdbc,
+      String countSql,
+      String pageSql,
+      RowMapper<T> rows,
+      int offset,
+      int limit,
+      Object[] filterArguments,
+      Object... selectArguments) {
     long total = jdbc.queryForObject(countSql, Long.class, filterArguments);
-    Object[] pageArguments = Arrays.copyOf(filterArguments, filterArguments.length + 2);
-    pageArguments[filterArguments.length] = limit;
-    pageArguments[filterArguments.length + 1] = offset;
-    return new CatalogPage<>(jdbc.query(pageSql, rows, pageArguments), total, offset, limit);
+    var pageArguments = new ArrayList<>(Arrays.asList(filterArguments));
+    pageArguments.add(limit);
+    pageArguments.add(offset);
+    pageArguments.addAll(Arrays.asList(selectArguments));
+    return new CatalogPage<>(
+        jdbc.query(pageSql, rows, pageArguments.toArray()), total, offset, limit);
   }
 }

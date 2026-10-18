@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Alert, Button, IconButton, Switch, Tooltip } from "@mui/material";
 import { Plus, Trash2 } from "lucide-react";
 import type { InputType, SourceConfig } from "../../types";
@@ -6,9 +6,15 @@ import {
   acceptsIdentifierEdit,
   identifierGuidance,
 } from "../../domain/identifiers";
-import { inputDefaultProblem } from "../../domain/inputDefaults";
+import {
+  defaultText,
+  parseStringDefault,
+  sameStringDefault,
+} from "../../domain/inputDefaults";
+import { shortId } from "../../domain/ids";
 import { inputTypeFacts, inputTypeOf } from "../../domain/inputTypes";
 import { stringifyJson } from "../../domain/json";
+import { counted } from "../../domain/text";
 import {
   parseNumericDefault,
   sameNumericDefault,
@@ -31,6 +37,34 @@ import {
   type ParameterRow,
 } from "./sourceParameters";
 
+const newRowId = () => shortId("param-");
+
+/**
+ * Identities for rows that are parsed from text on every render. Add and
+ * Remove keep them in step with the rows, so a removed row takes its own
+ * unfinished default with it instead of leaving it to the next row (lesson
+ * F6). A count changed from outside, by the JSON view or another version,
+ * adds or drops identities at the end.
+ */
+function useRowIds(count: number) {
+  const [ids, setIds] = useState<string[]>(() =>
+    Array.from({ length: count }, newRowId),
+  );
+  let current = ids;
+  if (ids.length !== count) {
+    current =
+      ids.length > count
+        ? ids.slice(0, count)
+        : [...ids, ...Array.from({ length: count - ids.length }, newRowId)];
+    setIds(current);
+  }
+  return {
+    ids: current,
+    add: () => setIds([...current, newRowId()]),
+    remove: (index: number) => setIds(current.filter((_, at) => at !== index)),
+  };
+}
+
 /**
  * A source's parameters as a table: name, type, required and default per row.
  * Every change writes the whole parameters text, as the JSON view would
@@ -52,6 +86,7 @@ export default function SourceParametersEditor({
   onValidity: (field: string, valid: boolean) => void;
 }) {
   const read = useMemo(() => readSourceParameters(text), [text]);
+  const rowIds = useRowIds(read.rows?.length ?? 0);
   if (!read.rows)
     return (
       <Alert severity="warning">
@@ -81,17 +116,20 @@ export default function SourceParametersEditor({
           <tbody>
             {rows.map((row, index) => (
               <ParameterTableRow
-                // Names change while they are typed; the position is the row.
-                key={index}
+                // Names change while they are typed, so a row is its identity.
+                key={rowIds.ids[index]}
                 label={fixedKey ? "Key" : `Parameter ${index + 1}`}
                 row={row}
                 nameProblem={parameterNameProblem(rows, index)}
                 fixedName={fixedKey}
                 disabled={disabled}
                 onChange={(next) => change(index, next)}
-                onRemove={() => write(rows.filter((_, at) => at !== index))}
+                onRemove={() => {
+                  rowIds.remove(index);
+                  write(rows.filter((_, at) => at !== index));
+                }}
                 onValidity={(valid) =>
-                  onValidity(`parameter ${index + 1} default`, valid)
+                  onValidity(`parameter ${rowIds.ids[index]} default`, valid)
                 }
               />
             ))}
@@ -112,15 +150,16 @@ export default function SourceParametersEditor({
                 size="small"
                 startIcon={<Plus size={14} />}
                 disabled={disabled || full}
-                onClick={() => write([...rows, newParameterRow(rows)])}
+                onClick={() => {
+                  rowIds.add();
+                  write([...rows, newParameterRow(rows)]);
+                }}
               >
                 Add parameter
               </Button>
             </span>
           </Tooltip>
-          <span>
-            {rows.length} {rows.length === 1 ? "parameter" : "parameters"}
-          </span>
+          <span>{counted(rows.length, "parameter")}</span>
         </div>
       )}
     </div>
@@ -262,19 +301,6 @@ function NameCell({
   );
 }
 
-const defaultText = (value: unknown) => (value == null ? "" : String(value));
-const sameText = (left: unknown, right: unknown) => left === right;
-
-// Module-level, as useParsedTextBuffer requires. Empty text is no default; a
-// number keeps every digit; text the server would refuse stays in the cell.
-function parseTextDefault(raw: string): ParsedText<string | null> {
-  if (raw === "") return { valid: true, value: null };
-  const problem = inputDefaultProblem("STRING", raw);
-  return problem
-    ? { valid: false, error: problem }
-    : { valid: true, value: raw };
-}
-
 function DefaultCell({
   label,
   type,
@@ -329,8 +355,8 @@ function DefaultCell({
         label={label}
         value={value}
         disabled={disabled}
-        parse={parseTextDefault}
-        same={sameText}
+        parse={parseStringDefault}
+        same={sameStringDefault}
         onValue={onValue}
         onValidity={onValidity}
       />

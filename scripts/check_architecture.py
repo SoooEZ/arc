@@ -63,26 +63,26 @@ PURE_FRONTEND = {
     "domain/": ("types", "domain/"),
     "app/routing.ts": ("domain/",),
     "app/pinnedReads.ts": (),
-    "app/graphImport.ts": ("types", "domain/"),
-    "features/editor/documentState.ts": ("types", "domain/"),
-    "features/editor/editorCapabilities.ts": (),
-    "features/editor/nodeFormDraft.ts": ("types", "domain/"),
+    "features/editor/document/documentState.ts": ("types", "domain/"),
+    "features/editor/document/editorCapabilities.ts": (),
+    "features/editor/dialogs/nodeFormDraft.ts": ("types", "domain/"),
     "features/editor/nodeSelection.ts": ("types", "domain/"),
     "features/library/previewCache.ts": ("types", "domain/"),
     "features/library/previewLayout.ts": ("types", "domain/"),
     "features/library/libraryOrder.ts": ("types",),
+    "features/library/graphImport.ts": ("types", "domain/"),
     "features/sources/sourceProviders.ts": ("types", "domain/"),
-    "features/sources/model.ts": ("types", "domain/", "features/sources/sourceProviders"),
+    "features/sources/sourceBuffers.ts": ("types", "domain/", "features/sources/sourceProviders"),
     "features/sources/httpSourcePolicy.ts": ("domain/",),
-    "features/sources/sourceDocument.ts": ("types", "domain/", "features/sources/httpSourcePolicy", "features/sources/model", "features/sources/sourceProviders"),
-    "features/sources/sourceBindings.ts": ("types", "domain/"),
+    "features/sources/sourceDocument.ts": ("types", "domain/", "features/sources/httpSourcePolicy", "features/sources/sourceBuffers", "features/sources/sourceProviders"),
+    "features/sources/binding/sourceBindings.ts": ("types", "domain/"),
     "features/sources/sourceCatalog.ts": ("types",),
-    "features/execution/publishedSelection.ts": ("types", "domain/"),
+    "features/playground/publishedSelection.ts": ("types", "domain/"),
     "features/execution/executionOptions.ts": (),
     "features/language/snippets.ts": ("types", "domain/"),
     "features/language/formulaCalls.ts": ("types", "domain/", "features/language/snippets"),
     "features/studio/definitionJson.ts": ("types", "domain/"),
-    "features/editor/commandRunner.ts": ("features/editor/editorCapabilities",),
+    "features/editor/document/commandRunner.ts": ("features/editor/document/editorCapabilities",),
     "features/studio/scriptOutline.ts": (),
     "features/language/cssColor.ts": (),
     "features/editor/canvas/edgeRouting.ts": (),
@@ -90,6 +90,15 @@ PURE_FRONTEND = {
     "features/editor/canvas/nodePlacement.ts": ("types", "domain/", "features/editor/canvas/graphGeometry"),
     "features/sources/lookupTable.ts": ("domain/",),
     "features/sources/sourceParameters.ts": ("types", "domain/"),
+}
+# The only app/ modules features may import, each with its reason; the rest of app/ is the shell.
+FEATURE_APP_IMPORTS = {
+    "app/routing": "navigation infrastructure",
+    "app/navigationGuards": "navigation infrastructure",
+    "app/useRuleLibrary": "catalog state that App owns",
+    "app/pinnedVersions": "a page-wide cache of immutable versions",
+    "app/pinnedReads": "the page-wide cache those reads share",
+    "app/layoutDirection": "a browser preference",
 }
 # HTTP clients may use the lossless JSON codec, but no other domain logic.
 TRANSPORT_FRONTEND = ("types", "api/", "domain/json")
@@ -227,6 +236,13 @@ def frontend_violations(frontend_root):
         if relative != FRONTEND_HANDLE_OWNER:
             for literal in FRONTEND_HANDLE_LITERAL.findall(path.read_text()):
                 reject(path, literal, FRONTEND_HANDLE_REASON)
+        if relative.startswith("features/"):
+            for dependency in frontend_imports(path.read_text())[0]:
+                if not dependency.startswith("."):
+                    continue
+                target = (path.parent / dependency).resolve().relative_to(frontend_root).as_posix()
+                if target.startswith("app/") and target not in FEATURE_APP_IMPORTS:
+                    reject(path, dependency, "features import only the app modules in FEATURE_APP_IMPORTS")
         pure_imports = next((
             allowed for owner, allowed in PURE_FRONTEND.items()
             if matches_boundary(relative, owner)
@@ -263,8 +279,46 @@ def frontend_violations(frontend_root):
     return violations
 
 
+def frontend_module_exists(frontend_root, module):
+    """Whether a boundary table entry names something: a folder prefix with a module, a file, or an
+    extensionless module specifier such as `types` or `features/sources/sourceProviders`."""
+    if module.endswith("/"):
+        folder = frontend_root / module
+        return folder.is_dir() and any(folder.rglob("*.ts*"))
+    if module.endswith((".ts", ".tsx")):
+        return (frontend_root / module).is_file()
+    return any((frontend_root / f"{module}{extension}").is_file() for extension in (".ts", ".tsx"))
+
+
+def stale_frontend_boundaries(
+    frontend_root, pure=None, transport=TRANSPORT_FRONTEND, feature_app=FEATURE_APP_IMPORTS
+):
+    """Table entries that no longer name a module: a pure file moved or renamed without its key
+    silently stops being checked, and a renamed allowed dependency would refuse a correct import."""
+    frontend_root = frontend_root.resolve()
+    pure = PURE_FRONTEND if pure is None else pure
+    stale = []
+    for owner, allowed in pure.items():
+        if not frontend_module_exists(frontend_root, owner):
+            stale.append(f"PURE_FRONTEND key {owner}: names no module; move the entry with its file")
+        for dependency in allowed:
+            if not frontend_module_exists(frontend_root, dependency):
+                stale.append(f"PURE_FRONTEND {owner}: allowed dependency {dependency} names no module")
+    for dependency in transport:
+        if not frontend_module_exists(frontend_root, dependency):
+            stale.append(f"TRANSPORT_FRONTEND: allowed dependency {dependency} names no module")
+    for module in feature_app:
+        if not frontend_module_exists(frontend_root, module):
+            stale.append(f"FEATURE_APP_IMPORTS: {module} names no module")
+    return stale
+
+
 def main():
-    errors = java_violations(JAVA) + frontend_violations(FRONTEND)
+    errors = (
+        java_violations(JAVA)
+        + frontend_violations(FRONTEND)
+        + stale_frontend_boundaries(FRONTEND)
+    )
     if errors:
         print("Architecture boundary violations:\n" + "\n".join(errors), file=sys.stderr)
         sys.exit(1)

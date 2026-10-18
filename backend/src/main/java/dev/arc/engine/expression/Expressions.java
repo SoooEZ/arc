@@ -99,9 +99,7 @@ public final class Expressions {
 
   public static Compiled compile(String source) {
     if (source == null || source.isBlank()) throw ArcException.invalid("Expression is required");
-    if (source.length() > Limits.MAX_EXPRESSION_CHARACTERS)
-      throw ArcException.invalid(
-          "Expression exceeds " + Limits.format(Limits.MAX_EXPRESSION_CHARACTERS) + " characters");
+    Limits.requireAtMost("Expression", source, Limits.MAX_EXPRESSION_CHARACTERS);
     var parser = new ExpressionParser(source.trim());
     Expr expression = parser.parse(0);
     if (!parser.atEnd()) throw ArcException.invalid("Unexpected token: " + parser.peek());

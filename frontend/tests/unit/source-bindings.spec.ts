@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { SourceBinding } from "../../src/types";
-import { withSourceParameterBinding } from "../../src/features/sources/sourceBindings";
+import { withSourceParameterBinding } from "../../src/features/sources/binding/sourceBindings";
 import { ownValue } from "../../src/domain/records";
 
 const binding: SourceBinding = {

@@ -7,6 +7,7 @@ import {
   previewNodeHeight,
   previewNodeWidth,
 } from "./previewLayout";
+import { counted } from "../../domain/text";
 
 /**
  * How much a preview shows: every label and branch caption while the graph
@@ -44,7 +45,7 @@ export default function RulePreview({ rule }: { rule: Rule }) {
               maxHeight: Math.max(graph.height, 130),
             }}
             role="img"
-            aria-label={`${rule.name}: complete graph overview, ${graph.nodes.length} ${graph.nodes.length === 1 ? "node" : "nodes"}, ${graph.connections.length} ${graph.connections.length === 1 ? "connection" : "connections"}`}
+            aria-label={`${rule.name}: complete graph overview, ${counted(graph.nodes.length, "node")}, ${counted(graph.connections.length, "connection")}`}
             data-detail={detail}
             data-direction={direction}
           >
@@ -123,8 +124,7 @@ export default function RulePreview({ rule }: { rule: Rule }) {
         </span>
         {graph.missingConnections > 0 && (
           <span className="preview-warning">
-            {graph.missingConnections} invalid{" "}
-            {graph.missingConnections === 1 ? "connection" : "connections"}
+            {counted(graph.missingConnections, "invalid connection")}
           </span>
         )}
       </div>

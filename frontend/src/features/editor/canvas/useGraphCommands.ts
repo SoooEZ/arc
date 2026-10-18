@@ -15,7 +15,7 @@ import {
 } from "../../../domain/graph";
 import { newId, shortId } from "../../../domain/ids";
 import { canAddEdge, canAddNode } from "../../../domain/limits";
-import type { DraftLayout } from "../useRuleDocument";
+import type { DraftLayout } from "../document/useRuleDocument";
 
 const unmeasured: NodeSizes = new Map();
 

@@ -6,7 +6,7 @@ import {
   sourceBuffers,
   sourceCandidate,
   sourceSample,
-} from "../../src/features/sources/model";
+} from "../../src/features/sources/sourceBuffers";
 
 /** A source as the API returns it, decoded by the HTTP client's lossless codec. */
 function apiSource(definition: string): DataSource {

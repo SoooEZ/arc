@@ -5,6 +5,7 @@ import dev.arc.engine.Identifiers;
 import dev.arc.engine.Limits;
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.script.ArcScript;
+import dev.arc.engine.validation.RuleCalls;
 import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.error.Revisions;
@@ -17,7 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Draft commands and immutable publication; transaction boundaries live here. */
+/**
+ * The rule's commands: create, save, duplicate, publish and delete, and the reads of a rule and its
+ * versions that clients make before them. Transaction boundaries and lock order live here; lists,
+ * summaries and callers are read by {@link RuleCatalogService}.
+ */
 @Service
 public class RuleService {
   public record Create(
@@ -59,25 +64,6 @@ public class RuleService {
     this.engine = engine;
   }
 
-  /** An empty kind lists every kind; the filter and the stored column spell {@link RuleKind}. */
-  public CatalogPage<RuleSummary> catalog(PageRequest page, String kind, boolean publishedOnly) {
-    if (!kind.isEmpty() && RuleKind.parse(kind).isEmpty())
-      throw ArcException.invalid("Unknown rule kind");
-    return store.catalog(page, kind, publishedOnly);
-  }
-
-  public CatalogPage<RuleVersionSummary> versionSummaries(String id, PageRequest page) {
-    return store.versionSummaries(id, page);
-  }
-
-  public RuleSummary summary(String id) {
-    return store.summary(id);
-  }
-
-  public List<Rule> list() {
-    return store.list();
-  }
-
   public Rule get(String id) {
     return store.get(id);
   }
@@ -88,40 +74,6 @@ public class RuleService {
 
   public RuleVersion version(String id, int version) {
     return store.version(id, version);
-  }
-
-  /**
-   * One page of the other rules that call the rule, by rule ID, with the versions of it that their
-   * saved drafts and latest published versions pin. Each definition is read on its own, so a page
-   * holds one at a time however large its callers' drafts are. A caller that changes between the
-   * reads shows what the later read found: a draft that stopped calling the rule has no pins.
-   */
-  public CatalogPage<RuleCaller> callers(String id, PageRequest page) {
-    CatalogPage<RuleRepository.CallingRule> calling = store.callingRules(id, page);
-    var callers = new ArrayList<RuleCaller>();
-    for (var rule : calling.items()) callers.add(caller(rule, id));
-    return new CatalogPage<>(callers, calling.total(), calling.offset(), calling.limit());
-  }
-
-  private RuleCaller caller(RuleRepository.CallingRule rule, String id) {
-    List<Integer> draftPins = rule.draftCalls() ? pins(rule.ruleId(), null, id) : null;
-    RuleCaller.Published published = null;
-    if (rule.latestCalls()) {
-      List<Integer> pins = pins(rule.ruleId(), rule.publishedVersion(), id);
-      if (pins != null) published = new RuleCaller.Published(rule.publishedVersion(), pins);
-    }
-    return new RuleCaller(rule.ruleId(), rule.name(), draftPins, published, rule.earlierVersions());
-  }
-
-  /**
-   * The versions of rule {@code id} that the caller's saved draft ({@code version} null) or
-   * published version pins; null when it no longer calls the rule.
-   */
-  private List<Integer> pins(String callerId, Integer version, String id) {
-    var definition = store.callingDefinition(callerId, version, id);
-    return definition.isEmpty()
-        ? null
-        : List.copyOf(Validator.pinnedVersions(definition.get(), id));
   }
 
   @Transactional
@@ -201,11 +153,7 @@ public class RuleService {
   /** The trimmed name and the description, empty when missing, within their limits. */
   private static Metadata metadata(String name, String description) {
     String trimmed = DisplayNames.normalize("Rule", name);
-    if (description != null && description.length() > Limits.MAX_DESCRIPTION_CHARACTERS)
-      throw ArcException.invalid(
-          "Description exceeds "
-              + Limits.format(Limits.MAX_DESCRIPTION_CHARACTERS)
-              + " characters");
+    Limits.requireAtMost("Description", description, Limits.MAX_DESCRIPTION_CHARACTERS);
     return new Metadata(trimmed, description == null ? "" : description);
   }
 
@@ -235,11 +183,7 @@ public class RuleService {
   /** A version's note as stored: as written, none when blank, within its limit. */
   private static String releaseNote(String note) {
     if (note == null || note.isBlank()) return null;
-    if (note.length() > Limits.MAX_RELEASE_NOTE_CHARACTERS)
-      throw ArcException.invalid(
-          "Release note exceeds "
-              + Limits.format(Limits.MAX_RELEASE_NOTE_CHARACTERS)
-              + " characters");
+    Limits.requireAtMost("Release note", note, Limits.MAX_RELEASE_NOTE_CHARACTERS);
     return note;
   }
 
@@ -272,7 +216,7 @@ public class RuleService {
    * is what the write stores beside the definition, for later deletions to find their callers.
    */
   private Set<String> holdCallees(Definition definition) {
-    Set<String> callees = Validator.calledRuleIds(definition);
+    Set<String> callees = RuleCalls.calledRuleIds(definition);
     if (!callees.isEmpty()) store.lockCallees(callees);
     return callees;
   }

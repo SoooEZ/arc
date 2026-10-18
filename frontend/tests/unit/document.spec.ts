@@ -8,7 +8,7 @@ import type {
 import {
   documentReducer,
   initialDocument,
-} from "../../src/features/editor/documentState";
+} from "../../src/features/editor/document/documentState";
 import {
   connectGraphNodes,
   isCurrentGraphLocation,

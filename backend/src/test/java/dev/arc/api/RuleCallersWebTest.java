@@ -15,10 +15,12 @@ import dev.arc.model.CatalogPage;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.Node;
 import dev.arc.model.PageRequest;
+import dev.arc.rule.RuleCatalog;
+import dev.arc.rule.RuleCatalog.CallingRule;
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
-import dev.arc.rule.RuleRepository.CallingRule;
 import dev.arc.rule.RuleService;
 import dev.arc.rule.RuleTestCaseRepository;
 import dev.arc.support.GraphFixtures;
@@ -36,10 +38,11 @@ import org.springframework.test.web.servlet.MockMvc;
  * bounds, and the 404 of an unknown rule.
  */
 @WebMvcTest(RuleController.class)
-@Import({RuleService.class, Validator.class})
+@Import({RuleService.class, RuleCatalogService.class, Validator.class})
 class RuleCallersWebTest {
   @Autowired private MockMvc mvc;
   @MockitoBean private RuleRepository rules;
+  @MockitoBean private RuleCatalog catalog;
   @MockitoBean private RuleTestCaseRepository testCases;
   @MockitoBean private RuleDefinitionService definitions;
   @MockitoBean private Engine engine;
@@ -58,7 +61,7 @@ class RuleCallersWebTest {
    */
   @Test
   void eachCallerIsWrittenWithItsPinsAndEarlierVersions() throws Exception {
-    when(rules.callingRules("rates", new PageRequest(0, 20, "")))
+    when(catalog.callingRules("rates", new PageRequest(0, 20, "")))
         .thenReturn(
             new CatalogPage<>(
                 List.of(
@@ -68,9 +71,9 @@ class RuleCallersWebTest {
                 3,
                 0,
                 20));
-    when(rules.callingDefinition("checkout", null, "rates")).thenReturn(Optional.of(pinning(2)));
-    when(rules.callingDefinition("checkout", 3, "rates")).thenReturn(Optional.of(pinning(1)));
-    when(rules.callingDefinition("drafts", null, "rates")).thenReturn(Optional.of(pinning(null)));
+    when(catalog.callingDefinition("checkout", null, "rates")).thenReturn(Optional.of(pinning(2)));
+    when(catalog.callingDefinition("checkout", 3, "rates")).thenReturn(Optional.of(pinning(1)));
+    when(catalog.callingDefinition("drafts", null, "rates")).thenReturn(Optional.of(pinning(null)));
 
     mvc.perform(get("/api/rules/rates/callers"))
         .andExpect(status().isOk())
@@ -89,7 +92,7 @@ class RuleCallersWebTest {
 
   @Test
   void pagesUseTheCatalogDefaultsAndBounds() throws Exception {
-    when(rules.callingRules("rates", new PageRequest(40, 5, "")))
+    when(catalog.callingRules("rates", new PageRequest(40, 5, "")))
         .thenReturn(new CatalogPage<>(List.of(), 41, 40, 5));
     mvc.perform(get("/api/rules/rates/callers").param("offset", "40").param("limit", "5"))
         .andExpect(status().isOk())
@@ -101,13 +104,13 @@ class RuleCallersWebTest {
           .andExpect(status().isUnprocessableEntity())
           .andExpect(jsonPath("$.message").value("Use offset >= 0 and limit from 1 to 100"));
     // Only the request within bounds reached the store.
-    verify(rules).callingRules("rates", new PageRequest(40, 5, ""));
-    verifyNoMoreInteractions(rules);
+    verify(catalog).callingRules("rates", new PageRequest(40, 5, ""));
+    verifyNoMoreInteractions(catalog);
   }
 
   @Test
   void anUnknownRuleIsNotFound() throws Exception {
-    when(rules.callingRules("gone", new PageRequest(0, 20, "")))
+    when(catalog.callingRules("gone", new PageRequest(0, 20, "")))
         .thenThrow(ArcException.notFound("Rule not found: gone"));
     mvc.perform(get("/api/rules/gone/callers"))
         .andExpect(status().isNotFound())

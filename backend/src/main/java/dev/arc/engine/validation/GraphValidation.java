@@ -112,7 +112,7 @@ final class GraphValidation {
                       inputNames,
                       expressions,
                       resolver,
-                      unknown -> NodeValidation.unavailableToSourceMapping(unknown, definition))
+                      unknown -> ScopeMessages.unavailableToSourceMapping(unknown, definition))
                   .variables());
         } catch (ArcException error) {
           problems.accept(Problems.onInputNode(error, definition));
@@ -244,7 +244,7 @@ final class GraphValidation {
     if (missing.equals(List.of(Handles.NEXT))) return "connect it to a next step";
     var names = new ArrayList<String>();
     for (String handle : missing) names.add(exitName(node, handle));
-    return "connect the " + listed(names) + (names.size() == 1 ? " exit" : " exits");
+    return "connect the " + Wording.listed(names) + (names.size() == 1 ? " exit" : " exits");
   }
 
   /** An exit's caption. The shape check, which runs first, has made sure every case has a label. */
@@ -264,12 +264,6 @@ final class GraphValidation {
     return handle;
   }
 
-  /** "A", "A and B", "A, B and C". */
-  static String listed(List<String> names) {
-    if (names.size() == 1) return names.getFirst();
-    return String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
-  }
-
   /**
    * Independent writers of one variable always meet at this join, so every execution would fail
    * there with the runtime's "Conflicting upstream values" ({@link GraphPlan.Conflict}). The
@@ -283,7 +277,7 @@ final class GraphValidation {
     writers.sort(Comparator.comparingInt(node -> conflict.writers().indexOf(node.id())));
     var labels = new ArrayList<String>();
     for (Node writer : writers) labels.add(writer.label());
-    String named = listed(labels);
+    String named = Wording.listed(labels);
     ArcException error =
         ArcException.invalid(
                 "Conflicting upstream values for '"

@@ -1,79 +1,26 @@
 package dev.arc.persistence;
 
+import static dev.arc.persistence.Rows.instant;
+import static dev.arc.persistence.RuleRows.ruleNotFound;
+
 import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import dev.arc.rule.RuleRepository;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Rules and their versions as the commands and the resolver need them: the locks, the writes, the
+ * reads made under them, and the callers a deletion must find. The read model, catalog pages,
+ * summaries and the callers page, is {@link JdbcRuleCatalog}.
+ */
 @Repository
 public class JdbcRuleRepository implements RuleRepository {
-  /** A search within the ID, the name or the description, a kind, and published rules only. */
-  private static final String[] SEARCHED = {"id", "name", "description"};
-
-  private static final String CATALOG_FILTER =
-      " WHERE "
-          + CatalogPages.searchWithin(SEARCHED)
-          + " AND (? = '' OR kind = ?) AND (NOT ? OR published_version IS NOT NULL)";
-
-  /**
-   * The columns of a {@link RuleSummary}: a rule's metadata and the counts read from its draft,
-   * never the draft itself. The counted node type is spelled by {@link NodeKind}, the one
-   * vocabulary of node types.
-   */
-  private static final String SUMMARY_COLUMNS =
-      """
-      r.id, r.name, r.description, r.kind, r.revision, r.published_version,
-        r.created_at, r.updated_at,
-        jsonb_array_length(r.draft->'nodes') AS node_count,
-        jsonb_array_length(r.draft->'inputs') AS input_count,
-        jsonb_array_length(
-          jsonb_path_query_array(r.draft, '$.nodes[*] ? (@.type == "%s")')) AS reference_count,
-        COALESCE(r.published_version IS NOT NULL AND r.draft <> v.definition, false)
-          AS draft_changed
-      """
-          .formatted(NodeKind.REFERENCE.name());
-
-  /**
-   * The latest published version beside its rule, for {@code draft_changed}: the publication copied
-   * the draft as stored, so the two stay equal until the draft is saved with a change.
-   */
-  private static final String LATEST_VERSION =
-      "LEFT JOIN rule_versions v ON v.rule_id = r.id AND v.version = r.published_version";
-
-  /**
-   * Chooses the page's IDs before reading drafts. PostgreSQL would otherwise compute the JSONB
-   * counts for every matching rule before sorting, although only one page is returned.
-   */
-  private static final String CATALOG_PAGE =
-      """
-      WITH page AS (
-        SELECT id FROM rules %s
-        ORDER BY updated_at DESC, id
-        LIMIT ? OFFSET ?)
-      SELECT %s
-      FROM page JOIN rules r ON r.id = page.id %s
-      ORDER BY r.updated_at DESC, r.id
-      """
-          .formatted(CATALOG_FILTER, SUMMARY_COLUMNS, LATEST_VERSION);
-
-  /** One rule's catalog item, as a catalog page writes it. */
-  private static final String SUMMARY =
-      "SELECT %s FROM rules r %s WHERE r.id = ?".formatted(SUMMARY_COLUMNS, LATEST_VERSION);
-
-  private static final String VERSION_FILTER =
-      " WHERE rule_id = ? AND (? = '' OR strpos(version::text, ?) > 0)";
-
   /**
    * The drafts and versions whose stored callee set names the rule, through the GIN indexes of the
    * {@code callees} columns (migration V5). Each write stores the exact set it holds against
@@ -95,77 +42,11 @@ public class JdbcRuleRepository implements RuleRepository {
   private static final RowMapper<Caller> CALLER_MAPPER =
       (row, index) -> new Caller(row.getString("rule_id"), row.getObject("version", Integer.class));
 
-  /** Each other rule once whose draft or a published version calls the rule, as in CALLERS. */
-  private static final String CALLING_RULES =
-      """
-      SELECT id AS rule_id FROM rules
-      WHERE id <> ? AND callees @> ARRAY[?::text]
-      UNION
-      SELECT rule_id FROM rule_versions
-      WHERE rule_id <> ? AND callees @> ARRAY[?::text]
-      """;
-
-  /**
-   * A page of {@link #CALLING_RULES} with what the callee sets tell of each: whether the draft and
-   * the latest published version call the rule, and how many earlier versions do. Only callee sets
-   * are read; the definitions are read one at a time afterwards, for their pins.
-   */
-  private static final String CALLING_PAGE =
-      """
-      WITH page AS (
-        %s
-        ORDER BY rule_id LIMIT ? OFFSET ?)
-      SELECT r.id, r.name, r.published_version,
-        r.callees @> ARRAY[?::text] AS draft_calls,
-        COALESCE(v.callees @> ARRAY[?::text], false) AS latest_calls,
-        (SELECT count(*) FROM rule_versions earlier
-          WHERE earlier.rule_id = r.id AND earlier.version < r.published_version
-            AND earlier.callees @> ARRAY[?::text]) AS earlier_versions
-      FROM page JOIN rules r ON r.id = page.rule_id
-      LEFT JOIN rule_versions v ON v.rule_id = r.id AND v.version = r.published_version
-      ORDER BY r.id
-      """
-          .formatted(CALLING_RULES);
-
-  private static final RowMapper<CallingRule> CALLING_RULE_MAPPER =
-      (row, index) ->
-          new CallingRule(
-              row.getString("id"),
-              row.getString("name"),
-              row.getObject("published_version", Integer.class),
-              row.getBoolean("draft_calls"),
-              row.getBoolean("latest_calls"),
-              row.getInt("earlier_versions"));
-
   /**
    * The columns of a {@link Rule} without its draft, for a write that leaves the draft as it is.
    */
   private static final String METADATA_COLUMNS =
       "id, name, description, kind, revision, published_version, created_at, updated_at";
-
-  private static final RowMapper<RuleSummary> SUMMARY_MAPPER =
-      (row, index) ->
-          new RuleSummary(
-              row.getString("id"),
-              row.getString("name"),
-              row.getString("description"),
-              row.getString("kind"),
-              row.getInt("revision"),
-              row.getObject("published_version", Integer.class),
-              instant(row, "created_at"),
-              instant(row, "updated_at"),
-              row.getInt("node_count"),
-              row.getInt("input_count"),
-              row.getInt("reference_count"),
-              row.getBoolean("draft_changed"));
-
-  private static final RowMapper<RuleVersionSummary> VERSION_SUMMARY_MAPPER =
-      (row, index) ->
-          new RuleVersionSummary(
-              row.getString("rule_id"),
-              row.getInt("version"),
-              instant(row, "published_at"),
-              row.getString("note"));
 
   private final JdbcTemplate jdbc;
   private final JsonCodec json;
@@ -175,18 +56,7 @@ public class JdbcRuleRepository implements RuleRepository {
   public JdbcRuleRepository(JdbcTemplate jdbc, JsonCodec json) {
     this.jdbc = jdbc;
     this.json = json;
-    this.ruleMapper =
-        (row, index) ->
-            new Rule(
-                row.getString("id"),
-                row.getString("name"),
-                row.getString("description"),
-                row.getString("kind"),
-                decode(row.getString("draft")),
-                row.getInt("revision"),
-                row.getObject("published_version", Integer.class),
-                instant(row, "created_at"),
-                instant(row, "updated_at"));
+    this.ruleMapper = RuleRows.mapper(json);
     this.versionMapper =
         (row, index) ->
             new RuleVersion(
@@ -196,56 +66,12 @@ public class JdbcRuleRepository implements RuleRepository {
                 instant(row, "published_at"));
   }
 
-  @Override
-  public List<Rule> list() {
-    return jdbc.query("SELECT * FROM rules ORDER BY updated_at DESC, id", ruleMapper);
-  }
-
   /** The marker row is inserted once; a later claim changes no row and returns false. */
   @Override
   public boolean claimSampleSeeding() {
     return jdbc.update(
             "INSERT INTO workspace_seeds (name) VALUES ('rule-samples') ON CONFLICT DO NOTHING")
         == 1;
-  }
-
-  @Override
-  public CatalogPage<RuleSummary> catalog(PageRequest page, String kind, boolean publishedOnly) {
-    var arguments = new ArrayList<>(CatalogPages.searchArguments(page.search(), SEARCHED));
-    arguments.addAll(List.of(kind, kind, publishedOnly));
-    return CatalogPages.read(
-        jdbc,
-        "SELECT count(*) FROM rules" + CATALOG_FILTER,
-        CATALOG_PAGE,
-        SUMMARY_MAPPER,
-        page.offset(),
-        page.limit(),
-        arguments.toArray());
-  }
-
-  @Override
-  public CatalogPage<RuleVersionSummary> versionSummaries(String id, PageRequest page) {
-    requireRule(id);
-    String search = page.search();
-    return CatalogPages.read(
-        jdbc,
-        "SELECT count(*) FROM rule_versions" + VERSION_FILTER,
-        "SELECT rule_id, version, published_at, note FROM rule_versions"
-            + VERSION_FILTER
-            + " ORDER BY version DESC LIMIT ? OFFSET ?",
-        VERSION_SUMMARY_MAPPER,
-        page.offset(),
-        page.limit(),
-        id,
-        search,
-        search);
-  }
-
-  @Override
-  public RuleSummary summary(String id) {
-    var rows = jdbc.query(SUMMARY, SUMMARY_MAPPER, id);
-    if (rows.isEmpty()) throw notFound(id);
-    return rows.getFirst();
   }
 
   @Override
@@ -260,7 +86,7 @@ public class JdbcRuleRepository implements RuleRepository {
             "SELECT published_version FROM rules WHERE id = ?",
             (row, index) -> row.getObject("published_version", Integer.class),
             id);
-    if (rows.isEmpty()) throw notFound(id);
+    if (rows.isEmpty()) throw ruleNotFound(id);
     return rows.getFirst();
   }
 
@@ -302,7 +128,7 @@ public class JdbcRuleRepository implements RuleRepository {
             "SELECT revision FROM rules WHERE id = ?" + lock,
             (row, index) -> row.getInt("revision"),
             id);
-    if (rows.isEmpty()) throw notFound(id);
+    if (rows.isEmpty()) throw ruleNotFound(id);
     return rows.getFirst();
   }
 
@@ -323,20 +149,8 @@ public class JdbcRuleRepository implements RuleRepository {
 
   private Rule find(String id, String lock) {
     var rows = jdbc.query("SELECT * FROM rules WHERE id = ?" + lock, ruleMapper, id);
-    if (rows.isEmpty()) throw notFound(id);
+    if (rows.isEmpty()) throw ruleNotFound(id);
     return rows.getFirst();
-  }
-
-  private void requireRule(String id) {
-    boolean exists =
-        Boolean.TRUE.equals(
-            jdbc.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM rules WHERE id = ?)", Boolean.class, id));
-    if (!exists) throw notFound(id);
-  }
-
-  private static ArcException notFound(String id) {
-    return ArcException.notFound("Rule not found: " + id);
   }
 
   @Override
@@ -396,7 +210,7 @@ public class JdbcRuleRepository implements RuleRepository {
             textArray(callees),
             note,
             rule.id());
-    if (inserted == 0) throw notFound(rule.id());
+    if (inserted == 0) throw ruleNotFound(rule.id());
     RowMapper<Rule> withLockedDraft =
         (row, index) ->
             new Rule(
@@ -417,7 +231,7 @@ public class JdbcRuleRepository implements RuleRepository {
             version,
             textArray(callees),
             rule.id());
-    if (rows.isEmpty()) throw notFound(rule.id());
+    if (rows.isEmpty()) throw ruleNotFound(rule.id());
     return rows.getFirst();
   }
 
@@ -432,13 +246,13 @@ public class JdbcRuleRepository implements RuleRepository {
    */
   private Rule written(String id, String statement, Object... arguments) {
     var rows = jdbc.query(statement, ruleMapper, arguments);
-    if (rows.isEmpty()) throw notFound(id);
+    if (rows.isEmpty()) throw ruleNotFound(id);
     return rows.getFirst();
   }
 
   @Override
   public List<RuleVersion> versions(String id) {
-    requireRule(id);
+    RuleRows.requireRule(jdbc, id);
     return jdbc.query(
         "SELECT * FROM rule_versions WHERE rule_id = ? ORDER BY version DESC", versionMapper, id);
   }
@@ -462,50 +276,6 @@ public class JdbcRuleRepository implements RuleRepository {
   }
 
   @Override
-  public CatalogPage<CallingRule> callingRules(String id, PageRequest page) {
-    requireRule(id);
-    long total =
-        jdbc.queryForObject(
-            "SELECT count(*) FROM (" + CALLING_RULES + ") calling", Long.class, id, id, id, id);
-    var items =
-        jdbc.query(
-            CALLING_PAGE,
-            CALLING_RULE_MAPPER,
-            id,
-            id,
-            id,
-            id,
-            page.limit(),
-            page.offset(),
-            id,
-            id,
-            id);
-    return new CatalogPage<>(items, total, page.offset(), page.limit());
-  }
-
-  @Override
-  public Optional<Definition> callingDefinition(String callerId, Integer version, String id) {
-    List<String> rows;
-    if (version == null)
-      rows =
-          jdbc.query(
-              "SELECT draft FROM rules WHERE id = ? AND callees @> ARRAY[?::text]",
-              (row, index) -> row.getString("draft"),
-              callerId,
-              id);
-    else
-      rows =
-          jdbc.query(
-              "SELECT definition FROM rule_versions"
-                  + " WHERE rule_id = ? AND version = ? AND callees @> ARRAY[?::text]",
-              (row, index) -> row.getString("definition"),
-              callerId,
-              version,
-              id);
-    return rows.isEmpty() ? Optional.empty() : Optional.of(decode(rows.getFirst()));
-  }
-
-  @Override
   public void delete(String id) {
     jdbc.update("DELETE FROM rule_versions WHERE rule_id = ?", id);
     jdbc.update("DELETE FROM rules WHERE id = ?", id);
@@ -523,10 +293,6 @@ public class JdbcRuleRepository implements RuleRepository {
     if (rows.isEmpty())
       throw ArcException.notFound("Published Formula version not found: " + id + " v" + version);
     return rows.getFirst();
-  }
-
-  private static Instant instant(ResultSet row, String column) throws SQLException {
-    return row.getTimestamp(column).toInstant();
   }
 
   private Definition decode(String value) {

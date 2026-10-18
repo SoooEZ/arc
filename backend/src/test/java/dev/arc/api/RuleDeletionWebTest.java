@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import dev.arc.engine.execution.Engine;
 import dev.arc.engine.validation.Validator;
+import dev.arc.rule.RuleCatalog;
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleDefinitionService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
@@ -36,6 +38,7 @@ class RuleDeletionWebTest {
                       new Validator(),
                       mock(RuleDefinitionService.class),
                       engine),
+                  new RuleCatalogService(mock(RuleCatalog.class)),
                   mock(RuleExecutionService.class)))
           .setControllerAdvice(new Errors())
           .build();

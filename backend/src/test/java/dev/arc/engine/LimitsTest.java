@@ -15,6 +15,24 @@ import org.junit.jupiter.api.Test;
 class LimitsTest {
   private final Validator validator = new Validator();
 
+  /**
+   * Every "exceeds" message of a text limit is built by one function: the expression limit was
+   * spelled out separately by draft shape and by expression compilation.
+   */
+  @Test
+  void aTextOverItsLimitIsRefusedWithOneMessageShape() {
+    assertThat(Limits.exceeds("Description", Limits.MAX_DESCRIPTION_CHARACTERS, "characters"))
+        .isEqualTo("Description exceeds 2,000 characters");
+    assertThat(Limits.exceeds("Release note", Limits.MAX_RELEASE_NOTE_CHARACTERS, "characters"))
+        .isEqualTo("Release note exceeds 500 characters");
+    assertThatCode(() -> Limits.requireAtMost("Note", null, 1)).doesNotThrowAnyException();
+    assertThatCode(() -> Limits.requireAtMost("Note", "ab", 2)).doesNotThrowAnyException();
+    assertThatThrownBy(() -> Limits.requireAtMost("Note", "abc", 2))
+        .hasMessage("Note exceeds 2 characters");
+    assertThatThrownBy(() -> Expressions.compile("1".repeat(Limits.MAX_EXPRESSION_CHARACTERS + 1)))
+        .hasMessage("Expression exceeds 2,000 characters");
+  }
+
   @Test
   void messagesShowLimitsWithCommaGroupingInEveryLocale() {
     Locale original = Locale.getDefault();

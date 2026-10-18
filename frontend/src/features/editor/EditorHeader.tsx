@@ -17,10 +17,10 @@ import {
   viewToggleLabel,
   type EditorCapabilities,
   type EditorTask,
-} from "./editorCapabilities";
-import type { Publication } from "./usePublication";
-import RestoreVersion from "./RestoreVersion";
-import type { ComparedState } from "./CompareVersions";
+} from "./document/editorCapabilities";
+import type { Publication } from "./versions/usePublication";
+import RestoreVersion from "./versions/RestoreVersion";
+import type { ComparedState } from "./versions/CompareVersions";
 
 /** How the draft relates to what is saved, shown beside the rule kind. */
 function saveStatus(dirty: boolean, readOnly: boolean): string {

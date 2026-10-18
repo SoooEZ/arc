@@ -16,7 +16,7 @@ import {
   inputTypes,
 } from "../../../domain/inputTypes";
 import IdentifierField from "./IdentifierField";
-import SourceBindingEditor from "../../sources/SourceBindingEditor";
+import SourceBindingEditor from "../../sources/binding/SourceBindingEditor";
 import InputDefaultValue from "./InputDefaultValue";
 
 /**

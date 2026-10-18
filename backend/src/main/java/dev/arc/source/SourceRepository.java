@@ -10,9 +10,11 @@ import java.util.List;
 public interface SourceRepository {
   List<DataSource> list();
 
-  CatalogPage<SourceSummary> catalog(int offset, int limit, String search);
+  /** Newest edits first; the search matches within the ID or the name. */
+  CatalogPage<SourceSummary> catalog(PageRequest page);
 
-  CatalogPage<SourceVersionSummary> versionSummaries(String id, int offset, int limit);
+  /** Version-descending; a source's history is not searched, so the page's search is unused. */
+  CatalogPage<SourceVersionSummary> versionSummaries(String id, PageRequest page);
 
   DataSource get(String id, int version);
 

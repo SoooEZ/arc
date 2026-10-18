@@ -1,12 +1,11 @@
 import { TextField } from "@mui/material";
+import { defaultText } from "../../../domain/inputDefaults";
 import type { DecimalNumber } from "../../../domain/json";
 import {
   parseNumericDefault,
   sameNumericDefault,
 } from "../../../domain/numericDefaults";
 import { useParsedTextBuffer } from "../../../hooks/useParsedTextBuffer";
-
-const defaultText = (value: unknown) => (value == null ? "" : String(value));
 
 export default function NumericDefaultField({
   value,

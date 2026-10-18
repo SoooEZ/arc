@@ -250,6 +250,72 @@ class FrontendTest(unittest.TestCase):
                 self.assertIn(reason, violations[0])
 
 
+class FeatureAppImportsTest(unittest.TestCase):
+    def test_features_import_only_the_listed_app_modules(self):
+        tree = ProbeTree()
+        try:
+            tree.add_frontend("app/routing.ts", "export const x = 1;\n")
+            tree.add_frontend("app/Sidebar.tsx", "export const y = 2;\n")
+            tree.add_frontend(
+                "features/editor/Editor.tsx",
+                'import { x } from "../../app/routing";\nimport { y } from "../../app/Sidebar";\n',
+            )
+            tree.add_frontend("App.tsx", 'import { y } from "./app/Sidebar";\n')
+            violations = check.frontend_violations(tree.frontend)
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("app/Sidebar", violations[0])
+            self.assertIn("FEATURE_APP_IMPORTS", violations[0])
+        finally:
+            tree.close()
+
+    def test_a_listed_app_module_that_is_gone_is_reported(self):
+        tree = ProbeTree()
+        try:
+            tree.add_frontend("app/routing.ts", "export const x = 1;\n")
+            stale = check.stale_frontend_boundaries(
+                tree.frontend, {}, (), {"app/routing": "kept", "app/gone": "moved"}
+            )
+            self.assertEqual(stale, ["FEATURE_APP_IMPORTS: app/gone names no module"])
+        finally:
+            tree.close()
+
+
+class FrontendBoundaryTableTest(unittest.TestCase):
+    def test_entries_that_name_no_module_are_reported(self):
+        tree = ProbeTree()
+        try:
+            tree.add_frontend("types.ts", "export type A = 1;\n")
+            tree.add_frontend("domain/graph.ts", "export const x = 1;\n")
+            tree.add_frontend("features/sources/sourceBuffers.ts", "export const y = 2;\n")
+            pure = {
+                "domain/": ("types", "domain/"),
+                # Moved without its key: the file is now sourceBuffers.ts.
+                "features/sources/model.ts": ("types",),
+                # Kept, but allowed to import a module that was renamed.
+                "features/sources/sourceBuffers.ts": ("types", "features/sources/model"),
+                "features/empty/": (),
+            }
+            stale = check.stale_frontend_boundaries(tree.frontend, pure, ("types", "api/"), {})
+            self.assertEqual(len(stale), 4, stale)
+            self.assertIn("PURE_FRONTEND key features/sources/model.ts", stale[0])
+            self.assertIn("allowed dependency features/sources/model", stale[1])
+            self.assertIn("PURE_FRONTEND key features/empty/", stale[2])
+            self.assertIn("TRANSPORT_FRONTEND: allowed dependency api/", stale[3])
+        finally:
+            tree.close()
+
+    def test_entries_naming_files_modules_and_populated_folders_pass(self):
+        tree = ProbeTree()
+        try:
+            tree.add_frontend("types.ts", "export type A = 1;\n")
+            tree.add_frontend("domain/deep/json.ts", "export const x = 1;\n")
+            tree.add_frontend("features/editor/Editor.tsx", "export const E = 1;\n")
+            pure = {"domain/": ("types", "domain/"), "features/editor/Editor.tsx": ("domain/deep/json",)}
+            self.assertEqual(check.stale_frontend_boundaries(tree.frontend, pure, ("types",), {}), [])
+        finally:
+            tree.close()
+
+
 class FrontendHandleTest(unittest.TestCase):
     def test_handle_literals_are_rejected_outside_the_port_owner(self):
         rejected = {
@@ -279,6 +345,7 @@ class CurrentTreeTest(unittest.TestCase):
     def test_the_repository_has_no_violations(self):
         self.assertEqual(check.java_violations(check.JAVA), [])
         self.assertEqual(check.frontend_violations(check.FRONTEND), [])
+        self.assertEqual(check.stale_frontend_boundaries(check.FRONTEND), [])
 
 
 if __name__ == "__main__":

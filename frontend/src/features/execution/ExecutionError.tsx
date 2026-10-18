@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Alert, Button } from "@mui/material";
 import type { ErrorLocation, GraphProblem } from "../../api/errors";
 import { isCurrentGraphLocation } from "../../domain/graph";
-import type { ReferenceTarget } from "../editor/types";
+import type { ReferenceLocation } from "./types";
 
 type ReferencedLocation = ErrorLocation & { ruleId: string; version: number };
 
@@ -42,7 +42,7 @@ export default function ExecutionError({
   /** A command after the ways out, such as saving the run as a test. */
   action?: ReactNode;
   onNode: (id: string) => void;
-  onOpenReference: (target: ReferenceTarget) => void;
+  onOpenReference: (target: ReferenceLocation) => void;
   onEditInputs: () => void;
 }) {
   const locations = problem?.locations ?? [];

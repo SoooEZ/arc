@@ -188,7 +188,7 @@ class DiagnosticsTest {
     assertThat(diagnosis.problems()).isEmpty();
     assertThat(resolutions.get()).isEqualTo(executable).isEqualTo(3);
     assertThat(diagnosis.dependencies())
-        .extracting(Validator.Dependency::nodeId)
+        .extracting(RuleCalls.Dependency::nodeId)
         .containsExactly("f1", "f2", "f3");
   }
 

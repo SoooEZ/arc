@@ -4,7 +4,7 @@ import {
   createSourceDraft,
   sourceCandidate,
   sourceSample,
-} from "../../src/features/sources/model";
+} from "../../src/features/sources/sourceBuffers";
 import {
   openSource,
   sourceDocumentReducer,

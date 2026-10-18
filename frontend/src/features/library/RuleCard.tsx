@@ -20,9 +20,10 @@ import {
 import type { RuleSummary, Rule } from "../../types";
 import { ruleKinds } from "../../domain/ruleKinds";
 import { KindIcon } from "../../components/Icons";
-import { exportDefinition } from "../editor/exportDefinition";
+import { exportDefinition } from "./exportDefinition";
 import RulePreview from "./RulePreview";
 import { cachedPreview, rememberPreview } from "./previewCache";
+import { counted } from "../../domain/text";
 
 /**
  * A card's other actions, above the card-wide Open graph button. Export
@@ -195,9 +196,9 @@ export default memo(function RuleCard({
       <div className="rule-card-footer">
         <span>{ruleKinds[rule.kind].label}</span>
         <span>
-          {rule.nodeCount} {rule.nodeCount === 1 ? "node" : "nodes"}
+          {counted(rule.nodeCount, "node")}
           <span className="tiny-divider" />
-          {rule.inputCount} {rule.inputCount === 1 ? "input" : "inputs"}
+          {counted(rule.inputCount, "input")}
         </span>
       </div>
       <button

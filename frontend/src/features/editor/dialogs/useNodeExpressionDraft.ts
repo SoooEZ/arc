@@ -1,0 +1,126 @@
+import { useEffect, useRef, useState } from "react";
+import { studioApi } from "../../../api/studio";
+import { errorMessage } from "../../../api/errors";
+import { useStagedDialogEdits } from "../../../app/navigationGuards";
+import { useAsyncResource } from "../../../hooks/useAsyncResource";
+import { useKeyedValue } from "../../../hooks/useKeyedValue";
+import type { Definition, Diagnostic } from "../../../types";
+
+interface Options {
+  definition: Definition;
+  nodeId: string;
+  readOnly: boolean;
+  onProblems: (messages: string[]) => void;
+  /** False when the document refused the change; the dialog then stays open. */
+  onApply: (definition: Definition) => boolean;
+  onClose: () => void;
+}
+
+/** Owns one local node-code buffer; checking never changes the parent graph. */
+export function useNodeExpressionDraft({
+  definition,
+  nodeId,
+  readOnly,
+  onProblems,
+  onApply,
+  onClose,
+}: Options) {
+  const [source, setSource] = useState<string | null>(null);
+  // An untouched buffer follows its node's current code (lesson F25): a graph
+  // change while the dialog is open, such as a finishing Arrange, would
+  // otherwise be overwritten by the stale text on Apply.
+  const [edited, setEdited] = useState(false);
+  // Apply is in flight: the dialog's own lock, apart from the document's commands.
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState("");
+  const [applyDiagnostics, setApplyDiagnostics] = useState<Diagnostic[]>([]);
+  const active = useRef<AbortController | null>(null);
+  useEffect(() => () => active.current?.abort(), []);
+  const rendered = useAsyncResource(
+    JSON.stringify([definition, nodeId]),
+    (signal) => studioApi.renderNode(definition, nodeId, { signal }),
+    null,
+  );
+  useEffect(() => {
+    const renderedSource = rendered.data?.source;
+    if (renderedSource !== undefined && !edited) setSource(renderedSource);
+  }, [rendered.data, edited]);
+  // Code typed here is applied only on Apply: leaving the dialog otherwise
+  // asks first. Only typed code counts: while the node's code is read again,
+  // an untouched buffer asked as if it had been edited.
+  const dismiss = useStagedDialogEdits(
+    edited && source !== rendered.data?.source,
+    onClose,
+  );
+  const checked = useAsyncResource(
+    JSON.stringify([definition, nodeId, source]),
+    source !== null && !readOnly
+      ? async (signal) => {
+          const built = await studioApi.buildNode(definition, nodeId, source, {
+            signal,
+          });
+          const issues = built.definition
+            ? await studioApi.diagnostics(built.definition, { signal })
+            : [];
+          const messages = issues
+            .filter((problem) =>
+              problem.locations.some(
+                (location) => !location.ruleId && location.nodeId === nodeId,
+              ),
+            )
+            .map((problem) => problem.message);
+          return { diagnostics: built.diagnostics, messages };
+        }
+      : null,
+    null,
+    { delay: 350 },
+  );
+  const diagnostics = applyDiagnostics.length
+    ? applyDiagnostics
+    : (checked.data?.diagnostics ?? []);
+  const messages = checked.data?.messages ?? [];
+  const problems = [
+    ...diagnostics.map((diagnostic) => diagnostic.message),
+    ...messages,
+  ];
+  // One array while the messages stay the same, so only changes are reported.
+  const reportedProblems = useKeyedValue(problems, JSON.stringify(problems));
+  useEffect(() => {
+    onProblems(reportedProblems);
+  }, [reportedProblems, onProblems]);
+  const changeSource = (value: string) => {
+    setEdited(true);
+    setSource(value);
+    setApplyError("");
+    setApplyDiagnostics([]);
+  };
+  const apply = async () => {
+    if (readOnly || source === null || active.current) return;
+    const controller = new AbortController();
+    active.current = controller;
+    setApplying(true);
+    setApplyError("");
+    try {
+      const built = await studioApi.buildNode(definition, nodeId, source, {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      setApplyDiagnostics(built.diagnostics);
+      if (built.definition && onApply(built.definition)) onClose();
+    } catch (failure) {
+      if (!controller.signal.aborted) setApplyError(errorMessage(failure));
+    } finally {
+      active.current = null;
+      if (!controller.signal.aborted) setApplying(false);
+    }
+  };
+  return {
+    source,
+    changeSource,
+    dismiss,
+    diagnostics,
+    applying,
+    apply,
+    error: applyError || rendered.error || checked.error || messages.join("\n"),
+  };
+}

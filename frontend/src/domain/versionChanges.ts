@@ -3,7 +3,7 @@ import { sameDefinition, sameJson } from "./definitionEchoes";
 import { inputTypeFacts } from "./inputTypes";
 import { stringifyJson } from "./json";
 import { nodeKinds } from "./nodeKinds";
-import { listed } from "./text";
+import { counted, listed } from "./text";
 
 /** One property that differs: its value in the version and in the draft, null when unset. */
 export interface FieldChange {
@@ -271,10 +271,6 @@ const detailsShown = 8;
 function named(names: string[]): string {
   if (names.length <= namesShown) return listed(names);
   return `${names.slice(0, namesShown).join(", ")} and ${names.length - namesShown} more`;
-}
-
-function counted(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
 }
 
 /** One line of the publish dialog's list, with the property changes it sums up. */

@@ -81,7 +81,7 @@ function specOperations() {
 test("the in-app API reference lists real operations and every /rules operation", () => {
   const operations = specOperations();
   const listed = JSON.parse(
-    read("frontend/src/features/execution/apiEndpoints.json"),
+    read("frontend/src/features/playground/apiEndpoints.json"),
   );
   for (const { method, path: endpoint } of listed)
     assert.ok(

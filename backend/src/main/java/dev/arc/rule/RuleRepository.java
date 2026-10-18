@@ -5,10 +5,14 @@ import dev.arc.error.ArcException;
 import dev.arc.model.*;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
-/** Storage port. lock/update/publish/delete are called inside the application transaction. */
+/**
+ * Storage port of the rule's commands and of the resolver: locks, writes, the rule and its versions
+ * as commands read them, and the callers a deletion must find. lock/update/publish/delete are
+ * called inside the application transaction. Lists, summaries and the callers page are read through
+ * {@link RuleCatalog}.
+ */
 public interface RuleRepository extends RuleResolver {
   /** A rule that calls another: its draft ({@code version} null) or one of its versions. */
   record Caller(String ruleId, Integer version) {
@@ -22,37 +26,10 @@ public interface RuleRepository extends RuleResolver {
   record KindedVersion(String kind, Definition definition) {}
 
   /**
-   * A rule whose saved draft or published versions call another, as their stored callee sets tell
-   * before any definition is read: whether its draft and its latest published version call the
-   * rule, and how many of its earlier versions do.
-   */
-  record CallingRule(
-      String ruleId,
-      String name,
-      Integer publishedVersion,
-      boolean draftCalls,
-      boolean latestCalls,
-      int earlierVersions) {}
-
-  List<Rule> list();
-
-  /**
    * Claims the one-time seeding of the sample rules: true for the first caller in the workspace's
    * life, false afterwards, however many rules the workspace holds now.
    */
   boolean claimSampleSeeding();
-
-  /** Newest edits first; the search matches ID, name and description, and an empty kind all. */
-  CatalogPage<RuleSummary> catalog(PageRequest page, String kind, boolean publishedOnly);
-
-  /** Version-descending metadata, filtered by a literal substring of the decimal version. */
-  CatalogPage<RuleVersionSummary> versionSummaries(String id, PageRequest page);
-
-  /**
-   * One rule's catalog item, without its draft, for clients that need only its current name, kind,
-   * publication and creation time; a missing rule is a 404.
-   */
-  RuleSummary summary(String id);
 
   Rule get(String id);
 
@@ -91,7 +68,7 @@ public interface RuleRepository extends RuleResolver {
   /**
    * An ID that is already stored, including by a concurrent create, is a 409 conflict. Each write
    * returns the rule as stored, read by the write itself, and stores {@code callees}, the rules the
-   * definition calls ({@code Validator.calledRuleIds}), beside it for {@link #callersOf}.
+   * definition calls ({@code RuleCalls.calledRuleIds}), beside it for {@link #callersOf}.
    */
   Rule create(
       String id,
@@ -127,20 +104,6 @@ public interface RuleRepository extends RuleResolver {
    * version with the draft first, from the callee sets their writes stored.
    */
   List<Caller> callersOf(String id);
-
-  /**
-   * One page of the other rules whose draft or published versions call the rule, ordered by rule
-   * ID, from the same stored callee sets as {@link #callersOf}; a missing rule is a 404. The count
-   * and the page are separate statements, as in the catalogs.
-   */
-  CatalogPage<CallingRule> callingRules(String id, PageRequest page);
-
-  /**
-   * The saved draft of rule {@code callerId} ({@code version} null) or one of its published
-   * versions, when its stored callee set names rule {@code id}; empty when it does not, or no
-   * longer exists.
-   */
-  Optional<Definition> callingDefinition(String callerId, Integer version, String id);
 
   /** Removes the rule with its draft and every published version. */
   void delete(String id);

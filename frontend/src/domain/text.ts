@@ -1,3 +1,11 @@
+/**
+ * A count with its noun: "1 input", "3 inputs". `many` names an irregular
+ * plural: counted(2, "entry", "entries") is "2 entries".
+ */
+export function counted(count: number, one: string, many = `${one}s`): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 /** Names as an English list: "a", "a and b" or "a, b and c". */
 export function listed(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? "";

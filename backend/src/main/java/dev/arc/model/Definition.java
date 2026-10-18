@@ -1,8 +1,10 @@
 package dev.arc.model;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Portable executable graph. Presentation coordinates never affect execution. */
@@ -175,6 +177,38 @@ public record Definition(
         case CASES -> cases != null;
         case FIELDS -> fields != null;
         case OUTPUT_NAME -> outputName != null;
+      };
+    }
+
+    /**
+     * Every expression text the node holds, whatever its type, property by property: its
+     * expression, its binding values, its selector and each case's and field's expression; an unset
+     * expression or selector is null. The rules a stored draft or version calls (its callee set,
+     * which keeps them from deletion) are read from these texts, so the switch below makes a new
+     * property say whether it holds expressions. A stored row is read as it is: a missing list,
+     * case or field holds nothing.
+     */
+    public List<String> expressionTexts() {
+      var texts = new ArrayList<String>();
+      for (NodeKind.Property property : NodeKind.Property.values())
+        texts.addAll(expressionTexts(property));
+      return texts;
+    }
+
+    private List<String> expressionTexts(NodeKind.Property property) {
+      return switch (property) {
+        case EXPRESSION -> Collections.singletonList(expression);
+        case SELECTOR -> Collections.singletonList(selector);
+        case BINDINGS -> bindings == null ? List.of() : new ArrayList<>(bindings.values());
+        case CASES ->
+            cases == null
+                ? List.of()
+                : cases.stream().filter(Objects::nonNull).map(BranchCase::expression).toList();
+        case FIELDS ->
+            fields == null
+                ? List.of()
+                : fields.stream().filter(Objects::nonNull).map(Field::expression).toList();
+        case OUTPUT, RULE, OUTPUT_NAME -> List.of();
       };
     }
 

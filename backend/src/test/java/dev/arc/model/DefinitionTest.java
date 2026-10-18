@@ -51,6 +51,29 @@ class DefinitionTest {
     assertThat(named.outputFieldName()).isEqualTo("payable");
   }
 
+  /**
+   * The texts a callee set is read from: every expression a node holds whatever its type, an unset
+   * expression and selector as null, and a stored row's missing case or field as nothing.
+   */
+  @Test
+  void aNodeListsEveryExpressionTextItHoldsWhateverItsType() {
+    var node =
+        nodeOf("n", "LATER", "N")
+            .expression("expression")
+            .selector("selector")
+            .cases(Arrays.asList(new BranchCase("c", "C", "case"), null))
+            .fields(Arrays.asList(new Field("f", "field"), null))
+            .bindings(Map.of("b", "binding"))
+            .output("result")
+            .rule("called", 1)
+            .outputName("named")
+            .build();
+    assertThat(node.expressionTexts())
+        .containsExactly("expression", "binding", "selector", "case", "field");
+    assertThat(nodeOf("bare", "OUTPUT", "Bare").build().expressionTexts())
+        .containsExactly(null, null);
+  }
+
   /** The one rule behind Reference bindings, {@code @id:version} arguments and source mappings. */
   @Test
   void anInputNeedsACallerValueOnlyWhenRequiredWithoutADefaultOrASource() {

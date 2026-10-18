@@ -1,13 +1,13 @@
 package dev.arc.persistence;
 
+import static dev.arc.persistence.Rows.instant;
+import static dev.arc.persistence.RuleRows.ruleNotFound;
+
 import dev.arc.engine.Limits;
 import dev.arc.error.ArcException;
 import dev.arc.model.RuleTestCase;
 import dev.arc.rule.RuleTestCaseRepository;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +47,7 @@ public class JdbcRuleTestCaseRepository implements RuleTestCaseRepository {
 
   @Override
   public List<RuleTestCase> list(String ruleId) {
-    requireRule(ruleId);
+    RuleRows.requireRule(jdbc, ruleId);
     return jdbc.query(
         "SELECT " + COLUMNS + " FROM rule_test_cases WHERE rule_id = ? ORDER BY id",
         mapper,
@@ -164,20 +164,8 @@ public class JdbcRuleTestCaseRepository implements RuleTestCaseRepository {
 
   /** An unknown rule is named first, so a case path under a missing rule says the rule is gone. */
   private ArcException missing(String ruleId, long id) {
-    requireRule(ruleId);
+    RuleRows.requireRule(jdbc, ruleId);
     return ArcException.notFound("Test case not found: " + id);
-  }
-
-  private void requireRule(String ruleId) {
-    boolean exists =
-        Boolean.TRUE.equals(
-            jdbc.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM rules WHERE id = ?)", Boolean.class, ruleId));
-    if (!exists) throw ruleNotFound(ruleId);
-  }
-
-  private static ArcException ruleNotFound(String ruleId) {
-    return ArcException.notFound("Rule not found: " + ruleId);
   }
 
   private Map<String, Object> inputs(String text) {
@@ -191,9 +179,5 @@ public class JdbcRuleTestCaseRepository implements RuleTestCaseRepository {
   /** SQL NULL (a failure is expected) and the JSON null (a null result is) both read as null. */
   private Object expectedResult(String text) {
     return text == null ? null : json.decode(text, Object.class);
-  }
-
-  private static Instant instant(ResultSet row, String column) throws SQLException {
-    return row.getTimestamp(column).toInstant();
   }
 }

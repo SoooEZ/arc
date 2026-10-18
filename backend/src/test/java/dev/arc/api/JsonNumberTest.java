@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.arc.engine.execution.Engine;
+import dev.arc.rule.RuleCatalogService;
 import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleExecutionService.ExecutionResponse;
 import dev.arc.rule.RuleExecutionService.Timing;
@@ -28,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class JsonNumberTest {
   @Autowired private MockMvc mvc;
   @MockitoBean private RuleService rules;
+  @MockitoBean private RuleCatalogService catalog;
   @MockitoBean private RuleExecutionService execution;
 
   @Test

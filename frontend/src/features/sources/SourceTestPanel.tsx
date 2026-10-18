@@ -4,7 +4,7 @@ import { Play } from "lucide-react";
 import type { Input } from "../../types";
 import { tryParseExecutionInputs } from "../../domain/executionInputs";
 import { stringifyJson } from "../../domain/json";
-import InputForm from "../execution/InputForm";
+import InputForm from "../../components/InputForm";
 import ViewToggle, { useRememberedView } from "./ViewToggle";
 
 type TestView = "form" | "json";

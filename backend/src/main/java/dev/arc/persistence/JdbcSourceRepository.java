@@ -52,9 +52,7 @@ public class JdbcSourceRepository implements SourceRepository {
   private static final RowMapper<SourceVersionSummary> VERSION_SUMMARY_MAPPER =
       (row, index) ->
           new SourceVersionSummary(
-              row.getString("source_id"),
-              row.getInt("version"),
-              row.getTimestamp("created_at").toInstant());
+              row.getString("source_id"), row.getInt("version"), Rows.instant(row, "created_at"));
 
   private final JdbcTemplate db;
   private final JsonCodec json;
@@ -78,19 +76,19 @@ public class JdbcSourceRepository implements SourceRepository {
   }
 
   @Override
-  public CatalogPage<SourceSummary> catalog(int offset, int limit, String search) {
+  public CatalogPage<SourceSummary> catalog(PageRequest page) {
     return CatalogPages.read(
         db,
         "SELECT count(*) FROM data_sources s" + CATALOG_FILTER,
         CATALOG_PAGE,
         SUMMARY_MAPPER,
-        offset,
-        limit,
-        CatalogPages.searchArguments(search, SEARCHED).toArray());
+        page.offset(),
+        page.limit(),
+        CatalogPages.searchArguments(page.search(), SEARCHED).toArray());
   }
 
   @Override
-  public CatalogPage<SourceVersionSummary> versionSummaries(String id, int offset, int limit) {
+  public CatalogPage<SourceVersionSummary> versionSummaries(String id, PageRequest page) {
     requireSource(id);
     return CatalogPages.read(
         db,
@@ -98,8 +96,8 @@ public class JdbcSourceRepository implements SourceRepository {
         "SELECT source_id, version, created_at FROM data_source_versions WHERE source_id = ?"
             + " ORDER BY version DESC LIMIT ? OFFSET ?",
         VERSION_SUMMARY_MAPPER,
-        offset,
-        limit,
+        page.offset(),
+        page.limit(),
         id);
   }
 

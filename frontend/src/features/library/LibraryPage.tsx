@@ -10,11 +10,12 @@ import { ArrowDown, ArrowRight, Plus, Search, Workflow } from "lucide-react";
 import type { Kind, Rule, RuleSummary } from "../../types";
 import { kinds, ruleKinds } from "../../domain/ruleKinds";
 import type { useRuleLibrary } from "../../app/useRuleLibrary";
-import { RecoverableBoundary } from "../../app/RecoverableBoundary";
+import { RecoverableBoundary } from "../../components/RecoverableBoundary";
 import CatalogPagination from "../../components/CatalogPagination";
 import RuleCard from "./RuleCard";
 import DuplicateRuleDialog from "./DuplicateRuleDialog";
 import { newestFirst } from "./libraryOrder";
+import { counted } from "../../domain/text";
 
 type KindFilter = Kind | "ALL";
 /** One tab for every rule kind, in the order the create dialog offers them. */
@@ -130,9 +131,7 @@ export default function Library({
         />
       </div>
       <div className="section-meta">
-        <span>
-          {rules.length} {rules.length === 1 ? "rule" : "rules"}
-        </span>
+        <span>{counted(rules.length, "rule")}</span>
         <span>
           Last updated <ArrowDown size={12} />
         </span>

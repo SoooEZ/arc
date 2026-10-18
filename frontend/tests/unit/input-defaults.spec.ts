@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
+  defaultText,
   inputDefaultProblem,
+  parseStringDefault,
+  sameStringDefault,
   valueBoundProblems,
 } from "../../src/domain/inputDefaults";
 import { DecimalNumber } from "../../src/domain/json";
@@ -120,4 +123,26 @@ test("a default holding text the server cannot store is refused in the field", (
     "String exceeds 2,000 characters",
   );
   expect(inputDefaultProblem("STRING", "😀 ok")).toBeNull();
+});
+
+// The inspector's STRING default field and the source parameter table share one policy.
+test("a STRING default typed as text: empty is none, refused text keeps the server's reason", () => {
+  expect(parseStringDefault("")).toEqual({ valid: true, value: null });
+  expect(parseStringDefault(" gold ")).toEqual({
+    valid: true,
+    value: " gold ",
+  });
+  expect(parseStringDefault("a".repeat(2001))).toEqual({
+    valid: false,
+    error: valueBoundProblems.string,
+  });
+  const nul = parseStringDefault("a\u0000b");
+  expect(nul.valid).toBe(false);
+  expect(defaultText(null)).toBe("");
+  expect(defaultText(undefined)).toBe("");
+  expect(defaultText("gold")).toBe("gold");
+  expect(defaultText(new DecimalNumber("12.50"))).toBe("12.50");
+  expect(sameStringDefault(null, null)).toBe(true);
+  expect(sameStringDefault("a", "a")).toBe(true);
+  expect(sameStringDefault("a", null)).toBe(false);
 });

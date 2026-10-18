@@ -128,6 +128,48 @@ test("an HTTP source's parameters edit as a table that writes the parameters JSO
   await expect(fetchSample).toBeEnabled();
 });
 
+// Rows were keyed by position, so removing a row left its unfinished default
+// to the row that moved up, which then held Save for a value it never had.
+test("a removed parameter takes its unfinished default with it", async ({
+  page,
+  request,
+}) => {
+  const number = (name: string) => ({
+    name,
+    type: "NUMBER" as const,
+    required: false,
+    defaultValue: null,
+  });
+  const source = await createSource(request, {
+    id: uniqueId("parameter-rows"),
+    name: `Parameter rows ${uniqueId("name")}`,
+    definition: {
+      kind: "HTTP",
+      url: "https://example.com/rates",
+      parameters: [number("first"), number("second")],
+      secretHeaders: {},
+      timeoutMs: 3000,
+    },
+  });
+  await openSource(page, source.name);
+  const first = page.getByLabel("Parameter 1 · default", { exact: true });
+  await first.fill("1x");
+  await expect(first).toHaveAttribute("aria-invalid", "true");
+  const save = page.getByRole("button", { name: "Save new version" });
+  await expect(save).toBeDisabled();
+
+  await page
+    .getByRole("button", { name: "Remove parameter 1 (first)", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Parameter 1 · name", { exact: true }),
+  ).toHaveValue("second");
+  const second = page.getByLabel("Parameter 1 · default", { exact: true });
+  await expect(second).toHaveValue("");
+  await expect(second).toHaveAttribute("aria-invalid", "false");
+  await expect(save).toBeEnabled();
+});
+
 test("secret headers edit as a table that checks what the server checks", async ({
   page,
   request,
