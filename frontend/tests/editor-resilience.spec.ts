@@ -5,11 +5,9 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import {
-  createRule as createApiRule,
-  publishRule,
-  uniqueId,
-} from "./helpers/api";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
+import { canvasNode, nodeCard } from "./helpers/canvas";
+import { deferred } from "./helpers/gates";
 
 const basic: Definition = {
   schemaVersion: 1,
@@ -29,13 +27,13 @@ const basic: Definition = {
   edges: [{ id: "next", source: "input", target: "out", sourceHandle: "next" }],
 };
 
-async function createRule(
+async function createResilienceRule(
   request: APIRequestContext,
   prefix: string,
   definition: Definition = basic,
 ) {
   const id = uniqueId(prefix);
-  await createApiRule(request, { id, name: `Resilience ${id}`, definition });
+  await createRule(request, { id, name: `Resilience ${id}`, definition });
   return id;
 }
 
@@ -44,8 +42,6 @@ async function publish(request: APIRequestContext, id: string) {
   return publishRule(request, rule);
 }
 
-const card = (page: Page, id: string) =>
-  page.locator(`.react-flow__node[data-id="${id}"]`);
 const nodeName = (page: Page) => page.getByLabel("Node name", { exact: true });
 
 /** Fails the lazily loaded module whose file name starts with `name`. */
@@ -86,25 +82,27 @@ test("node IDs named after Object members open, select and show their diagnostic
   };
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  const id = await createRule(request, "object-member-ids", definition);
+  const id = await createResilienceRule(
+    request,
+    "object-member-ids",
+    definition,
+  );
   const variables = page.waitForResponse((response) =>
     response.url().endsWith("/api/variables"),
   );
   await page.goto(`/#/rules/${id}`);
   await variables;
   await expect(page.locator(".react-flow__node")).toHaveCount(5);
-  await expect(card(page, "valueOf").locator(".graph-node")).toHaveClass(
-    /node-error/,
-  );
+  await expect(nodeCard(page, "valueOf")).toHaveClass(/node-error/);
   for (const nodeId of ids) {
-    await card(page, nodeId).locator(".graph-node").click();
+    await nodeCard(page, nodeId).click();
     await expect(nodeName(page)).toHaveValue(`Node ${nodeId}`);
-    await expect(card(page, nodeId)).toHaveClass(/selected/);
-    await expect(card(page, nodeId).locator(".node-error-message")).toHaveCount(
-      nodeId === "valueOf" ? 1 : 0,
-    );
+    await expect(canvasNode(page, nodeId)).toHaveClass(/selected/);
+    await expect(
+      canvasNode(page, nodeId).locator(".node-error-message"),
+    ).toHaveCount(nodeId === "valueOf" ? 1 : 0);
   }
-  await card(page, "valueOf").locator(".graph-node").click();
+  await nodeCard(page, "valueOf").click();
   await expect(
     page.getByRole("button", { name: "Node errors (1)", exact: true }),
   ).toBeVisible();
@@ -144,7 +142,7 @@ test("an API draft without node positions can add a default return", async ({
       { id: "e2", source: "route", target: "big", sourceHandle: "case:case-1" },
     ],
   } as unknown as Definition;
-  const id = await createRule(request, "unplaced-nodes", definition);
+  const id = await createResilienceRule(request, "unplaced-nodes", definition);
   await page.goto(`/#/rules/${id}?node=route`);
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
   await expect(nodeName(page)).toHaveValue("Route");
@@ -169,11 +167,8 @@ test("deleting a node while its code dialog loads releases the inspector", async
   page,
   request,
 }) => {
-  const id = await createRule(request, "delete-loading-dialog");
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const id = await createResilienceRule(request, "delete-loading-dialog");
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(
     /\/NodeExpressionDialog[^/]*\.(tsx|js)(\?.*)?$/,
@@ -191,14 +186,14 @@ test("deleting a node while its code dialog loads releases the inspector", async
       .click();
     await expect.poll(() => held).toBe(true);
     await expect(nodeName(page)).toBeDisabled();
-    await card(page, "out").click({ button: "right" });
+    await canvasNode(page, "out").click({ button: "right" });
     await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
-    await expect(card(page, "out")).toHaveCount(0);
+    await expect(canvasNode(page, "out")).toHaveCount(0);
     await expect(nodeName(page)).toBeEnabled();
     release();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await nodeName(page).fill("Still editable");
-    await expect(card(page, "input")).toContainText("Still editable");
+    await expect(canvasNode(page, "input")).toContainText("Still editable");
   } finally {
     release();
   }
@@ -208,11 +203,8 @@ test("a node editor that is still loading can be cancelled", async ({
   page,
   request,
 }) => {
-  const id = await createRule(request, "cancel-loading-editor");
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const id = await createResilienceRule(request, "cancel-loading-editor");
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(/\/NodeEditDialog[^/]*\.(tsx|js)(\?.*)?$/, async (route) => {
     held = true;
@@ -222,7 +214,7 @@ test("a node editor that is still loading can be cancelled", async ({
   try {
     await page.goto(`/#/rules/${id}`);
     await expect(nodeName(page)).toBeEnabled();
-    await card(page, "out").click({ button: "right" });
+    await canvasNode(page, "out").click({ button: "right" });
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
     await expect.poll(() => held).toBe(true);
     await expect(
@@ -234,7 +226,9 @@ test("a node editor that is still loading can be cancelled", async ({
     release();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await nodeName(page).fill("Editable after cancel");
-    await expect(card(page, "input")).toContainText("Editable after cancel");
+    await expect(canvasNode(page, "input")).toContainText(
+      "Editable after cancel",
+    );
   } finally {
     release();
   }
@@ -244,11 +238,11 @@ test("a node editor that cannot load can be cancelled without losing the draft",
   page,
   request,
 }) => {
-  const id = await createRule(request, "failed-node-editor");
+  const id = await createResilienceRule(request, "failed-node-editor");
   await failChunk(page, "NodeEditDialog");
   await page.goto(`/#/rules/${id}`);
   await nodeName(page).fill("Edited before failure");
-  await card(page, "out").click({ button: "right" });
+  await canvasNode(page, "out").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const failure = page
     .getByRole("alert")
@@ -267,7 +261,7 @@ test("a code editor or JSON editor that cannot load keeps the editor and the dra
   page,
   request,
 }) => {
-  const id = await createRule(request, "failed-lazy-views");
+  const id = await createResilienceRule(request, "failed-lazy-views");
   await failChunk(page, "CodeStudio");
   await failChunk(page, "InputJsonEditor");
   const errors: string[] = [];
@@ -306,7 +300,7 @@ test("a published version selects one of its own nodes when the draft's selectio
   page,
   request,
 }) => {
-  const id = await createRule(request, "version-selection");
+  const id = await createResilienceRule(request, "version-selection");
   await publish(request, id);
   const current = (await (
     await request.get(`/api/rules/${id}`)
@@ -336,14 +330,14 @@ test("a published version selects one of its own nodes when the draft's selectio
   await expect(page.getByText("Immutable published version")).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(2);
   await expect(nodeName(page)).toHaveValue("Inputs");
-  await expect(card(page, "input")).toHaveClass(/selected/);
+  await expect(canvasNode(page, "input")).toHaveClass(/selected/);
 });
 
 test("export keeps the download URL alive after the click", async ({
   page,
   request,
 }) => {
-  const id = await createRule(request, "export-url");
+  const id = await createResilienceRule(request, "export-url");
   await page.addInitScript(() => {
     const click = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
@@ -384,7 +378,7 @@ test("preview errors from a published self-reference or a rule named preview ope
   page,
   request,
 }) => {
-  const id = await createRule(request, "self-reference-error");
+  const id = await createResilienceRule(request, "self-reference-error");
   await publish(request, id);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
@@ -425,12 +419,8 @@ test("preview errors from a published self-reference or a rule named preview ope
         exact: true,
       }),
     ).toBeVisible();
-    await expect(card(page, "out").locator(".graph-node")).not.toHaveClass(
-      /node-error/,
-    );
-    await expect(card(page, "input").locator(".graph-node")).toHaveClass(
-      /node-error/,
-    );
+    await expect(nodeCard(page, "out")).not.toHaveClass(/node-error/);
+    await expect(nodeCard(page, "input")).toHaveClass(/node-error/);
     await page.unroute("**/api/preview");
   }
 });

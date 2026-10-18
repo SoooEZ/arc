@@ -18,20 +18,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.arc.engine.execution.Engine;
-import dev.arc.engine.validation.Validator;
 import dev.arc.persistence.JdbcRuleCatalog;
 import dev.arc.persistence.JdbcRuleRepository;
 import dev.arc.persistence.JdbcRuleTestCaseRepository;
 import dev.arc.persistence.JdbcSourceRepository;
 import dev.arc.persistence.JsonCodec;
-import dev.arc.rule.RuleCatalogService;
-import dev.arc.rule.RuleDefinitionService;
-import dev.arc.rule.RuleExecutionService;
-import dev.arc.rule.RuleService;
-import dev.arc.source.SourceExecutionService;
-import dev.arc.source.SourceService;
-import dev.arc.source.SourceValidator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
@@ -39,7 +30,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
  * Storage outcomes reach clients as errors about the requested resource. The real controllers,
@@ -50,22 +40,12 @@ class ResourceErrorsTest {
   private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
   private final JsonCodec json = new JsonCodec(new ObjectMapper());
   private final MockMvc mvc =
-      MockMvcBuilders.standaloneSetup(
-              new RuleController(
-                  new RuleService(
-                      new JdbcRuleRepository(jdbc, json),
-                      new JdbcRuleTestCaseRepository(jdbc, json),
-                      new Validator(),
-                      mock(RuleDefinitionService.class),
-                      mock(Engine.class)),
-                  new RuleCatalogService(new JdbcRuleCatalog(jdbc, json)),
-                  mock(RuleExecutionService.class)),
-              new SourceController(
-                  new SourceService(
-                      new JdbcSourceRepository(jdbc, json), mock(SourceValidator.class)),
-                  mock(SourceExecutionService.class)))
-          .setControllerAdvice(new Errors())
-          .build();
+      new RuleApi()
+          .rules(new JdbcRuleRepository(jdbc, json))
+          .testCases(new JdbcRuleTestCaseRepository(jdbc, json))
+          .catalog(new JdbcRuleCatalog(jdbc, json))
+          .sources(new JdbcSourceRepository(jdbc, json))
+          .mvc();
 
   @Test
   void aTakenIdIsAConflictAboutTheResourceBeingCreated() throws Exception {

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { createRule, readRule, uniqueId } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 async function chooseBranches(scope: Page | Locator, page: Page, mode: string) {
   await scope.getByRole("combobox", { name: "Branches", exact: true }).click();
@@ -16,7 +17,7 @@ async function conditionRule(
     kind: "RULE",
   });
   await page.goto(`/#/rules/${rule.id}?node=condition`);
-  const card = page.locator('.react-flow__node[data-id="condition"]');
+  const card = canvasNode(page, "condition");
   await expect(card.locator(".handle-caption")).toHaveText(["True", "False"]);
   return { rule, card };
 }

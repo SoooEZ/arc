@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, TestCase } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 import { setEditorText } from "./helpers/editor";
 
 const doubler: Definition = {
@@ -118,7 +119,7 @@ test("a run saved as a test runs again, catches a change and goes to the publish
   );
 
   // A changed formula fails the first test, which can take the new result.
-  await page.locator('.react-flow__node[data-id="calc"]').click();
+  await canvasNode(page, "calc").click();
   await setEditorText(
     page,
     page.getByLabel("Expression", { exact: true }),

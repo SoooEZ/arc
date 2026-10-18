@@ -1,4 +1,12 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
+import type { Definition, Input } from "../../src/types";
+import { createRule } from "./api";
+import { nodeCard } from "./canvas";
 
 export function editorSurface(input: Locator) {
   return input.locator(
@@ -76,4 +84,48 @@ export async function openRunOptions(page: Page) {
     !(await options.evaluate((element) => (element as HTMLDetailsElement).open))
   )
     await options.locator("summary").click();
+}
+
+/**
+ * Creates a rule whose Input declares `inputs` and whose Output returns
+ * `amount` when it is one of them, then opens it with the Input selected.
+ */
+export async function openInputRule(
+  page: Page,
+  request: APIRequestContext,
+  id: string,
+  inputs: Input[],
+) {
+  const definition: Definition = {
+    schemaVersion: 1,
+    inputs,
+    nodes: [
+      {
+        id: "input",
+        type: "INPUT",
+        label: "Inputs",
+        position: { x: 300, y: 0 },
+      },
+      {
+        id: "output",
+        type: "OUTPUT",
+        label: "Result",
+        expression: inputs.some((input) => input.name === "amount")
+          ? "amount"
+          : "7",
+        position: { x: 300, y: 200 },
+      },
+    ],
+    edges: [
+      { id: "next", source: "input", target: "output", sourceHandle: "next" },
+    ],
+  };
+  await createRule(request, {
+    id,
+    name: "Input editing fixture",
+    kind: "FORMULA",
+    definition,
+  });
+  await page.goto(`/#/rules/${id}`);
+  await nodeCard(page, "input").click();
 }

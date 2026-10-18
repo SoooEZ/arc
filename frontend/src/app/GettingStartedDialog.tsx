@@ -117,7 +117,7 @@ export default function GettingStartedDialog({
     >
       <DialogTitle id="getting-started-title">Getting started</DialogTitle>
       <DialogContent className="help-dialog">
-        <p className="help-intro">
+        <p className="muted-note">
           ARC keeps business logic as versioned rules that any application can
           call.
         </p>

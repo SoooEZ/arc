@@ -1,0 +1,48 @@
+/* The Sources page: ≤900px, then ≤600px. */
+@media (max-width: 900px) {
+  .sources-page {
+    padding: 24px;
+  }
+  .sources-layout {
+    grid-template-columns: 1fr;
+  }
+  .source-list {
+    display: flex;
+    overflow: auto;
+  }
+  .source-list button {
+    min-width: 180px;
+  }
+  .source-catalog > p {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .source-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .sources-page {
+    padding: 18px;
+  }
+  .sources-page .page-heading {
+    align-items: start;
+    gap: 10px;
+  }
+  .sources-page .page-heading h1 {
+    font-size: 26px;
+  }
+  .source-detail {
+    padding: 16px;
+  }
+  .source-detail-heading {
+    align-items: start;
+  }
+  .source-detail-heading > div {
+    flex-direction: column;
+    align-items: start;
+  }
+  .source-explainer {
+    gap: 10px;
+    font-size: var(--text-sm);
+  }
+}

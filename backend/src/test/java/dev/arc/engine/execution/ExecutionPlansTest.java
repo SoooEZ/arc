@@ -1,6 +1,7 @@
 package dev.arc.engine.execution;
 
 import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.inputToOutput;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
@@ -32,12 +33,8 @@ class ExecutionPlansTest {
     }
   }
 
-  static Definition graph(String expression) {
-    return new Definition(
-        1,
-        List.of(),
-        List.of(inputNode("in", "Input"), outputNode("out", "Output", expression)),
-        List.of(new Edge("edge", "in", "out", "next")));
+  private static Definition graph(String expression) {
+    return inputToOutput(List.of(), expression);
   }
 
   private ExecutionPlans.Session session(ExecutionPlans plans) {

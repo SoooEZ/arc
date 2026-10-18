@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Rule } from "../src/types";
 import { createRule, deleteRule, uniqueId } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 test("a node that sets a property its kind does not use is named and removed by hand", async ({
   page,
@@ -28,7 +29,7 @@ test("a node that sets a property its kind does not use is named and removed by 
   });
 
   await page.goto(`/#/rules/${id}`);
-  await page.locator('.react-flow__node[data-id="calculate"]').click();
+  await canvasNode(page, "calculate").click();
   const notice = page.locator(".inspector-unused-properties");
   await expect(notice).toContainText(
     "This Formula node also sets parameter bindings, which Formula nodes do not use.",

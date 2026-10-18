@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { canvasNode } from "./helpers/canvas";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, publishRule, uniqueId } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 test("a failed published version cannot expose the draft and can be retried", async ({
   page,
@@ -150,7 +152,7 @@ test("moving a node reuses semantic reads and late diagnostics cannot mark a new
     if (request.url().endsWith("/api/diagnostics")) reads.diagnostics++;
   });
   await page.goto(`/#/rules/${id}`);
-  const node = page.locator('.react-flow__node[data-id="calculate"]');
+  const node = canvasNode(page, "calculate");
   await node.locator(".graph-node").click();
   await expect(
     editorLines(page.getByLabel("Expression", { exact: true })),
@@ -173,10 +175,7 @@ test("moving a node reuses semantic reads and late diagnostics cannot mark a new
   await page.waitForTimeout(650);
   expect(reads).toEqual(before);
 
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   let delivered = false;
   await page.route("**/api/diagnostics", async (route) => {

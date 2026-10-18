@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { createRule, readRule, uniqueId } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -48,9 +49,6 @@ const definition: Definition = {
   ],
 };
 
-const card = (page: Page, id: string) =>
-  page.locator(`.react-flow__node[data-id="${id}"]`);
-
 /** Replaces a name field's text by typing, as a user renames. */
 async function retype(page: Page, label: string, name: string) {
   const field = page.getByLabel(label, { exact: true }).first();
@@ -71,8 +69,8 @@ test("renaming an input or a result renames it in every expression, as one undo 
   await expect(page.locator(".react-flow__node")).toHaveCount(5);
 
   await retype(page, "Parameter name", "orderTotal");
-  await expect(card(page, "large")).toContainText("orderTotal >= 100");
-  await expect(card(page, "full")).toContainText("orderTotal");
+  await expect(canvasNode(page, "large")).toContainText("orderTotal >= 100");
+  await expect(canvasNode(page, "full")).toContainText("orderTotal");
   await expect(page.locator(".node-error-message")).toHaveCount(0);
   // A valid name shows no naming rule under its field.
   await expect(
@@ -82,32 +80,32 @@ test("renaming an input or a result renames it in every expression, as one undo 
   // The typing was one step: Undo brings the old name back everywhere.
   await page.locator(".react-flow__pane").click({ position: { x: 20, y: 20 } });
   await page.keyboard.press("ControlOrMeta+z");
-  await expect(card(page, "large")).toContainText("amount >= 100");
-  await expect(card(page, "full")).toContainText("amount");
+  await expect(canvasNode(page, "large")).toContainText("amount >= 100");
+  await expect(canvasNode(page, "full")).toContainText("amount");
 
   // A cleared name leaves the expressions until the name is complete again.
-  await card(page, "input").click();
+  await canvasNode(page, "input").click();
   const name = page.getByLabel("Parameter name", { exact: true }).first();
   await name.click();
   await name.press("ControlOrMeta+a");
   await name.press("Backspace");
-  await expect(card(page, "large")).toContainText("amount >= 100");
+  await expect(canvasNode(page, "large")).toContainText("amount >= 100");
   await name.pressSequentially("price", { delay: 10 });
-  await expect(card(page, "large")).toContainText("price >= 100");
+  await expect(canvasNode(page, "large")).toContainText("price >= 100");
   await expect(page.locator(".node-error-message")).toHaveCount(0);
 
   // Typing follows each complete name ("r", "ra", "rat"), but not one that
   // another input has: "rate" leaves the expressions reading "rat" until the
   // name is unique again.
   await retype(page, "Parameter name", "rate");
-  await expect(card(page, "large")).toContainText("rat >= 100");
+  await expect(canvasNode(page, "large")).toContainText("rat >= 100");
   await retype(page, "Parameter name", "subtotal");
-  await expect(card(page, "large")).toContainText("subtotal >= 100");
+  await expect(canvasNode(page, "large")).toContainText("subtotal >= 100");
 
   // A result variable renames its reads too.
-  await card(page, "discount").click();
+  await canvasNode(page, "discount").click();
   await retype(page, "Result variable", "discounted");
-  await expect(card(page, "paid")).toContainText("discounted");
+  await expect(canvasNode(page, "paid")).toContainText("discounted");
 
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();

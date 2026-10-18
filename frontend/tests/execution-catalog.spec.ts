@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, RuleSummary } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { deferred } from "./helpers/gates";
 
 const ruleId = "catalog-pricing";
 const publishedAt = "2026-09-25T12:00:00Z";
@@ -586,10 +587,8 @@ test("the empty-catalog notice waits for a settled, successful catalog read", as
   const notice = page.getByText("Publish a rule in the library", {
     exact: false,
   });
-  let release!: () => void;
-  state.holdCatalog = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise, release } = deferred();
+  state.holdCatalog = promise;
   await page.goto("/#/playground");
   await expect(
     page.getByLabel("Find published rules", { exact: true }),

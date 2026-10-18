@@ -6,6 +6,8 @@ import {
 } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
+import { canvasNode, nodeCard } from "./helpers/canvas";
+import { deferred } from "./helpers/gates";
 
 function definition(connected = false): Definition {
   return {
@@ -143,11 +145,9 @@ test("Switch upstream choices follow its incoming connections and preserve an un
   ).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  const source = page.locator(
-    '.react-flow__node[data-id="calc"] .react-flow__handle.source',
-  );
-  const target = page.locator(
-    '.react-flow__node[data-id="choose"] .react-flow__handle.target',
+  const source = canvasNode(page, "calc").locator(".react-flow__handle.source");
+  const target = canvasNode(page, "choose").locator(
+    ".react-flow__handle.target",
   );
   await source.hover();
   const from = (await source.boundingBox())!;
@@ -206,10 +206,7 @@ test("pending and failed variable reads do not invent input choices or erase the
   request,
 }) => {
   const id = await create(request, definition(true));
-  let release!: () => void;
-  const pending = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: pending, release } = deferred();
   let requested = false;
   await page.route("**/api/variables", async (route) => {
     requested = true;
@@ -356,12 +353,10 @@ test("variable menus and expression tooltips show declared types and live produc
     ["input", "Customer data"],
     ["calc", "Normalize score"],
   ]) {
-    await page
-      .locator(`.react-flow__node[data-id="${nodeId}"] .graph-node`)
-      .click();
+    await nodeCard(page, nodeId).click();
     await inspector.getByLabel("Node name", { exact: true }).fill(label);
   }
-  await page.locator('.react-flow__node[data-id="result"] .graph-node').click();
+  await nodeCard(page, "result").click();
   await variable.click();
   await expect(
     page.getByRole("option", {
@@ -529,7 +524,7 @@ test("a content problem elsewhere keeps every scope, and an unknown scope neithe
     .click();
   // Before, switching back erased the expression, and the editor has no undo.
   await expect(returnValue).toContainText("price · unavailable");
-  await page.locator('.react-flow__node[data-id="calc"] .graph-node').click();
+  await nodeCard(page, "calc").click();
   await inspector
     .getByRole("button", { name: "Open in Editor · Expression", exact: true })
     .click();

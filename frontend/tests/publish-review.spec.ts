@@ -6,6 +6,7 @@ import {
   publishRuleResponse,
   uniqueId,
 } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 test("publishing reviews the changes since the latest version, keeps a note and refuses a repeat", async ({
   page,
@@ -38,7 +39,7 @@ test("publishing reviews the changes since the latest version, keeps a note and 
   );
 
   // A saved change marks the library card until it is published.
-  await page.locator('.react-flow__node[data-id="out"]').click();
+  await canvasNode(page, "out").click();
   await page.getByLabel("Node name", { exact: true }).fill("Total");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();

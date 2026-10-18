@@ -5,7 +5,8 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
-import { createRule as createApiRule, uniqueId } from "./helpers/api";
+import { createRule, uniqueId } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -25,9 +26,12 @@ const definition: Definition = {
   edges: [{ id: "next", source: "input", target: "out", sourceHandle: "next" }],
 };
 
-async function createRule(request: APIRequestContext, prefix: string) {
+async function createNavigationRule(
+  request: APIRequestContext,
+  prefix: string,
+) {
   const id = uniqueId(`${prefix}`);
-  await createApiRule(request, {
+  await createRule(request, {
     id,
     name: id,
     kind: "FORMULA",
@@ -65,7 +69,7 @@ test("cancelling a leave prompt keeps the browser history and the draft", async 
   page,
   request,
 }) => {
-  const id = await createRule(request, "history-cancel");
+  const id = await createNavigationRule(request, "history-cancel");
   const nodeName = await openDirtyRule(page, id);
   const ruleUrl = new RegExp(`#/rules/${id}\\?node=input$`);
   const before = await sessionHistory(page);
@@ -123,7 +127,7 @@ test("the embedded source manager guards Back, view switches and unloading", asy
   page,
   request,
 }) => {
-  const id = await createRule(request, "manager-guard");
+  const id = await createNavigationRule(request, "manager-guard");
   const sourceName = `Guarded provider ${id}`;
   const createdSource = await request.post("/api/sources", {
     data: {
@@ -195,7 +199,7 @@ test("leaving asks while a source save is still running", async ({
   page,
   request,
 }) => {
-  const id = await createRule(request, "manager-saving");
+  const id = await createNavigationRule(request, "manager-saving");
   const sourceId = `src-${id}`;
   const createdSource = await request.post("/api/sources", {
     data: {
@@ -212,10 +216,7 @@ test("leaving asks while a source save is still running", async ({
     },
   });
   expect(createdSource.ok()).toBeTruthy();
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(`**/api/sources/${sourceId}`, async (route) => {
     held = true;
@@ -270,11 +271,8 @@ test("a pending draft save guards leaving the rule but not its graph/code switch
   page,
   request,
 }) => {
-  const id = await createRule(request, "draft-saving");
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const id = await createNavigationRule(request, "draft-saving");
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(`**/api/rules/${id}`, async (route) => {
     if (route.request().method() === "PUT") {
@@ -337,7 +335,7 @@ test("the section crumb names the shown view without leading away", async ({
     await expect(crumbs.getByRole("button", { name: label })).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`#${hash}$`));
   }
-  const id = await createRule(request, "crumb");
+  const id = await createNavigationRule(request, "crumb");
   const nodeName = await openDirtyRule(page, id);
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
@@ -363,7 +361,7 @@ test("a refused arrival is corrected in place and never adds a history entry", a
   page,
   request,
 }) => {
-  const id = await createRule(request, "refused-arrival");
+  const id = await createNavigationRule(request, "refused-arrival");
   await page.goto("/#/library");
   await expect(
     page.getByRole("heading", { name: "Rule library" }),
@@ -405,7 +403,7 @@ test("a pushed graph arrival with unbuildable code steps back once and shows why
   page,
   request,
 }) => {
-  const id = await createRule(request, "pushed-arrival");
+  const id = await createNavigationRule(request, "pushed-arrival");
   await page.goto("/#/library");
   await expect(
     page.getByRole("heading", { name: "Rule library" }),
@@ -454,7 +452,7 @@ test("a graph arrival whose build fails in transit builds once and returns to th
   page,
   request,
 }) => {
-  const id = await createRule(request, "transient-arrival");
+  const id = await createNavigationRule(request, "transient-arrival");
   await page.goto("/#/library");
   await expect(
     page.getByRole("heading", { name: "Rule library" }),
@@ -499,7 +497,7 @@ test("Back and Forward continue past an entry rewritten in place", async ({
   page,
   request,
 }) => {
-  const id = await createRule(request, "rewritten-entry");
+  const id = await createNavigationRule(request, "rewritten-entry");
   await page.goto("/#/library");
   await expect(
     page.getByRole("heading", { name: "Rule library" }),
@@ -552,7 +550,7 @@ test("a jump to an entry several steps away stays on that entry", async ({
   page,
   request,
 }) => {
-  const id = await createRule(request, "history-jump");
+  const id = await createNavigationRule(request, "history-jump");
   await page.goto("/#/library");
   await expect(
     page.getByRole("heading", { name: "Rule library" }),

@@ -30,23 +30,19 @@
   --color-focus-ring: #72a98c;
   --color-danger: #c54d45;
   --color-sidebar-highlight: #c1e7ae;
-  --color-editor-border: #e5eae3;
   --color-code-background: #fcfdfc;
   --color-code-text: #486f42;
   /* Count and type badges in inspector and function-library headings. */
   --color-badge: #edf2ee;
-  --color-library-muted: #6d7865;
-  --color-inspector-border: #e2e8de;
+  /* Text and border roles that several views share: hints and counts, labels
+     and code in the green tone, dividers and card borders. A colour within a few
+     units per channel of a role uses the role instead of a new literal. */
+  --color-text-muted: #6d7765;
+  --color-text-secondary: #647a56;
+  --color-border: #e2e7df;
+  --color-border-strong: #dde4dc;
   --color-inspector-strong: #526e60;
-  --color-inspector-muted: #6b7964;
-  --color-test-muted: #657a58;
-  --color-api-strong: #657e56;
-  --color-api-muted: #6b7963;
   --color-studio-border: #e4eae6;
-  --color-studio-border-strong: #dde5df;
-  /* Editor sub-panels: mapping cards, the node code layout and the
-     referenced-rule navigation share one border. */
-  --color-panel-border: #e1e8e2;
 
   /* Symbol roles in expressions: the Monaco theme (arcLanguage.ts reads these
      when it defines arc-light), the color key and the Available variables list. */

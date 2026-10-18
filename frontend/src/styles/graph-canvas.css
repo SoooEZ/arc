@@ -1,3 +1,85 @@
+/* The canvas chrome: the workspace, its toolbar (GraphToolbar, NodeKindMenu),
+   the routing warnings and the flow container (GraphCanvas). */
+.graph-workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.graph-toolbar {
+  height: 56px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 17px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.graph-view-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.graph-view-label strong {
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: #637857;
+}
+.graph-view-label > span {
+  font-size: var(--text-sm);
+  color: #6c795f;
+  margin-left: 5px;
+}
+.graph-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.graph-tools .MuiButton-root {
+  font-size: var(--text-sm);
+  min-height: 28px;
+  padding: 4px 10px;
+}
+.graph-tools .MuiIconButton-root {
+  color: #889b77;
+  padding: 6px;
+}
+.tool-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--color-border);
+}
+.node-kind-option {
+  margin-left: 10px;
+}
+/* The class pair outranks the rounded corners of MUI's Alert. */
+.routing-warning.MuiAlert-root {
+  border-radius: 0;
+  flex-shrink: 0;
+  max-height: 128px;
+  overflow: auto;
+}
+.flow-container {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  background: var(--color-canvas);
+  isolation: isolate;
+}
+/* The canvas waits for its opening fit, and a left-to-right view for its
+   first layout: the cards render, so they are measured, but stay out of sight
+   until they are placed. Opacity, not visibility, which React Flow sets on
+   every measured card. */
+.flow-laying-out .react-flow__viewport {
+  opacity: 0;
+  pointer-events: none;
+}
 /* Card widths come from nodeWidth() in domain/nodePorts.ts (inline styles);
    card text sizes below change the measured heights used by routing and Arrange. */
 .graph-node {
@@ -22,7 +104,7 @@
   align-items: center;
   gap: 6px;
   font-size: var(--text-md);
-  color: #6a7963;
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 .node-type-problem {
@@ -241,7 +323,7 @@
 .react-flow__controls {
   left: 12px !important;
   bottom: 27px !important;
-  border: 1px solid #dfe6dc !important;
+  border: 1px solid var(--color-border-strong) !important;
   border-radius: 6px !important;
   overflow: hidden;
   box-shadow: 0 2px 6px #23341609 !important;
@@ -257,7 +339,7 @@
   width: 11px !important;
 }
 .react-flow__minimap {
-  border: 1px solid #e0e7dc;
+  border: 1px solid var(--color-border-strong);
   border-radius: 7px;
   overflow: hidden;
   width: 135px !important;
@@ -298,7 +380,7 @@
 .editor-status {
   height: 27px;
   background: var(--color-surface);
-  border-top: 1px solid #e4eae0;
+  border-top: 1px solid var(--color-border);
   padding: 0 14px;
   display: flex;
   justify-content: space-between;

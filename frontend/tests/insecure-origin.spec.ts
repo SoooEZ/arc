@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 const uuidV4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -64,15 +65,15 @@ test("graph edits generate IDs where crypto.randomUUID is unavailable", async ({
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const id = await create(request);
   await page.goto(`/#/rules/${id}?node=choose`);
-  await expect(page.locator('.react-flow__node[data-id="calc"]')).toBeVisible();
+  await expect(canvasNode(page, "calc")).toBeVisible();
   expect(
     await page.evaluate(() => typeof Reflect.get(crypto, "randomUUID")),
   ).toBe("undefined");
 
   await page.getByRole("button", { name: "Add case", exact: true }).click();
   await expect(
-    page.locator(
-      '.react-flow__node[data-id="choose"] .react-flow__handle.source[data-handleid^="case:case-"]',
+    canvasNode(page, "choose").locator(
+      '.react-flow__handle.source[data-handleid^="case:case-"]',
     ),
   ).toHaveCount(1);
   await page
@@ -80,11 +81,9 @@ test("graph edits generate IDs where crypto.randomUUID is unavailable", async ({
     .click();
   await expect(page.locator(".react-flow__node")).toHaveCount(4);
 
-  const source = page.locator(
-    '.react-flow__node[data-id="calc"] .react-flow__handle.source',
-  );
-  const target = page.locator(
-    '.react-flow__node[data-id="choose"] .react-flow__handle.target',
+  const source = canvasNode(page, "calc").locator(".react-flow__handle.source");
+  const target = canvasNode(page, "choose").locator(
+    ".react-flow__handle.target",
   );
   await source.hover();
   const from = (await source.boundingBox())!;

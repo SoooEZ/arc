@@ -3,33 +3,23 @@
 import concurrent.futures
 import copy
 import json
-import os
 import re
 import time
-import urllib.error
-import urllib.request
 import uuid
 
-BASE = os.environ.get("ARC_API_URL", "http://localhost:8080")
+import smoke_http
+from smoke_http import exchange, send
+
 PREFIX = "smoke-" + uuid.uuid4().hex[:8]
 created = []
-checks = 0
 
 
 def request(method, path, body=None, expected=200, headers=None):
-    global checks
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(BASE + path, data=data, method=method,
-                                 headers={"Content-Type": "application/json", **(headers or {})})
-    try:
-        response = urllib.request.urlopen(req, timeout=20)
-    except urllib.error.HTTPError as error:
-        response = error
-    content = response.read()
-    assert response.status == expected, (method, path, response.status, content.decode())
+    status, response_headers, content = send(method, path, data, headers=headers)
+    assert status == expected, (method, path, status, content.decode())
     if headers and "Origin" in headers:
-        assert response.headers.get("Access-Control-Allow-Origin") == "*"
-    checks += 1
+        assert response_headers.get("Access-Control-Allow-Origin") == "*"
     return json.loads(content) if content else None
 
 
@@ -40,28 +30,20 @@ def raw_request(method, path, body):
 
 def raw_text_request(method, path, text):
     """Sends JSON text as written, for number tokens Python's json module would rewrite (0e-1500)."""
-    global checks
-    req = urllib.request.Request(BASE + path, data=text.encode(), method=method,
-                                 headers={"Content-Type": "application/json"})
-    try:
-        response = urllib.request.urlopen(req, timeout=20)
-    except urllib.error.HTTPError as error:
-        response = error
-    checks += 1
-    return response.status, response.read().decode()
+    status, _, content = send(method, path, text.encode())
+    return status, content.decode()
+
+
+def read_text(path):
+    """Status and body text of a GET, for numbers the parsed JSON would rewrite (120.00 as 120.0)."""
+    status, _, content = send("GET", path)
+    return status, content.decode()
 
 
 def typed_request(method, path, text, content_type):
     """Status, headers and body text of a request with any content type."""
-    global checks
-    req = urllib.request.Request(BASE + path, data=text.encode(), method=method,
-                                 headers={"Content-Type": content_type})
-    try:
-        response = urllib.request.urlopen(req, timeout=20)
-    except urllib.error.HTTPError as error:
-        response = error
-    checks += 1
-    return response.status, response.headers, response.read().decode()
+    status, headers, content = send(method, path, text.encode(), content_type)
+    return status, headers, content.decode()
 
 
 def create(suffix, kind="FORMULA", definition=None):
@@ -92,7 +74,11 @@ def delete(rule_id, expected=204, headers=None):
     return body
 
 
-try:
+
+
+def check_seeded_execution():
+    """The seeded samples run through the execution API, with and without a trace, and a request it
+    cannot run fails with a client error."""
     assert request("GET", "/actuator/health")["status"] == "UP"
     request("GET", "/api/missing-endpoint", expected=404)
     request("POST", "/api/rules", {"description": "x" * (1024 * 1024)}, 413)
@@ -119,7 +105,9 @@ try:
     request("OPTIONS", "/api/rules/order-pricing/execute", headers={"Origin": "https://example.com",
             "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "Content-Type"})
 
-    # Boundaries answer with client errors, never 500 or a silently different value.
+
+def check_request_boundaries():
+    """Boundaries answer with client errors, never 500 or a silently different value."""
     request("POST", "/api;x=1/preview", {"definition": None, "pad": "x" * (1024 * 1024)}, 413)
     duplicate_rule = request("POST", "/api/rules", {"id": "order-pricing", "name": "Duplicate",
                              "description": "", "kind": "RULE", "definition": None}, 409)
@@ -200,6 +188,10 @@ try:
         method, body = ("PUT", {"name": "Missing", "revision": 1, "definition": invalid_table}) if path.endswith("-missing") else ("GET", None)
         assert request(method, path, body, expected=404)["message"] == "Source not found", path
 
+
+def check_versions_and_catalogs():
+    """Draft edits never change a published version or a pinned reference, and histories and catalogs
+    page and search."""
     child = create("child")
     # Input problems are located on the Input node from a save too, as /validate reports them.
     duplicated = dict(child, draft={**child["draft"], "inputs": child["draft"]["inputs"] * 2})
@@ -255,7 +247,11 @@ try:
     assert summary == next(item for item in listed if item["id"] == parent["id"]), summary
     assert "draft" not in summary and summary["referenceCount"] == 1, summary
     request("GET", f"/api/rule-summaries/{PREFIX}-missing", expected=404)
+    return child, parent
 
+
+def check_version_search():
+    """A version history searches version numbers as literal text and pages the matches."""
     version_search = create("version-search")
     for _ in range(12):
         version_search = publish(version_search)
@@ -272,7 +268,9 @@ try:
     request("GET", version_history + "?search=" + "1" * 201, expected=422)
     request("GET", f"/api/rules/{PREFIX}-missing/version-summaries?search=2", expected=404)
 
-    # Multiple reached Outputs name fields without adding a second alias wrapper.
+
+def check_named_outputs(child, parent):
+    """Multiple reached Outputs name fields without adding a second alias wrapper."""
     named_graph = {
         "schemaVersion": 1,
         "inputs": [{"name": "amount", "type": "NUMBER", "required": True}],
@@ -333,7 +331,9 @@ try:
     assert request("POST", "/api/preview", {"definition": nullable, "inputs": {"amount": 100}})["result"] == {
         "absent": None, "details": {"amount": 100}}
 
-    # A valid graph can repeat large intermediate values; only trace is bounded.
+
+def check_bounded_trace():
+    """A valid graph can repeat large intermediate values; only trace is bounded."""
     payload = ['x' * 100 for _ in range(100)]
     large = {"schemaVersion": 1, "inputs": [{"name": "payload", "type": "ARRAY", "required": True}],
              "nodes": [{"id": "input", "type": "INPUT", "label": "Input", "position": {"x": 0, "y": 0}}], "edges": []}
@@ -351,6 +351,11 @@ try:
     assert bounded["executedSteps"] == 100 and 0 < len(bounded["trace"]) < 100
     assert bounded["traceBytes"] == len(json.dumps(bounded["trace"], separators=(',', ':'), ensure_ascii=False).encode())
     assert bounded["traceBytes"] <= 262144
+
+
+def check_incomplete_draft(child):
+    """An incomplete draft saves, but neither validates nor publishes, and the published version keeps
+    running."""
     invalid = copy.deepcopy(child["draft"])
     invalid["nodes"][1]["expression"] = "unavailable + 1"
     request("POST", "/api/validate", invalid, 422)
@@ -359,7 +364,10 @@ try:
     publish(child, expected=422)
     assert execute(child["id"], {"amount": 100})["result"] == 50
 
-    # PostgreSQL stores a 1e100 default written out (101 digits); limits apply by value, so it saves again.
+
+def check_decimal_storage():
+    """PostgreSQL stores a 1e100 default written out (101 digits); limits apply by value, so it saves
+    again."""
     big_graph = {"schemaVersion": 1,
                  "inputs": [{"name": "amount", "type": "NUMBER", "required": False, "defaultValue": 1e100}],
                  "nodes": [{"id": "input", "type": "INPUT", "label": "Inputs"},
@@ -378,7 +386,9 @@ try:
     assert status == 422 and "precision or magnitude" in text, (status, text[:200])
     request("GET", "/api/rules/" + PREFIX + "-zero-default", expected=404)
 
-    # POI's number parser backtracks on long digit text; ARC rejects the call before POI runs.
+
+def check_numeric_text_guard():
+    """POI's number parser backtracks on long digit text; ARC rejects the call before POI runs."""
     digit_text = {"schemaVersion": 1,
                   "inputs": [{"name": "items", "type": "ARRAY", "required": True}],
                   "nodes": [{"id": "input", "type": "INPUT", "label": "Inputs"},
@@ -391,7 +401,9 @@ try:
     assert "numeric text needs more than" in rejected["message"], rejected
     assert time.monotonic() - started < 1.5, "the call must fail before POI parses the text"
 
-    # A rule that other rules call is kept; once none does, it goes with every version.
+
+def check_deletion():
+    """A rule that other rules call is kept; once none does, it goes with every version."""
     callee = publish(create("delete-callee"))
     assert execute(callee["id"], {"amount": 100}, 1)["result"] == 90
     calling = copy.deepcopy(callee["draft"])
@@ -443,8 +455,10 @@ try:
     save(dict(callee, name="Stale editor"), expected=409)
     assert request("GET", "/api/rules/" + recreated["id"])["name"] == recreated["name"]
 
-    # A deletion and the publication of a new caller never both succeed: the callee's lock is
-    # held by whichever write commits first, and the other sees its outcome.
+
+def check_deletion_race():
+    """A deletion and the publication of a new caller never both succeed: the callee's lock is held by
+    whichever write commits first, and the other sees its outcome."""
     for attempt in range(4):
         racing_callee = publish(create(f"race-callee-{attempt}"))
         racing_caller = create(f"race-caller-{attempt}")
@@ -473,8 +487,10 @@ try:
         else:
             delete(racing_callee["id"])
 
-    # A draft may call more rules than one SQL statement may have parameters (65,535): the callee
-    # lock binds them as one array, where a placeholder per callee made the save a 500.
+
+def check_many_callees():
+    """A draft may call more rules than one SQL statement may have parameters (65,535): the callee lock
+    binds them as one array, where a placeholder per callee made the save a 500."""
     calls = [f"@c{index}:1()" for index in range(66_000)]
     calls_per_field, fields_per_node = 64, 50
     many_nodes = [{"id": "input", "type": "INPUT", "label": "Inputs", "position": {"x": 0, "y": 0}}]
@@ -488,7 +504,9 @@ try:
     many_callees = create("many-callees", definition={"schemaVersion": 1, "inputs": [], "nodes": many_nodes, "edges": []})
     save(many_callees)
 
-    # A save or publication without a revision is malformed rather than stale.
+
+def check_malformed_writes():
+    """A save or publication without a revision is malformed rather than stale."""
     no_revision = create("no-revision")
     request("PUT", "/api/rules/" + no_revision["id"], {"name": "No revision", "definition": no_revision["draft"]}, 422)
     assert request("POST", "/api/rules/" + no_revision["id"] + "/publish", {}, 422)["message"] == "Revision is required"
@@ -498,22 +516,23 @@ try:
     status, headers, _ = typed_request("PATCH", "/api/rules/" + no_revision["id"], "{}", "application/json")
     assert status == 405 and "PUT" in headers.get("Allow", ""), (status, dict(headers))
 
-    # Row locks + revision checks allow exactly one competing update.
+
+def check_competing_saves():
+    """Row locks + revision checks allow exactly one competing update."""
     race = create("concurrent")
     def competing_update(number):
+        # Not counted: the pair is one check, the status assertion below.
         body = {"name": f"Concurrent {number}", "description": "", "revision": race["revision"], "definition": race["draft"]}
-        req = urllib.request.Request(BASE + "/api/rules/" + race["id"], data=json.dumps(body).encode(),
-                                     method="PUT", headers={"Content-Type": "application/json"})
-        try:
-            return urllib.request.urlopen(req, timeout=20).status
-        except urllib.error.HTTPError as error:
-            return error.code
+        return exchange("PUT", "/api/rules/" + race["id"], json.dumps(body).encode(),
+                        {"Content-Type": "application/json"})[0]
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         statuses = sorted(executor.map(competing_update, [1, 2]))
     assert statuses == [200, 409], statuses
 
-    # Saved test cases live beside the rule: decimals and explicit nulls are kept as written, a
-    # write never touches the draft's revision, and the cases go with the rule.
+
+def check_test_cases():
+    """Saved test cases live beside the rule: decimals and explicit nulls are kept as written, a write
+    never touches the draft's revision, and the cases go with the rule."""
     tested = create("test-cases")
     cases_path = "/api/rules/" + tested["id"] + "/test-cases"
     assert request("GET", cases_path) == []
@@ -523,7 +542,7 @@ try:
     case = json.loads(text)
     assert case["name"] == "Premium order" and case["ruleId"] == tested["id"], case
     assert case["inputs"] == {"amount": 120, "note": None} and case["expectedError"] is None, case
-    status, text = raw_text_request("GET", cases_path, "")
+    status, text = read_text(cases_path)
     assert status == 200 and '"expectedResult":120.00' in text and str(case["id"]) in text, (status, text)
     failing = request("PUT", f"{cases_path}/{case['id']}", {"name": "Fails", "inputs": {},
                       "expectedError": "Missing required input"})
@@ -558,8 +577,10 @@ try:
     create("test-cases")
     assert request("GET", cases_path) == []
 
-    # The rules that call a rule list the versions of it that their draft and latest version pin,
-    # each rule once and ordered by ID, from the callee sets that deletions read.
+
+def check_callers():
+    """The rules that call a rule list the versions of it that their draft and latest version pin, each
+    rule once and ordered by ID, from the callee sets that deletions read."""
     target = publish(create("callers-target"))
     target = publish(target)  # version 2, the same graph
     def pinning(version, output="total"):
@@ -594,8 +615,10 @@ try:
         f"Rule not found: {PREFIX}-missing"
     assert request("GET", "/api/rules/" + caller_b["id"] + "/callers")["items"] == []
 
-    # A duplicate is a new, unpublished rule with the original's kind and saved draft, or one of its
-    # versions, and its saved tests as stored; refused copies answer as creates and reads do.
+
+def check_duplicates():
+    """A duplicate is a new, unpublished rule with the original's kind and saved draft, or one of its
+    versions, and its saved tests as stored; refused copies answer as creates and reads do."""
     original = create("dup-original")
     original_cases = "/api/rules/" + original["id"] + "/test-cases"
     status, text = raw_text_request("POST", original_cases,
@@ -612,7 +635,7 @@ try:
     assert copied["name"] == "Copy" and copied["kind"] == original["kind"], copied
     assert copied["description"] == original["description"] and copied["publishedVersion"] is None, copied
     assert copied["draft"]["nodes"][1]["expression"] == "amount * 0.5", copied["draft"]
-    status, text = raw_text_request("GET", f"/api/rules/{copy_id}/test-cases", "")
+    status, text = read_text(f"/api/rules/{copy_id}/test-cases")
     assert status == 200 and '"expectedResult":90.00' in text, (status, text)
     copied_cases = json.loads(text)
     assert [case["name"] for case in copied_cases] == ["Exact", "Fails"], copied_cases
@@ -637,6 +660,31 @@ try:
     delete(copy_id)
     assert len(request("GET", original_cases)) == 2
     assert request("GET", "/api/rules/" + original["id"])["revision"] == original["revision"]
-    print(f"PASS: {checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, concurrent edits, saved test cases, callers and duplicates.")
-finally:
-    print("Created fixtures: " + ", ".join(created))
+
+
+def main():
+    check_seeded_execution()
+    check_request_boundaries()
+    child, parent = check_versions_and_catalogs()
+    check_version_search()
+    check_named_outputs(child, parent)
+    check_bounded_trace()
+    check_incomplete_draft(child)
+    check_decimal_storage()
+    check_numeric_text_guard()
+    check_deletion()
+    check_deletion_race()
+    check_many_callees()
+    check_malformed_writes()
+    check_competing_saves()
+    check_test_cases()
+    check_callers()
+    check_duplicates()
+    print(f"PASS: {smoke_http.checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, concurrent edits, saved test cases, callers and duplicates.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    finally:
+        print("Created fixtures: " + ", ".join(created))

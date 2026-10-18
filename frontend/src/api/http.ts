@@ -46,11 +46,30 @@ async function failureBody(response: Response): Promise<unknown> {
   }
 }
 
+/** Statuses a proxy answers with when the service behind it did not answer. */
+const unavailableStatuses = new Set([502, 503, 504]);
+
+/**
+ * What a failure without the server's own message says: in plain words when
+ * the service did not answer ("Request failed (502)" told the user nothing).
+ */
+function failureText(status: number): string {
+  if (unavailableStatuses.has(status))
+    return `The ARC service is not responding (${status}). It may be restarting; try again in a moment.`;
+  return `Request failed (${status})`;
+}
+
+/** A request that reached no server: the network or the proxy's host is down. */
+const unreachable = () =>
+  new ApiError(
+    "Could not reach the ARC service. Check the connection and try again.",
+  );
+
 function requestFailure(payload: unknown, status: number): ApiError {
   const body: Record<string, unknown> = isJsonObject(payload) ? payload : {};
   const issues = Array.isArray(body.issues) ? body.issues : [];
   return new ApiError(
-    body.message ? String(body.message) : `Request failed (${status})`,
+    body.message ? String(body.message) : failureText(status),
     Array.isArray(body.locations) ? body.locations : [],
     status,
     issues.filter((issue): issue is string => typeof issue === "string"),
@@ -70,12 +89,19 @@ export function createHttpClient(
     body?: unknown,
     options?: RequestOptions,
   ): Promise<T> {
-    const response = await fetcher(url(path), {
-      method,
-      signal: options?.signal,
-      headers: { "Content-Type": "application/json" },
-      ...(body === undefined ? {} : { body: stringifyJson(body) }),
-    });
+    let response: Response;
+    try {
+      response = await fetcher(url(path), {
+        method,
+        signal: options?.signal,
+        headers: { "Content-Type": "application/json" },
+        ...(body === undefined ? {} : { body: stringifyJson(body) }),
+      });
+    } catch (failure) {
+      // Callers recognize their own cancellation; keep its original error.
+      if (options?.signal?.aborted) throw failure;
+      throw unreachable();
+    }
     if (!response.ok)
       throw requestFailure(await failureBody(response), response.status);
     // The endpoint module declares the payload type; the transport only decodes JSON.

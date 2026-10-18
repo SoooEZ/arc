@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Alert, Button, IconButton, Tooltip } from "@mui/material";
 import { Plus, Trash2 } from "lucide-react";
 import { stringifyJson } from "../../domain/json";
@@ -9,6 +8,7 @@ import {
 } from "./httpSourcePolicy";
 import { secretHeaderAliases } from "./sourceProviders";
 import { counted } from "../../domain/text";
+import RenameCell from "./RenameCell";
 
 interface HeaderRow {
   name: string;
@@ -83,10 +83,13 @@ export default function SecretHeadersEditor({
             {rows.map((row, index) => (
               <tr key={row.name}>
                 <td>
-                  <HeaderNameCell
+                  <RenameCell
                     name={row.name}
-                    taken={taken}
+                    label={`Header ${row.name}`}
+                    className="secret-header-name"
+                    problem={(text) => headerNameProblem(text, row.name, taken)}
                     disabled={disabled}
+                    spellCheck={false}
                     onRename={(name) =>
                       write(
                         rows.map((old, at) =>
@@ -168,40 +171,7 @@ export default function SecretHeadersEditor({
   );
 }
 
-/** A header is renamed when its field loses focus; a name the server refuses stays here, marked. */
-function HeaderNameCell({
-  name,
-  taken,
-  disabled,
-  onRename,
-}: {
-  name: string;
-  taken: ReadonlySet<string>;
-  disabled: boolean;
-  onRename: (name: string) => void;
-}) {
-  const [text, setText] = useState(name);
-  const problem = headerNameProblem(text, name, taken);
-  return (
-    <input
-      className={`table-cell-input secret-header-name ${problem ? "table-cell-invalid" : ""}`}
-      aria-label={`Header ${name}`}
-      aria-invalid={!!problem}
-      title={problem ?? undefined}
-      value={text}
-      disabled={disabled}
-      spellCheck={false}
-      onChange={(event) => setText(event.target.value)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") event.currentTarget.blur();
-      }}
-      onBlur={() => {
-        if (text !== name && !problem) onRename(text);
-      }}
-    />
-  );
-}
-
+/** A name the server refuses stays in its cell, marked with this error. */
 function headerNameProblem(
   text: string,
   current: string,

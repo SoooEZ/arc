@@ -13,6 +13,8 @@ import {
   uniqueId,
   uniqueStamp,
 } from "./helpers/api";
+import { nodeCard } from "./helpers/canvas";
+import { deferred } from "./helpers/gates";
 
 async function fixture(request: APIRequestContext, versions = 2) {
   const id = uniqueId("reference-picker");
@@ -97,13 +99,6 @@ const summary = (index: number): RuleSummary => ({
   referenceCount: 0,
   draftChanged: false,
 });
-const deferred = () => {
-  let release!: () => void;
-  const promise = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  return { promise, release };
-};
 
 // Every mapping was dropped with the old version, so an optional parameter
 // silently took its default and a required one failed only at publish.
@@ -455,7 +450,7 @@ test("reference pickers in the node dialog stage changes and historical pins rem
   const { parent, child } = await fixture(request);
   await publishRule(request, parent);
   await page.goto(`/#/rules/${parent.id}?node=ref`);
-  const card = page.locator('.react-flow__node[data-id="ref"] .graph-node');
+  const card = nodeCard(page, "ref");
   const open = async () => {
     await card.click({ button: "right" });
     await page
@@ -549,13 +544,11 @@ test("selecting a Reference node again does not read its pinned version again", 
   const parameter = page.getByRole("group", { name: "Parameter amount" });
   await expect(parameter).toBeVisible();
   for (let round = 0; round < 3; round++) {
-    await page
-      .locator('.react-flow__node[data-id="input"] .graph-node')
-      .click();
+    await nodeCard(page, "input").click();
     await expect(page.getByLabel("Node name", { exact: true })).toHaveValue(
       "Inputs",
     );
-    await page.locator('.react-flow__node[data-id="ref"] .graph-node').click();
+    await nodeCard(page, "ref").click();
     await expect(parameter).toBeVisible();
   }
   // The immutable pin was read on every selection.

@@ -1,6 +1,7 @@
 package dev.arc.engine.execution;
 
 import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.inputToOutput;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
 import static org.assertj.core.api.Assertions.*;
@@ -27,14 +28,6 @@ class ErrorRecoveryTest {
   private final ArcScript script = new ArcScript(new ObjectMapper(), validator);
   private final RuleResolver formulas = formulas(publishedFormulas());
 
-  private static Definition graph(List<Input> inputs, String expression) {
-    return new Definition(
-        1,
-        inputs,
-        List.of(inputNode("in", "Input"), outputNode("out", "Output", expression)),
-        List.of(new Edge("next", "in", "out", "next")));
-  }
-
   /** The guarded expression is not the last node, so later work also observes the budget. */
   private static Definition formulaThenOutput(List<Input> inputs, String expression) {
     return new Definition(
@@ -56,10 +49,10 @@ class ErrorRecoveryTest {
         new Input(
             "value", "NUMBER", true, null, new SourceBinding("table", 1, Map.of(), "", "FAIL"));
     var definitions = new HashMap<String, Definition>();
-    definitions.put("one:1", graph(List.of(), "1"));
-    definitions.put("read:1", graph(List.of(sourced), "value"));
-    definitions.put("broken:1", graph(List.of(), "1 / 0"));
-    definitions.put("lookup:1", graph(List.of(), "$MATCH(\"zz\", [\"a\"], 0)"));
+    definitions.put("one:1", inputToOutput(List.of(), "1"));
+    definitions.put("read:1", inputToOutput(List.of(sourced), "value"));
+    definitions.put("broken:1", inputToOutput(List.of(), "1 / 0"));
+    definitions.put("lookup:1", inputToOutput(List.of(), "$MATCH(\"zz\", [\"a\"], 0)"));
     var amount = List.of(new Input("amount", "NUMBER", true, null));
     // Stored versions that no longer prepare: an Output with a result variable (lesson B25) and an
     // unprefixed function call.
@@ -72,13 +65,13 @@ class ErrorRecoveryTest {
                 inputNode("in", "Input"),
                 nodeOf("out", "OUTPUT", "Output").expression("amount").output("r").build()),
             List.of(new Edge("next", "in", "out", "next"))));
-    definitions.put("unprefixed:1", graph(amount, "ROUND(amount, 2)"));
-    definitions.put("echo:1", graph(amount, "amount"));
+    definitions.put("unprefixed:1", inputToOutput(amount, "ROUND(amount, 2)"));
+    definitions.put("echo:1", inputToOutput(amount, "amount"));
     // level-0 calls level-1 ... level-17, one level deeper than the shared nesting limit allows.
     for (int level = 0; level < 18; level++)
       definitions.put(
           "level-" + level + ":1",
-          graph(List.of(), level == 17 ? "1" : "@level-" + (level + 1) + ":1()"));
+          inputToOutput(List.of(), level == 17 ? "1" : "@level-" + (level + 1) + ":1()"));
     return definitions;
   }
 
@@ -123,7 +116,8 @@ class ErrorRecoveryTest {
             "$SUM($MAP(items, x, $IF($ISERROR(@one:1()), 1, 0)))",
             "$SUM($MAP(items, x, $IF($ISERR(@one:1()), 1, 0)))",
             "$SUM($MAP(items, x, $IF($ISNA(@one:1()), 1, 0)))")) {
-      assertLimit(() -> run(graph(items(600), expression)), "Execution exceeds 1,000 steps");
+      assertLimit(
+          () -> run(inputToOutput(items(600), expression)), "Execution exceeds 1,000 steps");
     }
   }
 
@@ -131,8 +125,8 @@ class ErrorRecoveryTest {
   void errorFunctionsCannotHideAnExhaustedSourceReadBudget() {
     for (Definition parent :
         List.of(
-            graph(items(60), "$SUM($MAP(items, x, $IFERROR(@read:1(), 0)))"),
-            graph(items(60), "$IFERROR($SUM($MAP(items, x, @read:1())), -1)"),
+            inputToOutput(items(60), "$SUM($MAP(items, x, $IFERROR(@read:1(), 0)))"),
+            inputToOutput(items(60), "$IFERROR($SUM($MAP(items, x, @read:1())), -1)"),
             formulaThenOutput(items(60), "$SUM($MAP(items, x, $IFERROR(@read:1(), 0)))"))) {
       var providerReads = new AtomicInteger();
       SourceReader reader =
@@ -153,10 +147,11 @@ class ErrorRecoveryTest {
   void errorFunctionsCannotHideTheNestingLimit() {
     for (String expression :
         List.of("$IFERROR(@level-0:1(), -1)", "$ISERROR(@level-0:1())", "$ISERR(@level-0:1())")) {
-      assertLimit(() -> run(graph(List.of(), expression)), "Rule nesting exceeds 16 levels");
+      assertLimit(
+          () -> run(inputToOutput(List.of(), expression)), "Rule nesting exceeds 16 levels");
     }
     // level-2 ... level-17 is exactly 16 nested calls below the parent.
-    assertThat(run(graph(List.of(), "@level-2:1()")).result()).isEqualTo(BigDecimal.ONE);
+    assertThat(run(inputToOutput(List.of(), "@level-2:1()")).result()).isEqualTo(BigDecimal.ONE);
   }
 
   @Test
@@ -247,7 +242,12 @@ class ErrorRecoveryTest {
     assertThatThrownBy(
             () ->
                 Engines.execute(
-                    validator, "parent", 1, graph(List.of(mapping), "value"), Map.of(), expired))
+                    validator,
+                    "parent",
+                    1,
+                    inputToOutput(List.of(mapping), "value"),
+                    Map.of(),
+                    expired))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -267,11 +267,12 @@ class ErrorRecoveryTest {
 
   @Test
   void notAvailableSurvivesNestedCallsAndStaysRecoverable() {
-    assertThat(run(graph(List.of(), "$ISNA(@lookup:1())")).result()).isEqualTo(true);
-    assertThat(run(graph(List.of(), "$ISERR(@lookup:1())")).result()).isEqualTo(false);
-    assertThat(run(graph(List.of(), "$IFERROR(@lookup:1(), \"none\")")).result()).isEqualTo("none");
-    assertThat(run(graph(List.of(), "$ISNA(@broken:1())")).result()).isEqualTo(false);
-    assertThat(run(graph(List.of(), "$ISERR(@broken:1())")).result()).isEqualTo(true);
+    assertThat(run(inputToOutput(List.of(), "$ISNA(@lookup:1())")).result()).isEqualTo(true);
+    assertThat(run(inputToOutput(List.of(), "$ISERR(@lookup:1())")).result()).isEqualTo(false);
+    assertThat(run(inputToOutput(List.of(), "$IFERROR(@lookup:1(), \"none\")")).result())
+        .isEqualTo("none");
+    assertThat(run(inputToOutput(List.of(), "$ISNA(@broken:1())")).result()).isEqualTo(false);
+    assertThat(run(inputToOutput(List.of(), "$ISERR(@broken:1())")).result()).isEqualTo(true);
   }
 
   @Test
@@ -284,7 +285,7 @@ class ErrorRecoveryTest {
             "$ISERROR(@stale:1(3))",
             "$ISERR(@stale:1(3))",
             "$ISNA(@stale:1(3))")) {
-      assertThatThrownBy(() -> run(graph(List.of(), expression)))
+      assertThatThrownBy(() -> run(inputToOutput(List.of(), expression)))
           .as(expression)
           .isInstanceOfSatisfying(
               ArcException.class,
@@ -299,9 +300,9 @@ class ErrorRecoveryTest {
                         new ArcException.Location("parent", 1, "out", "Output"));
               });
     }
-    assertThatThrownBy(() -> run(graph(List.of(), "$IFERROR(@unprefixed:1(3), -1)")))
+    assertThatThrownBy(() -> run(inputToOutput(List.of(), "$IFERROR(@unprefixed:1(3), -1)")))
         .hasMessageContaining("Function calls require a $ prefix; use $ROUND(...)");
-    assertThatThrownBy(() -> run(graph(List.of(), "$IFERROR(@missing:1(), -1)")))
+    assertThatThrownBy(() -> run(inputToOutput(List.of(), "$IFERROR(@missing:1(), -1)")))
         .isInstanceOfSatisfying(
             ArcException.class,
             error -> {
@@ -309,7 +310,7 @@ class ErrorRecoveryTest {
               assertThat(error.kind()).isEqualTo(ArcException.Kind.DEFINITION);
             });
     // The callee's own value errors stay recoverable.
-    assertThat(run(graph(List.of(), "$IFERROR(@broken:1(), -1)")).result())
+    assertThat(run(inputToOutput(List.of(), "$IFERROR(@broken:1(), -1)")).result())
         .isEqualTo(new BigDecimal("-1"));
   }
 

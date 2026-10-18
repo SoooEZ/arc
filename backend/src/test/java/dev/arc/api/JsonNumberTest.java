@@ -9,29 +9,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.arc.engine.execution.Engine;
-import dev.arc.rule.RuleCatalogService;
-import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleExecutionService.ExecutionResponse;
 import dev.arc.rule.RuleExecutionService.Timing;
-import dev.arc.rule.RuleService;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 /** Responses use the application's Jackson configuration from application.yaml. */
-@WebMvcTest(RuleController.class)
-class JsonNumberTest {
-  @Autowired private MockMvc mvc;
-  @MockitoBean private RuleService rules;
-  @MockitoBean private RuleCatalogService catalog;
-  @MockitoBean private RuleExecutionService execution;
-
+class JsonNumberTest extends RuleControllerSlice {
   @Test
   void decimalsAreWrittenWithoutExponentNotation() throws Exception {
     var result = new LinkedHashMap<String, Object>();

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -43,10 +44,7 @@ for (const outcome of ["success", "failure"] as const) {
       `${source}\n// Unbuilt edit`,
     );
 
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: gate, release } = deferred();
     let held = false;
     let cancelled = false;
     let delivered = false;

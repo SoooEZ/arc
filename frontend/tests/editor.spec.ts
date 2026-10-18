@@ -1,3 +1,4 @@
+import { canvasNode, nodeCard } from "./helpers/canvas";
 import { editorLines, publishDraft, setEditorText } from "./helpers/editor";
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
@@ -84,18 +85,14 @@ test("settings modal and runtime/validation errors jump to the failing node from
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(
-    page.locator('.react-flow__node[data-id="bad"] .graph-node'),
-  ).toHaveClass(/node-error/);
+  await expect(nodeCard(page, "bad")).toHaveClass(/node-error/);
   await page
     .getByRole("button", { name: "Show problem · bad", exact: true })
     .click();
   await expect(page.getByLabel("Node name", { exact: true })).toHaveValue(
     "bad",
   );
-  await expect(page.locator('.react-flow__node[data-id="bad"]')).toHaveClass(
-    /selected/,
-  );
+  await expect(canvasNode(page, "bad")).toHaveClass(/selected/);
   await setEditorText(
     page,
     page.getByLabel("Expression", { exact: true }),
@@ -315,12 +312,8 @@ test("condition string builder quotes text and graph connections retain multiple
   });
   await page.goto(`/#/rules/${id}`);
   await page.reload(); // API-created fixture is newer than this tab's library snapshot.
-  const from = page.locator(
-    '.react-flow__node[data-id="base"] .react-flow__handle.source',
-  );
-  const to = page.locator(
-    '.react-flow__node[data-id="shipping"] .react-flow__handle.target',
-  );
+  const from = canvasNode(page, "base").locator(".react-flow__handle.source");
+  const to = canvasNode(page, "shipping").locator(".react-flow__handle.target");
   await from.dragTo(to);
   await expect(page.locator(".react-flow__edge")).toHaveCount(3);
   await from.dragTo(to);
@@ -401,9 +394,7 @@ test("errors inside reused rules open the failing published node in a modal", as
   await expect(
     page.getByRole("button", { name: "Show problem · reuse", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.locator('.react-flow__node[data-id="reuse"] .graph-node'),
-  ).toHaveClass(/node-error/);
+  await expect(nodeCard(page, "reuse")).toHaveClass(/node-error/);
   await page
     .getByRole("button", { name: "Open problem · broken", exact: true })
     .click();
@@ -411,9 +402,7 @@ test("errors inside reused rules open the failing published node in a modal", as
   await expect(viewer.getByLabel("Node name", { exact: true })).toHaveValue(
     "broken",
   );
-  await expect(
-    viewer.locator('.react-flow__node[data-id="broken"] .graph-node'),
-  ).toHaveClass(/node-error/);
+  await expect(nodeCard(viewer, "broken")).toHaveClass(/node-error/);
   await viewer.getByRole("button", { name: "Close all", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/rules/${id}`));
 });
@@ -450,15 +439,11 @@ test("a problem jump from the studio centers a far node however the canvas was m
     .getByRole("button", { name: "Show problem · far", exact: true })
     .click();
   await expect(page).toHaveURL(new RegExp(`/rules/${id}`));
-  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
-    /selected/,
-  );
+  await expect(canvasNode(page, "far")).toHaveClass(/selected/);
   // The remounted canvas used to fit the whole graph over the focus, leaving the node off screen.
   const inside = async () => {
     const flow = await page.locator(".react-flow").boundingBox();
-    const card = await page
-      .locator('.react-flow__node[data-id="far"]')
-      .boundingBox();
+    const card = await canvasNode(page, "far").boundingBox();
     if (!flow || !card) return false;
     return (
       card.x >= flow.x &&
@@ -500,9 +485,7 @@ test("a node link reached by Back while the code is unbuilt centers the node onc
   });
   // The link's first arrival focuses the node and measures every card.
   await page.goto(`/#/rules/${id}?node=far`);
-  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
-    /selected/,
-  );
+  await expect(canvasNode(page, "far")).toHaveClass(/selected/);
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
   const code = page.getByRole("textbox", {
     name: "ARC code editor",
@@ -522,14 +505,10 @@ test("a node link reached by Back while the code is unbuilt centers the node onc
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(new RegExp(`/rules/${id}\\?node=far`));
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
-  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
-    /selected/,
-  );
+  await expect(canvasNode(page, "far")).toHaveClass(/selected/);
   const centered = async () => {
     const flow = await page.locator(".react-flow").boundingBox();
-    const card = await page
-      .locator('.react-flow__node[data-id="far"]')
-      .boundingBox();
+    const card = await canvasNode(page, "far").boundingBox();
     if (!flow || !card) return false;
     const dx = card.x + card.width / 2 - (flow.x + flow.width / 2);
     const dy = card.y + card.height / 2 - (flow.y + flow.height / 2);
@@ -572,9 +551,7 @@ test("a deep link to a node the rule does not have shows the whole graph", async
   // far card stayed outside the pane.
   const inside = async (nodeId: string) => {
     const flow = await page.locator(".react-flow").boundingBox();
-    const card = await page
-      .locator(`.react-flow__node[data-id="${nodeId}"]`)
-      .boundingBox();
+    const card = await canvasNode(page, nodeId).boundingBox();
     if (!flow || !card) return false;
     return (
       card.x >= flow.x &&
@@ -627,13 +604,11 @@ test("a connection dropped on a draft at the connection limit says why", async (
   await createRule(request, { id, definition });
   await page.goto(`/#/rules/${id}`);
   await expect(page.locator(".react-flow__node")).toHaveCount(100);
-  await page
-    .locator('.react-flow__node[data-id="input"] .react-flow__handle.source')
-    .dragTo(
-      page.locator(
-        '.react-flow__node[data-id="o9"] .react-flow__handle.target',
-      ),
-    );
+  // A graph this large opens at its start, readable; fit it to reach o9.
+  await page.getByRole("button", { name: "Fit View", exact: true }).click();
+  await canvasNode(page, "input")
+    .locator(".react-flow__handle.source")
+    .dragTo(canvasNode(page, "o9").locator(".react-flow__handle.target"));
   await expect(
     page.getByText("A draft holds at most 200 connections"),
   ).toBeVisible();
@@ -655,9 +630,7 @@ test("the inspector footer names a published version only for one", async ({
   const footer = page.locator(".inspector-footer");
   await page.goto(`/#/rules/${id}?node=near`);
   await expect(footer).toHaveText("Changes are saved when you save the draft");
-  await page
-    .locator('.react-flow__node[data-id="near"] .graph-node')
-    .click({ button: "right" });
+  await nodeCard(page, "near").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect(page.getByRole("dialog", { name: /^Edit node/ })).toBeVisible();
   await expect(footer).toHaveText("Changes are saved when you save the draft");
@@ -689,9 +662,7 @@ test("Code studio in the sidebar opens the published version in view", async ({
 /** Whether the node's card lies wholly inside the canvas pane. */
 async function cardInsidePane(page: Page, nodeId: string) {
   const flow = await page.locator(".react-flow").boundingBox();
-  const card = await page
-    .locator(`.react-flow__node[data-id="${nodeId}"]`)
-    .boundingBox();
+  const card = await canvasNode(page, nodeId).boundingBox();
   if (!flow || !card) return false;
   return (
     card.x >= flow.x &&
@@ -719,15 +690,11 @@ test("a link to another node of the open rule focuses that node", async ({
   const id = uniqueId("editor-relink");
   await createRule(request, { id, definition: nearAndFar });
   await page.goto(`/#/rules/${id}?node=near`);
-  await expect(page.locator('.react-flow__node[data-id="near"]')).toHaveClass(
-    /selected/,
-  );
+  await expect(canvasNode(page, "near")).toHaveClass(/selected/);
   // The editor stays mounted for the same rule and version, and it read only
   // the first link's node.
   await page.goto(`/#/rules/${id}?node=far`);
-  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
-    /selected/,
-  );
+  await expect(canvasNode(page, "far")).toHaveClass(/selected/);
   await expect
     .poll(() => cardInsidePane(page, "far"), { timeout: 5000 })
     .toBe(true);
@@ -760,9 +727,7 @@ test("a link to a node only a published version has focuses it once the version 
   // so opening a problem in a published version never reached its node.
   await page.goto(`/#/rules/${id}?version=1&node=far`);
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
-  await expect(page.locator('.react-flow__node[data-id="far"]')).toHaveClass(
-    /selected/,
-  );
+  await expect(canvasNode(page, "far")).toHaveClass(/selected/);
   await expect
     .poll(() => cardInsidePane(page, "far"), { timeout: 5000 })
     .toBe(true);

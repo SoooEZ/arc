@@ -7,28 +7,19 @@ be deleted).
 """
 import copy
 import json
-import os
-import urllib.error
-import urllib.request
 import uuid
 
-BASE = os.environ.get("ARC_API_URL", "http://localhost:8080")
+import smoke_http
+from smoke_http import send
+
 PREFIX = "studio-smoke-" + uuid.uuid4().hex[:8]
-checks = 0
 
 
 def call(method, path, body=None, status=200):
-    global checks
-    req = urllib.request.Request(BASE + "/api" + path, method=method,
-                                 data=None if body is None else json.dumps(body).encode(),
-                                 headers={"Content-Type": "application/json"})
-    try:
-        response = urllib.request.urlopen(req, timeout=20)
-    except urllib.error.HTTPError as error:
-        response = error
-    value = json.loads(response.read())
-    assert response.status == status, (path, response.status, value)
-    checks += 1
+    data = None if body is None else json.dumps(body).encode()
+    actual, _, content = send(method, "/api" + path, data)
+    value = json.loads(content)
+    assert actual == status, (path, actual, value)
     return value
 
 
@@ -272,7 +263,7 @@ node output OUTPUT "Result" { return $SUM(SUM, $ROUND(ROUND, 2)); }
     assert lazy["result"] == 7 and not lazy["sources"] and lazy["executedSteps"] == 2
     assert not any(step["ruleId"] == rule_id for step in lazy["trace"])
 
-    print(f"PASS: {checks} studio/source HTTP checks, pinned Formula calls, function namespaces, identifier validation, version pins, fallbacks, caller overrides, diagnostics, and HTTP destination policy.")
+    print(f"PASS: {smoke_http.checks} studio/source HTTP checks, pinned Formula calls, function namespaces, identifier validation, version pins, fallbacks, caller overrides, diagnostics, and HTTP destination policy.")
 finally:
     print("Created rule fixtures: " + ", ".join(created_rules))
     print("Created source fixtures: " + ", ".join(created_sources))

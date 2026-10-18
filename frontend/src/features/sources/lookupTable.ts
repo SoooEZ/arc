@@ -1,4 +1,5 @@
 import { isJsonObject, parseJson, stringifyJson } from "../../domain/json";
+import { ownValue } from "../../domain/records";
 
 /**
  * A lookup source's entries as a table: a row per key, and a column per field
@@ -50,6 +51,23 @@ export function lookupEntries(rows: readonly LookupRow[]): string {
   const entries: Record<string, unknown> = {};
   for (const { key, value } of rows) entries[key] = value;
   return stringifyJson(entries, 2);
+}
+
+/** `record` with `field` set to `value`, or without it when `value` is undefined. */
+export function withField(
+  record: unknown,
+  field: string,
+  value?: unknown,
+): unknown {
+  const fields = new Map(isJsonObject(record) ? Object.entries(record) : []);
+  if (value === undefined) fields.delete(field);
+  else fields.set(field, value);
+  return Object.fromEntries(fields);
+}
+
+/** A record's own value for `field`: a missing or inherited field is undefined (lesson F22). */
+export function fieldValue(record: unknown, field: string): unknown {
+  return isJsonObject(record) ? ownValue(record, field) : undefined;
 }
 
 /**

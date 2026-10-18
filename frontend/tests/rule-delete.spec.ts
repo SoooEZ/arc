@@ -6,18 +6,19 @@ import {
 } from "@playwright/test";
 import type { Definition } from "../src/types";
 import {
-  createRule as createApiRule,
+  createRule,
   deleteRule,
   publishRule,
   uniqueId,
   uniqueStamp,
 } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
-const createRule = (
+const createDeletionRule = (
   request: APIRequestContext,
   id: string,
   definition?: Definition,
-) => createApiRule(request, { id, name: `Delete ${id}`, definition });
+) => createRule(request, { id, name: `Delete ${id}`, definition });
 
 async function openDeletion(page: Page) {
   await page
@@ -32,7 +33,7 @@ test("deleting a draft leaves for the library without asking about its unsaved c
   request,
 }) => {
   const id = uniqueId("delete-draft");
-  await createRule(request, id);
+  await createDeletionRule(request, id);
   const prompts: string[] = [];
   page.on("dialog", (dialog) => {
     prompts.push(dialog.message());
@@ -79,10 +80,7 @@ test("deleting a draft leaves for the library without asking about its unsaved c
 
 /** Holds the DELETE response until released; the server has already acted. */
 async function holdDeletion(page: Page, id: string) {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   await page.route(
     (url) => url.pathname === `/api/rules/${id}`,
     async (route) => {
@@ -100,7 +98,7 @@ test("a deletion outlives the editor: leaving during it still reports and forget
   request,
 }) => {
   const id = uniqueId("delete-leave");
-  await createRule(request, id);
+  await createDeletionRule(request, id);
   const prompts: string[] = [];
   page.on("dialog", (dialog) => {
     prompts.push(dialog.message());
@@ -140,7 +138,7 @@ test("a deletion outlives the editor: leaving during it still reports and forget
 });
 
 async function callee(request: APIRequestContext, id: string) {
-  const rule = await createRule(request, id);
+  const rule = await createDeletionRule(request, id);
   const published = await publishRule(request, rule);
   return published;
 }
@@ -189,7 +187,7 @@ test("a pending deletion keeps its dialog open, and a refusal lists every caller
   const called = await callee(request, `delete-called-${stamp}`);
   const callers: string[] = [];
   for (let index = 0; index < 7; index++) {
-    const caller = await createRule(
+    const caller = await createDeletionRule(
       request,
       `delete-caller-${index}-${stamp}`,
       callerOf(called.id),
@@ -237,7 +235,7 @@ test("a refusal that arrives after leaving is reported in the workspace", async 
 }) => {
   const stamp = uniqueStamp();
   const called = await callee(request, `delete-late-${stamp}`);
-  const caller = await createRule(
+  const caller = await createDeletionRule(
     request,
     `delete-late-caller-${stamp}`,
     callerOf(called.id),
@@ -278,7 +276,7 @@ test("a rule published elsewhere is not deleted behind a draft-only confirmation
   request,
 }) => {
   const id = uniqueId("delete-stale");
-  const rule = await createRule(request, id);
+  const rule = await createDeletionRule(request, id);
   await page.goto(`/#/rules/${id}`);
   await page
     .getByRole("button", { name: "Rule settings", exact: true })
@@ -306,9 +304,9 @@ test("a published rule asks for its ID, and a rule that another rule calls is ke
   page,
   request,
 }) => {
-  const callee = await createRule(request, uniqueId("delete-callee"));
+  const callee = await createDeletionRule(request, uniqueId("delete-callee"));
   await publishRule(request, callee);
-  const caller = await createRule(request, uniqueId("delete-caller"), {
+  const caller = await createDeletionRule(request, uniqueId("delete-caller"), {
     schemaVersion: 1,
     inputs: [],
     nodes: [

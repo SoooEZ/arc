@@ -13,6 +13,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  useNodesInitialized,
   useReactFlow,
 } from "@xyflow/react";
 import { Code2, Trash2 } from "lucide-react";
@@ -24,7 +25,7 @@ import {
   type DefinitionChange,
 } from "../../../domain/graph";
 import { canAddNode } from "../../../domain/limits";
-import { nodeKinds } from "../../../domain/nodeKinds";
+import { entryInputNode, nodeKinds } from "../../../domain/nodeKinds";
 import { sourcePort, type LayoutDirection } from "../../../domain/nodePorts";
 import type { useGraphCanvas } from "./useGraphCanvas";
 import type { EditorCapabilities } from "../document/editorCapabilities";
@@ -34,6 +35,7 @@ import NodeKindMenu from "./NodeKindMenu";
 import CanvasContextMenu, { type CanvasMenuTarget } from "./CanvasContextMenu";
 import { useCanvasShortcuts } from "./useCanvasShortcuts";
 import { counted } from "../../../domain/text";
+import { openingViewport } from "./graphGeometry";
 const nodeTypes = { arc: GraphNode };
 const edgeTypes = { routed: RoutedEdge };
 const initialFit = { padding: 0.18 };
@@ -134,6 +136,7 @@ export default function GraphCanvas({
   children,
 }: Props) {
   const [outline, setOutline] = useState(false);
+  const closeOutline = useCallback(() => setOutline(false), []);
   const [contextMenu, setContextMenu] = useState<CanvasMenuTarget | null>(null);
   // The selection follows the draft: a removed connection is no longer selected.
   const removeEdge = (id: string) => {
@@ -244,31 +247,55 @@ export default function GraphCanvas({
       ) => menuAt("edge", edge.id, event),
     };
   }, []);
-  // Decided once per mount: React Flow would otherwise fit on a later node
-  // measurement once the pending focus has cleared and the prop turns true.
+  // Decided once per mount: a requested node focuses the view instead.
   const [fitOnMount] = useState(!initialFocus);
-  // React Flow fits the cards it first measures, which a left-to-right view
-  // draws at their stored positions until its layout arrives: that view fits
-  // once laid out instead, and so does every change of direction.
-  const [fitViewOnMount] = useState(fitOnMount && direction === "vertical");
+  // The canvas opens readable (openingViewport) once its cards are measured
+  // and, left to right, laid out; until then they stay out of sight. A change
+  // of direction opens the graph the same way. Fitting every card of a large
+  // graph drew unreadable cards around its middle, with the Input off screen.
+  const nodesInitialized = useNodesInitialized();
+  const [opened, setOpened] = useState(!fitOnMount);
   const directionFit = useRef({
     direction,
-    pending: fitOnMount && direction === "horizontal",
+    pending: fitOnMount,
+    padding: initialFit.padding,
   });
+  const entryId = entryInputNode(definition)?.id;
+  const measured = nodesInitialized || nodes.length === 0;
   useEffect(() => {
     const fit = directionFit.current;
     if (fit.direction !== direction) {
       fit.direction = direction;
       fit.pending = true;
+      fit.padding = arrangedFit.padding;
     }
-    if (!fit.pending || !layoutReady) return;
+    if (!fit.pending || !layoutReady || !measured) return;
     const frame = requestAnimationFrame(() => {
       fit.pending = false;
+      const area = canvasArea.current;
+      const cards = flow.getNodes().map((node) => ({
+        id: node.id,
+        x: node.position.x,
+        y: node.position.y,
+        width: node.measured?.width ?? 0,
+        height: node.measured?.height ?? 0,
+      }));
+      const viewport =
+        area &&
+        openingViewport(
+          cards,
+          entryId,
+          { width: area.clientWidth, height: area.clientHeight },
+          direction,
+          fit.padding,
+        );
       // Nothing awaits the fit: an interrupted fit may never settle.
-      void flow.fitView(arrangedFit);
+      if (viewport) void flow.setViewport(viewport);
+      else void flow.fitView({ padding: fit.padding, duration: 0 });
+      setOpened(true);
     });
     return () => cancelAnimationFrame(frame);
-  }, [direction, layoutReady, flow]);
+  }, [direction, layoutReady, measured, entryId, flow]);
   // Fit requests made while this canvas was unmounted were covered by the
   // initial fit, so only requests made while it is mounted run here.
   const handledFit = useRef(fitRequest);
@@ -330,7 +357,7 @@ export default function GraphCanvas({
       )}
       <div
         ref={canvasArea}
-        className={`flow-container ${layoutReady ? "" : "flow-laying-out"}`}
+        className={`flow-container ${layoutReady && opened ? "" : "flow-laying-out"}`}
       >
         <RoutingContext.Provider value={routing}>
           <ReactFlow
@@ -356,8 +383,6 @@ export default function GraphCanvas({
             nodesConnectable={can.edit}
             edgesReconnectable={false}
             deleteKeyCode={null}
-            fitView={fitViewOnMount}
-            fitViewOptions={initialFit}
             minZoom={0.25}
             maxZoom={1.5}
             proOptions={proOptions}
@@ -401,7 +426,7 @@ export default function GraphCanvas({
             nodes={definition.nodes}
             selected={selected}
             onSelect={focusNode}
-            onClose={() => setOutline(false)}
+            onClose={closeOutline}
           />
         )}
         {selectedEdge && !readOnly && (

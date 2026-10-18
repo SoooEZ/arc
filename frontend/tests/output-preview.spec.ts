@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
+import { nodeCard } from "./helpers/canvas";
 import { setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
 
@@ -117,7 +118,7 @@ test("multiple Output previews use variable names and aliases as top-level field
   await page
     .getByRole("button", { name: "Close test panel", exact: true })
     .click();
-  await page.locator('.react-flow__node[data-id="result"] .graph-node').click();
+  await nodeCard(page, "result").click();
   await expect(preview.locator("code")).toHaveText([
     "total",
     '{ "total": total, … }',
@@ -217,9 +218,7 @@ test("duplicate reached Output fields fail with both node locations and recover 
     error.message,
   );
   for (const nodeId of ["node-dfe76b5c", "result"]) {
-    await expect(
-      page.locator(`.react-flow__node[data-id="${nodeId}"] .graph-node`),
-    ).toHaveClass(/node-error/);
+    await expect(nodeCard(page, nodeId)).toHaveClass(/node-error/);
   }
   await page
     .getByRole("button", { name: "Show problem · Final amount", exact: true })

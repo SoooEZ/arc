@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { nodeCard } from "./helpers/canvas";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, publishRule, uniqueId } from "./helpers/api";
 
@@ -180,7 +181,7 @@ test("inspector accordions start expanded and variable help opens above without 
     editorLines(sidebar.getByLabel("Expression", { exact: true })),
   ).toHaveText("amount * 2");
   await expression.click();
-  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
+  await nodeCard(page, "out").click();
   await expect(
     sidebar.getByRole("button", { name: "Returns", exact: true }),
   ).toHaveAttribute("aria-expanded", "true");
@@ -208,7 +209,7 @@ test("inspector accordions start expanded and variable help opens above without 
   await expect(outputVariables).toContainText("Calculate price");
   await page.keyboard.press("Escape");
   await expect(outputVariables).toBeVisible();
-  await page.locator('.react-flow__node[data-id="calc"] .graph-node').click();
+  await nodeCard(page, "calc").click();
   await expect(outputVariables).not.toBeVisible();
   await expect(expression).toHaveAttribute("aria-expanded", "true");
   await expect(
@@ -228,9 +229,7 @@ test("node edit modal shares section controls without losing pending form values
 }) => {
   const rule = await create(request);
   await page.goto(`/#/rules/${rule.id}?node=calc`);
-  await page
-    .locator('.react-flow__node[data-id="calc"] .graph-node')
-    .click({ button: "right" });
+  await nodeCard(page, "calc").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const dialog = page.getByRole("dialog", {
     name: "Edit node · Calculate price",

@@ -13,6 +13,7 @@ import {
   readRule,
   uniqueStamp,
 } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 /** inputToOutput returning amount * 2 instead: the saved draft after v1. */
 const doubled: Definition = {
@@ -218,7 +219,7 @@ test("rule settings duplicate the saved draft, saying that unsaved changes stay 
   const copyId = `${rule.id}-settings`;
   await page.goto(`/#/rules/${rule.id}`);
   // An unsaved edit is not part of the copy.
-  await page.locator('.react-flow__node[data-id="out"]').click();
+  await canvasNode(page, "out").click();
   await page.getByLabel("Node name", { exact: true }).fill("Unsaved name");
   await page
     .getByRole("button", { name: "Rule settings", exact: true })

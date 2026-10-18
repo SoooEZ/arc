@@ -14,6 +14,12 @@
 .source-binding .MuiAlert-message {
   flex: 1 1 150px;
 }
+.source-binding p {
+  font-size: var(--text-lg);
+  line-height: 1.7;
+  color: #6b7770;
+  margin: 0;
+}
 .sources-page {
   padding: 36px 42px;
   max-width: 1600px;
@@ -25,9 +31,9 @@
   gap: 17px;
   padding: 18px 20px;
   background: #f0f5ef;
-  border: 1px solid #e2e9df;
+  border: 1px solid var(--color-border);
   border-radius: 9px;
-  color: #6a7a61;
+  color: var(--color-text-muted);
   font-size: var(--text-lg);
   margin-bottom: 28px;
   flex-wrap: wrap;
@@ -81,7 +87,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  border: 1px solid #e2e8e0;
+  border: 1px solid var(--color-border);
   border-radius: 11px;
   padding: 26px;
   background: var(--color-surface);
@@ -137,7 +143,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   background: #f5f8f3;
-  border: 1px solid #e0e8dc;
+  border: 1px solid var(--color-border);
   padding: 18px;
   border-radius: 7px;
   margin: 0;
@@ -147,7 +153,7 @@
   flex-direction: column;
   gap: 13px;
   padding-top: 24px;
-  border-top: 1px solid #e4e9e1;
+  border-top: 1px solid var(--color-border);
 }
 .source-test h3 {
   font-size: var(--text-2xl);
@@ -215,7 +221,7 @@
 /* The parameter and lookup tables: compact cells that read as text until
    they are hovered or focused. */
 .source-table {
-  border: 1px solid #e2e8e0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 .source-table-scroll {
@@ -236,7 +242,7 @@
   font-weight: 600;
   text-align: left;
   padding: 6px 8px;
-  border-bottom: 1px solid #e2e8e0;
+  border-bottom: 1px solid var(--color-border);
   white-space: nowrap;
 }
 .source-table th > span:first-child {
@@ -258,7 +264,7 @@
   color: var(--color-code-text);
 }
 .table-cell-input:hover:not(:disabled) {
-  border-color: #dfe7dc;
+  border-color: var(--color-border-strong);
 }
 .table-cell-input:focus {
   outline: none;
@@ -277,7 +283,7 @@
   margin: 0;
   padding: 10px 12px;
   font-size: var(--text-md);
-  color: var(--color-library-muted);
+  color: var(--color-text-muted);
 }
 .source-table-actions {
   display: flex;
@@ -285,9 +291,9 @@
   flex-wrap: wrap;
   gap: 10px;
   padding: 8px;
-  border-top: 1px solid #e2e8e0;
+  border-top: 1px solid var(--color-border);
   font-size: var(--text-sm);
-  color: var(--color-library-muted);
+  color: var(--color-text-muted);
 }
 .source-table-actions > span:last-child {
   margin-left: auto;

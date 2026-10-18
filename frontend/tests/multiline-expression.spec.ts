@@ -1,13 +1,9 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
-import {
-  createRule as createApiRule,
-  publishRule,
-  uniqueId,
-} from "./helpers/api";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 
-async function createRule(request: APIRequestContext) {
+async function createMultilineRule(request: APIRequestContext) {
   const id = uniqueId("multiline");
   const definition: Definition = {
     schemaVersion: 1,
@@ -47,7 +43,7 @@ async function createRule(request: APIRequestContext) {
       { id: "end", source: "calculate", target: "out", sourceHandle: "next" },
     ],
   };
-  const rule = await createApiRule(request, {
+  const rule = await createRule(request, {
     id,
     name: id,
     kind: "FORMULA",
@@ -61,7 +57,7 @@ test("multiline strings retain literal function and Formula text through typing,
   page,
   request,
 }) => {
-  const rule = await createRule(request);
+  const rule = await createMultilineRule(request);
   const catalog = page.waitForResponse((response) =>
     response.url().endsWith("/api/functions"),
   );
@@ -109,7 +105,7 @@ test("closing multiline strings and ending comments restore normal function and 
   page,
   request,
 }) => {
-  const rule = await createRule(request);
+  const rule = await createMultilineRule(request);
   await page.goto(`/#/rules/${rule.id}?node=calculate`);
   const expression = page.getByLabel("Expression", { exact: true });
   const suggestions = page.locator(".suggest-widget.visible");

@@ -146,17 +146,15 @@ public final class ValueBounds {
 
   static ArcException stringTooLong() {
     return ArcException.invalid(
-        "String exceeds " + Limits.format(Limits.MAX_STRING_CHARACTERS) + " characters");
+        Limits.exceeds("String", Limits.MAX_STRING_CHARACTERS, "characters"));
   }
 
   static ArcException arrayTooLarge() {
-    return ArcException.invalid(
-        "Array exceeds " + Limits.format(Limits.MAX_COLLECTION_ITEMS) + " items");
+    return ArcException.invalid(Limits.exceeds("Array", Limits.MAX_COLLECTION_ITEMS, "items"));
   }
 
   static ArcException objectTooLarge() {
-    return ArcException.invalid(
-        "Object exceeds " + Limits.format(Limits.MAX_COLLECTION_ITEMS) + " fields");
+    return ArcException.invalid(Limits.exceeds("Object", Limits.MAX_COLLECTION_ITEMS, "fields"));
   }
 
   /**

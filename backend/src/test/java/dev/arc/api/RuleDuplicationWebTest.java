@@ -13,28 +13,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import dev.arc.engine.execution.Engine;
-import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.Rule;
 import dev.arc.model.RuleVersion;
-import dev.arc.rule.RuleCatalog;
-import dev.arc.rule.RuleCatalogService;
-import dev.arc.rule.RuleDefinitionService;
-import dev.arc.rule.RuleExecutionService;
-import dev.arc.rule.RuleRepository;
-import dev.arc.rule.RuleService;
-import dev.arc.rule.RuleTestCaseRepository;
 import java.time.Instant;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 /**
@@ -42,18 +28,8 @@ import org.springframework.test.web.servlet.ResultActions;
  * service and mocked stores: a strict body (lesson B32), the original's 404 before the body's 422s
  * (lesson B29), create's own ID, name and conflict outcomes, and the copied tests.
  */
-@WebMvcTest(RuleController.class)
-@Import({RuleService.class, RuleCatalogService.class, Validator.class})
-class RuleDuplicationWebTest {
+class RuleDuplicationWebTest extends RuleServicesSlice {
   private static final String DUPLICATE = "/api/rules/pricing/duplicate";
-
-  @Autowired private MockMvc mvc;
-  @MockitoBean private RuleRepository rules;
-  @MockitoBean private RuleCatalog catalog;
-  @MockitoBean private RuleTestCaseRepository testCases;
-  @MockitoBean private RuleDefinitionService definitions;
-  @MockitoBean private Engine engine;
-  @MockitoBean private RuleExecutionService execution;
 
   private final Rule original =
       new Rule(

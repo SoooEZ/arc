@@ -1,3 +1,4 @@
+import { nodeCard } from "./helpers/canvas";
 import { editorLines, publishDraft, setEditorText } from "./helpers/editor";
 import {
   expect,
@@ -169,9 +170,7 @@ for (const scenario of [
     ).toContainText("equals");
     await page.getByRole("button", { name: "Graph view", exact: true }).click();
     await page.reload();
-    await page
-      .locator('.react-flow__node[data-id="choose"] .graph-node')
-      .click();
+    await nodeCard(page, "choose").click();
     await expect(
       page.getByRole("combobox", { name: "Branches", exact: true }),
     ).toHaveText("Match a value");
@@ -206,9 +205,7 @@ test("range cases and a staged Default return survive cancel, apply, code round 
   const id = await create(request, definition);
   await page.goto(`/#/rules/${id}?node=choose`);
   const open = async () => {
-    await page
-      .locator('.react-flow__node[data-id="choose"] .graph-node')
-      .click({ button: "right" });
+    await nodeCard(page, "choose").click({ button: "right" });
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: /Edit node/ });
     await expect(dialog).toBeVisible();

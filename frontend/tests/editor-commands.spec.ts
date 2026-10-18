@@ -1,12 +1,8 @@
-import {
-  expect,
-  test,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition } from "../src/types";
-import { createRule as createApiRule, readRule, uniqueId } from "./helpers/api";
+import { createRule, readRule, uniqueId } from "./helpers/api";
 import { editorLines, publishDraft } from "./helpers/editor";
+import { deferred, holdRequest } from "./helpers/gates";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -37,35 +33,10 @@ const definition: Definition = {
   ],
 };
 
-async function createRule(request: APIRequestContext, prefix: string) {
+async function createCommandsRule(request: APIRequestContext, prefix: string) {
   const id = uniqueId(`${prefix}`);
-  await createApiRule(request, { id, name: `Commands ${id}`, definition });
+  await createRule(request, { id, name: `Commands ${id}`, definition });
   return id;
-}
-
-/** Holds the first matching request until released; reports whether the page aborted it. */
-async function holdRequest(page: Page, url: string, method: string) {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const state = { held: false, aborted: false, settled: false };
-  page.on("requestfailed", (failed) => {
-    if (failed.url().endsWith(url) && failed.method() === method)
-      state.aborted = true;
-  });
-  await page.route(`**${url}`, async (route) => {
-    if (route.request().method() !== method || state.held) {
-      await route.fallback();
-      return;
-    }
-    state.held = true;
-    await gate;
-    // An aborted request can no longer reach the server.
-    await route.continue().catch(() => {});
-    state.settled = true;
-  });
-  return { state, release };
 }
 
 for (const step of ["validate", "save", "publish"] as const) {
@@ -73,7 +44,7 @@ for (const step of ["validate", "save", "publish"] as const) {
     page,
     request,
   }) => {
-    const id = await createRule(request, `leave-publish-${step}`);
+    const id = await createCommandsRule(request, `leave-publish-${step}`);
     const initialRevision = (await readRule(request, id)).revision;
     const target = {
       validate: { url: "/api/validate", method: "POST" },
@@ -143,7 +114,7 @@ test("an open version history lists a version published while it is open", async
   page,
   request,
 }) => {
-  const id = await createRule(request, "history-refresh");
+  const id = await createCommandsRule(request, "history-refresh");
   await page.goto(`/#/rules/${id}`);
   await page
     .getByRole("button", { name: "Version history", exact: true })
@@ -162,11 +133,8 @@ test("leaving the graph while Arrange waits for its layout module cannot keep th
   page,
   request,
 }) => {
-  const id = await createRule(request, "arrange-view-switch");
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const id = await createCommandsRule(request, "arrange-view-switch");
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(/\/graphLayout[^/]*\.(ts|js)(\?.*)?$/, async (route) => {
     held = true;
@@ -216,7 +184,7 @@ test("a graph arrival with unbuilt code applies once the running build ends, and
   page,
   request,
 }) => {
-  const id = await createRule(request, "arrival-after-build");
+  const id = await createCommandsRule(request, "arrival-after-build");
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`#/studio/${id}$`));
@@ -269,11 +237,8 @@ test("node code cannot open while Arrange runs, and opens with the arranged posi
   page,
   request,
 }) => {
-  const id = await createRule(request, "arrange-node-code");
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const id = await createCommandsRule(request, "arrange-node-code");
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(/\/graphLayout[^/]*\.(ts|js)(\?.*)?$/, async (route) => {
     held = true;
@@ -367,7 +332,7 @@ test("Arrange lays out a large graph off the main thread, and a failing worker r
     });
   }
   const id = uniqueId("arrange-worker");
-  await createApiRule(request, {
+  await createRule(request, {
     id,
     name: `Arrange worker ${id}`,
     kind: "FORMULA",

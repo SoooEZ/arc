@@ -18,6 +18,7 @@ import {
   renderCounts,
   resetRenderCounts,
 } from "./helpers/renderProbe";
+import { deferred } from "./helpers/gates";
 
 async function replaceCode(
   page: import("@playwright/test").Page,
@@ -132,10 +133,7 @@ node input INPUT "Input" { next -> out; }
 node out OUTPUT "Current result" { return 30; }`,
   );
   // A second press while the save holds the editor read-only is swallowed, not the browser's.
-  let releaseSave!: () => void;
-  const saveHeld = new Promise<void>((resolve) => {
-    releaseSave = resolve;
-  });
+  const { promise: saveHeld, release: releaseSave } = deferred();
   await page.route(`**/api/rules/${id}`, async (route) => {
     if (route.request().method() !== "PUT") return route.fallback();
     await saveHeld;

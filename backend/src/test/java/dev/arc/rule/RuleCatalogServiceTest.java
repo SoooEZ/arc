@@ -3,6 +3,7 @@ package dev.arc.rule;
 import static dev.arc.support.GraphFixtures.inputNode;
 import static dev.arc.support.GraphFixtures.node;
 import static dev.arc.support.GraphFixtures.nodeOf;
+import static dev.arc.support.GraphFixtures.withInput;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -68,9 +69,9 @@ class RuleCatalogServiceTest {
     Node unpinned = nodeOf("tax", "REFERENCE", "Tax").rule("rates", null).output("tax").build();
     when(catalog.callingDefinition("checkout", null, "rates"))
         .thenReturn(Optional.of(draftDefinition));
-    when(catalog.callingDefinition("checkout", 3, "rates")).thenReturn(Optional.of(graphWith(v1)));
+    when(catalog.callingDefinition("checkout", 3, "rates")).thenReturn(Optional.of(withInput(v1)));
     when(catalog.callingDefinition("drafts", null, "rates"))
-        .thenReturn(Optional.of(graphWith(unpinned)));
+        .thenReturn(Optional.of(withInput(unpinned)));
 
     var callers = service.callers("rates", page);
 
@@ -99,9 +100,5 @@ class RuleCatalogServiceTest {
 
     assertThat(service.callers("rates", page).items())
         .containsExactly(new RuleCaller("checkout", "Checkout", null, null, 0));
-  }
-
-  private static Definition graphWith(Node node) {
-    return new Definition(1, List.of(), List.of(inputNode("in", "Input"), node), List.of());
   }
 }

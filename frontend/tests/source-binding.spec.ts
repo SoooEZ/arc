@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { createRule, uniqueStamp } from "./helpers/api";
+import type { SourceConfig } from "../src/types";
+import { createRule, uniqueId, uniqueStamp } from "./helpers/api";
+import { openInputRule, setEditorText } from "./helpers/editor";
 
 test("source parameters named like Object members can be mapped and saved", async ({
   page,
@@ -203,4 +205,105 @@ test("a mapping for a parameter the pinned source version does not declare is na
     pointer: "/rate",
     onError: "FAIL",
   });
+});
+
+test("changing a pinned source version removes obsolete mappings and retains compatible mappings", async ({
+  page,
+  request,
+}) => {
+  const sourceId = uniqueId("source-contract");
+  const configuration: SourceConfig = {
+    kind: "HTTP",
+    timeoutMs: 3000,
+    url: "https://example.com/customer",
+    parameters: [
+      { name: "key", type: "STRING", required: true, defaultValue: null },
+      {
+        name: "customerId",
+        type: "STRING",
+        required: true,
+        defaultValue: null,
+      },
+    ],
+  };
+  const created = await request.post("/api/sources", {
+    data: {
+      id: sourceId,
+      name: "Evolving contract",
+      definition: configuration,
+    },
+  });
+  expect(created.ok()).toBeTruthy();
+  const revised = await request.put(`/api/sources/${sourceId}`, {
+    data: {
+      name: "Evolving contract",
+      revision: 1,
+      definition: {
+        ...configuration,
+        parameters: configuration.parameters.map((parameter) =>
+          parameter.name === "customerId"
+            ? { ...parameter, name: "accountId" }
+            : parameter,
+        ),
+      },
+    },
+  });
+  expect(revised.ok()).toBeTruthy();
+  const ruleId = uniqueId("source-version-mapping");
+  await openInputRule(page, request, ruleId, [
+    {
+      name: "amount",
+      type: "NUMBER",
+      required: true,
+      defaultValue: null,
+      source: {
+        id: sourceId,
+        version: 1,
+        pointer: "",
+        onError: "FAIL",
+        bindings: { key: '"US"', customerId: '"customer-1"' },
+      },
+    },
+  ]);
+  await expect(
+    page.getByLabel("Source customerId", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Source version", exact: true })
+    .click();
+  await page.getByRole("option", { name: "v2", exact: true }).click();
+  await expect(
+    page.getByLabel("Source customerId", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Source key", { exact: true })).toHaveValue(
+    "US",
+  );
+  await page
+    .getByRole("combobox", {
+      name: "Source accountId · value source",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("option", { name: "Constant", exact: true }).click();
+  await page.getByLabel("Source accountId", { exact: true }).fill("account-1");
+  await page.getByRole("button", { name: "Test rule", exact: true }).click();
+  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
+  // Caller override keeps this contract regression independent of external HTTP services.
+  await setEditorText(
+    page,
+    page.getByLabel("Test input JSON", { exact: true }),
+    '{"amount":7}',
+  );
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+  await expect(page.getByTestId("test-result")).toHaveText("7");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  const saved = await (await request.get(`/api/rules/${ruleId}`)).json();
+  expect(saved.draft.inputs[0].source).toMatchObject({
+    version: 2,
+    bindings: { key: '"US"', accountId: '"account-1"' },
+  });
+  expect(saved.draft.inputs[0].source.bindings).not.toHaveProperty(
+    "customerId",
+  );
 });

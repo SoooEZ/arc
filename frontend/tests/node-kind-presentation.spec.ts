@@ -3,14 +3,10 @@ import {
   test,
   type APIRequestContext,
   type Locator,
-  type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
-import {
-  createRule as createApiRule,
-  publishRule,
-  uniqueStamp,
-} from "./helpers/api";
+import { createRule, publishRule, uniqueStamp } from "./helpers/api";
+import { canvasNode, nodeCard } from "./helpers/canvas";
 
 /*
  * Cards, menus, the inspector, library previews, the Script outline and the
@@ -19,14 +15,14 @@ import {
  * routing rely on.
  */
 
-async function createRule(
+async function createPresentationRule(
   request: APIRequestContext,
   id: string,
   name: string,
   definition: Definition,
   publish: boolean,
 ) {
-  const rule = await createApiRule(request, {
+  const rule = await createRule(request, {
     id,
     name,
     kind: "DECISION_TREE",
@@ -223,9 +219,6 @@ function expectations(childId: string): Record<string, Expected> {
   };
 }
 
-const card = (page: Page, id: string) =>
-  page.locator(`.react-flow__node[data-id="${id}"]`);
-
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const exactly = (text: string) => new RegExp(`^${escaped(text)}$`);
 
@@ -243,8 +236,14 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
   const childId = `kinds-child-${stamp}`;
   const id = `kinds-parent-${stamp}`;
   const name = `Every node kind ${stamp}`;
-  await createRule(request, childId, `Kinds child ${stamp}`, childRule(), true);
-  await createRule(request, id, name, everyKind(childId), false);
+  await createPresentationRule(
+    request,
+    childId,
+    `Kinds child ${stamp}`,
+    childRule(),
+    true,
+  );
+  await createPresentationRule(request, id, name, everyKind(childId), false);
   const expected = Object.entries(expectations(childId));
 
   await page.goto(`/#/rules/${id}`);
@@ -254,7 +253,7 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
   ).toBeVisible();
 
   for (const [nodeId, kind] of expected) {
-    const node = card(page, nodeId);
+    const node = canvasNode(page, nodeId);
     const graphNode = node.locator(".graph-node");
     await expectClass(graphNode, `node-${kind.key}`, true);
     await expectClass(graphNode, "node-error", false);
@@ -285,21 +284,17 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
   expect(await stroke("g")).not.toBe(await stroke("e"));
   // Fallback exits (False, Default) have their own caption style.
   const caption = (nodeId: string, text: string) =>
-    card(page, nodeId).locator(".handle-caption", { hasText: exactly(text) });
+    canvasNode(page, nodeId).locator(".handle-caption", {
+      hasText: exactly(text),
+    });
   await expectClass(caption("check", "True"), "handle-fallback", false);
   await expectClass(caption("check", "False"), "handle-fallback", true);
   await expectClass(caption("pick", "High"), "handle-fallback", false);
   await expectClass(caption("pick", "Mid"), "handle-fallback", false);
   await expectClass(caption("pick", "Default"), "handle-fallback", true);
   // Cards are 230px wide; a Switch with three exits widens to 270px.
-  await expect(card(page, "pick").locator(".graph-node")).toHaveCSS(
-    "width",
-    "270px",
-  );
-  await expect(card(page, "check").locator(".graph-node")).toHaveCSS(
-    "width",
-    "230px",
-  );
+  await expect(nodeCard(page, "pick")).toHaveCSS("width", "270px");
+  await expect(nodeCard(page, "check")).toHaveCSS("width", "230px");
 
   // Only Conditions, True / False or with cases, stand out on the minimap.
   const minimapNodes = page.locator(".react-flow__minimap-node");

@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
 import { createRule, publishRule, uniqueId, uniqueStamp } from "./helpers/api";
+import { nodeCard } from "./helpers/canvas";
 
 const node = (
   id: string,
@@ -101,8 +102,8 @@ test("node expressions edit one node, group functions, and flag all invalid expr
   await create(request, id, definition);
   const original = await (await request.get(`/api/rules/${id}`)).json();
   await page.goto(`/#/rules/${id}`);
-  const calc = page.locator('.react-flow__node[data-id="calc"] .graph-node');
-  const out = page.locator('.react-flow__node[data-id="out"] .graph-node');
+  const calc = nodeCard(page, "calc");
+  const out = nodeCard(page, "out");
   await expect(calc).toHaveClass(/node-error/);
   await expect(out).toHaveClass(/node-error/);
   const nodeHeight = await calc.evaluate(
@@ -219,10 +220,7 @@ test("references navigate within one modal with back and close all while preserv
   };
   await create(request, parent, definition);
   await page.goto(`/#/rules/${parent}?node=reuse`);
-  await expectGroupedGraphActions(
-    page.locator('.react-flow__node[data-id="reuse"] .graph-node'),
-    ".node-link-icon",
-  );
+  await expectGroupedGraphActions(nodeCard(page, "reuse"), ".node-link-icon");
   await page
     .getByLabel("Node name", { exact: true })
     .fill("Parent unsaved edit");
@@ -268,13 +266,9 @@ test("references navigate within one modal with back and close all while preserv
   await viewer
     .getByRole("button", { name: "Open problem · Amount & rate", exact: true })
     .click();
-  await expect(
-    viewer.locator('.react-flow__node[data-id="input"] .graph-node'),
-  ).toHaveClass(/node-error/);
+  await expect(nodeCard(viewer, "input")).toHaveClass(/node-error/);
   await viewer.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(
-    viewer.locator('.react-flow__node[data-id="reuse"] .graph-node'),
-  ).toHaveClass(/node-error/);
+  await expect(nodeCard(viewer, "reuse")).toHaveClass(/node-error/);
   await viewer
     .getByRole("button", { name: "Code editor", exact: true })
     .click();

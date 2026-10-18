@@ -1,3 +1,4 @@
+import { canvasNode } from "./helpers/canvas";
 import { editorLines, publishDraft } from "./helpers/editor";
 import {
   expect,
@@ -8,6 +9,7 @@ import {
 } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
 import { createRule, uniqueId, uniqueStamp } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 async function create(request: APIRequestContext, source: string) {
   const built = await (
@@ -167,9 +169,7 @@ test("Switch and Transform survive Graph/code edits, case reordering and version
   await page.getByLabel("Field 3 value", { exact: true }).fill("active");
   await focusNode(page, "Pricing tier");
   await expect(
-    page.locator(
-      '.react-flow__node[data-id="choose"] .react-flow__handle.source',
-    ),
+    canvasNode(page, "choose").locator(".react-flow__handle.source"),
   ).toHaveCount(3);
   await page.getByLabel("Case 1 label", { exact: true }).fill("High value");
   await page
@@ -247,16 +247,14 @@ test("Switch and Transform survive Graph/code edits, case reordering and version
   await expect(
     page.getByRole("button", { name: "Arrange graph", exact: true }),
   ).toBeEnabled();
-  const newExit = page.locator(
-    '.react-flow__node[data-id="choose"] .react-flow__handle.source[data-handleid^="case:case-"]',
+  const newExit = canvasNode(page, "choose").locator(
+    '.react-flow__handle.source[data-handleid^="case:case-"]',
   );
   await page
     .getByRole("button", { name: "Close outline", exact: true })
     .click();
   await newExit.dragTo(
-    page.locator(
-      '.react-flow__node[data-id="premium"] .react-flow__handle.target',
-    ),
+    canvasNode(page, "premium").locator(".react-flow__handle.target"),
   );
   await expect(page.locator(".react-flow__edge")).toHaveCount(5);
   const reconnected = await save(page, request, id);
@@ -347,10 +345,7 @@ test("late expression checks cannot override newer text or reenable Apply", asyn
     })
     .click();
   const dialog = page.getByRole("dialog", { name: /Expression editor/ });
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false,
     delivered = false;
   await page.route("**/api/studio/expression/check", async (route) => {

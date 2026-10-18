@@ -6,6 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { nodeCard } from "./helpers/canvas";
 import { editorLines, publishDraft, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
 
@@ -109,9 +110,7 @@ test("input and every result-producing node use the same identifier restrictions
     ["transform", "Result variable", "data", "transformed_data"],
     ["reuse", "Result variable", "reused", "reused_value"],
   ]) {
-    await page
-      .locator(`.react-flow__node[data-id="${node}"] .graph-node`)
-      .click();
+    await nodeCard(page, node).click();
     const input = page.getByLabel(label, { exact: true });
     await expect(input).toHaveValue(original);
     await rejectInvalidNames(input, original);
@@ -211,7 +210,7 @@ test("named Outputs survive graph/code and staged edits, preserve null and publi
     .getByRole("button", { name: "Apply to graph", exact: true })
     .click();
   await expect(alias).toHaveValue("payable");
-  const card = page.locator('.react-flow__node[data-id="out"] .graph-node');
+  const card = nodeCard(page, "out");
   await card.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const form = page.getByRole("dialog", { name: /^Edit node/ });
@@ -366,9 +365,7 @@ test("a refused paste stops being reported once the name changes through the nod
   await expect(field).toHaveValue("total");
   await expect(field).toHaveAttribute("aria-invalid", "true");
   await expect(page.getByText(/No spaces, \$ or @/).first()).toBeVisible();
-  await page
-    .locator('.react-flow__node[data-id="calc"] .graph-node')
-    .click({ button: "right" });
+  await nodeCard(page, "calc").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: /Edit node/ });
   await dialog

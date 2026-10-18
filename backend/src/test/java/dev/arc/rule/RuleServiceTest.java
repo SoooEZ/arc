@@ -1,10 +1,9 @@
 package dev.arc.rule;
 
 import static dev.arc.support.GraphFixtures.calculation;
-import static dev.arc.support.GraphFixtures.inputNode;
-import static dev.arc.support.GraphFixtures.node;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
+import static dev.arc.support.GraphFixtures.withInput;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -167,11 +166,6 @@ class RuleServiceTest {
     verifyNoInteractions(definitions);
   }
 
-  /** A graph whose Input node leads to {@code node}; edges do not matter to dependencies. */
-  private static Definition graphWith(Node node) {
-    return new Definition(1, List.of(), List.of(inputNode("in", "Input"), node), List.of());
-  }
-
   /** No stored callee set names the rule: it goes, and its plans are forgotten after the commit. */
   @Test
   void aRuleNoStoredCalleeSetNamesIsDeleted() {
@@ -270,8 +264,8 @@ class RuleServiceTest {
                         "rates", 1, Map.of("key", "$TO_STRING(@example:1(1))"), "/rate", "FAIL"))),
             List.of(outputNode("out", "Output", "amount")),
             List.of());
-    service.update("checkout", new RuleService.Update("Checkout", "", 3, graphWith(unpinned)));
-    verify(repository).update("checkout", "Checkout", "", graphWith(unpinned), Set.of("example"));
+    service.update("checkout", new RuleService.Update("Checkout", "", 3, withInput(unpinned)));
+    verify(repository).update("checkout", "Checkout", "", withInput(unpinned), Set.of("example"));
     service.update("pricing", new RuleService.Update("Pricing", "", 3, sourced));
     verify(repository).update("pricing", "Pricing", "", sourced, Set.of("example"));
     verify(repository, times(2)).lockCallees(Set.of("example"));
@@ -281,7 +275,7 @@ class RuleServiceTest {
   @Test
   void savesAndPublicationsHoldTheRulesTheyCallAgainstDeletion() {
     Node reference = nodeOf("tax", "REFERENCE", "Tax").rule("callee", 1).output("tax").build();
-    var calling = graphWith(reference);
+    var calling = withInput(reference);
     var callingDraft =
         new Rule("example", "Example", "", "RULE", calling, 3, null, Instant.EPOCH, Instant.EPOCH);
     when(repository.lockForPublication("example")).thenReturn(callingDraft);
@@ -396,7 +390,7 @@ class RuleServiceTest {
   @Test
   void aDuplicateCopiesTheSavedDraftTheKindAndTheTestsAsANewRule() {
     Node reference = nodeOf("tax", "REFERENCE", "Tax").rule("callee", 1).output("tax").build();
-    var calling = graphWith(reference);
+    var calling = withInput(reference);
     var original =
         new Rule(
             "pricing",
@@ -468,7 +462,7 @@ class RuleServiceTest {
             2,
             Instant.EPOCH,
             Instant.EPOCH);
-    Definition published = graphWith(outputNode("out", "Version 1", "1"));
+    Definition published = withInput(outputNode("out", "Version 1", "1"));
     when(repository.lockForCopy("pricing")).thenReturn(original);
     when(repository.version("pricing", 1))
         .thenReturn(new dev.arc.model.RuleVersion("pricing", 1, published, Instant.EPOCH));

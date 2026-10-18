@@ -18,8 +18,8 @@ import {
   resultCounts,
   runSavedTests,
   type TestResult,
-} from "../../execution/testPanel/savedTests";
-import type { SavedTests } from "../../execution/testPanel/useSavedTests";
+} from "../../execution/test-panel/savedTests";
+import type { SavedTests } from "../../execution/test-panel/useSavedTests";
 import type { PublishReview } from "../document/useRuleDocument";
 import VersionChangeList from "./VersionChangeList";
 

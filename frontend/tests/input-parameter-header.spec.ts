@@ -1,12 +1,12 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import {
-  createRule as createApiRule,
-  publishRule,
-  uniqueId,
-} from "./helpers/api";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
+import { nodeCard } from "./helpers/canvas";
 
-async function createRule(request: APIRequestContext, name = "amount") {
+async function createRuleWithInput(
+  request: APIRequestContext,
+  name = "amount",
+) {
   const id = uniqueId("input-parameter-header");
   const definition: Definition = {
     schemaVersion: 1,
@@ -30,7 +30,7 @@ async function createRule(request: APIRequestContext, name = "amount") {
       { id: "next", source: "input", sourceHandle: "next", target: "output" },
     ],
   };
-  const response = await createApiRule(request, {
+  const response = await createRule(request, {
     id,
     name: id,
     kind: "FORMULA",
@@ -43,9 +43,9 @@ test("input headers edit Required/Optional and card counts follow added and remo
   page,
   request,
 }) => {
-  const rule = await createRule(request);
+  const rule = await createRuleWithInput(request);
   await page.goto(`/#/rules/${rule.id}`);
-  const node = page.locator('.react-flow__node[data-id="input"] .graph-node');
+  const node = nodeCard(page, "input");
   await node.click();
   const sidebar = page.locator(".inspector-sidebar");
   const parameter = sidebar.locator(".input-schema-card").first();
@@ -94,10 +94,10 @@ test("parameter headers fit narrow layouts and preserve published read-only cont
   request,
 }) => {
   const name = "very_long_parameter_name_that_stays_inside_a_narrow_card";
-  const rule = await createRule(request, name);
+  const rule = await createRuleWithInput(request, name);
   await publishRule(request, rule);
   await page.goto(`/#/rules/${rule.id}?version=1`);
-  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
+  await nodeCard(page, "input").click();
   const header = page.locator(".inspector-sidebar .input-card-title");
   await expect(header.getByLabel("Required", { exact: true })).toBeChecked();
   await expect(header.getByLabel("Required", { exact: true })).toBeDisabled();

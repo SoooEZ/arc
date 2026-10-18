@@ -41,6 +41,7 @@ import {
   writeCaptures,
   type Capture,
 } from "./style-snapshot";
+import { nodeCard } from "./helpers/canvas";
 import { setEditorText } from "./helpers/editor";
 import { createRule } from "./helpers/api";
 
@@ -463,9 +464,7 @@ const scenarios: Scenario[] = [
     pseudo: true,
     setup: async (page) => {
       await openEditor(page, `/rules/${nodeKinds.id}?node=input`, 11);
-      await page
-        .locator('.react-flow__node[data-id="band"] .graph-node')
-        .click({ button: "right" });
+      await nodeCard(page, "band").click({ button: "right" });
       await page.getByRole("menuitem", { name: "Edit" }).click();
       await expect(page.locator(".node-edit-dialog")).toBeVisible();
       await expect(page.locator(".inline-expression-loading")).toHaveCount(0);
@@ -476,9 +475,7 @@ const scenarios: Scenario[] = [
     viewports: ["desktop"],
     setup: async (page) => {
       await openEditor(page, `/rules/${nodeKinds.id}?node=check`, 11);
-      await page
-        .locator('.react-flow__node[data-id="input"] .graph-node')
-        .click({ button: "right" });
+      await nodeCard(page, "input").click({ button: "right" });
       await page.getByRole("menuitem", { name: "Edit" }).click();
       await expect(page.locator(".node-edit-dialog")).toBeVisible();
       await expect(page.locator(".input-schema-card").first()).toBeVisible();
@@ -533,9 +530,7 @@ const scenarios: Scenario[] = [
       await openEditor(page, "/rules/order-pricing", 7);
       await button(page, "Test rule").click();
       await expect(page.locator(".test-panel")).toBeVisible();
-      await expect(
-        page.locator(".test-input .view-line").first(),
-      ).toBeVisible();
+      await expect(page.locator(".test-input .input-form")).toBeVisible();
     },
   },
   {
@@ -545,9 +540,7 @@ const scenarios: Scenario[] = [
     setup: async (page) => {
       await openEditor(page, "/rules/order-pricing", 7);
       await button(page, "Test rule").click();
-      await expect(
-        page.locator(".test-input .view-line").first(),
-      ).toBeVisible();
+      await expect(page.locator(".test-input .input-form")).toBeVisible();
       await button(page, "Run test").click();
       await expect(
         page.locator(".test-output .test-result, .test-output .MuiAlert-root"),
@@ -570,9 +563,7 @@ const scenarios: Scenario[] = [
     setup: async (page) => {
       await openEditor(page, `/rules/${nodeKinds.id}?node=input`, 11);
       await button(page, "Test rule").click();
-      await expect(
-        page.locator(".test-input .view-line").first(),
-      ).toBeVisible();
+      await expect(page.locator(".test-input .input-form")).toBeVisible();
       await button(page, "Run test").click();
       await expect(page.locator(".test-output .MuiAlert-root")).toBeVisible();
     },
@@ -770,7 +761,7 @@ const scenarios: Scenario[] = [
     setup: async (page) => {
       await open(page, "/docs");
       await expect(page.locator(".endpoint-table")).toBeVisible();
-      await expect(page.locator(".parameter-chips")).toBeVisible();
+      await expect(page.locator(".api-notes")).toBeVisible();
     },
   },
 ];

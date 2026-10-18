@@ -6,6 +6,8 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { createRule, publishRule, uniqueId } from "./helpers/api";
+import { canvasNode, nodeCard } from "./helpers/canvas";
+import { deferred } from "./helpers/gates";
 
 /*
  * Every editor control reads one capability set from the rule document. These
@@ -66,12 +68,9 @@ async function expectButtons(
   }
 }
 
-const node = (page: Page, id: string) =>
-  page.locator(`.react-flow__node[data-id="${id}"]`);
-
 /** Cards move only while the draft is editable (React Flow marks them draggable). */
 async function expectCanvasEditable(page: Page, editable: boolean) {
-  const card = expect(node(page, "calc"));
+  const card = expect(canvasNode(page, "calc"));
   if (editable) await card.toHaveClass(/\bdraggable\b/);
   else await card.not.toHaveClass(/\bdraggable\b/);
 }
@@ -83,7 +82,7 @@ test("a draft allows editing and commands until a save holds the document", asyn
   const id = uniqueId("capabilities-draft");
   await createPublishedRule(request, id);
   await page.goto(`/#/rules/${id}`);
-  await node(page, "calc").locator(".graph-node").click();
+  await nodeCard(page, "calc").click();
   const name = page.getByLabel("Node name", { exact: true });
   await expect(name).toHaveValue("Calculate");
   await expectButtons(page, {
@@ -104,10 +103,7 @@ test("a draft allows editing and commands until a save holds the document", asyn
   await name.fill("Calculate twice");
   await expectButtons(page, { "Save draft": "enabled", Publish: "enabled" });
 
-  let release = () => {};
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: held, release } = deferred();
   let saving = false;
   await page.route(`**/api/rules/${id}`, async (route) => {
     if (route.request().method() === "PUT") {
@@ -161,7 +157,7 @@ test("a published version offers commands that keep it unchanged", async ({
   });
   await page.goto(`/#/rules/${id}?version=1`);
   await expect(page.getByText("Immutable published version")).toBeVisible();
-  await node(page, "calc").locator(".graph-node").click();
+  await nodeCard(page, "calc").click();
   await expectButtons(page, {
     "Rule settings": "enabled",
     "Code editor": "enabled",

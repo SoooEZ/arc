@@ -177,6 +177,13 @@ export default function StudioLibrary({
               <span>+</span>
             </button>
           ))}
+          {!catalog.loading && !catalog.error && !catalog.data.total && (
+            <p className="studio-hint" role="status">
+              {search.trim()
+                ? `No published rule matches “${search.trim()}”.`
+                : "No rule is published yet. Publish a rule to reuse it here."}
+            </p>
+          )}
           <CatalogPagination
             label="Reusable rules"
             {...paginationProps(catalog)}

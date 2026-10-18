@@ -152,7 +152,7 @@ export default function DuplicateRuleDialog({
               helperText="The saved draft, or a published version as it was published."
             />
           ) : (
-            <p className="duplicate-source-note">
+            <p className="muted-note">
               Copies the saved draft: {source.name} has no published version.
             </p>
           )}

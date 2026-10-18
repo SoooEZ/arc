@@ -99,10 +99,39 @@ test("API errors retain graph locations and status; non-JSON errors still explai
     async () => new Response("upstream unavailable", { status: 503 }),
   );
   await expect(offline.get("/rules")).rejects.toMatchObject({
-    message: "Request failed (503)",
+    message:
+      "The ARC service is not responding (503). It may be restarting; try again in a moment.",
     status: 503,
     issues: [],
   });
+  // Another status without a message keeps naming it.
+  const teapot = createHttpClient(
+    "/api",
+    async () => new Response("", { status: 418 }),
+  );
+  await expect(teapot.get("/rules")).rejects.toMatchObject({
+    message: "Request failed (418)",
+    status: 418,
+  });
+});
+
+test("a request that reaches no server says so, and a cancelled one keeps its own error", async () => {
+  const unreachable = createHttpClient("/api", async () => {
+    throw new TypeError("Failed to fetch");
+  });
+  await expect(unreachable.get("/rules")).rejects.toMatchObject({
+    name: "ApiError",
+    message:
+      "Could not reach the ARC service. Check the connection and try again.",
+  });
+  const controller = new AbortController();
+  const cancelled = createHttpClient("/api", async () => {
+    controller.abort();
+    throw new DOMException("The operation was aborted.", "AbortError");
+  });
+  await expect(
+    cancelled.get("/rules", { signal: controller.signal }),
+  ).rejects.toMatchObject({ name: "AbortError" });
 });
 
 test("API errors keep the body's issues, and only issues beyond the message are details", async () => {

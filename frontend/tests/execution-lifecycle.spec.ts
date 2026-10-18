@@ -5,8 +5,10 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Execution } from "../src/types";
+import { nodeCard } from "./helpers/canvas";
 import { editorLines, openRunOptions, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -50,10 +52,7 @@ async function openRule(page: Page, request: APIRequestContext) {
   return id;
 }
 async function holdPreview(page: Page) {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   let delivered = false;
   const old: Execution = {
@@ -260,15 +259,10 @@ test("save commands disable all graph mutation actions until the submitted draft
   await page
     .getByRole("button", { name: "Close test panel", exact: true })
     .click();
-  await page
-    .locator('.react-flow__node[data-id="calculate"] .graph-node')
-    .click();
+  await nodeCard(page, "calculate").click();
   const expression = page.getByLabel("Expression", { exact: true });
   await setEditorText(page, expression, "amount * 3");
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(`**/api/rules/${id}`, async (route) => {
     if (route.request().method() !== "PUT") {

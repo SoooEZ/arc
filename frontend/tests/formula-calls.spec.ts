@@ -1,7 +1,9 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { nodeCard } from "./helpers/canvas";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, publishRule, uniqueStamp } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 function definition(
   expression: string,
   inputs: Definition["inputs"],
@@ -179,7 +181,7 @@ test("at completion pins a formula and hover explains input, formula and result 
   await page
     .getByRole("button", { name: "Close test panel", exact: true })
     .click();
-  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
+  await nodeCard(page, "out").click();
   const result = page.getByLabel("Return value", { exact: true });
   await editorLines(result)
     .locator("span")
@@ -265,10 +267,7 @@ test("formula picker preserves pins after publication and ignores late insertion
     .click();
   await dialog.getByRole("button", { name: "@ Formulas", exact: true }).click();
   await dialog.getByLabel("Find published formula").fill(suffix);
-  let release!: () => void;
-  const blocked = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: blocked, release } = deferred();
   await page.route(`**/api/rules/${callee}/versions/2`, async (route) => {
     await blocked;
     await route.continue();
@@ -331,9 +330,7 @@ test("formula runtime errors open the pinned child node and preserve unsaved cal
   await expect(
     viewer.getByRole("heading", { name: `Tax formula ${suffix}`, exact: true }),
   ).toBeVisible();
-  await expect(
-    viewer.locator('.react-flow__node[data-id="calc"] .graph-node'),
-  ).toHaveClass(/node-error/);
+  await expect(nodeCard(viewer, "calc")).toHaveClass(/node-error/);
   await expect(
     editorLines(viewer.getByLabel("Expression", { exact: true })),
   ).toHaveText("amount / 0");

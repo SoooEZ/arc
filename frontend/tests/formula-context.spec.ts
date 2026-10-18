@@ -8,6 +8,7 @@ import {
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, publishRule, uniqueStamp } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 async function fixtures(request: APIRequestContext) {
   const suffix = uniqueStamp();
@@ -314,14 +315,8 @@ test("Formula completion uses scope that arrives after suggestions appeared", as
   request,
 }) => {
   const { caller, callee } = await fixtures(request);
-  let release!: () => void;
-  const pending = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  let releaseCatalog!: () => void;
-  const pendingCatalog = new Promise<void>((resolve) => {
-    releaseCatalog = resolve;
-  });
+  const { promise: pending, release } = deferred();
+  const { promise: pendingCatalog, release: releaseCatalog } = deferred();
   let scopeReleased = false;
   await page.route("**/api/rule-summaries?**", async (route) => {
     const url = new URL(route.request().url());

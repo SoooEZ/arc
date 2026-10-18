@@ -41,7 +41,7 @@ function EmptyLibrary({
       }
     : {
         title: "Build your first rule",
-        hint: "Start with a formula, condition, or decision tree.",
+        hint: "Start from a formula, condition or decision tree template, or import a graph file exported from ARC.",
         action: "Create rule",
         onAction: onCreate,
       };
@@ -55,7 +55,7 @@ function EmptyLibrary({
   );
 }
 
-export default function Library({
+export default function LibraryPage({
   library,
   onOpen,
   onOpenCode,

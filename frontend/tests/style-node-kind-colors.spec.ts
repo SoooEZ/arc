@@ -1,6 +1,7 @@
 import { expect, test, type Locator } from "@playwright/test";
 import type { NodeType } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 const kinds: NodeType[] = [
   "INPUT",
@@ -62,9 +63,7 @@ test("library previews colour every node kind like its canvas icon", async ({
 
   await page.goto(`/#/rules/${id}`);
   for (const type of kinds) {
-    const icon = page.locator(
-      `.react-flow__node[data-id="${type.toLowerCase()}"] .node-icon`,
-    );
+    const icon = canvasNode(page, type.toLowerCase()).locator(".node-icon");
     await expect(icon).toBeVisible();
     expect(await color(icon), `${type} preview colour`).toBe(
       previewColors.get(type),

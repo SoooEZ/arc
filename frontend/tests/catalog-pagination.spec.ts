@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { Rule, RuleSummary } from "../src/types";
+import { deferred } from "./helpers/gates";
 
 const summaries: RuleSummary[] = Array.from({ length: 45 }, (_, index) => ({
   id: `catalog-${index}`,
@@ -140,10 +141,7 @@ test("a late search response cannot replace newer catalog results", async ({
   page,
 }) => {
   await mocks(page);
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route("**/api/rule-summaries?*", async (route) => {
     if (
@@ -187,10 +185,7 @@ test("library search waits for typing to pause and keeps cards and previews whil
     const id = /^\/api\/rules\/catalog-(\d+)$/.exec(url.pathname);
     if (id) previews.push(Number(id[1]));
   });
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   await page.route("**/api/rule-summaries?*", async (route) => {
     if (new URL(route.request().url()).searchParams.get("search")) await gate;
     await catalog(route);
@@ -347,7 +342,7 @@ test("a filter or search round trip starts at page 1, and the filters expose the
   await expect(cards.first()).toContainText("Catalog rule 0");
 });
 
-test("a catalog that fits on one page shows no pager, and an empty one still says so", async ({
+test("a catalog that fits on one page shows no pager, and neither does an empty one", async ({
   page,
 }) => {
   await mocks(page);
@@ -360,5 +355,6 @@ test("a catalog that fits on one page shows no pager, and an empty one still say
   await expect(pager).toHaveCount(0);
   await page.getByLabel("Search rules", { exact: true }).fill("no such rule");
   await expect(page.getByText("No rules match this view")).toBeVisible();
-  await expect(pager).toHaveText("0 results");
+  // The empty state says it; a "0 results" pager under it only repeated it.
+  await expect(pager).toHaveCount(0);
 });

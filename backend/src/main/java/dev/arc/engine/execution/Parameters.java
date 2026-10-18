@@ -92,8 +92,8 @@ public final class Parameters {
         throw ArcException.invalid("Circular source parameter dependency: " + name);
       Object value;
       if (supplied.containsKey(name)) value = checked(parameter, supplied.get(name));
-      // A source's value is checked inside the read, where a wrong type may still fall back; it
-      // was checked once more here, a second walk of a large value.
+      // A source's value is checked inside the read, where a wrong type may still fall back, so it
+      // is not checked again here, which would walk a large value twice.
       else if (parameter.source() != null) value = read(parameter);
       else value = checked(parameter, parameter.defaultValue());
       if (value == null && parameter.isRequired())

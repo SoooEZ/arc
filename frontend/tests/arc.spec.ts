@@ -1,3 +1,4 @@
+import { canvasNode } from "./helpers/canvas";
 import { publishDraft, setEditorText } from "./helpers/editor";
 import { expect, test } from "@playwright/test";
 import { uniqueStamp } from "./helpers/api";
@@ -158,12 +159,8 @@ test("create, edit a formula, save, publish, reload, and execute", async ({
     page.getByRole("button", { name: "Arrange graph", exact: true }),
   ).toBeEnabled();
   const connectNodes = async (source: string, target: string) => {
-    const from = page.locator(
-      `.react-flow__node[data-id="${source}"] .react-flow__handle.source`,
-    );
-    const to = page.locator(
-      `.react-flow__node[data-id="${target}"] .react-flow__handle.target`,
-    );
+    const from = canvasNode(page, source).locator(".react-flow__handle.source");
+    const to = canvasNode(page, target).locator(".react-flow__handle.target");
     await expect(from).toBeVisible();
     await expect(to).toBeVisible();
     // Fit the current measured nodes before testing the connection gesture.

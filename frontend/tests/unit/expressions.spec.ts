@@ -136,3 +136,15 @@ test("comparisonText parenthesizes operands whose top-level operators bind no ti
     expect(comparisonText(left, operator, right), text).toBe(text);
   }
 });
+
+test("string constants round-trip escapes and comparison parsing respects quoted operators", () => {
+  const text = 'hello "arc" \\ value\n下一行';
+  expect(literalText(quoteText(text))).toBe(text);
+  expect(literalText("SUM(amount)")).toBeNull();
+  expect(simpleComparison('tier == "a > b && c"')?.slice(1)).toEqual([
+    "tier",
+    "==",
+    '"a > b && c"',
+  ]);
+  expect(simpleComparison("amount > 1 && amount < 10")).toBeNull();
+});

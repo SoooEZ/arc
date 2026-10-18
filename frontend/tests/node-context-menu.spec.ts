@@ -1,3 +1,4 @@
+import { nodeCard } from "./helpers/canvas";
 import { setEditorText } from "./helpers/editor";
 import {
   expect,
@@ -6,13 +7,10 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import {
-  createRule as createApiRule,
-  publishRule,
-  uniqueId,
-} from "./helpers/api";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
-async function createRule(
+async function createMenuRule(
   request: APIRequestContext,
   id: string,
   publish = false,
@@ -51,7 +49,7 @@ async function createRule(
       { id: "finish", source: "calc", sourceHandle: "next", target: "out" },
     ],
   };
-  const rule: Rule = await createApiRule(request, {
+  const rule: Rule = await createRule(request, {
     id,
     name: id,
     kind: "FORMULA",
@@ -61,10 +59,8 @@ async function createRule(
   return rule;
 }
 
-const card = (page: Page, id: string) =>
-  page.locator(`.react-flow__node[data-id="${id}"] .graph-node`);
 async function openMenu(page: Page, id: string) {
-  await card(page, id).click({ button: "right" });
+  await nodeCard(page, id).click({ button: "right" });
   return page.getByRole("menu", { name: "Node actions" });
 }
 
@@ -73,9 +69,9 @@ test("node context menu edits in a roomy form, cancels safely, and deletes its t
   request,
 }) => {
   const id = uniqueId("node-context");
-  const original = await createRule(request, id);
+  const original = await createMenuRule(request, id);
   await page.goto(`/#/rules/${id}`);
-  await card(page, "input").click();
+  await nodeCard(page, "input").click();
   let menu = await openMenu(page, "calc");
   await page.keyboard.press("Escape");
   await expect(menu).not.toBeVisible();
@@ -90,7 +86,7 @@ test("node context menu edits in a roomy form, cancels safely, and deletes its t
     .getByLabel("Node name", { exact: true })
     .fill("Discard this name");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(card(page, "calc")).toContainText("Calculate");
+  await expect(nodeCard(page, "calc")).toContainText("Calculate");
   menu = await openMenu(page, "calc");
   await menu.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await dialog
@@ -105,7 +101,7 @@ test("node context menu edits in a roomy form, cancels safely, and deletes its t
     .getByRole("button", { name: "Apply to graph", exact: true })
     .click();
   await expect(dialog).not.toBeVisible();
-  await expect(card(page, "calc")).toContainText("Updated calculation");
+  await expect(nodeCard(page, "calc")).toContainText("Updated calculation");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
   const saved: Rule = await (await request.get(`/api/rules/${id}`)).json();
@@ -126,9 +122,9 @@ test("node context menu edits in a roomy form, cancels safely, and deletes its t
   await page.keyboard.press("Escape");
   menu = await openMenu(page, "calc");
   await menu.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await expect(card(page, "calc")).toHaveCount(0);
+  await expect(nodeCard(page, "calc")).toHaveCount(0);
   await expect(page.locator(".react-flow__edge")).toHaveCount(0);
-  await expect(card(page, "input")).toBeVisible();
+  await expect(nodeCard(page, "input")).toBeVisible();
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
   const deleted: Rule = await (await request.get(`/api/rules/${id}`)).json();
@@ -141,9 +137,9 @@ test("input modal validates JSON locally and cancel clears only its own buffer",
   request,
 }) => {
   const id = uniqueId("node-context-input");
-  const original = await createRule(request, id);
+  const original = await createMenuRule(request, id);
   await page.goto(`/#/rules/${id}`);
-  await card(page, "input").click();
+  await nodeCard(page, "input").click();
   const sidebar = page.locator(".inspector-sidebar");
   await sidebar.getByLabel("Default JSON (optional)").fill("[");
   let menu = await openMenu(page, "calc");
@@ -195,7 +191,7 @@ test("historical versions and pending saves disable context mutations", async ({
   request,
 }) => {
   const id = uniqueId("node-context-guards");
-  await createRule(request, id, true);
+  await createMenuRule(request, id, true);
   await page.goto(`/#/rules/${id}?version=1`);
   let menu = await openMenu(page, "calc");
   await expect(
@@ -209,12 +205,9 @@ test("historical versions and pending saves disable context mutations", async ({
   ).toBeDisabled();
   await page.keyboard.press("Escape");
   await page.goto(`/#/rules/${id}`);
-  await card(page, "calc").click();
+  await nodeCard(page, "calc").click();
   await page.getByLabel("Node name", { exact: true }).fill("Pending save edit");
-  let release = () => {};
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: held, release } = deferred();
   let saving = false;
   await page.route(`**/api/rules/${id}`, async (route) => {
     if (route.request().method() === "PUT") {
@@ -239,7 +232,7 @@ test("historical versions and pending saves disable context mutations", async ({
     await page.keyboard.press("Escape");
     release();
     await expect(page.getByText("All changes saved")).toBeVisible();
-    await expect(card(page, "calc")).toBeVisible();
+    await expect(nodeCard(page, "calc")).toBeVisible();
   } finally {
     release();
   }
@@ -250,9 +243,9 @@ test("Rename focuses the inline name, targets the clicked node, and preserves un
   request,
 }) => {
   const id = uniqueId("node-context-rename");
-  const original = await createRule(request, id);
+  const original = await createMenuRule(request, id);
   await page.goto(`/#/rules/${id}`);
-  await card(page, "input").click();
+  await nodeCard(page, "input").click();
   const sidebar = page.locator(".inspector-sidebar");
   const name = sidebar.getByLabel("Node name", { exact: true });
   await sidebar.getByLabel("Default JSON (optional)").fill("[");
@@ -300,18 +293,18 @@ test("deleting an unselected node from the context menu keeps the selection", as
   request,
 }) => {
   const id = uniqueId("node-context-keep");
-  await createRule(request, id);
+  await createMenuRule(request, id);
   await page.goto(`/#/rules/${id}?node=calc`);
   const nodeName = page.getByLabel("Node name", { exact: true });
   await expect(nodeName).toHaveValue("Calculate");
   // The Inspector jumped to Inputs before.
   const menu = await openMenu(page, "out");
   await menu.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await expect(card(page, "out")).toHaveCount(0);
+  await expect(nodeCard(page, "out")).toHaveCount(0);
   await expect(nodeName).toHaveValue("Calculate");
   // Deleting the selected node from the Inspector still selects the Input node.
   await page.getByRole("button", { name: "Delete node", exact: true }).click();
-  await expect(card(page, "calc")).toHaveCount(0);
+  await expect(nodeCard(page, "calc")).toHaveCount(0);
   await expect(nodeName).toHaveValue("Inputs");
 });
 
@@ -349,7 +342,7 @@ test("an extra Input node can be deleted while the entry Input stays", async ({
       { id: "stray", source: "input2", sourceHandle: "next", target: "out" },
     ],
   };
-  await createApiRule(request, {
+  await createRule(request, {
     id,
     name: id,
     kind: "FORMULA",
@@ -371,7 +364,7 @@ test("an extra Input node can be deleted while the entry Input stays", async ({
   // Every Input was undeletable, so a stray second one kept the graph invalid.
   menu = await openMenu(page, "input2");
   await menu.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await expect(card(page, "input2")).toHaveCount(0);
+  await expect(nodeCard(page, "input2")).toHaveCount(0);
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
@@ -386,7 +379,7 @@ test("deleting the selected node selects the default node, as a build or version
   request,
 }) => {
   const id = uniqueId("node-context-default");
-  await createApiRule(request, {
+  await createRule(request, {
     id,
     definition: {
       schemaVersion: 1,
@@ -424,7 +417,7 @@ test("deleting the selected node selects the default node, as a build or version
   await expect(nodeName).toHaveValue("Result");
   const menu = await openMenu(page, "out");
   await menu.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await expect(card(page, "out")).toHaveCount(0);
+  await expect(nodeCard(page, "out")).toHaveCount(0);
   // The default node is the first Condition, not the Input.
   await expect(nodeName).toHaveValue("Check");
 });
@@ -434,7 +427,7 @@ test("a node dialog with staged edits asks before the browser leaves the rule", 
   request,
 }) => {
   const id = uniqueId("node-context-staged");
-  await createRule(request, id);
+  await createMenuRule(request, id);
   await page.goto("/#/library");
   await expect(
     page.getByRole("heading", { name: "Rule library" }),

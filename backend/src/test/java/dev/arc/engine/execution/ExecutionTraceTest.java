@@ -1,6 +1,7 @@
 package dev.arc.engine.execution;
 
 import static dev.arc.support.GraphFixtures.inputNode;
+import static dev.arc.support.GraphFixtures.inputToOutput;
 import static dev.arc.support.GraphFixtures.nodeOf;
 import static dev.arc.support.GraphFixtures.outputNode;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -63,7 +64,7 @@ class ExecutionTraceTest {
 
   @Test
   void disablingOrTruncatingTracePreservesResultAndExecutedStepCount() {
-    Definition graph = ExecutionPlansTest.graph("'" + "x".repeat(100) + "'");
+    Definition graph = inputToOutput(List.of(), "'" + "x".repeat(100) + "'");
     var engine = new Engine(new Validator(), json, 10);
     for (boolean enabled : List.of(true, false)) {
       var result =
@@ -146,9 +147,9 @@ class ExecutionTraceTest {
               1,
               List.of(new Input("payload", "OBJECT", true, null)),
               List.of(
-                  ExecutionPlansTest.graph("1").nodes().getFirst(),
+                  inputToOutput(List.of(), "1").nodes().getFirst(),
                   action,
-                  ExecutionPlansTest.graph("1").nodes().getLast()),
+                  inputToOutput(List.of(), "1").nodes().getLast()),
               edges);
       var engine = new Engine(new Validator(), json);
       assertThatThrownBy(
@@ -222,7 +223,7 @@ class ExecutionTraceTest {
   void theTraceIsSerializedOnceAndTheResponseWritesThoseBytes() throws Exception {
     // Each step was serialized to count its bytes and again for the response.
     var plain = new ObjectMapper().enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN);
-    Definition graph = ExecutionPlansTest.graph("$ROUND(123, -2)");
+    Definition graph = inputToOutput(List.of(), "$ROUND(123, -2)");
     for (int maximum : List.of(256 * 1024, 120)) {
       var result =
           new Engine(new Validator(), plain, maximum)

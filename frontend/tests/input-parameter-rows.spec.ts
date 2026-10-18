@@ -1,4 +1,3 @@
-import { setEditorText } from "./helpers/editor";
 import {
   expect,
   test,
@@ -6,48 +5,11 @@ import {
   type Page,
   type Request,
 } from "@playwright/test";
-import type { Definition, Input, SourceConfig } from "../src/types";
-import { createRule, uniqueId } from "./helpers/api";
+import { uniqueId } from "./helpers/api";
+import { openInputRule } from "./helpers/editor";
 
-async function openInputRule(
-  page: Page,
-  request: APIRequestContext,
-  id: string,
-  inputs: Input[],
-) {
-  const definition: Definition = {
-    schemaVersion: 1,
-    inputs,
-    nodes: [
-      {
-        id: "input",
-        type: "INPUT",
-        label: "Inputs",
-        position: { x: 300, y: 0 },
-      },
-      {
-        id: "output",
-        type: "OUTPUT",
-        label: "Result",
-        expression: inputs.some((input) => input.name === "amount")
-          ? "amount"
-          : "7",
-        position: { x: 300, y: 200 },
-      },
-    ],
-    edges: [
-      { id: "next", source: "input", target: "output", sourceHandle: "next" },
-    ],
-  };
-  await createRule(request, {
-    id,
-    name: "Input editing fixture",
-    kind: "FORMULA",
-    definition,
-  });
-  await page.goto(`/#/rules/${id}`);
-  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
-}
+// An input row's unfinished default and its validity belong to that row: they
+// follow it through other rows' removal, a rename and a change of type.
 
 async function expectInvalidDefaultCannotSave(
   page: Page,
@@ -193,105 +155,4 @@ test("input row identity preserves another row's invalid buffer through deletion
     type: "ARRAY",
     defaultValue: [3],
   });
-});
-
-test("changing a pinned source version removes obsolete mappings and retains compatible mappings", async ({
-  page,
-  request,
-}) => {
-  const sourceId = uniqueId("source-contract");
-  const configuration: SourceConfig = {
-    kind: "HTTP",
-    timeoutMs: 3000,
-    url: "https://example.com/customer",
-    parameters: [
-      { name: "key", type: "STRING", required: true, defaultValue: null },
-      {
-        name: "customerId",
-        type: "STRING",
-        required: true,
-        defaultValue: null,
-      },
-    ],
-  };
-  const created = await request.post("/api/sources", {
-    data: {
-      id: sourceId,
-      name: "Evolving contract",
-      definition: configuration,
-    },
-  });
-  expect(created.ok()).toBeTruthy();
-  const revised = await request.put(`/api/sources/${sourceId}`, {
-    data: {
-      name: "Evolving contract",
-      revision: 1,
-      definition: {
-        ...configuration,
-        parameters: configuration.parameters.map((parameter) =>
-          parameter.name === "customerId"
-            ? { ...parameter, name: "accountId" }
-            : parameter,
-        ),
-      },
-    },
-  });
-  expect(revised.ok()).toBeTruthy();
-  const ruleId = uniqueId("source-version-mapping");
-  await openInputRule(page, request, ruleId, [
-    {
-      name: "amount",
-      type: "NUMBER",
-      required: true,
-      defaultValue: null,
-      source: {
-        id: sourceId,
-        version: 1,
-        pointer: "",
-        onError: "FAIL",
-        bindings: { key: '"US"', customerId: '"customer-1"' },
-      },
-    },
-  ]);
-  await expect(
-    page.getByLabel("Source customerId", { exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("combobox", { name: "Source version", exact: true })
-    .click();
-  await page.getByRole("option", { name: "v2", exact: true }).click();
-  await expect(
-    page.getByLabel("Source customerId", { exact: true }),
-  ).toHaveCount(0);
-  await expect(page.getByLabel("Source key", { exact: true })).toHaveValue(
-    "US",
-  );
-  await page
-    .getByRole("combobox", {
-      name: "Source accountId · value source",
-      exact: true,
-    })
-    .click();
-  await page.getByRole("option", { name: "Constant", exact: true }).click();
-  await page.getByLabel("Source accountId", { exact: true }).fill("account-1");
-  await page.getByRole("button", { name: "Test rule", exact: true }).click();
-  await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
-  // Caller override keeps this contract regression independent of external HTTP services.
-  await setEditorText(
-    page,
-    page.getByLabel("Test input JSON", { exact: true }),
-    '{"amount":7}',
-  );
-  await page.getByRole("button", { name: "Run test", exact: true }).click();
-  await expect(page.getByTestId("test-result")).toHaveText("7");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByText("All changes saved")).toBeVisible();
-  const saved = await (await request.get(`/api/rules/${ruleId}`)).json();
-  expect(saved.draft.inputs[0].source).toMatchObject({
-    version: 2,
-    bindings: { key: '"US"', accountId: '"account-1"' },
-  });
-  expect(saved.draft.inputs[0].source.bindings).not.toHaveProperty(
-    "customerId",
-  );
 });

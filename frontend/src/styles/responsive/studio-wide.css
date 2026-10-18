@@ -8,11 +8,4 @@
   .studio-filebar small {
     display: none;
   }
-  .editor-actions {
-    gap: 5px;
-  }
-  .editor-actions .MuiButton-root {
-    padding: 6px 8px;
-    font-size: var(--text-lg);
-  }
 }

@@ -10,21 +10,12 @@ import dev.arc.source.*;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.web.servlet.MockMvc;
 
 class CatalogControllerTest {
   private final RuleCatalog rules = mock(RuleCatalog.class);
   private final SourceRepository sources = mock(SourceRepository.class);
-  private final org.springframework.test.web.servlet.MockMvc mvc =
-      MockMvcBuilders.standaloneSetup(
-              new RuleController(
-                  new RuleService(null, null, null, null, null),
-                  new RuleCatalogService(rules),
-                  mock(RuleExecutionService.class)),
-              new SourceController(
-                  new SourceService(sources, null), mock(SourceExecutionService.class)))
-          .setControllerAdvice(new Errors())
-          .build();
+  private final MockMvc mvc = new RuleApi().catalog(rules).sources(sources).mvc();
 
   @Test
   void ruleCatalogUsesBoundedMetadataAndPassesSearchFilters() throws Exception {

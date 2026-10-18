@@ -3,7 +3,7 @@
   align-items: center;
   gap: 24px;
   margin-top: 34px;
-  border: 1px solid #e2e7df;
+  border: 1px solid var(--color-border);
   background: #f1f5ee;
   border-radius: 10px;
   padding: 24px;
@@ -50,7 +50,7 @@
 }
 .getting-started p {
   font-size: var(--text-md);
-  color: var(--color-library-muted);
+  color: var(--color-text-muted);
   line-height: 1.6;
 }
 .getting-started > .MuiButton-root {
@@ -62,12 +62,12 @@
 .library-footer {
   display: flex;
   justify-content: space-between;
-  color: #6d7962;
+  color: var(--color-text-muted);
   font-size: var(--text-xs);
   letter-spacing: 0.3px;
   margin-top: 40px;
   padding-top: 19px;
-  border-top: 1px solid #e6ebe2;
+  border-top: 1px solid var(--color-border);
 }
 .empty-library {
   grid-column: 1/-1;
@@ -76,7 +76,7 @@
   border: 1px dashed #dbe4d5;
   border-radius: 10px;
   padding: 65px 20px;
-  color: #6c7963;
+  color: var(--color-text-muted);
 }
 .empty-library h3 {
   color: #4e6543;

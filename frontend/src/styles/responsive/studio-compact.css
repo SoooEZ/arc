@@ -5,20 +5,4 @@
   .studio-library {
     padding: 12px 9px;
   }
-  .sources-page {
-    padding: 24px;
-  }
-  .sources-layout {
-    grid-template-columns: 1fr;
-  }
-  .source-list {
-    display: flex;
-    overflow: auto;
-  }
-  .source-list button {
-    min-width: 180px;
-  }
-  .source-catalog > p {
-    display: none;
-  }
 }

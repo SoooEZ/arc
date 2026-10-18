@@ -6,6 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, RuleNode } from "../src/types";
+import { canvasNode, nodeCard } from "./helpers/canvas";
 import {
   installRenderProbe,
   renderCounts,
@@ -137,7 +138,7 @@ test("dragging one card and selecting cards re-render only the cards involved", 
 }) => {
   const id = await create(request, "render-cost", chain(60));
   await openGraph(page, id, "input", 60);
-  const card = page.locator('.react-flow__node[data-id="n1"]');
+  const card = canvasNode(page, "n1");
   // The deep link centres the viewport with an animation; drag once it has settled.
   const box = await settledBox(page, card);
   await page.mouse.move(box.x + box.width / 2, box.y + 12);
@@ -157,9 +158,7 @@ test("dragging one card and selecting cards re-render only the cards involved", 
   expect(counts.cardRenders).toBeLessThanOrEqual(2 * 22);
   await resetRenderCounts(page);
   for (const node of ["n3", "n4", "n5", "n6"])
-    await page
-      .locator(`.react-flow__node[data-id="${node}"] .graph-node`)
-      .click();
+    await nodeCard(page, node).click();
   await expect(page.getByLabel("Node name", { exact: true })).toHaveValue(
     "Step 6",
   );
@@ -180,7 +179,7 @@ test("dragging a card leaves an open execution trace alone", async ({
   await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page.locator(".trace-list > button")).toHaveCount(60);
   // The deep link centred the Input card above the Test panel.
-  const card = page.locator('.react-flow__node[data-id="input"]');
+  const card = canvasNode(page, "input");
   const box = await settledBox(page, card);
   await page.mouse.move(box.x + box.width / 2, box.y + 12);
   await page.mouse.down();
@@ -269,7 +268,7 @@ test("typing into one Transform field or Switch case leaves the other rows alone
     .scrollIntoViewIfNeeded();
   await expect(last.locator(".monaco-editor")).toBeVisible();
   await expect(last.locator(".inline-expression-placeholder")).toHaveCount(0);
-  await page.locator('.react-flow__node[data-id="choose"] .graph-node').click();
+  await nodeCard(page, "choose").click();
   const caseLabel = page.getByLabel("Case 1 label", { exact: true });
   await expect(page.getByLabel("Case 20 label", { exact: true })).toBeVisible();
   await caseLabel.click();
@@ -325,7 +324,7 @@ test("typing an input parameter's name or dragging another card leaves the other
   expect(counts.commits).toBeGreaterThan(0);
   expect(counts.otherRowRenders).toBe(0);
   // A drag of the Output card edits the draft on every frame.
-  const card = page.locator('.react-flow__node[data-id="out"]');
+  const card = canvasNode(page, "out");
   const box = await settledBox(page, card);
   await page.mouse.move(box.x + box.width / 2, box.y + 12);
   await page.mouse.down();

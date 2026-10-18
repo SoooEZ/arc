@@ -2,7 +2,7 @@ import type { RuleSummary } from "../../types";
 import { sameRule, type RuleIdentity } from "../../domain/ruleIdentity";
 
 /** The sample rule the playground opens with when it is published. */
-export const defaultRuleId = "order-pricing";
+const defaultRuleId = "order-pricing";
 
 /**
  * The selection after a catalog page arrives: with nothing selected, the sample

@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { canvasNode } from "./helpers/canvas";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
 
@@ -80,9 +81,7 @@ test("an inline expression editor that fails to load leaves the inspector and dr
   await inspector
     .getByLabel("Node name", { exact: true })
     .fill("Double the amount");
-  await expect(page.locator('.react-flow__node[data-id="calc"]')).toContainText(
-    "Double the amount",
-  );
+  await expect(canvasNode(page, "calc")).toContainText("Double the amount");
   const saved = await saveAndRead(page, request, rule.id);
   expect(saved.output).toBe("doubled");
   expect(saved.label).toBe("Double the amount");

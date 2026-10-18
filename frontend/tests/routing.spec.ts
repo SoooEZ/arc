@@ -5,6 +5,7 @@ import {
   type RoutingNode,
 } from "../src/features/editor/canvas/edgeRouting";
 import type { Definition, Rule } from "../src/types";
+import { canvasNode } from "./helpers/canvas";
 
 const box = (
   id: string,
@@ -330,7 +331,7 @@ test("rendered paths avoid cards on load, during dragging, after arranging and i
   await expect.poll(() => collisions(page)).toEqual([]);
   const direct = page.locator("path#direct");
   const before = await direct.getAttribute("d");
-  const blocker = page.locator('.react-flow__node[data-id="blocker"]');
+  const blocker = canvasNode(page, "blocker");
   const box = (await blocker.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 40);
   await page.mouse.down();
@@ -339,7 +340,7 @@ test("rendered paths avoid cards on load, during dragging, after arranging and i
   await expect.poll(() => collisions(page)).toEqual([]);
   await page.mouse.up();
   // New connections use the same routing while the pointer is still free.
-  const handle = page.locator('.react-flow__node[data-id="input"] .source');
+  const handle = canvasNode(page, "input").locator(".source");
   const h = (await handle.boundingBox())!;
   const canvas = (await page.locator(".flow-container").boundingBox())!;
   await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
@@ -530,7 +531,7 @@ test("a deep link to a wide Switch centres the whole card in the pane", async ({
     ],
   });
   await page.goto("/#/rules/routing-fixture?node=wide");
-  const card = page.locator('.react-flow__node[data-id="wide"]');
+  const card = canvasNode(page, "wide");
   const pane = page.locator(".react-flow__pane");
   await expect(card).toBeVisible();
   // The focus animates: poll until the card rests centred, not only inside.
@@ -557,25 +558,23 @@ const laidOut = (page: Page, count: number) =>
 
 /** A card's position as React Flow draws it, in flow coordinates. */
 const drawnAt = (page: Page, id: string) =>
-  page
-    .locator(`.react-flow__node[data-id="${id}"]`)
-    .evaluate((node) => (node as HTMLElement).style.transform);
+  canvasNode(page, id).evaluate(
+    (node) => (node as HTMLElement).style.transform,
+  );
 
 test("left to right lays the graph out for display, around every card, without touching the draft", async ({
   page,
 }) => {
   const saved = await fixture(page);
   await page.goto("/#/rules/routing-fixture");
-  const card = (id: string) =>
-    page.locator(`.react-flow__node[data-id="${id}"]`);
-  await expect(card("out")).toBeVisible();
+  await expect(canvasNode(page, "out")).toBeVisible();
   const stored = await drawnAt(page, "blocker");
   await page
     .getByRole("button", { name: "Left to right", exact: true })
     .click();
   await laidOut(page, 3);
   await expect.poll(() => drawnAt(page, "blocker")).not.toBe(stored);
-  const at = async (id: string) => (await card(id).boundingBox())!;
+  const at = async (id: string) => (await canvasNode(page, id).boundingBox())!;
   const [input, blocker, out] = [
     await at("input"),
     await at("blocker"),
@@ -585,7 +584,9 @@ test("left to right lays the graph out for display, around every card, without t
   expect(out.x).toBeGreaterThan(blocker.x + blocker.width);
   // Connections enter the left edge and leave the right edge.
   const centre = async (handle: string) => {
-    const box = (await card("blocker").locator(handle).boundingBox())!;
+    const box = (await canvasNode(page, "blocker")
+      .locator(handle)
+      .boundingBox())!;
     return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   };
   expect(
@@ -620,7 +621,7 @@ test("left to right lays the graph out for display, around every card, without t
   await expect.poll(() => collisions(page)).toEqual([]);
   await page.goto("/#/rules/routing-fixture?version=1");
   await laidOut(page, 3);
-  await expect(card("out")).toBeVisible();
+  await expect(canvasNode(page, "out")).toBeVisible();
   expect((await at("out")).x).toBeGreaterThan((await at("blocker")).x);
   await expect.poll(() => collisions(page)).toEqual([]);
   await page.goto("/#/library");

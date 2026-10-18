@@ -7,6 +7,7 @@ import {
   readRule,
   uniqueId,
 } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 const doubled: Definition = {
   ...inputToOutput,
@@ -61,7 +62,7 @@ test("any two versions, or a version and the draft, compare property by property
 
   // From the history, the latest version compares with the draft, unsaved edits included.
   await page.goto(`/#/rules/${rule.id}`);
-  await page.locator('.react-flow__node[data-id="out"]').click();
+  await canvasNode(page, "out").click();
   await page.getByLabel("Node name", { exact: true }).fill("Twice");
   await page
     .getByRole("button", { name: "Version history", exact: true })

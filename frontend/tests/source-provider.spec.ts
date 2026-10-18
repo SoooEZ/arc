@@ -1,7 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { nodeCard } from "./helpers/canvas";
 import { lookupEntriesJson } from "./helpers/sources";
 import type { DataSource, Rule } from "../src/types";
 import { createRule, uniqueStamp } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 const providers: DataSource[] = Array.from({ length: 45 }, (_, index) => ({
   id: index === 0 ? "caller" : `provider-${index}`,
@@ -262,10 +264,7 @@ test("late search success and search errors cannot replace newer results or clea
   page,
 }) => {
   await fixture(page);
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   let failSearch = true;
   await page.route("**/api/source-summaries?*", async (route) => {
@@ -383,10 +382,7 @@ for (const failure of [false, true]) {
     page,
   }) => {
     await fixture(page);
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: gate, release } = deferred();
     let held = false;
     let completed = false;
     await page.route("**/api/source-summaries?*", async (route) => {
@@ -442,10 +438,7 @@ test("nested source management keeps its staged parent and blocks closing during
   page,
 }) => {
   await fixture(page);
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route("**/api/sources/caller", async (route) => {
     held = true;
@@ -462,9 +455,7 @@ test("nested source management keeps its staged parent and blocks closing during
   });
   try {
     await page.goto("/#/rules/provider-picker?node=input");
-    await page
-      .locator('.react-flow__node[data-id="input"] .graph-node')
-      .click({ button: "right" });
+    await nodeCard(page, "input").click({ button: "right" });
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
     const parent = page.getByRole("dialog", { name: /Edit node/ });
     await parent
@@ -784,8 +775,8 @@ test("five inputs bound to one source read its pinned version once and no versio
   // Each card sent its own pin read and its own version list: 10 reads on mount.
   await page.waitForTimeout(300);
   expect(reads).toEqual({ pins: 1, lists: 0 });
-  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
-  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
+  await nodeCard(page, "out").click();
+  await nodeCard(page, "input").click();
   await expect(cards).toHaveCount(5);
   await page.waitForTimeout(300);
   expect(reads).toEqual({ pins: 1, lists: 0 });
@@ -953,10 +944,7 @@ test("a source renamed by a save that finishes after its editor closed shows its
       ],
     },
   });
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(`**/api/sources/${sourceId}`, async (route) => {
     if (route.request().method() !== "PUT") return route.continue();
@@ -1124,8 +1112,8 @@ test("a source renamed from another card's manager shows its new name on the car
   await expect(manager).toHaveCount(0);
   // Every version carries the source's current name. The second card is
   // shown again from the page-wide cache, which used to keep the old name.
-  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
-  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
+  await nodeCard(page, "out").click();
+  await nodeCard(page, "input").click();
   await expect(pickers.nth(1)).toHaveValue(renamed);
   await expect(pickers.nth(0)).toHaveValue(sources[0].name);
 });

@@ -72,7 +72,7 @@ export default function RuleCallers({
     >
       <h3 className="rule-settings-heading">Used by</h3>
       {loading && (
-        <span className="rule-callers-state">
+        <span className="inline-status">
           <CircularProgress size={13} /> Finding the rules that call it…
         </span>
       )}
@@ -82,9 +82,7 @@ export default function RuleCallers({
         </Alert>
       )}
       {!loading && !error && !total && (
-        <span className="rule-callers-state">
-          No other rule calls this rule.
-        </span>
+        <span className="inline-status">No other rule calls this rule.</span>
       )}
       {items.length > 0 && (
         <ul>

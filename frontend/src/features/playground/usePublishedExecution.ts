@@ -15,12 +15,22 @@ import { useExecutionRequest } from "../execution/useExecutionRequest";
 import { useInputBuffer } from "../execution/useInputBuffer";
 import { publishedCurl } from "../execution/publishedCurl";
 import {
-  defaultRuleId,
   knownVersion,
   newestKnownRelease,
   noRelease,
   selectionAfterCatalogPage,
 } from "./publishedSelection";
+
+/** Where the selected rule's ID goes in the endpoint and cURL example until one is chosen. */
+const ruleIdPlaceholder = "{rule-id}";
+
+/** A URL as shown: the placeholder unencoded, as API documentation writes it. */
+function shownUrl(url: string): string {
+  return url.replaceAll(
+    encodeURIComponent(ruleIdPlaceholder),
+    ruleIdPlaceholder,
+  );
+}
 
 export function usePublishedExecution(notify: (message: string) => void) {
   const [search, setSearch] = useState("");
@@ -136,10 +146,13 @@ export function usePublishedExecution(notify: (message: string) => void) {
       }),
     );
   };
-  // The endpoint line, the cURL example and the request name one rule: the
-  // sample rule stands in until one is selected.
-  const endpoint = ruleApi.executeUrl(id || defaultRuleId);
-  const curl = publishedCurl(id || defaultRuleId, inputs, version, options);
+  // The endpoint line, the cURL example and the request name one rule. Until
+  // one is selected they show where its ID goes: the sample rule's ID stood
+  // in before, and read as a real call where no such rule exists.
+  const endpoint = shownUrl(ruleApi.executeUrl(id || ruleIdPlaceholder));
+  const curl = shownUrl(
+    publishedCurl(id || ruleIdPlaceholder, inputs, version, options),
+  );
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(curl);
@@ -171,7 +184,7 @@ export function usePublishedExecution(notify: (message: string) => void) {
     loadError,
     loading: detail.loading,
     requestDurationMs,
-    endpointPath: new URL(endpoint).pathname,
+    endpointPath: shownUrl(new URL(endpoint).pathname),
     curl,
     copy,
     selectRule,

@@ -131,14 +131,14 @@
   margin: 20px -20px 0;
   padding: 15px 17px;
   font-size: var(--text-xs);
-  color: var(--color-library-muted);
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 .rule-card-footer > span:last-child {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #6e7863;
+  color: var(--color-text-muted);
 }
 .tiny-divider {
   display: inline-block;

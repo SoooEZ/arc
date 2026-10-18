@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
+import { nodeCard } from "./helpers/canvas";
 
 /** The stored draft as raw JSON text: parsing it into doubles would hide rounding. */
 async function storedDraft(request: APIRequestContext, id: string) {
@@ -187,7 +188,7 @@ test("the staged Input editor blocks unsupported defaults, cancels without chang
   request,
 }) => {
   const { id } = await openNumericRule(page, request);
-  const input = page.locator('.react-flow__node[data-id="input"] .graph-node');
+  const input = nodeCard(page, "input");
   await input.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const dialog = page.getByRole("dialog", {

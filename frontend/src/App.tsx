@@ -1,7 +1,7 @@
 import { lazy, useCallback, useState, type ReactNode } from "react";
 import { Alert, Button, CircularProgress, Snackbar } from "@mui/material";
 import WorkspaceHeader from "./app/WorkspaceHeader";
-import Library from "./features/library/LibraryPage";
+import LibraryPage from "./features/library/LibraryPage";
 import { forgetPreview } from "./features/library/previewCache";
 import ApiPage from "./features/playground/ApiPage";
 import SourcesPage from "./features/sources/SourcesPage";
@@ -199,7 +199,7 @@ export default function App() {
         return <ApiPage mode={view.page} notify={notify} navigate={navigate} />;
       case "library":
         return (
-          <Library
+          <LibraryPage
             library={library}
             onOpen={openRule}
             onOpenCode={openRuleCode}

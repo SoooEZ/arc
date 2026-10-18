@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { createRule, publishRule, readRule, uniqueId } from "./helpers/api";
+import { canvasEdge, canvasNode } from "./helpers/canvas";
 
 /** True leads to an Output under the True exit; False has no connection yet. */
 const definition: Definition = {
@@ -30,9 +31,6 @@ const definition: Definition = {
     { id: "b", source: "check", target: "yes", sourceHandle: "true" },
   ],
 };
-
-const card = (page: Page, id: string) =>
-  page.locator(`.react-flow__node[data-id="${id}"]`);
 
 async function open(page: Page, request: Parameters<typeof createRule>[0]) {
   const rule = await createRule(request, {
@@ -103,26 +101,26 @@ test("undo and redo step through graph edits by button and key, and a deleted ca
   const undo = page.getByRole("button", { name: "Undo", exact: true });
   const redo = page.getByRole("button", { name: "Redo", exact: true });
   await expect(undo).toBeDisabled();
-  await card(page, "yes").click();
+  await canvasNode(page, "yes").click();
   await page.keyboard.press("Delete");
-  await expect(card(page, "yes")).toHaveCount(0);
+  await expect(canvasNode(page, "yes")).toHaveCount(0);
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
   await page.keyboard.press("ControlOrMeta+z");
-  await expect(card(page, "yes")).toHaveCount(1);
+  await expect(canvasNode(page, "yes")).toHaveCount(1);
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
   // Back at the saved draft, nothing is left to save.
   await expect(page.getByText("All changes saved")).toBeVisible();
   await page.keyboard.press("ControlOrMeta+Shift+z");
-  await expect(card(page, "yes")).toHaveCount(0);
+  await expect(canvasNode(page, "yes")).toHaveCount(0);
   await undo.click();
-  await expect(card(page, "yes")).toHaveCount(1);
+  await expect(canvasNode(page, "yes")).toHaveCount(1);
   await expect(redo).toBeEnabled();
 
   // A rename typed at once is one step; Undo restores the name before it.
-  await card(page, "check").click();
+  await canvasNode(page, "check").click();
   const name = page.getByLabel("Node name", { exact: true });
   await name.fill("Large order?");
-  await expect(card(page, "check")).toContainText("Large order?");
+  await expect(canvasNode(page, "check")).toContainText("Large order?");
   await undo.click();
   await expect(name).toHaveValue("Check");
   // A key typed in a field stays with the field.
@@ -130,12 +128,12 @@ test("undo and redo step through graph edits by button and key, and a deleted ca
   await page.keyboard.press("End");
   await page.keyboard.press("Backspace");
   await expect(name).toHaveValue("Chec");
-  await expect(card(page, "check")).toHaveCount(1);
+  await expect(canvasNode(page, "check")).toHaveCount(1);
   // ⌘Z in a field undoes the field's typing, not the graph.
   await expect(redo).toBeDisabled();
 
   // A selected connection goes with Backspace and comes back with Undo.
-  await page.locator('.react-flow__edge[data-id="b"]').click();
+  await canvasEdge(page, "b").click();
   await expect(
     page.getByRole("button", { name: "Delete connection", exact: true }),
   ).toBeVisible();
@@ -177,7 +175,7 @@ test("a published version offers no undo, add buttons or deletion by key", async
     page.getByRole("button", { name: "Undo", exact: true }),
   ).toHaveCount(0);
   await expect(page.locator(".exit-add")).toHaveCount(0);
-  await card(page, "no").click();
+  await canvasNode(page, "no").click();
   await page.keyboard.press("Delete");
   await expect(page.locator(".react-flow__node")).toHaveCount(4);
 });

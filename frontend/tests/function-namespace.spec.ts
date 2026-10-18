@@ -2,6 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 async function create(request: APIRequestContext) {
   const id = uniqueId("function-namespace");
@@ -117,14 +118,8 @@ test("a function catalog arriving after dollar entry refreshes only namespaced s
   request,
 }) => {
   const rule = await create(request);
-  let release!: () => void;
-  let started!: () => void;
-  const blocked = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const requested = new Promise<void>((resolve) => {
-    started = resolve;
-  });
+  const { promise: blocked, release } = deferred();
+  const { promise: requested, release: started } = deferred();
   await page.route("**/api/functions", async (route) => {
     started();
     await blocked;
@@ -222,14 +217,8 @@ test("late function help still completes a bare prefix without changing same-nam
   request,
 }) => {
   const rule = await create(request);
-  let release!: () => void;
-  let started!: () => void;
-  const blocked = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const requested = new Promise<void>((resolve) => {
-    started = resolve;
-  });
+  const { promise: blocked, release } = deferred();
+  const { promise: requested, release: started } = deferred();
   await page.route("**/api/functions", async (route) => {
     started();
     await blocked;

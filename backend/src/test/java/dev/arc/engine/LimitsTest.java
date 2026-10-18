@@ -2,6 +2,7 @@ package dev.arc.engine;
 
 import static dev.arc.support.GraphFixtures.inputNode;
 import static dev.arc.support.GraphFixtures.nodeOf;
+import static dev.arc.support.GraphFixtures.withInput;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.arc.engine.expression.Expressions;
@@ -100,8 +101,8 @@ class LimitsTest {
     assertThatThrownBy(() -> Expressions.compile(tooLong))
         .hasMessage("Expression exceeds 2,000 characters");
     for (var site : sites.entrySet()) {
-      validator.shape(withNode(site.getValue().apply(longest)));
-      assertThatThrownBy(() -> validator.shape(withNode(site.getValue().apply(tooLong))))
+      validator.shape(withInput(site.getValue().apply(longest)));
+      assertThatThrownBy(() -> validator.shape(withInput(site.getValue().apply(tooLong))))
           .as(site.getKey())
           .hasMessage(site.getKey());
     }
@@ -117,10 +118,6 @@ class LimitsTest {
 
   private static Node switchNode(List<BranchCase> cases, String selector) {
     return nodeOf("site", "SWITCH", "Site").cases(cases).selector(selector).build();
-  }
-
-  private static Definition withNode(Node site) {
-    return new Definition(1, List.of(), List.of(inputNode("in", "Input"), site), List.of());
   }
 
   private static Definition withSourceMapping(String expression) {

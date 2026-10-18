@@ -8,15 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import dev.arc.rule.RuleCatalogService;
-import dev.arc.rule.RuleExecutionService;
-import dev.arc.rule.RuleService;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 /**
@@ -24,13 +17,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * field, a second document after the body or a fraction where a whole number belongs is a 400,
  * never dropped or truncated into a different request.
  */
-@WebMvcTest(RuleController.class)
-class RequestJsonWebTest {
-  @Autowired private MockMvc mvc;
-  @MockitoBean private RuleService rules;
-  @MockitoBean private RuleCatalogService catalog;
-  @MockitoBean private RuleExecutionService execution;
-
+class RequestJsonWebTest extends RuleControllerSlice {
   /**
    * "pointr" for "pointer" was dropped: the input read the source's whole response, failed its type
    * and fell back to the default on every run.

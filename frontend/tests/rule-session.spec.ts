@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { canvasNode, nodeCard } from "./helpers/canvas";
 import { publishDraft } from "./helpers/editor";
 import type { Definition, Rule } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -61,14 +63,8 @@ test("reopening a saved rule waits for a fresh detail read and uses its latest r
   });
   expect(updatedResponse.ok()).toBeTruthy();
   const updated: Rule = await updatedResponse.json();
-  let releaseFailure!: () => void;
-  let releaseRead!: () => void;
-  const failureGate = new Promise<void>((resolve) => {
-    releaseFailure = resolve;
-  });
-  const readGate = new Promise<void>((resolve) => {
-    releaseRead = resolve;
-  });
+  const { promise: failureGate, release: releaseFailure } = deferred();
+  const { promise: readGate, release: releaseRead } = deferred();
   let reads = 0;
   await page.route(`**/api/rules/${id}`, async (route) => {
     if (route.request().method() !== "GET") return route.continue();
@@ -162,10 +158,7 @@ test("returning from a published version refreshes the draft while graph/code sw
   });
   expect(updatedResponse.ok()).toBeTruthy();
   const updated: Rule = await updatedResponse.json();
-  let releaseRead!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    releaseRead = resolve;
-  });
+  const { promise: gate, release: releaseRead } = deferred();
   let detailReads = 0;
   await page.route(`**/api/rules/${id}`, async (route) => {
     if (route.request().method() !== "GET") return route.continue();
@@ -181,9 +174,7 @@ test("returning from a published version refreshes the draft while graph/code sw
     ).toBeVisible();
     await expect(page.locator(".react-flow__node")).toHaveCount(0);
     releaseRead();
-    await page
-      .locator('.react-flow__node[data-id="input"] .graph-node')
-      .click();
+    await nodeCard(page, "input").click();
     await expect(page.getByLabel("Default value (optional)")).toHaveValue("9");
     await page.getByLabel("Default value (optional)").fill("10");
     await page
@@ -191,9 +182,7 @@ test("returning from a published version refreshes the draft while graph/code sw
       .click();
     await expect(page.locator(".monaco-editor")).toBeVisible();
     await page.getByRole("button", { name: "Graph view", exact: true }).click();
-    await page
-      .locator('.react-flow__node[data-id="input"] .graph-node')
-      .click();
+    await nodeCard(page, "input").click();
     await expect(page.getByLabel("Default value (optional)")).toHaveValue("10");
     expect(detailReads).toBe(1);
     const saved = page.waitForResponse(
@@ -259,7 +248,5 @@ test("a saved copy never stands in for a rule created again under the same ID", 
   await expect(
     page.getByRole("heading", { name: "Someone else's rule", exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.react-flow__node[data-id="out"]')).toContainText(
-    "Their result",
-  );
+  await expect(canvasNode(page, "out")).toContainText("Their result");
 });

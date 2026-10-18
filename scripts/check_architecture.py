@@ -65,7 +65,7 @@ PURE_FRONTEND = {
     "app/pinnedReads.ts": (),
     "features/editor/document/documentState.ts": ("types", "domain/"),
     "features/editor/document/editorCapabilities.ts": (),
-    "features/editor/dialogs/nodeFormDraft.ts": ("types", "domain/"),
+    "features/editor/node-dialogs/nodeFormDraft.ts": ("types", "domain/"),
     "features/editor/nodeSelection.ts": ("types", "domain/"),
     "features/library/previewCache.ts": ("types", "domain/"),
     "features/library/previewLayout.ts": ("types", "domain/"),
@@ -313,10 +313,41 @@ def stale_frontend_boundaries(
     return stale
 
 
+def stale_java_boundaries(
+    java_root, allowed=ALLOWED_JAVA, engine=ENGINE_DEPENDENCIES, vocabulary=NODE_VOCABULARY_ALLOWED
+):
+    """Java table entries that no longer name a package, engine feature, root contract or file: a
+    moved file leaves its allowlist entry behind, and a renamed contract would refuse a correct
+    import with a misleading reason."""
+    java_root = java_root.resolve()
+    stale = []
+    packages = {path.name for path in java_root.iterdir() if path.is_dir()}
+    for owner, allowed_packages in allowed.items():
+        if owner not in packages:
+            stale.append(f"ALLOWED_JAVA key {owner}: names no package under dev.arc")
+        for package in sorted(allowed_packages):
+            if package not in packages:
+                stale.append(f"ALLOWED_JAVA {owner}: allowed package {package} names no package")
+    engine_root = java_root / "engine"
+    for feature, dependencies in engine.items():
+        if not (engine_root / feature).is_dir():
+            stale.append(f"ENGINE_DEPENDENCIES key {feature}: names no engine feature package")
+        for dependency in sorted(dependencies):
+            if not (engine_root / dependency).is_dir() and not (engine_root / f"{dependency}.java").is_file():
+                stale.append(
+                    f"ENGINE_DEPENDENCIES {feature}: {dependency} names no engine feature or root contract"
+                )
+    for path, literal in vocabulary:
+        if not (java_root / path).is_file():
+            stale.append(f"NODE_VOCABULARY_ALLOWED ({path}, {literal}): names no file")
+    return stale
+
+
 def main():
     errors = (
         java_violations(JAVA)
         + frontend_violations(FRONTEND)
+        + stale_java_boundaries(JAVA)
         + stale_frontend_boundaries(FRONTEND)
     )
     if errors:

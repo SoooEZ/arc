@@ -5,11 +5,9 @@ import {
   type Locator,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
-import {
-  createRule as createApiRule,
-  publishRule,
-  uniqueId,
-} from "./helpers/api";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
+import { canvasNode, nodeCard } from "./helpers/canvas";
+import { deferred } from "./helpers/gates";
 
 async function expectHeaderActions(header: Locator) {
   const actions = header.locator(".inspector-heading-actions");
@@ -34,7 +32,10 @@ async function expectHeaderActions(header: Locator) {
   expect(geometry.rightInset).toBeCloseTo(geometry.padding, 1);
 }
 
-async function createRule(request: APIRequestContext, label: string) {
+async function createRuleWithCondition(
+  request: APIRequestContext,
+  label: string,
+) {
   const id = uniqueId("inspector-header");
   const definition: Definition = {
     schemaVersion: 1,
@@ -82,7 +83,7 @@ async function createRule(request: APIRequestContext, label: string) {
       },
     ],
   };
-  const response = await createApiRule(request, {
+  const response = await createRule(request, {
     id,
     name: id,
     kind: "DECISION_TREE",
@@ -95,13 +96,11 @@ test("the sidebar header follows node selection and name edits, retaining the ex
   page,
   request,
 }) => {
-  const rule = await createRule(request, "Check eligibility");
+  const rule = await createRuleWithCondition(request, "Check eligibility");
   await page.goto(`/#/rules/${rule.id}`);
   const sidebar = page.locator(".inspector-sidebar");
   const header = sidebar.locator(".inspector-heading");
-  await page
-    .locator('.react-flow__node[data-id="condition"] .graph-node')
-    .click();
+  await nodeCard(page, "condition").click();
   await expect(header.getByLabel("Node name", { exact: true })).toHaveValue(
     "Check eligibility",
   );
@@ -153,15 +152,13 @@ test("the sidebar header follows node selection and name edits, retaining the ex
     "Check account",
   );
 
-  await page.locator('.react-flow__node[data-id="output"] .graph-node').click();
+  await nodeCard(page, "output").click();
   await expect(header.getByLabel("Node name", { exact: true })).toHaveValue(
     "Result",
   );
   await expect(header.getByText("Output", { exact: true })).toBeVisible();
   await deleteNode.click();
-  await expect(page.locator('.react-flow__node[data-id="output"]')).toHaveCount(
-    0,
-  );
+  await expect(canvasNode(page, "output")).toHaveCount(0);
   // The selection falls back to the default node (the first Condition), the
   // same fallback a build or a version load uses; it used to jump to the Input.
   await expect(header.getByLabel("Node name", { exact: true })).toHaveValue(
@@ -169,7 +166,7 @@ test("the sidebar header follows node selection and name edits, retaining the ex
   );
   await expect(deleteNode).toBeEnabled();
   await expect(header.locator(".inspector-delete-slot")).toHaveCount(1);
-  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
+  await nodeCard(page, "input").click();
   await expect(header.getByLabel("Node name", { exact: true })).toHaveValue(
     "Inputs",
   );
@@ -190,12 +187,10 @@ test("long names fit the sidebar header on narrow screens and remain inspectable
   request,
 }) => {
   const label = "Eligibility".repeat(14);
-  const rule = await createRule(request, label);
+  const rule = await createRuleWithCondition(request, label);
   await publishRule(request, rule);
   await page.goto(`/#/rules/${rule.id}?version=1`);
-  await page
-    .locator('.react-flow__node[data-id="condition"] .graph-node')
-    .click();
+  await nodeCard(page, "condition").click();
   const sidebar = page.locator(".inspector-sidebar");
   const header = sidebar.locator(".inspector-heading");
   const heading = header.getByLabel("Node name", { exact: true });
@@ -252,7 +247,7 @@ test("node errors use one stable header slot and an overlay that can be pinned a
   page,
   request,
 }, testInfo) => {
-  const rule = await createRule(request, "Check eligibility");
+  const rule = await createRuleWithCondition(request, "Check eligibility");
   const errors = [
     "First expression is incomplete",
     "Second expression uses an unknown variable",
@@ -348,10 +343,7 @@ test("node errors use one stable header slot and an overlay that can be pinned a
   await expect(indicator).toHaveCount(0);
   await page.setViewportSize({ width: 1440, height: 1000 });
   expect(await geometry()).toEqual(before);
-  let release = () => {};
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: held, release } = deferred();
   let saving = false;
   await page.route(`**/api/rules/${rule.id}`, async (route) => {
     if (route.request().method() === "PUT") {

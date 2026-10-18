@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 import type { Definition, RuleSummary } from "../src/types";
 import { editorLines, setEditorText } from "./helpers/editor";
+import { deferred } from "./helpers/gates";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -185,10 +186,7 @@ for (const failure of [false, true]) {
     page,
   }) => {
     const { results, search } = await openLibrary(page);
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: gate, release } = deferred();
     let held = false;
     let completed = false;
     await page.route("**/api/rule-summaries?*", async (route) => {

@@ -6,11 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition } from "../src/types";
-import {
-  createRule as createApiRule,
-  publishRule,
-  uniqueId,
-} from "./helpers/api";
+import { createRule, publishRule, uniqueId } from "./helpers/api";
 import { editorLines, setEditorText } from "./helpers/editor";
 
 const definition: Definition = {
@@ -38,9 +34,12 @@ const definition: Definition = {
   ],
 };
 
-async function createRule(request: APIRequestContext, publish = false) {
+async function createJsonEditorRule(
+  request: APIRequestContext,
+  publish = false,
+) {
   const id = uniqueId("json-editor");
-  const rule = await createApiRule(request, { id, definition });
+  const rule = await createRule(request, { id, definition });
   if (publish) await publishRule(request, rule);
   return id;
 }
@@ -75,7 +74,7 @@ test("preview JSON supports indentation and preserves unfinished text across cUR
   page,
   request,
 }, testInfo) => {
-  const id = await createRule(request);
+  const id = await createJsonEditorRule(request);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
@@ -131,7 +130,7 @@ test("published JSON uses the same keyboard editor and retains invalid input wit
   page,
   request,
 }, testInfo) => {
-  const id = await createRule(request, true);
+  const id = await createJsonEditorRule(request, true);
   await page.goto("/#/playground");
   await page.getByLabel("Find published rules", { exact: true }).fill(id);
   await page.getByRole("combobox", { name: "Rule", exact: true }).click();
@@ -174,7 +173,7 @@ test("cURL examples show only object inputs and keep every digit of the buffer",
   page,
   request,
 }) => {
-  const id = await createRule(request, true);
+  const id = await createJsonEditorRule(request, true);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("tab", { name: "Input JSON", exact: true }).click();
@@ -212,7 +211,7 @@ test("a failure at the Input node offers both the node and editing the test inpu
   page,
   request,
 }) => {
-  const id = await createRule(request);
+  const id = await createJsonEditorRule(request);
   await page.goto(`/#/rules/${id}`);
   await page.getByRole("button", { name: "Test rule", exact: true }).click();
   await page.getByRole("tab", { name: "Input JSON", exact: true }).click();

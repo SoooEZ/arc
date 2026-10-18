@@ -1,0 +1,91 @@
+/* Shared components (src/components) and the text styles several features use.
+   Imported right after base.css; contextual rules stay with their context,
+   such as api.css's .api-request .input-form. */
+/* InputForm: a row per declared input, in the Test panel, the playground
+   and a source's test panel. */
+.input-form {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.input-form .MuiInputBase-root {
+  font-size: var(--text-lg);
+}
+.input-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.input-form-name {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: var(--text-md);
+  color: #4f6a45;
+}
+.input-form-name > span {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.input-form-name > .input-form-required {
+  color: #a3372f;
+}
+.input-form-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 8px;
+}
+.input-form-code {
+  font-family: var(--font-mono);
+}
+.input-form-help {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.input-form-help:empty {
+  display: none;
+}
+.input-form-notice {
+  padding: 12px;
+  font-size: var(--text-md);
+  color: var(--color-text-secondary);
+}
+/* JsonField: JSON default editors read the shared mono font and the workspace code size. */
+.json-field-input {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+}
+/* CatalogPagination: Previous, the shown range of the server's total, Next. */
+.catalog-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+/* A loading or empty state in a line of muted text, such as a rule's callers
+   or a comparison being read. */
+.inline-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+}
+/* A short muted paragraph, such as the Getting started introduction or a
+   duplicate's note about its source. */
+.muted-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+}
+/* A hint or explanation paragraph, in the inspector and in dialogs. */
+.muted-copy {
+  font-size: var(--text-sm);
+  line-height: 1.85;
+  color: var(--color-text-muted);
+}

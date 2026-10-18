@@ -18,7 +18,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #667b53;
+  color: var(--color-text-secondary);
 }
 .test-panel-heading strong {
   font-size: var(--text-md);
@@ -27,7 +27,7 @@
 }
 .test-badge {
   font-size: var(--text-xs);
-  border: 1px solid #e4eadc;
+  border: 1px solid var(--color-border);
   background: #f5f8ef;
   color: #667b50;
   border-radius: 3px;
@@ -110,7 +110,7 @@
 }
 .source-reads {
   padding: 8px 0;
-  border-bottom: 1px solid #e0e8de;
+  border-bottom: 1px solid var(--color-border);
 }
 .source-reads > div {
   display: flex;
@@ -118,7 +118,7 @@
   align-items: center;
   font-size: var(--text-md);
   padding: 4px 0;
-  color: #697965;
+  color: var(--color-text-muted);
 }
 .source-reads strong {
   font-size: var(--text-sm);
@@ -134,7 +134,7 @@
   align-items: center;
   font-size: var(--text-2xs);
   letter-spacing: 1px;
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 9px;
 }
 .trace-label span {
@@ -156,7 +156,7 @@
   background: none;
   text-align: left;
   padding: 5px;
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
   font-size: var(--text-xs);
   border-radius: 3px;
 }
@@ -176,7 +176,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 95px;
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
 }
 .trace-list small {
   font-size: var(--text-2xs);
@@ -219,7 +219,7 @@
   border: 1px solid #e9f0e0;
   border-radius: 10px;
   margin-bottom: 3px;
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
 }
 .test-empty strong {
   font-size: var(--text-lg);
@@ -286,58 +286,8 @@
   font-size: var(--text-md);
   color: #4f6a45;
 }
-.execution-options .MuiInputBase-root,
-.input-form .MuiInputBase-root {
+.execution-options .MuiInputBase-root {
   font-size: var(--text-lg);
-}
-/* The test inputs as a form: a row per declared input. */
-.input-form {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 10px 12px;
-}
-.input-form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.input-form-name {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  font-size: var(--text-md);
-  color: #4f6a45;
-}
-.input-form-name > span {
-  font-size: var(--text-xs);
-  color: var(--color-test-muted);
-}
-.input-form-name > .input-form-required {
-  color: #a3372f;
-}
-.input-form-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px;
-  gap: 8px;
-}
-.input-form-code {
-  font-family: var(--font-mono);
-}
-.input-form-help {
-  font-size: var(--text-xs);
-  color: var(--color-test-muted);
-}
-.input-form-help:empty {
-  display: none;
-}
-.input-form-notice {
-  padding: 12px;
-  font-size: var(--text-md);
-  color: var(--color-test-muted);
 }
 /* A taller Test panel for long traces and test lists. */
 .test-panel.expanded {
@@ -359,7 +309,7 @@
 }
 .saved-tests-summary {
   font-size: var(--text-sm);
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
 }
 /* Trace and timeout, folded under the inputs: most runs keep the defaults. */
 .run-options {
@@ -371,7 +321,7 @@
 }
 .run-options > summary {
   cursor: pointer;
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
 }
 .run-options .execution-options {
   padding: 4px 0 0;
@@ -387,7 +337,7 @@
 .execution-timing-compact {
   display: inline-block;
   margin: 0 0 10px;
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
 }
 /* The rule's saved tests, one row each. */
 .test-panel-saved {
@@ -405,7 +355,7 @@
   align-items: center;
   gap: 8px;
   font-size: var(--text-md);
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
 }
 .saved-tests ul {
   margin: 0;
@@ -449,7 +399,7 @@
 }
 .saved-test-expectation small {
   font-size: var(--text-sm);
-  color: var(--color-test-muted);
+  color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

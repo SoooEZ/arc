@@ -2,7 +2,7 @@ import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Button, IconButton, TextField, Tooltip } from "@mui/material";
 import { Plus, Trash2, X } from "lucide-react";
 import { sameJson } from "../../domain/definitionEchoes";
-import { isJsonObject, stringifyJson } from "../../domain/json";
+import { stringifyJson } from "../../domain/json";
 import {
   useParsedTextBuffer,
   type ParsedText,
@@ -10,10 +10,13 @@ import {
 import {
   cellText,
   cellValue,
+  fieldValue,
   lookupEntries,
   readLookupTable,
+  withField,
   type LookupRow,
 } from "./lookupTable";
+import RenameCell from "./RenameCell";
 import { counted } from "../../domain/text";
 
 /**
@@ -150,21 +153,6 @@ export default function LookupTableEditor({
   );
 }
 
-/** `record` with `field` set to `value`, or without it when `value` is undefined. */
-function withField(record: unknown, field: string, value?: unknown): unknown {
-  const fields = new Map(isJsonObject(record) ? Object.entries(record) : []);
-  if (value === undefined) fields.delete(field);
-  else fields.set(field, value);
-  return Object.fromEntries(fields);
-}
-
-/** A record's value for `field`, which a missing field leaves undefined. */
-function fieldValue(record: unknown, field: string): unknown {
-  return isJsonObject(record) && Object.hasOwn(record, field)
-    ? record[field]
-    : undefined;
-}
-
 /**
  * One key and its cells. `signature` is the row's value as text and
  * `fieldList` the columns as text, so typing in another row, which re-reads
@@ -195,9 +183,11 @@ const LookupTableRow = memo(
     return (
       <tr>
         <td>
-          <KeyCell
+          <RenameCell
             name={row.key}
-            taken={taken}
+            label={`Key ${row.key}`}
+            className="lookup-key"
+            problem={(text) => keyProblem(text, row.key, taken)}
             disabled={disabled}
             onRename={(key) => onChange(index, { ...row, key })}
           />
@@ -292,39 +282,7 @@ function ValueCell({
   );
 }
 
-/** A key is renamed when its field loses focus; an empty or taken key stays here with its error. */
-function KeyCell({
-  name,
-  taken,
-  disabled,
-  onRename,
-}: {
-  name: string;
-  taken: ReadonlySet<string>;
-  disabled: boolean;
-  onRename: (key: string) => void;
-}) {
-  const [text, setText] = useState(name);
-  const problem = keyProblem(text, name, taken);
-  return (
-    <input
-      className={`table-cell-input lookup-key ${problem ? "table-cell-invalid" : ""}`}
-      aria-label={`Key ${name}`}
-      aria-invalid={!!problem}
-      title={problem ?? undefined}
-      value={text}
-      disabled={disabled}
-      onChange={(event) => setText(event.target.value)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") event.currentTarget.blur();
-      }}
-      onBlur={() => {
-        if (text !== name && !problem) onRename(text);
-      }}
-    />
-  );
-}
-
+/** An empty or taken key stays in its cell with this error. */
 function keyProblem(
   text: string,
   current: string,

@@ -11,7 +11,7 @@ final class FormulaCallValidation {
   static void validate(Expressions.Compiled expression, RuleResolver resolver) {
     for (var call : expression.formulaCalls()) {
       var inputs = resolver.resolveFormula(call.id(), call.version()).inputs();
-      String name = "@" + call.id() + ":" + call.version();
+      String name = call.written();
       if (call.argumentCount() > inputs.size())
         throw ArcException.invalid(name + " accepts at most " + inputs.size() + " arguments");
       for (int index = call.argumentCount(); index < inputs.size(); index++) {

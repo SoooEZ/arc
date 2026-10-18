@@ -6,7 +6,7 @@ import {
   suggestedTestName,
   testOutcome,
 } from "../../src/domain/testCases";
-import { resultCounts } from "../../src/features/execution/testPanel/savedTests";
+import { resultCounts } from "../../src/features/execution/test-panel/savedTests";
 import type { TestCase } from "../../src/types";
 
 test("numbers match by decimal value, whatever their places or spelling", () => {

@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { createRule, uniqueId } from "./helpers/api";
+import { nodeCard } from "./helpers/canvas";
 
 async function openArrayDefault(
   page: Page,
@@ -88,7 +89,7 @@ test("a JSON default shows values applied from outside and keeps a cleared buffe
   request,
 }) => {
   const { id, field } = await openArrayDefault(page, request, [1]);
-  const input = page.locator('.react-flow__node[data-id="input"] .graph-node');
+  const input = nodeCard(page, "input");
   await input.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: /^Edit node/ });

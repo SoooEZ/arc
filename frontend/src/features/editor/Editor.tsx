@@ -11,7 +11,7 @@ import {
   editableDraft,
 } from "../../domain/definitionEchoes";
 import Inspector from "./inspector/Inspector";
-import TestPanel from "../execution/testPanel/TestPanel";
+import TestPanel from "../execution/test-panel/TestPanel";
 import RuleSettings from "./settings/RuleSettings";
 import ReferenceDialog from "./ReferenceDialog";
 import { useRuleDocument } from "./document/useRuleDocument";
@@ -23,13 +23,13 @@ import VersionHistory from "./versions/VersionHistory";
 import { useGraphCommands } from "./canvas/useGraphCommands";
 import { useGraphFocus } from "./canvas/useGraphFocus";
 import { exportDefinition } from "../library/exportDefinition";
-import { usePreviewExecution } from "../execution/testPanel/usePreviewExecution";
-import { useSavedTests } from "../execution/testPanel/useSavedTests";
+import { usePreviewExecution } from "../execution/test-panel/usePreviewExecution";
+import { useSavedTests } from "../execution/test-panel/useSavedTests";
 import { usePublication } from "./versions/usePublication";
 import { useSaveShortcut } from "./useSaveShortcut";
 import { takeRestore } from "./versions/draftRestore";
-import { useNodeDialog } from "./dialogs/useNodeDialog";
-import LazyNodeDialog from "./dialogs/LazyNodeDialog";
+import { useNodeDialog } from "./node-dialogs/useNodeDialog";
+import LazyNodeDialog from "./node-dialogs/LazyNodeDialog";
 import { useNodeSelection } from "./useNodeSelection";
 import type { EditorProps, ReferenceTarget } from "./types";
 import type { ComparedState } from "./versions/CompareVersions";
@@ -40,9 +40,9 @@ import {
 } from "../../app/layoutDirection";
 const CodeStudio = lazy(() => import("../studio/CodeStudio"));
 const NodeExpressionDialog = lazy(
-  () => import("./dialogs/NodeExpressionDialog"),
+  () => import("./node-dialogs/NodeExpressionDialog"),
 );
-const NodeEditDialog = lazy(() => import("./dialogs/NodeEditDialog"));
+const NodeEditDialog = lazy(() => import("./node-dialogs/NodeEditDialog"));
 const PublishDialog = lazy(() => import("./versions/PublishDialog"));
 const CompareVersions = lazy(() => import("./versions/CompareVersions"));
 const noProblems: GraphProblem[] = [];

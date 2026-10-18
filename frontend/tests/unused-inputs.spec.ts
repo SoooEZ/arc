@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Definition } from "../src/types";
 import { createRule, inputToOutput, uniqueId } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 import { setEditorText } from "./helpers/editor";
 
 const definition: Definition = {
@@ -62,13 +63,13 @@ test("a new parameter's name is selected, and a parameter no step reads is marke
   await expect(cards.nth(2).locator(".input-unused")).toHaveText("Not used");
 
   // Reading a parameter anywhere clears the mark.
-  await page.locator('.react-flow__node[data-id="fee"]').click();
+  await canvasNode(page, "fee").click();
   await setEditorText(
     page,
     page.getByLabel("Expression", { exact: true }),
     "$IF(express, 10, 5) + weight * 0.5",
   );
-  await page.locator('.react-flow__node[data-id="input"]').click();
+  await canvasNode(page, "input").click();
   await expect(cards.nth(1).locator(".input-unused")).toHaveCount(0);
   await expect(cards.nth(2).locator(".input-unused")).toHaveText("Not used");
   // The status bar counts in words that agree with the number.

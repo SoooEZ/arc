@@ -192,7 +192,7 @@ function Comparison({
     return <Alert severity="error">Could not read a version: {error}</Alert>;
   if (!changes)
     return (
-      <div className="compare-loading">
+      <div className="inline-status">
         <CircularProgress size={14} /> Reading the versions…
       </div>
     );

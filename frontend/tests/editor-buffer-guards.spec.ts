@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { nodeCard } from "./helpers/canvas";
 import { editorLines, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -40,7 +42,7 @@ test("unfinished defaults survive canvas, outline, node-code and sidebar view ch
   const field = page.getByLabel("Default JSON (optional)", { exact: true });
   const name = page.getByLabel("Node name", { exact: true });
   await field.fill("[");
-  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
+  await nodeCard(page, "out").click();
   await expect(name).toHaveValue("Inputs");
   await expect(field).toHaveValue("[");
   await page.getByRole("button", { name: "Node outline", exact: true }).click();
@@ -106,9 +108,9 @@ test("unfinished defaults survive canvas, outline, node-code and sidebar view ch
   });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
+  await nodeCard(page, "out").click();
   await expect(name).toHaveValue("Result");
-  await page.locator('.react-flow__node[data-id="input"] .graph-node').click();
+  await nodeCard(page, "input").click();
   expect(JSON.parse(await field.inputValue())).toEqual([1, 2]);
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
@@ -135,7 +137,7 @@ test("a draft's last non-Input node cannot be deleted from either entry point", 
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(`/#/rules/${id}`);
-  const node = page.locator('.react-flow__node[data-id="out"] .graph-node');
+  const node = nodeCard(page, "out");
   await expect(
     page.getByRole("button", { name: "Delete node", exact: true }),
   ).toBeDisabled();
@@ -167,10 +169,7 @@ test("opening node code locks defaults while its editor module is loading", asyn
     kind: "FORMULA",
     definition,
   });
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   await page.route(
     /\/NodeExpressionDialog[^/]*\.(tsx|js)(\?.*)?$/,

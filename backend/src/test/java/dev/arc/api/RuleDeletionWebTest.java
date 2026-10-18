@@ -11,37 +11,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.arc.engine.execution.Engine;
-import dev.arc.engine.validation.Validator;
-import dev.arc.rule.RuleCatalog;
-import dev.arc.rule.RuleCatalogService;
-import dev.arc.rule.RuleDefinitionService;
-import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleRepository;
 import dev.arc.rule.RuleRepository.Caller;
-import dev.arc.rule.RuleService;
-import dev.arc.rule.RuleTestCaseRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /** DELETE /api/rules/{id}: its statuses and the conflict body that clients read. */
 class RuleDeletionWebTest {
   private final RuleRepository rules = mock(RuleRepository.class);
   private final Engine engine = mock(Engine.class);
-  private final MockMvc mvc =
-      MockMvcBuilders.standaloneSetup(
-              new RuleController(
-                  new RuleService(
-                      rules,
-                      mock(RuleTestCaseRepository.class),
-                      new Validator(),
-                      mock(RuleDefinitionService.class),
-                      engine),
-                  new RuleCatalogService(mock(RuleCatalog.class)),
-                  mock(RuleExecutionService.class)))
-          .setControllerAdvice(new Errors())
-          .build();
+  private final MockMvc mvc = new RuleApi().rules(rules).engine(engine).mvc();
 
   /**
    * The revision a client read is an optional precondition of a deletion; saves and publications

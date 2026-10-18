@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
-  leavesRuleDocument,
   leaveWarning,
+  leavesRuleDocument,
   pagePath,
   parseRoute,
   rulePath,
@@ -165,4 +165,17 @@ test("rulePath writes today's paths and parseRoute reads every one of them back"
     ruleId: "a/b",
   });
   expect(parseRoute("/rules/%E0%A4%A")).toEqual({ page: "library" });
+});
+
+test("graph/code navigation preserves a draft but switching published versions does not", () => {
+  expect(sameRuleDocument("/rules/example", "/studio/example?node=left")).toBe(
+    true,
+  );
+  expect(
+    sameRuleDocument("/rules/example?version=1", "/studio/example?version=1"),
+  ).toBe(true);
+  expect(sameRuleDocument("/rules/example", "/rules/example?version=1")).toBe(
+    false,
+  );
+  expect(sameRuleDocument("/rules/example", "/rules/other")).toBe(false);
 });

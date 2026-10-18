@@ -8,6 +8,7 @@ import type { Definition, RuleNode } from "../src/types";
 import { branchHandleX } from "../src/domain/nodePorts";
 import { cardSize } from "../src/features/editor/canvas/graphGeometry";
 import { createRule, uniqueId } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 // Node tests lay out in-thread; the browser runs ELK in a worker (graphLayoutWorker).
 const elk = new ELK();
@@ -167,8 +168,8 @@ test("Arrange graph uncrosses branches, persists layout, and preserves both exec
     definition: split,
   });
   await page.goto(`/#/rules/${id}`);
-  const approved = page.locator('.react-flow__node[data-id="approved"]');
-  const declined = page.locator('.react-flow__node[data-id="declined"]');
+  const approved = canvasNode(page, "approved");
+  const declined = canvasNode(page, "declined");
   await expect(approved).toBeVisible();
   expect((await approved.boundingBox())!.x).toBeGreaterThan(
     (await declined.boundingBox())!.x,

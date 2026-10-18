@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { canvasNode } from "./helpers/canvas";
 import { lookupEntriesJson, testParametersJson } from "./helpers/sources";
 import { createRule, uniqueId, uniqueStamp } from "./helpers/api";
 
@@ -72,9 +73,7 @@ test("canvas expressions and JSON fields draw every operator character", async (
     },
   });
   await page.goto(`/#/rules/${ruleId}`);
-  const preview = page.locator(
-    '.react-flow__node[data-id="check"] .node-detail',
-  );
+  const preview = canvasNode(page, "check").locator(".node-detail");
   await expect(preview).toHaveText("amount == 100 != false");
   await page.evaluate(() => document.fonts.ready);
   expect(await ligatureRendering(preview)).toEqual({

@@ -6,6 +6,7 @@ import {
   testParametersJson,
 } from "./helpers/sources";
 import type { DataSource } from "../src/types";
+import { deferred } from "./helpers/gates";
 
 function source(id: string, name: string): DataSource {
   return {
@@ -71,19 +72,11 @@ async function mockWorkspace(page: Page) {
   });
 }
 
-function deferredResponse() {
-  let release!: () => void;
-  const promise = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  return { promise, release };
-}
-
 test("saving A preserves the selection and edits of B when A completes", async ({
   page,
 }) => {
   await mockWorkspace(page);
-  const gate = deferredResponse();
+  const gate = deferred();
   let held = false;
   let delivered = false;
   await page.route("**/api/sources/source-a", async (route) => {
@@ -135,7 +128,7 @@ for (const scenario of ["current", "reopened", "failed"] as const) {
     page,
   }) => {
     await mockWorkspace(page);
-    const gate = deferredResponse();
+    const gate = deferred();
     let held = false;
     let delivered = false;
     await page.route("**/api/sources/source-a", async (route) => {
@@ -222,7 +215,7 @@ for (const change of ["source", "version", "input"] as const) {
     page,
   }) => {
     await mockWorkspace(page);
-    const gate = deferredResponse();
+    const gate = deferred();
     let held = false;
     let delivered = false;
     await page.route("**/api/sources/*/test", async (route) => {
@@ -270,7 +263,7 @@ test("a delayed initial source list cannot overwrite a newly started source", as
   page,
 }) => {
   await mockWorkspace(page);
-  const gate = deferredResponse();
+  const gate = deferred();
   let held = false;
   await page.route("**/api/source-summaries?*", async (route) => {
     held = true;
@@ -298,7 +291,7 @@ test("a failed save finishes after leaving and reopening the same source", async
   page,
 }) => {
   await mockWorkspace(page);
-  const gate = deferredResponse();
+  const gate = deferred();
   let held = false;
   await page.route("**/api/sources/source-a", async (route) => {
     held = true;
@@ -350,7 +343,7 @@ test("a failed source test cannot mark another selected source", async ({
   page,
 }) => {
   await mockWorkspace(page);
-  const gate = deferredResponse();
+  const gate = deferred();
   let held = false;
   await page.route("**/api/sources/source-a/test", async (route) => {
     held = true;
@@ -392,7 +385,7 @@ test("an old source list retains a source created while that list was loading", 
   page,
 }) => {
   await mockWorkspace(page);
-  const gate = deferredResponse();
+  const gate = deferred();
   let held = false;
   // Like the server, every read that starts after the creation lists the new source.
   const created: DataSource[] = [];
@@ -444,7 +437,7 @@ test("a late selected source detail cannot replace another source's edits", asyn
   page,
 }) => {
   await mockWorkspace(page);
-  const gate = deferredResponse();
+  const gate = deferred();
   let held = false;
   await page.route("**/api/sources/source-a/versions/2", async (route) => {
     held = true;
@@ -582,7 +575,7 @@ for (const failure of [false, true]) {
     page,
   }) => {
     await mockWorkspace(page);
-    const gate = deferredResponse();
+    const gate = deferred();
     let held = false;
     const historical = {
       ...first,
@@ -805,7 +798,7 @@ test("a new draft that takes a pending create's ID stays its own and receives th
   page,
 }) => {
   await mockWorkspace(page);
-  const gate = deferredResponse();
+  const gate = deferred();
   const posts: string[] = [];
   let puts = 0;
   await page.route("**/api/sources", async (route) => {

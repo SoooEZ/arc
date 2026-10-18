@@ -6,6 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule, RuleNode } from "../src/types";
+import { nodeCard } from "./helpers/canvas";
 import { editorLines } from "./helpers/editor";
 import { createRule, publishRule, uniqueId } from "./helpers/api";
 
@@ -121,9 +122,7 @@ test("an inferred number constant keeps its field while cleared or negated, unti
 
   // A change applied from the node editor is not this control's edit: the
   // sidebar shows the control that fits the new value.
-  await page
-    .locator('.react-flow__node[data-id="out"] .graph-node')
-    .click({ button: "right" });
+  await nodeCard(page, "out").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const dialog = page.getByRole("dialog", {
     name: "Edit node · Return",
@@ -255,9 +254,7 @@ test("literals the server rejects open as expressions, and a typed one is report
   await page.goto(`/#/rules/${rule.id}?node=out0`);
   const inspector = page.locator(".inspector-sidebar");
   for (const [index, expression] of stored.entries()) {
-    await page
-      .locator(`.react-flow__node[data-id="out${index}"] .graph-node`)
-      .click();
+    await nodeCard(page, `out${index}`).click();
     await expect(
       inspector.getByRole("combobox", {
         name: "Return value · value source",
@@ -281,7 +278,7 @@ test("literals the server rejects open as expressions, and a typed one is report
   await save(page);
   expect((await savedNode(request, rule.id, "out2")).expression).toBe("500");
   // The server trims padding, so a padded number is a constant with its digits shown.
-  await page.locator('.react-flow__node[data-id="padded"] .graph-node').click();
+  await nodeCard(page, "padded").click();
   await expect(
     inspector.getByRole("combobox", {
       name: "Return value · value source",

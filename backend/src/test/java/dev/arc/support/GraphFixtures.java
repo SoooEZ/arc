@@ -53,6 +53,20 @@ public final class GraphFixtures {
             edge("condition", "no", "false")));
   }
 
+  /** Input {@code in} and {@code node}, without edges: enough for shape and dependency checks. */
+  public static Definition withInput(Node node) {
+    return new Definition(1, List.of(), List.of(inputNode("in", "Input"), node), List.of());
+  }
+
+  /** Input {@code in} connected to Output {@code out}, which returns {@code expression}. */
+  public static Definition inputToOutput(List<Input> inputs, String expression) {
+    return new Definition(
+        1,
+        inputs,
+        List.of(inputNode("in", "Input"), outputNode("out", "Output", expression)),
+        List.of(edge("in", "out", "next")));
+  }
+
   /** A node labelled with its ID at (0, 0); its other optional fields are unset. */
   public static Node node(String id, String type, String expression, String output) {
     return nodeOf(id, type, id).at(0, 0).expression(expression).output(output).build();

@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { canvasNode, nodeCard } from "./helpers/canvas";
 import { editorLines, openRunOptions, setEditorText } from "./helpers/editor";
 import { createRule, uniqueId } from "./helpers/api";
 
@@ -132,7 +133,7 @@ test("moving a card keeps the preview result and its trace until the graph chang
   await expect(result(page)).toHaveText("20");
   await expect(page.locator(".node-visited")).toHaveCount(3);
   // The open Test panel covers the lower cards; Calculation stays visible.
-  const card = page.locator('.react-flow__node[data-id="calculate"]');
+  const card = canvasNode(page, "calculate");
   const box = (await card.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 20);
   await page.mouse.down();
@@ -143,9 +144,7 @@ test("moving a card keeps the preview result and its trace until the graph chang
   await expect(page.getByText("Execution path highlighted")).toBeVisible();
   await expect(page.locator(".node-visited")).toHaveCount(3);
 
-  await page
-    .locator('.react-flow__node[data-id="calculate"] .graph-node')
-    .click();
+  await nodeCard(page, "calculate").click();
   await setEditorText(
     page,
     page.getByLabel("Expression", { exact: true }),

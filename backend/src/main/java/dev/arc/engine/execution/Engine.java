@@ -34,13 +34,16 @@ public class Engine {
       int executedSteps,
       int traceBytes) {}
 
+  /** The serialized trace a response carries at most (256 KiB); longer traces are truncated. */
+  private static final int TRACE_MAXIMUM_BYTES = 256 * 1024;
+
   private final ExecutionPlans plans;
   private final ObjectMapper json;
   private final int traceMaximumBytes;
 
   @Autowired
   public Engine(Validator validator, ObjectMapper json) {
-    this(validator, json, 256 * 1024);
+    this(validator, json, TRACE_MAXIMUM_BYTES);
   }
 
   Engine(Validator validator, ObjectMapper json, int traceMaximumBytes) {

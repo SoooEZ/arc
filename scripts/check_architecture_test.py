@@ -316,6 +316,49 @@ class FrontendBoundaryTableTest(unittest.TestCase):
             tree.close()
 
 
+class JavaBoundaryTableTest(unittest.TestCase):
+    def test_java_entries_that_name_nothing_are_reported(self):
+        tree = ProbeTree()
+        try:
+            tree.add_java("model/Definition.java", "class Definition {}\n")
+            tree.add_java("engine/Limits.java", "class Limits {}\n")
+            tree.add_java("engine/graph/Topology.java", "class Topology {}\n")
+            allowed = {"model": {"model"}, "gone": {"model", "missing"}}
+            # graph exists; "expression" was renamed, and so was the root contract "Bounds".
+            engine = {"graph": {"graph", "Limits", "Bounds"}, "expression": {"expression"}}
+            vocabulary = {("engine/graph/Topology.java", "next"): "kept", ("engine/Moved.java", "true"): "moved"}
+            stale = check.stale_java_boundaries(tree.java, allowed, engine, vocabulary)
+            self.assertEqual(
+                stale,
+                [
+                    "ALLOWED_JAVA key gone: names no package under dev.arc",
+                    "ALLOWED_JAVA gone: allowed package missing names no package",
+                    "ENGINE_DEPENDENCIES graph: Bounds names no engine feature or root contract",
+                    "ENGINE_DEPENDENCIES key expression: names no engine feature package",
+                    "ENGINE_DEPENDENCIES expression: expression names no engine feature or root contract",
+                    "NODE_VOCABULARY_ALLOWED (engine/Moved.java, true): names no file",
+                ],
+            )
+        finally:
+            tree.close()
+
+    def test_java_entries_naming_packages_contracts_and_files_pass(self):
+        tree = ProbeTree()
+        try:
+            tree.add_java("model/Definition.java", "class Definition {}\n")
+            tree.add_java("engine/Limits.java", "class Limits {}\n")
+            tree.add_java("engine/graph/Topology.java", "class Topology {}\n")
+            stale = check.stale_java_boundaries(
+                tree.java,
+                {"model": {"model"}, "engine": {"engine", "model"}},
+                {"graph": {"graph", "Limits"}},
+                {("engine/graph/Topology.java", "next"): "kept"},
+            )
+            self.assertEqual(stale, [])
+        finally:
+            tree.close()
+
+
 class FrontendHandleTest(unittest.TestCase):
     def test_handle_literals_are_rejected_outside_the_port_owner(self):
         rejected = {
@@ -345,6 +388,7 @@ class CurrentTreeTest(unittest.TestCase):
     def test_the_repository_has_no_violations(self):
         self.assertEqual(check.java_violations(check.JAVA), [])
         self.assertEqual(check.frontend_violations(check.FRONTEND), [])
+        self.assertEqual(check.stale_java_boundaries(check.JAVA), [])
         self.assertEqual(check.stale_frontend_boundaries(check.FRONTEND), [])
 
 

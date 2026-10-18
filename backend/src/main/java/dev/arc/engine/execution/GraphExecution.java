@@ -284,10 +284,11 @@ final class GraphExecution {
             depth + 1,
             compiled -> positionalInputs(call, compiled.definition(), arguments));
       } catch (ArcException error) {
-        if (error.locations().isEmpty())
-          throw error.atNode(
-              call.id(), call.version(), null, "@" + call.id() + ":" + call.version());
-        throw error.inRule(call.id(), call.version());
+        // invoke already placed a located failure in the called rule; an unlocated one is the
+        // call's.
+        throw error.locations().isEmpty()
+            ? error.atNode(call.id(), call.version(), null, call.written())
+            : error;
       }
     }
 
@@ -295,7 +296,7 @@ final class GraphExecution {
     private static Map<String, Object> positionalInputs(
         Expressions.FormulaCall call, Definition child, List<Object> arguments) {
       if (arguments.size() > child.inputs().size())
-        throw ArcException.invalid("Too many arguments for @" + call.id() + ":" + call.version());
+        throw ArcException.invalid("Too many arguments for " + call.written());
       var inputs = new LinkedHashMap<String, Object>();
       for (int index = 0; index < arguments.size(); index++)
         inputs.put(child.inputs().get(index).name(), arguments.get(index));
@@ -329,9 +330,8 @@ final class GraphExecution {
       }
       // Each value is bounded; the aggregate has a budget as a whole (Limits.MAX_RESULT_*), so a
       // rule with many Outputs cannot stream gigabytes or fill a parent's scopes through
-      // References,
-      // and both callers of the rule meet the same limit (lesson B19). Located at the Output that
-      // passes it, as the single Output's bound is.
+      // References, and both callers of the rule meet the same limit (lesson B19). Located at the
+      // Output that passes it, as the single Output's bound is.
       var result = new LinkedHashMap<String, Object>();
       long elements = 1;
       long characters = 0;

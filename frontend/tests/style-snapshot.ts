@@ -336,6 +336,9 @@ export async function settle(page: Page) {
     for (const element of Array.from(document.querySelectorAll("span"))) {
       if (/^Request \d+(\.\d+)? ms$/.test(element.textContent ?? ""))
         element.textContent = "Request 0.00 ms";
+      // The Test panel's compact timing reads "Ran in 32 ms".
+      else if (/^Ran in \d+(\.\d+)? ms$/.test(element.textContent ?? ""))
+        element.textContent = "Ran in 0 ms";
     }
     // A focused Monaco editor blinks its cursor with an animation.
     const active = document.activeElement;

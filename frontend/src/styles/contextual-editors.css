@@ -4,13 +4,12 @@
   grid-template-columns: 245px minmax(0, 1fr);
   height: 52vh;
   min-height: 280px;
-  border: 1px solid var(--color-panel-border);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
   margin: 12px 0;
 }
 .node-expression-content > .muted-copy {
-  margin: 0;
   font-size: var(--text-lg);
 }
 .node-expression-content > .MuiAlert-root {
@@ -29,7 +28,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--color-panel-border);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 .reference-navigation > .MuiButton-root {

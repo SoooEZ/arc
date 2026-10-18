@@ -12,6 +12,7 @@ import {
   renderCounts,
   resetRenderCounts,
 } from "./helpers/renderProbe";
+import { deferred } from "./helpers/gates";
 
 function node(id: string, type: RuleNode["type"], label: string): RuleNode {
   return { id, type, label, position: { x: 0, y: 0 }, expression: "1" };
@@ -273,10 +274,7 @@ test("leaving a catalog page cancels its preview and late data cannot replace th
   page,
 }) => {
   await mockLibrary(page);
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: gate, release } = deferred();
   let held = false;
   let canceled = false;
   page.on("requestfailed", (request) => {

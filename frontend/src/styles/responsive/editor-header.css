@@ -1,0 +1,11 @@
+/* The editor header's actions from 1350px down, mobile included: this file
+   stays after mobile.css. */
+@media (max-width: 1350px) {
+  .editor-actions {
+    gap: 5px;
+  }
+  .editor-actions .MuiButton-root {
+    padding: 6px 8px;
+    font-size: var(--text-lg);
+  }
+}

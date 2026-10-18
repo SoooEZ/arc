@@ -14,11 +14,8 @@ import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.Rule;
-import dev.arc.rule.RuleCatalogService;
-import dev.arc.rule.RuleExecutionService;
 import dev.arc.rule.RuleExecutionService.ExecutionResponse;
 import dev.arc.rule.RuleExecutionService.Timing;
-import dev.arc.rule.RuleService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Arrays;
@@ -26,23 +23,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Exact HTTP payloads that model refactors must not change: field names, field order, nulls and
  * nesting, written with the application's Jackson configuration.
  */
-@WebMvcTest(RuleController.class)
-class PayloadSnapshotTest {
-  @Autowired private MockMvc mvc;
-  @MockitoBean private RuleService rules;
-  @MockitoBean private RuleCatalogService catalog;
-  @MockitoBean private RuleExecutionService execution;
-
+class PayloadSnapshotTest extends RuleControllerSlice {
   @Test
   void executionResponsesKeepEveryFieldInOrder() throws Exception {
     var result = new LinkedHashMap<String, Object>();

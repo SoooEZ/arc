@@ -13,12 +13,12 @@
   margin: 35px 0;
 }
 .api-intro-cards > div {
-  border: 1px solid #e0e7d9;
+  border: 1px solid var(--color-border-strong);
   background: var(--color-surface);
   border-radius: 9px;
   padding: 22px;
   position: relative;
-  color: #667b52;
+  color: var(--color-text-secondary);
 }
 .api-intro-cards > div > span {
   position: absolute;
@@ -35,7 +35,7 @@
 .api-intro-cards p {
   font-size: var(--text-md);
   line-height: 1.8;
-  color: var(--color-api-muted);
+  color: var(--color-text-muted);
 }
 .api-console {
   border: 1px solid #dce6d2;
@@ -60,7 +60,7 @@
 .api-console-heading > span {
   margin-left: auto;
   font-size: var(--text-sm);
-  color: var(--color-api-muted);
+  color: var(--color-text-muted);
 }
 .api-console-heading .MuiButton-root {
   flex-shrink: 0;
@@ -128,7 +128,7 @@
   flex-shrink: 0;
 }
 .api-select-row .MuiInputLabel-root {
-  color: var(--color-api-strong);
+  color: var(--color-text-secondary);
 }
 .api-request .MuiInputBase-root {
   font-size: var(--text-lg);
@@ -155,7 +155,7 @@
 }
 .endpoint > code {
   font-size: var(--text-sm);
-  color: var(--color-api-strong);
+  color: var(--color-text-secondary);
   overflow-wrap: anywhere;
   min-width: 0;
 }
@@ -164,7 +164,7 @@
 .field-label {
   font-size: var(--text-md);
   font-weight: 500;
-  color: var(--color-api-muted);
+  color: var(--color-text-muted);
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -195,11 +195,11 @@
 }
 .parameter-chips code {
   font-size: var(--text-xs);
-  color: var(--color-api-strong);
+  color: var(--color-text-secondary);
 }
 .parameter-chips small {
   font-size: var(--text-2xs);
-  color: var(--color-api-muted);
+  color: var(--color-text-muted);
 }
 .api-response {
   background: #f8faf5;
@@ -215,7 +215,7 @@
   margin-bottom: 18px;
   min-height: 28px;
   font-size: var(--text-md);
-  color: var(--color-api-strong);
+  color: var(--color-text-secondary);
 }
 .code-panel-heading > .MuiButton-root {
   font-size: var(--text-sm);
@@ -252,11 +252,11 @@
 }
 .api-reference-heading p {
   font-size: var(--text-md);
-  color: var(--color-api-strong);
+  color: var(--color-text-secondary);
 }
 .api-reference-heading code {
   font-size: var(--text-md);
-  color: var(--color-api-strong);
+  color: var(--color-text-secondary);
 }
 .endpoint-table {
   border: 1px solid #e0e8d7;
@@ -271,14 +271,14 @@
   gap: 12px;
   padding: 15px 19px;
   font-size: var(--text-md);
-  color: var(--color-api-muted);
+  color: var(--color-text-muted);
 }
 .endpoint-table > div:not(:last-child) {
   border-bottom: 1px solid #ebf0e3;
 }
 .endpoint-table code {
   font-size: var(--text-sm);
-  color: var(--color-api-strong);
+  color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
 .method {
@@ -311,12 +311,12 @@
 .api-notes h3 {
   font-size: var(--text-xl);
   font-weight: 550;
-  color: var(--color-api-strong);
+  color: var(--color-text-secondary);
   margin-bottom: 9px;
 }
 .api-notes p {
   font-size: var(--text-md);
-  color: var(--color-api-muted);
+  color: var(--color-text-muted);
   line-height: 1.9;
 }
 .api-notes code {
@@ -330,7 +330,7 @@
   gap: 16px;
   padding: 20px 24px;
   margin-bottom: 33px;
-  border: 1px solid #dfe8dc;
+  border: 1px solid var(--color-border-strong);
   border-radius: 10px;
   background: var(--color-surface);
   color: #4f6a57;
@@ -341,5 +341,5 @@
 .api-try p {
   margin-top: 4px;
   font-size: var(--text-lg);
-  color: var(--color-api-muted);
+  color: var(--color-text-muted);
 }

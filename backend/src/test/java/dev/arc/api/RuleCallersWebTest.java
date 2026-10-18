@@ -8,46 +8,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import dev.arc.engine.execution.Engine;
-import dev.arc.engine.validation.Validator;
 import dev.arc.error.ArcException;
 import dev.arc.model.CatalogPage;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.Node;
 import dev.arc.model.PageRequest;
-import dev.arc.rule.RuleCatalog;
 import dev.arc.rule.RuleCatalog.CallingRule;
-import dev.arc.rule.RuleCatalogService;
-import dev.arc.rule.RuleDefinitionService;
-import dev.arc.rule.RuleExecutionService;
-import dev.arc.rule.RuleRepository;
-import dev.arc.rule.RuleService;
-import dev.arc.rule.RuleTestCaseRepository;
 import dev.arc.support.GraphFixtures;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * GET /api/rules/{id}/callers: the exact payload clients read, the catalogs' paging defaults and
  * bounds, and the 404 of an unknown rule.
  */
-@WebMvcTest(RuleController.class)
-@Import({RuleService.class, RuleCatalogService.class, Validator.class})
-class RuleCallersWebTest {
-  @Autowired private MockMvc mvc;
-  @MockitoBean private RuleRepository rules;
-  @MockitoBean private RuleCatalog catalog;
-  @MockitoBean private RuleTestCaseRepository testCases;
-  @MockitoBean private RuleDefinitionService definitions;
-  @MockitoBean private Engine engine;
-  @MockitoBean private RuleExecutionService execution;
-
+class RuleCallersWebTest extends RuleServicesSlice {
   private static Definition pinning(Integer version) {
     Node reference =
         GraphFixtures.nodeOf("tax", "REFERENCE", "Tax").rule("rates", version).output("t").build();

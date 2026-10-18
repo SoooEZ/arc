@@ -34,8 +34,16 @@ final class ExecutionPlans {
    */
   private long generation;
 
+  /**
+   * Published plans kept at most: by count, and by their summed {@link #weight} (8 Mi estimated
+   * weight units, not measured heap bytes).
+   */
+  private static final int MAXIMUM_PLANS = 128;
+
+  private static final long MAXIMUM_PLAN_WEIGHT = 8 * 1024 * 1024;
+
   ExecutionPlans(Validator validator, ObjectMapper json) {
-    this(validator, json, 128, 8 * 1024 * 1024);
+    this(validator, json, MAXIMUM_PLANS, MAXIMUM_PLAN_WEIGHT);
   }
 
   ExecutionPlans(Validator validator, ObjectMapper json, int maximumEntries, long maximumWeight) {

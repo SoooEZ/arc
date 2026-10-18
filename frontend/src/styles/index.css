@@ -1,13 +1,14 @@
 /*
- * Cascade order. Tokens and element defaults come first. Each view or
- * component stylesheet then owns its selectors, so their order among
- * themselves does not matter. The responsive layers come last and keep this
- * order: where two breakpoints set the same property, the later file wins
- * (studio-wide.css sets the editor action buttons at every width up to
+ * Cascade order. Tokens, element defaults and the shared components come
+ * first. Each view or component stylesheet then owns its selectors, so their
+ * order among themselves does not matter. The responsive layers come last and
+ * keep this order: where two breakpoints set the same property, the later file
+ * wins (editor-header.css sets the editor action buttons at every width up to
  * 1350px, including the laptop and mobile widths).
  */
 @import "./tokens.css";
 @import "./base.css";
+@import "./components.css";
 @import "./workspace.css";
 @import "./library.css";
 @import "./library-previews.css";
@@ -29,6 +30,8 @@
 @import "./responsive/mobile.css";
 @import "./responsive/short-height.css";
 @import "./responsive/studio-wide.css";
+@import "./responsive/editor-header.css";
 @import "./responsive/studio-compact.css";
 @import "./responsive/studio-mobile.css";
+@import "./responsive/sources.css";
 @import "./responsive/contextual-editors.css";

@@ -6,7 +6,7 @@
   }
   .studio-library {
     max-height: 220px;
-    border-bottom: 1px solid var(--color-studio-border-strong);
+    border-bottom: 1px solid var(--color-border-strong);
   }
   .studio-editor {
     flex: 1;
@@ -18,33 +18,6 @@
     font-size: var(--text-sm);
   }
   .studio-problems {
-    font-size: var(--text-sm);
-  }
-  .source-form-grid {
-    grid-template-columns: 1fr;
-  }
-  .sources-page {
-    padding: 18px;
-  }
-  .sources-page .page-heading {
-    align-items: start;
-    gap: 10px;
-  }
-  .sources-page .page-heading h1 {
-    font-size: 26px;
-  }
-  .source-detail {
-    padding: 16px;
-  }
-  .source-detail-heading {
-    align-items: start;
-  }
-  .source-detail-heading > div {
-    flex-direction: column;
-    align-items: start;
-  }
-  .source-explainer {
-    gap: 10px;
     font-size: var(--text-sm);
   }
 }

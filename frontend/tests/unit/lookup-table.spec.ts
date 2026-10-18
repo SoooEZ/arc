@@ -2,8 +2,10 @@ import { test, expect } from "@playwright/test";
 import {
   cellText,
   cellValue,
+  fieldValue,
   lookupEntries,
   readLookupTable,
+  withField,
 } from "../../src/features/sources/lookupTable";
 import { parseJson, stringifyJson } from "../../src/domain/json";
 
@@ -57,4 +59,20 @@ test("a table writes the entries back as the JSON view formats them", () => {
   expect(lookupEntries(rows)).toBe(
     '{\n  "DE": {\n    "rate": 0.190\n  },\n  "US": {\n    "rate": 0.07\n  }\n}',
   );
+});
+
+test("a record cell reads only the record's own fields and writes one field at a time", () => {
+  const record = parseJson('{"rate": 0.19, "currency": "EUR"}');
+  expect(stringifyJson(fieldValue(record, "rate"))).toBe("0.19");
+  // A column named after an Object member is empty until a row sets it.
+  expect(fieldValue(record, "toString")).toBeUndefined();
+  expect(fieldValue(record, "constructor")).toBeUndefined();
+  expect(fieldValue("text", "rate")).toBeUndefined();
+  expect(stringifyJson(withField(record, "constructor", 1))).toBe(
+    '{"rate":0.19,"currency":"EUR","constructor":1}',
+  );
+  expect(stringifyJson(withField(record, "rate"))).toBe('{"currency":"EUR"}');
+  // A cell typed into a row that is not a record yet starts one.
+  expect(withField(7, "rate", 0.2)).toEqual({ rate: 0.2 });
+  expect(stringifyJson(record)).toBe('{"rate":0.19,"currency":"EUR"}');
 });

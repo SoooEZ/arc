@@ -3,7 +3,7 @@ package dev.arc.api;
 import dev.arc.error.ArcException;
 import dev.arc.model.PageRequest;
 
-/** Binds the paging parameters shared by the catalog and version-history endpoints. */
+/** Binds the paging parameters shared by the catalog, version-history and callers endpoints. */
 final class PageParameters {
   private PageParameters() {}
 

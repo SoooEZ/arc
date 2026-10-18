@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { nodeCard } from "./helpers/canvas";
 import { setEditorText } from "./helpers/editor";
 import {
   createRule,
@@ -12,6 +13,7 @@ import {
   publishRule,
   uniqueStamp,
 } from "./helpers/api";
+import { deferred } from "./helpers/gates";
 
 function definition(
   expression: string,
@@ -125,7 +127,7 @@ test("editors share immutable pinned formula metadata", async ({
   expect(traffic.versionReads).toBe(1);
 
   // A different node mounts a new editor; the pinned version is not read again.
-  await page.locator('.react-flow__node[data-id="out"] .graph-node').click();
+  await nodeCard(page, "out").click();
   const returnValue = page.getByLabel("Return value", { exact: true });
   await setEditorText(page, returnValue, "");
   await page.keyboard.type(`@${callee}`);
@@ -139,10 +141,7 @@ test("a variable scope that finishes loading leaves an open formula suggestion l
 }) => {
   const { callee, caller } = await fixtures(request);
   const traffic = formulaTraffic(page, callee);
-  let release!: () => void;
-  const released = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const { promise: released, release } = deferred();
   let holding = false;
   // Scope and diagnostic responses re-render the inspector without changing its text.
   for (const path of ["**/api/variables", "**/api/diagnostics"])

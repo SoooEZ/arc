@@ -48,7 +48,7 @@
 }
 .studio-tabs {
   display: flex;
-  border-bottom: 1px solid var(--color-studio-border-strong);
+  border-bottom: 1px solid var(--color-border-strong);
   gap: 5px;
 }
 .studio-tabs button {
@@ -67,8 +67,7 @@
   border-color: var(--color-accent);
   font-weight: 600;
 }
-.studio-hint,
-.source-binding p {
+.studio-hint {
   font-size: var(--text-lg);
   line-height: 1.7;
   color: #6b7770;
@@ -124,7 +123,7 @@
   gap: 8px;
 }
 .function-group {
-  border: 1px solid var(--color-studio-border-strong);
+  border: 1px solid var(--color-border-strong);
   border-radius: 7px;
   background: var(--color-surface);
 }

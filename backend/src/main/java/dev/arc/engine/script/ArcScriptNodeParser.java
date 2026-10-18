@@ -41,6 +41,9 @@ final class ArcScriptNodeParser {
   private static final String KINDS =
       Arrays.stream(NodeKind.values()).map(NodeKind::name).collect(Collectors.joining("|"));
 
+  /** One position coordinate: an optional sign, digits, optional decimals and exponent. */
+  private static final String NUMBER = "(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)";
+
   private static final Pattern HEADER =
       Pattern.compile(
           "node\\s+"
@@ -49,7 +52,11 @@ final class ArcScriptNodeParser {
               + KINDS
               + ")\\s+("
               + QUOTED
-              + ")(?:\\s+at\\s*\\(\\s*(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\s*\\))?",
+              + ")(?:\\s+at\\s*\\(\\s*"
+              + NUMBER
+              + "\\s*,\\s*"
+              + NUMBER
+              + "\\s*\\))?",
           Pattern.CASE_INSENSITIVE);
 
   /** A connection {@code handle -> target [edge id]}; fixed handle names may use any case. */

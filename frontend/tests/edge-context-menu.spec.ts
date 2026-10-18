@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Definition, Rule } from "../src/types";
+import { canvasEdge, nodeCard } from "./helpers/canvas";
+import { deferred } from "./helpers/gates";
 
 const definition: Definition = {
   schemaVersion: 1,
@@ -100,8 +102,6 @@ async function fixture(page: Page) {
   };
 }
 
-const edge = (page: Page, id: string) =>
-  page.locator(`.react-flow__edge[data-id="${id}"]`);
 async function clickEdge(
   page: Page,
   id: string,
@@ -109,7 +109,7 @@ async function clickEdge(
 ) {
   // Coordinate clicks must wait until a dismissed menu's backdrop has exited.
   await expect(page.locator(".MuiMenu-root")).toHaveCount(0);
-  const path = edge(page, id).locator(".react-flow__edge-path");
+  const path = canvasEdge(page, id).locator(".react-flow__edge-path");
   await expect(path).toHaveCount(1);
   const point = await path.evaluate((element: SVGPathElement) => {
     const point = element
@@ -125,12 +125,12 @@ test("connection context menu deletes the clicked edge, keeps unrelated edits, a
 }) => {
   const state = await fixture(page);
   await page.goto("/#/rules/edge-context-fixture");
-  await page.locator('.react-flow__node[data-id="calc"] .graph-node').click();
+  await nodeCard(page, "calc").click();
   await page
     .getByLabel("Node name", { exact: true })
     .fill("Keep this node edit");
   await clickEdge(page, "start", "left");
-  await expect(edge(page, "start")).toHaveClass(/selected/);
+  await expect(canvasEdge(page, "start")).toHaveClass(/selected/);
   await clickEdge(page, "finish");
   const menu = page.getByRole("menu", { name: "Connection actions" });
   await expect(menu.getByRole("menuitem")).toHaveCount(1);
@@ -139,15 +139,15 @@ test("connection context menu deletes the clicked edge, keeps unrelated edits, a
   ).toBeEnabled();
   await page.keyboard.press("Escape");
   await expect(menu).not.toBeVisible();
-  await expect(edge(page, "finish")).toHaveCount(1);
+  await expect(canvasEdge(page, "finish")).toHaveCount(1);
   await clickEdge(page, "finish");
   await page.mouse.click(15, 15);
   await expect(menu).not.toBeVisible();
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
   await clickEdge(page, "finish");
   await menu.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await expect(edge(page, "finish")).toHaveCount(0);
-  await expect(edge(page, "start")).toHaveClass(/selected/);
+  await expect(canvasEdge(page, "finish")).toHaveCount(0);
+  await expect(canvasEdge(page, "start")).toHaveClass(/selected/);
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("All changes saved")).toBeVisible();
@@ -167,9 +167,7 @@ test("connection context menu deletes the clicked edge, keeps unrelated edits, a
   await expect(
     page.getByRole("button", { name: "Delete connection", exact: true }),
   ).toHaveCount(0);
-  await page
-    .locator('.react-flow__node[data-id="calc"] .graph-node')
-    .click({ button: "right" });
+  await nodeCard(page, "calc").click({ button: "right" });
   const nodeMenu = page.getByRole("menu", { name: "Node actions" });
   await expect(
     nodeMenu.getByRole("menuitem", { name: "Edit", exact: true }),
@@ -196,12 +194,8 @@ test("connection context menu obeys historical and pending-save guards", async (
   await page
     .getByLabel("Node name", { exact: true })
     .fill("Edited before save");
-  let release = () => {};
-  state.holdSave(
-    new Promise<void>((resolve) => {
-      release = resolve;
-    }),
-  );
+  const { promise, release } = deferred();
+  state.holdSave(promise);
   try {
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect.poll(state.saving).toBe(true);
@@ -229,30 +223,28 @@ test("a selected connection is deselected as soon as a node deletion removes it"
 }) => {
   await fixture(page);
   await page.goto("/#/rules/edge-context-fixture");
-  await page.locator('.react-flow__node[data-id="calc"] .graph-node').click();
+  await nodeCard(page, "calc").click();
   await clickEdge(page, "finish", "left");
-  await expect(edge(page, "finish")).toHaveClass(/selected/);
+  await expect(canvasEdge(page, "finish")).toHaveClass(/selected/);
   const deleteConnection = page.getByRole("button", {
     name: "Delete connection",
     exact: true,
   });
   await expect(deleteConnection).toBeVisible();
   // The node context menu removes "out" with its connection; the button stayed before.
-  await page
-    .locator('.react-flow__node[data-id="out"] .graph-node')
-    .click({ button: "right" });
+  await nodeCard(page, "out").click({ button: "right" });
   await page
     .getByRole("menu", { name: "Node actions" })
     .getByRole("menuitem", { name: "Delete", exact: true })
     .click();
-  await expect(edge(page, "finish")).toHaveCount(0);
+  await expect(canvasEdge(page, "finish")).toHaveCount(0);
   await expect(deleteConnection).toHaveCount(0);
   await clickEdge(page, "start", "left");
-  await expect(edge(page, "start")).toHaveClass(/selected/);
+  await expect(canvasEdge(page, "start")).toHaveClass(/selected/);
   await expect(deleteConnection).toBeVisible();
   // The Inspector deletes the selected node, the connection's target.
   await page.getByRole("button", { name: "Delete node", exact: true }).click();
-  await expect(edge(page, "start")).toHaveCount(0);
+  await expect(canvasEdge(page, "start")).toHaveCount(0);
   await expect(deleteConnection).toHaveCount(0);
   await expect(page.locator(".react-flow__node")).toHaveCount(1);
 });

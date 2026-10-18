@@ -31,7 +31,12 @@ public final class Expressions {
   @FunctionalInterface
   interface BoundedExpr extends Expr {}
 
-  public record FormulaCall(String id, int version, int argumentCount) {}
+  public record FormulaCall(String id, int version, int argumentCount) {
+    /** The call as an expression writes it, {@code @id:version}, which messages and labels name. */
+    public String written() {
+      return "@" + id + ":" + version;
+    }
+  }
 
   /**
    * Host capability for a reached published Formula call; arguments retain explicit nulls. The

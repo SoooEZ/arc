@@ -7,6 +7,7 @@ import {
   readRule,
   uniqueId,
 } from "./helpers/api";
+import { canvasNode } from "./helpers/canvas";
 
 const doubled: Definition = {
   ...inputToOutput,
@@ -34,7 +35,7 @@ async function saveDraft(
   return (await response.json()) as Rule;
 }
 
-const output = (page: Page) => page.locator('.react-flow__node[data-id="out"]');
+const output = (page: Page) => canvasNode(page, "out");
 
 test("a published version restored to the draft is one undoable edit that Save keeps", async ({
   page,
@@ -112,7 +113,7 @@ test("an unpublished rule says so, and a publication makes the draft current", a
     .click();
   await expect(header).toContainText("Published · v1");
   await expect(header).not.toContainText("Unpublished changes");
-  await page.locator('.react-flow__node[data-id="out"]').click();
+  await canvasNode(page, "out").click();
   await page.getByLabel("Node name", { exact: true }).fill("Total");
   await expect(header).toContainText("Unpublished changes");
   // Typing the old name back makes the draft the published version again.
