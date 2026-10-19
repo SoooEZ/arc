@@ -225,9 +225,17 @@ class ValidatorTest {
             1, List.of(new Input("ROUND", "NUMBER", true, null)), base.nodes(), base.edges()));
   }
 
+  /** A node that stores a result: a decision table also needs its (here empty) table. */
+  private static Node resultNode(String type, String name) {
+    var node = copyOf(node("result", type, null, name));
+    if (type.equals("DECISION_TABLE"))
+      node.table(new DecisionTable(null, List.of(), List.of(), List.of()));
+    return node.build();
+  }
+
   @Test
   void suppliedResultNamesAreCheckedEvenInIncompleteDrafts() {
-    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE")) {
+    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE", "DECISION_TABLE")) {
       for (String name :
           List.of(
               "unit price",
@@ -239,8 +247,7 @@ class ValidatorTest {
               "value@",
               "true",
               "a".repeat(65))) {
-        var definition =
-            new Definition(1, List.of(), List.of(node("result", type, null, name)), List.of());
+        var definition = new Definition(1, List.of(), List.of(resultNode(type, name)), List.of());
         assertThatThrownBy(() -> validator.shape(definition))
             .as(type + " " + name)
             .isInstanceOfSatisfying(
@@ -256,8 +263,7 @@ class ValidatorTest {
             .containsExactly("result: provide a valid result variable");
       }
       for (String name : Arrays.asList(null, "", "ROUND", "_result2", "a".repeat(64)))
-        validator.shape(
-            new Definition(1, List.of(), List.of(node("result", type, null, name)), List.of()));
+        validator.shape(new Definition(1, List.of(), List.of(resultNode(type, name)), List.of()));
     }
   }
 

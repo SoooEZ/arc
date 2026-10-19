@@ -126,6 +126,7 @@ class DraftRoundTripTest {
             node t TRANSFORM "Shape" { field "x" =; }
             node r REFERENCE "Reuse" { use "child"; bind amount =; }
             node o OUTPUT "Result" { return; }
+            node d DECISION_TABLE "Table" { condition "Tier" =; result; row  -> ; }
             """);
     assertThat(built.diagnostics()).isEmpty();
     var nodes = built.definition().nodes();
@@ -141,6 +142,14 @@ class DraftRoundTripTest {
     assertThat(nodes.get(5).version()).isNull();
     assertThat(nodes.get(5).bindings()).isEqualTo(Map.of("amount", ""));
     assertThat(nodes.get(6).expression()).isEmpty();
+    assertThat(nodes.get(7).table())
+        .isEqualTo(
+            new DecisionTable(
+                null,
+                List.of(new DecisionTable.Condition("Tier", "")),
+                List.of(new DecisionTable.Result("")),
+                List.of(new DecisionTable.Row(List.of(""), List.of("")))));
+    assertThat(nodes.get(7).output()).isNull();
   }
 
   /**
@@ -223,7 +232,40 @@ class DraftRoundTripTest {
           nodes.add(reference(output, "child", version, bindings));
           if (version == null) nodes.add(reference(output, null, null, bindings));
         }
+    for (String output : NAMES)
+      for (DecisionTable table : unfinishedTables()) nodes.add(decisionTable(output, table));
     return nodes;
+  }
+
+  /**
+   * Tables without columns or rows, with an empty condition expression, an unnamed result and empty
+   * cells, with no test because there is no condition, and with two empty tests in one row.
+   */
+  private static List<DecisionTable> unfinishedTables() {
+    var tier = new DecisionTable.Condition("Tier", "");
+    var amount = new DecisionTable.Condition("Amount", "amount");
+    return List.of(
+        new DecisionTable(null, List.of(), List.of(), List.of()),
+        new DecisionTable(
+            null,
+            List.of(tier),
+            List.of(new DecisionTable.Result("")),
+            List.of(new DecisionTable.Row(List.of(""), List.of("")))),
+        new DecisionTable(
+            "COLLECT",
+            List.of(amount),
+            List.of(new DecisionTable.Result("fee")),
+            List.of(new DecisionTable.Row(List.of(">= 100"), List.of("amount * 2")))),
+        new DecisionTable(
+            "FIRST",
+            List.of(),
+            List.of(new DecisionTable.Result("fee")),
+            List.of(new DecisionTable.Row(List.of(), List.of("1")))),
+        new DecisionTable(
+            null,
+            List.of(tier, amount),
+            List.of(new DecisionTable.Result("fee"), new DecisionTable.Result("")),
+            List.of(new DecisionTable.Row(List.of("", ""), List.of("", "2")))));
   }
 
   private static Node formula(String output, String expression) {
@@ -263,6 +305,10 @@ class DraftRoundTripTest {
         .rule(ruleId, version)
         .bindings(bindings)
         .build();
+  }
+
+  private static Node decisionTable(String output, DecisionTable table) {
+    return nodeOf("n", "DECISION_TABLE", "N").position(AT).output(output).table(table).build();
   }
 
   private static List<BranchCase> caseList(String expression) {

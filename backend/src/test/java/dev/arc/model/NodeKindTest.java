@@ -17,7 +17,14 @@ class NodeKindTest {
   void jsonTypesNameTheKindsExactly() {
     assertThat(Arrays.stream(NodeKind.values()).map(NodeKind::name))
         .containsExactly(
-            "INPUT", "FORMULA", "CONDITION", "SWITCH", "TRANSFORM", "REFERENCE", "OUTPUT");
+            "INPUT",
+            "FORMULA",
+            "CONDITION",
+            "SWITCH",
+            "TRANSFORM",
+            "REFERENCE",
+            "OUTPUT",
+            "DECISION_TABLE");
     assertThat(NodeKind.parse("SWITCH")).contains(NodeKind.SWITCH);
     for (String unknown : Arrays.asList(null, "", "switch", "Switch", " SWITCH", "LOOP"))
       assertThat(NodeKind.parse(unknown)).as(String.valueOf(unknown)).isEmpty();
@@ -27,12 +34,17 @@ class NodeKindTest {
   }
 
   @Test
-  void onlyFormulasTransformsAndReferencesStoreAResult() {
+  void onlyFormulasTransformsReferencesAndDecisionTablesStoreAResult() {
     for (NodeKind kind : NodeKind.values())
       assertThat(kind.storesResult())
           .as(kind.name())
           .isEqualTo(
-              Set.of(NodeKind.FORMULA, NodeKind.TRANSFORM, NodeKind.REFERENCE).contains(kind));
+              Set.of(
+                      NodeKind.FORMULA,
+                      NodeKind.TRANSFORM,
+                      NodeKind.REFERENCE,
+                      NodeKind.DECISION_TABLE)
+                  .contains(kind));
   }
 
   /**
@@ -49,7 +61,8 @@ class NodeKindTest {
             NodeKind.SWITCH, Set.of(Property.SELECTOR, Property.CASES),
             NodeKind.TRANSFORM, Set.of(Property.FIELDS, Property.EXPRESSION, Property.OUTPUT),
             NodeKind.REFERENCE, Set.of(Property.RULE, Property.BINDINGS, Property.OUTPUT),
-            NodeKind.OUTPUT, Set.of(Property.EXPRESSION, Property.OUTPUT_NAME));
+            NodeKind.OUTPUT, Set.of(Property.EXPRESSION, Property.OUTPUT_NAME),
+            NodeKind.DECISION_TABLE, Set.of(Property.TABLE, Property.OUTPUT));
     for (NodeKind kind : NodeKind.values()) {
       assertThat(kind.properties()).as(kind.name()).isEqualTo(expected.get(kind));
       assertThat(kind.uses(Property.OUTPUT)).as(kind.name()).isEqualTo(kind.storesResult());
@@ -66,7 +79,12 @@ class NodeKindTest {
   void handlesFollowEachKindsExitRuleInCanvasOrder() {
     var cases = List.of(new BranchCase("big", "Big", "true"), new BranchCase("small", "S", "true"));
     for (NodeKind kind :
-        List.of(NodeKind.INPUT, NodeKind.FORMULA, NodeKind.TRANSFORM, NodeKind.REFERENCE))
+        List.of(
+            NodeKind.INPUT,
+            NodeKind.FORMULA,
+            NodeKind.TRANSFORM,
+            NodeKind.REFERENCE,
+            NodeKind.DECISION_TABLE))
       assertThat(kind.handles(null)).as(kind.name()).containsExactly("next");
     assertThat(NodeKind.CONDITION.handles(null)).containsExactly("true", "false");
     assertThat(NodeKind.SWITCH.handles(cases)).containsExactly("case:big", "case:small", "default");

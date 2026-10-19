@@ -54,6 +54,15 @@ public final class Limits {
   /** Field mappings per Transform node. */
   public static final int MAX_TRANSFORM_FIELDS = 50;
 
+  /** Condition columns per decision table. */
+  public static final int MAX_TABLE_CONDITIONS = 20;
+
+  /** Result columns per decision table. */
+  public static final int MAX_TABLE_RESULTS = 10;
+
+  /** Rows per decision table. */
+  public static final int MAX_TABLE_ROWS = 200;
+
   /** Object keys that a rule creates: Transform field names and {@code $OBJECT} keys. */
   public static final int MAX_FIELD_NAME_CHARACTERS = 160;
 

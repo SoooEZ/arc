@@ -122,8 +122,83 @@ public record Definition(
   public record Field(String name, String expression) {}
 
   /**
+   * A decision table: condition columns, each an expression evaluated once, and rows holding one
+   * test per condition and one result expression per result column. The rows that {@code hitPolicy}
+   * selects among those whose tests all hold produce the node's value; a missing policy is {@link
+   * HitPolicy#FIRST}. The policy stays text, as {@code onError} does, so draft shape can name the
+   * policies when a request misspells one.
+   */
+  public record DecisionTable(
+      String hitPolicy, List<Condition> conditions, List<Result> results, List<Row> rows) {
+    /** Which matching rows produce the value; the JSON {@code hitPolicy} is the constant's name. */
+    public enum HitPolicy {
+      /** The first row whose tests hold, in table order. */
+      FIRST,
+      /** The one row whose tests hold; a second matching row fails the run. */
+      UNIQUE,
+      /** Every row whose tests hold, in table order, as a list. */
+      COLLECT;
+
+      /** The policy that {@code hitPolicy} names exactly; empty for null or an unknown name. */
+      public static Optional<HitPolicy> parse(String name) {
+        for (HitPolicy policy : values())
+          if (policy.name().equals(name)) return Optional.of(policy);
+        return Optional.empty();
+      }
+    }
+
+    /**
+     * The policy the rows are matched by: {@link HitPolicy#FIRST} when none is chosen. Draft shape
+     * rejects an unknown name, so use this on checked tables only.
+     */
+    public HitPolicy policy() {
+      if (hitPolicy == null) return HitPolicy.FIRST;
+      return HitPolicy.parse(hitPolicy)
+          .orElseThrow(() -> new IllegalStateException("Unknown hit policy: " + hitPolicy));
+    }
+
+    /** A condition column: the value its tests compare, and the label that names the column. */
+    public record Condition(String label, String expression) {}
+
+    /** A result column: the field it fills when a table has several results. */
+    public record Result(String name) {}
+
+    /** One row: a test per condition column, then a result expression per result column. */
+    public record Row(List<String> when, List<String> then) {
+      Row detached() {
+        return new Row(Frozen.list(when), Frozen.list(then));
+      }
+    }
+
+    /**
+     * The expressions the table holds: each condition's, then each row's results in table order.
+     * Tests are not expressions. A stored table is read as it is: a missing list, column, row or
+     * cell holds nothing.
+     */
+    List<String> expressionTexts() {
+      var texts = new ArrayList<String>();
+      if (conditions != null)
+        for (Condition condition : conditions)
+          if (condition != null) texts.add(condition.expression());
+      if (rows != null)
+        for (Row row : rows) if (row != null && row.then() != null) texts.addAll(row.then());
+      return texts;
+    }
+
+    DecisionTable detached() {
+      return new DecisionTable(
+          hitPolicy,
+          Frozen.list(conditions),
+          Frozen.list(results),
+          Frozen.list(rows, Row::detached));
+    }
+  }
+
+  /**
    * One graph node. Its {@code type} selects the {@link NodeKind}; the kind decides which of the
-   * optional fields the node uses.
+   * optional fields the node uses. {@code table} is written only when set ({@code
+   * engine.DefinitionJson}), so the JSON of every other node, stored or sent, is what it was before
+   * decision tables.
    */
   public record Node(
       String id,
@@ -138,7 +213,8 @@ public record Definition(
       List<BranchCase> cases,
       List<Field> fields,
       String selector,
-      String outputName) {
+      String outputName,
+      DecisionTable table) {
     /**
      * The kind that {@code type} names. Draft-shape validation rejects unknown types, so use this
      * on validated definitions only; {@link Definition#nodesOf} also reads unvalidated ones.
@@ -177,16 +253,17 @@ public record Definition(
         case CASES -> cases != null;
         case FIELDS -> fields != null;
         case OUTPUT_NAME -> outputName != null;
+        case TABLE -> table != null;
       };
     }
 
     /**
      * Every expression text the node holds, whatever its type, property by property: its
-     * expression, its binding values, its selector and each case's and field's expression; an unset
-     * expression or selector is null. The rules a stored draft or version calls (its callee set,
-     * which keeps them from deletion) are read from these texts, so the switch below makes a new
-     * property say whether it holds expressions. A stored row is read as it is: a missing list,
-     * case or field holds nothing.
+     * expression, its binding values, its selector, each case's and field's expression and a
+     * decision table's condition and result expressions; an unset expression or selector is null.
+     * The rules a stored draft or version calls (its callee set, which keeps them from deletion)
+     * are read from these texts, so the switch below makes a new property say whether it holds
+     * expressions. A stored row is read as it is: a missing list, case or field holds nothing.
      */
     public List<String> expressionTexts() {
       var texts = new ArrayList<String>();
@@ -208,6 +285,7 @@ public record Definition(
             fields == null
                 ? List.of()
                 : fields.stream().filter(Objects::nonNull).map(Field::expression).toList();
+        case TABLE -> table == null ? List.of() : table.expressionTexts();
         case OUTPUT, RULE, OUTPUT_NAME -> List.of();
       };
     }
@@ -231,7 +309,8 @@ public record Definition(
           Frozen.list(cases),
           Frozen.list(fields),
           selector,
-          outputName);
+          outputName,
+          table == null ? null : table.detached());
     }
   }
 

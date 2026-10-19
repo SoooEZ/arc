@@ -2,6 +2,7 @@ package dev.arc.engine.validation;
 
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.graph.GraphPlan;
+import dev.arc.engine.table.DecisionTables;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
@@ -20,9 +21,13 @@ import java.util.stream.Collectors;
 final class GraphValidation {
   /**
    * What a pass produced: whether the draft shape let it run, the scope plan (null for a cyclic or
-   * too complex graph) and the expressions it compiled.
+   * too complex graph), the expressions it compiled and its decision tables by node ID.
    */
-  record Pass(boolean shaped, GraphPlan plan, ExpressionCache expressions) {}
+  record Pass(
+      boolean shaped,
+      GraphPlan plan,
+      ExpressionCache expressions,
+      Map<String, DecisionTables.Compiled> tables) {}
 
   private final DefinitionShape documentShape;
   private final NodeValidation nodeValidation;
@@ -39,7 +44,8 @@ final class GraphValidation {
   CompiledGraph compile(Definition definition, RuleResolver resolver) {
     try {
       Pass pass = check(definition, resolver, GraphValidation::fail);
-      return new CompiledGraph(definition, pass.plan(), pass.expressions().compiled());
+      return new CompiledGraph(
+          definition, pass.plan(), pass.expressions().compiled(), pass.tables());
     } catch (ArcException error) {
       throw Problems.onInputNode(error, definition);
     }
@@ -58,9 +64,10 @@ final class GraphValidation {
     if (violation.isPresent()) {
       // Later checks assume a well-formed document.
       problems.accept(DefinitionShape.located(violation.get(), definition));
-      return new Pass(false, null, null);
+      return new Pass(false, null, null, Map.of());
     }
     var expressions = new ExpressionCache();
+    var tables = new HashMap<String, DecisionTables.Compiled>();
     var inputReads = checkSourceMappings(definition, expressions, resolver, problems);
     checkInputCycles(definition, inputReads, problems);
     boolean oneInput = checkConnections(definition, problems);
@@ -70,7 +77,7 @@ final class GraphValidation {
     for (Node node : nodes) {
       Set<String> scope = plan == null ? null : plan.available().get(node.id());
       try {
-        nodeValidation.validate(definition, node, scope, resolver, expressions);
+        nodeValidation.validate(definition, node, scope, resolver, expressions, tables);
       } catch (ArcException error) {
         problems.accept(error);
       }
@@ -78,7 +85,7 @@ final class GraphValidation {
         for (GraphPlan.Conflict conflict : plan.conflicts(node.id()))
           problems.accept(conflictProblem(definition, node, conflict));
     }
-    return new Pass(true, plan, expressions);
+    return new Pass(true, plan, expressions, tables);
   }
 
   /** A cyclic or too complex graph has no scope plan; its nodes still get every other check. */

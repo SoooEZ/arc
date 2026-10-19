@@ -26,6 +26,8 @@ final class DefinitionShape {
       expressionTooLong("Case expression") + " or is missing";
   private static final String FIELD_TOO_LONG_OR_MISSING =
       expressionTooLong("Field expression") + " or is missing";
+  private static final String CONDITION_TOO_LONG_OR_MISSING =
+      expressionTooLong("Condition expression") + " or is missing";
   private static final Document DOCUMENT = new Document();
 
   /**
@@ -86,6 +88,9 @@ final class DefinitionShape {
       case NodeDeclaration declaration -> declaration.node();
       case SwitchCase switchCase -> switchCase.node();
       case TransformField field -> field.node();
+      case TableCondition condition -> condition.node();
+      case TableResult result -> result.node();
+      case TableRow row -> row.node();
       case Connection connection -> connectedNode(connection.edge(), definition);
       case Document document -> null;
       case Note note -> null;
@@ -162,6 +167,7 @@ final class DefinitionShape {
       checkFields(node);
       checkBindings(node);
       checkPin(node);
+      if (kind.uses(Property.TABLE)) checkTable(node);
     }
   }
 
@@ -284,6 +290,111 @@ final class DefinitionShape {
         "Transform uses either field mappings or one expression, not both");
   }
 
+  /**
+   * A decision table's lists, sizes, labels, result names and row lengths. A draft may leave a
+   * table without columns or rows, a result unnamed and cells or condition expressions empty;
+   * validation reports those before a run.
+   */
+  private void checkTable(Node node) {
+    var declaration = new NodeDeclaration(node);
+    DecisionTable table = node.table();
+    require(table != null, declaration, node.label() + ": a decision table needs its table");
+    require(
+        table.hitPolicy() == null || DecisionTable.HitPolicy.parse(table.hitPolicy()).isPresent(),
+        declaration,
+        node.label() + ": hitPolicy must be FIRST, UNIQUE or COLLECT");
+    require(
+        table.conditions() != null && table.results() != null && table.rows() != null,
+        declaration,
+        node.label() + ": a decision table needs its conditions, results and rows lists");
+    requireAtMost(
+        table.conditions(),
+        Limits.MAX_TABLE_CONDITIONS,
+        condition -> new TableCondition(node, condition),
+        "Provide at most " + Limits.MAX_TABLE_CONDITIONS + " conditions");
+    requireAtMost(
+        table.results(),
+        Limits.MAX_TABLE_RESULTS,
+        result -> new TableResult(node, result),
+        "Provide at most " + Limits.MAX_TABLE_RESULTS + " results");
+    requireAtMost(
+        table.rows(),
+        Limits.MAX_TABLE_ROWS,
+        row -> new TableRow(node, row),
+        "Provide at most " + Limits.MAX_TABLE_ROWS + " rows");
+    var labels = new HashSet<String>();
+    for (DecisionTable.Condition condition : table.conditions()) {
+      var column = new TableCondition(node, condition);
+      require(
+          condition != null
+              && condition.label() != null
+              && !condition.label().isBlank()
+              && condition.label().length() <= Limits.MAX_LABEL_CHARACTERS
+              && labels.add(condition.label()),
+          column,
+          "Conditions need unique labels of 1 to " + Limits.MAX_LABEL_CHARACTERS + " characters");
+      require(
+          condition.expression() != null
+              && condition.expression().length() <= Limits.MAX_EXPRESSION_CHARACTERS,
+          column,
+          CONDITION_TOO_LONG_OR_MISSING);
+    }
+    var names = new HashSet<String>();
+    for (DecisionTable.Result result : table.results()) {
+      var column = new TableResult(node, result);
+      // An empty name is unset in an unfinished draft; a supplied one names a field of the value.
+      require(
+          result != null
+              && result.name() != null
+              && (result.name().isEmpty()
+                  || Identifiers.isValid(result.name()) && names.add(result.name())),
+          column,
+          "Results need unique names: letters, digits and underscores, starting with a letter or"
+              + " underscore");
+    }
+    for (int index = 0; index < table.rows().size(); index++) checkRow(node, table, index);
+  }
+
+  private void checkRow(Node node, DecisionTable table, int index) {
+    DecisionTable.Row row = table.rows().get(index);
+    var element = new TableRow(node, row);
+    String name = "Row " + (index + 1);
+    require(
+        row != null && row.when() != null && row.then() != null,
+        element,
+        name + " needs its tests and results");
+    require(
+        row.when().size() == table.conditions().size(),
+        element,
+        name
+            + " has "
+            + counted(row.when().size(), "test", "tests")
+            + ", but the table has "
+            + counted(table.conditions().size(), "condition", "conditions"));
+    require(
+        row.then().size() == table.results().size(),
+        element,
+        name
+            + " has "
+            + counted(row.then().size(), "result", "results")
+            + ", but the table has "
+            + counted(table.results().size(), "result column", "result columns"));
+    var cells = new ArrayList<String>(row.when());
+    cells.addAll(row.then());
+    for (String cell : cells) {
+      require(cell != null, element, name + ": write every cell as text; - tests any value");
+      require(
+          cell.length() <= Limits.MAX_EXPRESSION_CHARACTERS,
+          element,
+          Limits.exceeds(
+              name + " has a cell that", Limits.MAX_EXPRESSION_CHARACTERS, "characters"));
+    }
+  }
+
+  private static String counted(int count, String one, String many) {
+    return count + " " + (count == 1 ? one : many);
+  }
+
   private void checkBindings(Node node) {
     var declaration = new NodeDeclaration(node);
     require(
@@ -362,12 +473,14 @@ final class DefinitionShape {
       case CASES -> "Cases";
       case FIELDS -> "Fields";
       case OUTPUT_NAME -> "Output names";
+      case TABLE -> "Tables";
     };
   }
 
-  /** A kind as messages name it, e.g. "Formula". */
+  /** A kind as messages name it, e.g. "Formula" or "Decision table". */
   private static String title(NodeKind kind) {
-    return kind.name().charAt(0) + kind.name().substring(1).toLowerCase(Locale.ROOT);
+    String words = kind.name().replace('_', ' ').toLowerCase(Locale.ROOT);
+    return Character.toUpperCase(words.charAt(0)) + words.substring(1);
   }
 
   /** A list over its limit is reported at its first extra element. */

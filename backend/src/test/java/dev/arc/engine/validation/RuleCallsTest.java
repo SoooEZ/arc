@@ -125,6 +125,13 @@ class RuleCallsTest {
       case RULE -> builder.rule("called", 1);
       case OUTPUT -> builder.output("result");
       case OUTPUT_NAME -> builder.outputName("named");
+      case TABLE ->
+          builder.table(
+              new DecisionTable(
+                  null,
+                  List.of(new DecisionTable.Condition("C", "@condition:1()")),
+                  List.of(new DecisionTable.Result("r")),
+                  List.of(new DecisionTable.Row(List.of("-"), List.of("@result:1()")))));
     };
   }
 

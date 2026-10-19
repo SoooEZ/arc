@@ -662,6 +662,77 @@ def check_duplicates():
     assert request("GET", "/api/rules/" + original["id"])["revision"] == original["revision"]
 
 
+def table_definition(policy):
+    """Input, a shipping-fee decision table with the given policy, and an Output that returns its value."""
+    return {"schemaVersion": 1,
+            "inputs": [{"name": "tier", "type": "STRING", "required": True, "defaultValue": None},
+                       {"name": "amount", "type": "NUMBER", "required": False, "defaultValue": None}],
+            "nodes": [
+                {"id": "input", "type": "INPUT", "label": "Input", "position": {"x": 0, "y": 0}},
+                {"id": "fee", "type": "DECISION_TABLE", "label": "Shipping fee", "position": {"x": 0, "y": 160},
+                 "output": "shipping",
+                 "table": {"hitPolicy": policy,
+                           "conditions": [{"label": "Tier", "expression": "tier"},
+                                          {"label": "Order amount", "expression": "amount"}],
+                           "results": [{"name": "fee"}],
+                           "rows": [{"when": ['"gold"', "-"], "then": ["0"]},
+                                    {"when": ["-", ">= 100"], "then": ["0"]},
+                                    {"when": ["-", "< 100"], "then": ["amount * 0.1"]}]}},
+                {"id": "out", "type": "OUTPUT", "label": "Output", "position": {"x": 0, "y": 320},
+                 "expression": "shipping"}],
+            "edges": [{"id": "in", "source": "input", "target": "fee", "sourceHandle": "next"},
+                      {"id": "out", "source": "fee", "target": "out", "sourceHandle": "next"}]}
+
+
+def check_decision_tables():
+    """A decision table through create, validation, publish and execution: each policy selects its rows,
+    the trace names them, an overlap or a missing match fails at the node, and only the table's node is
+    written with a table."""
+    rule = create("table", "DECISION_TREE", table_definition(None))
+    nodes = rule["draft"]["nodes"]
+    assert [("table" in node) for node in nodes] == [False, True, False], nodes
+    assert nodes[1]["table"]["hitPolicy"] is None, nodes[1]
+    assert request("POST", "/api/validate", rule["draft"]) == {"valid": True}
+    rule = publish(rule)
+    gold = execute(rule["id"], {"tier": "gold", "amount": 150})
+    assert gold["result"] == 0 and gold["trace"][1]["matchedRows"] == [1], gold
+    assert gold["trace"][1]["branch"] == "next" and "matchedRows" not in gold["trace"][0], gold
+    status, text = raw_request("POST", f"/api/rules/{rule['id']}/execute", {"inputs": {"tier": "x", "amount": 50}})
+    assert status == 200 and text.startswith('{"ruleId":"' + rule["id"] + '","version":1,"result":5.0,'), text
+    missing = execute(rule["id"], {"tier": "silver"}, expected=422)
+    assert missing["message"] == 'No row matches Tier "silver", Order amount null', missing
+    assert [location["nodeId"] for location in missing["locations"]] == ["fee"], missing
+    for policy, inputs, value, rows in (("UNIQUE", {"tier": "x", "amount": 50}, 5.0, [3]),
+                                        ("COLLECT", {"tier": "gold", "amount": 150}, [0, 0], [1, 2]),
+                                        ("COLLECT", {"tier": "silver"}, [], [])):
+        rule["draft"]["nodes"][1]["table"]["hitPolicy"] = policy
+        rule = publish(save(rule))
+        result = execute(rule["id"], inputs)
+        assert result["result"] == value and result["trace"][1]["matchedRows"] == rows, (policy, result)
+    rule["draft"]["nodes"][1]["table"]["hitPolicy"] = "UNIQUE"
+    rule = publish(save(rule))
+    overlap = execute(rule["id"], {"tier": "gold", "amount": 150}, expected=422)
+    assert overlap["message"] == ('Rows 1 and 2 both match Tier "gold", Order amount 150; '
+                                  "with one match only, rows must not overlap"), overlap
+    # A cell that is not a test saves in a draft and fails validation at its cell.
+    bare = copy.deepcopy(rule)
+    bare["draft"]["nodes"][1]["table"]["rows"][0]["when"][0] = "gold"
+    bare = save(bare)
+    assert request("POST", "/api/validate", bare["draft"], 422)["message"] == (
+        'Shipping fee / Row 1 / Condition Tier: Write text in quotes: "gold"; a test cannot read a variable')
+    # Draft shape: a row without a test per condition, a table on another kind, a misspelled field.
+    short = copy.deepcopy(bare)
+    short["draft"]["nodes"][1]["table"]["rows"][0]["when"] = ["-"]
+    assert save(short, 422)["message"] == "Row 1 has 1 test, but the table has 2 conditions"
+    misplaced = copy.deepcopy(bare)
+    misplaced["draft"]["nodes"][0]["table"] = misplaced["draft"]["nodes"][1]["table"]
+    assert save(misplaced, 422)["message"] == "Tables belong to Decision table nodes"
+    misspelled = copy.deepcopy(bare)
+    misspelled["draft"]["nodes"][1]["table"]["rows"][0]["than"] = ["1"]
+    assert save(misspelled, 400)["message"] == \
+        "Request contains an unknown field: definition.nodes[1].table.rows[0].than"
+
+
 def main():
     check_seeded_execution()
     check_request_boundaries()
@@ -680,7 +751,8 @@ def main():
     check_test_cases()
     check_callers()
     check_duplicates()
-    print(f"PASS: {smoke_http.checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, concurrent edits, saved test cases, callers and duplicates.")
+    check_decision_tables()
+    print(f"PASS: {smoke_http.checks} HTTP checks, pricing branches, named Output fields, pinned calls, collisions, immutable references, deletions, concurrent edits, saved test cases, callers, duplicates and decision tables.")
 
 
 if __name__ == "__main__":

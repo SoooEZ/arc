@@ -102,6 +102,12 @@ export const modules: StudioModule[] = [
       '\nnode "${1:transform}" TRANSFORM "${2:Normalize data}" {\n  field "${3:name}" = ${4:\\$UPPER(\\$TRIM(customer.name))};\n  field "${5:amount}" = ${6:\\$TO_NUMBER(customer.amount)};\n  as ${7:normalized};\n  next -> "${8:output}";\n}\n',
   },
   {
+    name: "Decision table",
+    placement: "end",
+    snippet:
+      '\nnode "${1:table}" DECISION_TABLE "${2:Shipping fee}" {\n  hit first;\n  condition "${3:Tier}" = ${4:tier};\n  condition "${5:Order amount}" = ${6:amount};\n  result ${7:fee};\n  row "gold" | - -> 0;\n  row - | >= 100 -> 0;\n  row - | < 100 -> 8;\n  as ${8:shipping};\n  next -> "${9:output}";\n}\n',
+  },
+  {
     name: "Formula",
     placement: "end",
     snippet:

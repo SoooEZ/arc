@@ -12,6 +12,7 @@ import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.validation.Validator;
 import dev.arc.model.Definition;
+import dev.arc.model.Definition.DecisionTable;
 import dev.arc.model.Definition.Edge;
 import dev.arc.model.Definition.Node;
 import dev.arc.model.NodeKind;
@@ -102,6 +103,16 @@ class ArcScriptContractTest {
           next -> done;
         }
         node done OUTPUT "Done" at (0, 600) { return price; as total; }
+        node fee DECISION_TABLE "Fee" at (300, 500) {
+          result fee;
+          row "gold" | -  -> 0;
+          condition "Tier" = tier;
+          hit unique;
+          condition "Amount" = amount;
+          row - | >= 100 -> amount * 0.1;
+          as shipping;
+          next -> done;
+        }
         """;
     String canonical =
         """
@@ -165,6 +176,17 @@ class ArcScriptContractTest {
           return price;
           as total;
         }
+
+        node "fee" DECISION_TABLE "Fee" at (300.0, 500.0) {
+          hit unique;
+          condition "Tier" = tier;
+          condition "Amount" = amount;
+          result fee;
+          row "gold" | - -> 0;
+          row - | >= 100 -> amount * 0.1;
+          as shipping;
+          next -> "done" edge "fee-next-done";
+        }
         """;
     var built = script.build(source);
     assertThat(built.diagnostics()).isEmpty();
@@ -175,7 +197,12 @@ class ArcScriptContractTest {
         .isEqualTo(
             canonical.substring(0, canonical.indexOf("\nnode \"calc\"")).replace("// kinds\n", ""));
     assertThat(script.renderNode(built.definition(), "done"))
-        .isEqualTo("schema 1;\n\n" + canonical.substring(canonical.indexOf("\nnode \"done\"")));
+        .isEqualTo(
+            "schema 1;\n\n"
+                + canonical.substring(
+                    canonical.indexOf("\nnode \"done\""), canonical.indexOf("\nnode \"fee\"")));
+    assertThat(script.renderNode(built.definition(), "fee"))
+        .isEqualTo("schema 1;\n\n" + canonical.substring(canonical.indexOf("\nnode \"fee\"")));
   }
 
   /**
@@ -232,6 +259,34 @@ class ArcScriptContractTest {
                   .output("price")
                   .build());
       case OUTPUT -> List.of(node.expression("price").outputName("total").build());
+      case DECISION_TABLE ->
+          List.of(
+              node.table(
+                      new DecisionTable(
+                          "UNIQUE",
+                          List.of(
+                              new DecisionTable.Condition("Tier", "tier"),
+                              new DecisionTable.Condition("Amount", "amount")),
+                          List.of(
+                              new DecisionTable.Result("fee"), new DecisionTable.Result("note")),
+                          List.of(
+                              new DecisionTable.Row(
+                                  List.of("\"gold\", \"silver\"", "-"), List.of("0", "\"free\"")),
+                              new DecisionTable.Row(
+                                  List.of("not(\"gold\")", "10..<100"),
+                                  List.of("amount * 0.1", "$CONCAT(\"a\", \"|\")")))))
+                  .output("shipping")
+                  .build(),
+              nodeOf("n", kind.name(), "N")
+                  .at(0, 0)
+                  .table(
+                      new DecisionTable(
+                          null,
+                          List.of(new DecisionTable.Condition("Amount", "amount")),
+                          List.of(new DecisionTable.Result("fee")),
+                          List.of(new DecisionTable.Row(List.of(">= 100"), List.of("a || b")))))
+                  .output("fee")
+                  .build());
     };
   }
 

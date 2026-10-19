@@ -1,4 +1,11 @@
-import type { Definition, Input, NodeType, RuleNode } from "../types";
+import type {
+  DecisionTable,
+  Definition,
+  Input,
+  NodeType,
+  RuleNode,
+} from "../types";
+import { hitPolicyLabel, rowText } from "./decisionTables";
 import { sameDefinition, sameJson } from "./definitionEchoes";
 import { inputTypeFacts } from "./inputTypes";
 import { stringifyJson } from "./json";
@@ -50,6 +57,7 @@ const expressionField: Record<NodeType, string> = {
   TRANSFORM: "Expression",
   REFERENCE: "Expression",
   OUTPUT: "Returns",
+  DECISION_TABLE: "Expression",
 };
 
 function kindName(node: RuleNode): string {
@@ -84,6 +92,64 @@ function compareEntries(
     compare(fields, entry.name, before.get(key)?.value, entry.value);
   for (const [key, entry] of before)
     if (!after.has(key)) compare(fields, entry.name, entry.value, null);
+}
+
+/** Rows that differ at more than this many positions are counted, not listed. */
+const listedRowChanges = 8;
+
+/**
+ * A decision table's changes: its match policy, conditions by label, results
+ * by name and rows by number.
+ */
+function compareTables(
+  fields: FieldChange[],
+  before: DecisionTable | null | undefined,
+  after: DecisionTable | null | undefined,
+) {
+  if (!before && !after) return;
+  compare(
+    fields,
+    "Matching",
+    before && hitPolicyLabel(before.hitPolicy),
+    after && hitPolicyLabel(after.hitPolicy),
+  );
+  const conditions = (table: DecisionTable | null | undefined) =>
+    new Map(
+      (table?.conditions ?? []).map((condition) => [
+        condition.label,
+        { name: `Condition ${condition.label}`, value: condition.expression },
+      ]),
+    );
+  const changes = fields.length;
+  compareEntries(fields, conditions(before), conditions(after));
+  const order = (table: DecisionTable | null | undefined) =>
+    (table?.conditions ?? []).map((condition) => condition.label).join(", ");
+  if (fields.length === changes && order(before) !== order(after))
+    compare(fields, "Condition order", order(before), order(after));
+  const results = (table: DecisionTable | null | undefined) =>
+    (table?.results ?? []).map((result) => result.name).join(", ");
+  compare(fields, "Results", results(before), results(after));
+  const rowsBefore = before?.rows ?? [];
+  const rowsAfter = after?.rows ?? [];
+  const rows: FieldChange[] = [];
+  for (
+    let index = 0;
+    index < Math.max(rowsBefore.length, rowsAfter.length);
+    index++
+  )
+    compare(
+      rows,
+      `Row ${index + 1}`,
+      rowsBefore[index] && rowText(rowsBefore[index]),
+      rowsAfter[index] && rowText(rowsAfter[index]),
+    );
+  if (rows.length <= listedRowChanges) fields.push(...rows);
+  else
+    fields.push({
+      field: "Rows",
+      before: counted(rowsBefore.length, "row"),
+      after: `${counted(rowsAfter.length, "row")}, ${rows.length} changed`,
+    });
 }
 
 function nodeFields(before: RuleNode, after: RuleNode): FieldChange[] {
@@ -130,6 +196,7 @@ function nodeFields(before: RuleNode, after: RuleNode): FieldChange[] {
       ]),
     );
   compareEntries(fields, bindings(before), bindings(after));
+  compareTables(fields, before.table, after.table);
   compare(fields, "Result variable", before.output, after.output);
   compare(fields, "Output name", before.outputName, after.outputName);
   return fields;

@@ -86,11 +86,12 @@ class GraphPlanTest {
 
   /**
    * An empty result name means that no name is chosen yet, as draft shape and the code view read
-   * it, so a Formula, Transform or Reference with {@code output: ""} names no variable downstream.
+   * it, so a Formula, Transform, Reference or decision table with {@code output: ""} names no
+   * variable downstream.
    */
   @Test
   void anEmptyResultNameContributesNoVariableDownstream() {
-    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE")) {
+    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE", "DECISION_TABLE")) {
       for (String output : Arrays.asList(null, "")) {
         var unnamed = nodeOf("calc", type, "Calc").output(output).build();
         var definition =

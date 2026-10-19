@@ -9,7 +9,7 @@ import java.util.List;
  * NodeKind#handles} says which handles a node connects.
  */
 public final class Handles {
-  /** The only exit of an Input, Formula, Transform or Reference node. */
+  /** The only exit of an Input, Formula, Transform, Reference or Decision table node. */
   public static final String NEXT = "next";
 
   public static final String TRUE = "true";

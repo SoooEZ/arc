@@ -1,10 +1,12 @@
 import type {
   BranchCase,
+  DecisionTable,
   Definition,
   NodeType,
   RuleNode,
   TransformField,
 } from "../types";
+import { decisionTableCardSummary, newDecisionTable } from "./decisionTables";
 import { counted } from "./text";
 
 /**
@@ -33,7 +35,8 @@ export type NodeProperty =
   | "selector"
   | "cases"
   | "fields"
-  | "outputName";
+  | "outputName"
+  | "table";
 
 /** Kind-specific fields of a newly added node. */
 export interface NewNodeFields {
@@ -41,6 +44,7 @@ export interface NewNodeFields {
   bindings?: Record<string, string>;
   cases?: BranchCase[];
   fields?: TransformField[];
+  table?: DecisionTable;
 }
 
 /**
@@ -87,7 +91,8 @@ export interface NodeKind {
    * in the stylesheets, selected through `className`.
    */
   minimapColor: string;
-  newNodeFields: () => NewNodeFields;
+  /** Kind-specific fields of a node added to `definition`. */
+  newNodeFields: (definition: Pick<Definition, "inputs">) => NewNodeFields;
   /** The one-line detail a canvas card shows under its label. */
   summary: (node: RuleNode, inputCount: number) => string;
 }
@@ -230,6 +235,21 @@ export const nodeKinds: Record<NodeType, NodeKind> = {
         ? `${node.outputName} ← ${node.expression || "Choose a value"}`
         : expressionSummary(node),
   },
+  DECISION_TABLE: {
+    label: "Decision table",
+    newNodeLabel: "Decision table",
+    className: "decision_table",
+    storesResult: true,
+    addable: true,
+    removable: true,
+    acceptsIncoming: true,
+    ownsInputs: false,
+    exits: "next",
+    properties: ["table", "output"],
+    minimapColor: neutralMinimap,
+    newNodeFields: (definition) => ({ table: newDecisionTable(definition) }),
+    summary: (node) => decisionTableCardSummary(node.table, node.output),
+  },
 };
 
 /** Whether `value` names a node kind, e.g. a type read from ARC Script text. */
@@ -257,7 +277,7 @@ export function entryInputNode(
   return definition.nodes.find((node) => node.type === "INPUT");
 }
 
-/** Formula, Transform and Reference nodes assign the scoped variable named by `output`. */
+/** Formula, Transform, Reference and decision table nodes assign the scoped variable named by `output`. */
 export function storesResult(type: NodeType): boolean {
   return nodeKinds[type].storesResult;
 }
@@ -281,6 +301,7 @@ const propertyKeys: Record<
   cases: ["cases"],
   fields: ["fields"],
   outputName: ["outputName"],
+  table: ["table"],
 };
 
 function isNodeProperty(value: string): value is NodeProperty {
@@ -300,6 +321,7 @@ export const propertyNames: Record<NodeProperty, string> = {
   cases: "cases",
   fields: "fields",
   outputName: "an output name",
+  table: "a decision table",
 };
 
 /**

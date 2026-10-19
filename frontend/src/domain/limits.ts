@@ -22,7 +22,13 @@ export const MAX_EDGES = 200;
 export const MAX_SWITCH_CASES = 20;
 /** Fields of one Transform. */
 export const MAX_TRANSFORM_FIELDS = 50;
-/** UTF-16 units of a node label or Switch case label. */
+/** Condition columns of one decision table. */
+export const MAX_TABLE_CONDITIONS = 20;
+/** Result columns of one decision table. */
+export const MAX_TABLE_RESULTS = 10;
+/** Rows of one decision table. */
+export const MAX_TABLE_ROWS = 200;
+/** UTF-16 units of a node label, Switch case label or decision table condition label. */
 export const MAX_LABEL_CHARACTERS = 160;
 /** UTF-16 units of a rule or source name. */
 export const MAX_NAME_CHARACTERS = 160;

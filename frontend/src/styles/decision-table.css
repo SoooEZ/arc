@@ -1,0 +1,220 @@
+/* The decision table node: its grid dialog and its inspector preview. Cells
+   reuse .table-cell-input from sources.css. */
+.decision-table-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.decision-table-title h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.decision-table-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* The content scrolls as a whole; the grid keeps its own height and scroll. */
+.decision-table-content > * {
+  flex-shrink: 0;
+}
+.decision-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+}
+.decision-table-toolbar .MuiTextField-root {
+  width: 220px;
+}
+.decision-table-counts {
+  margin-left: auto;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+.decision-table-column-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: #f8faf7;
+}
+.decision-table-column-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.decision-table-scroll {
+  max-height: min(56vh, 620px);
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.decision-table-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 100%;
+  font-size: var(--text-lg);
+}
+.decision-table-grid th,
+.decision-table-grid td {
+  padding: 2px 4px;
+  border-bottom: 1px solid #eef2ed;
+  vertical-align: middle;
+}
+.decision-table-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f4f7f3;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  font-weight: 600;
+  color: #4f6a57;
+}
+.decision-table-grid thead .decision-table-result {
+  background: #f7f1ee;
+}
+.decision-table-number {
+  width: 36px;
+  text-align: right;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.decision-table-arrow {
+  width: 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+.decision-table-row-actions {
+  width: 36px;
+}
+.decision-table-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  min-width: 110px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.decision-table-heading:hover {
+  border-color: var(--color-border-strong);
+}
+.decision-table-heading:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.decision-table-heading code {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-code-text);
+}
+.decision-table-selected .decision-table-heading {
+  border-color: var(--color-focus-ring);
+  background: var(--color-surface);
+}
+.decision-table-cell {
+  min-width: 110px;
+}
+.decision-table-result-cell {
+  min-width: 130px;
+}
+.decision-table-empty,
+.decision-table-notice,
+.decision-table-help {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+.decision-table-empty {
+  padding: 12px;
+}
+.decision-table-help code {
+  font-family: var(--font-mono);
+  color: var(--color-code-text);
+}
+.decision-table-structure {
+  margin-right: auto;
+  font-size: var(--text-md);
+  color: var(--color-danger);
+}
+.decision-table-problem {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-danger);
+}
+.decision-table-preview-scroll {
+  /* As a grid or flex item it would otherwise grow to the table's width. */
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+.decision-table-preview {
+  width: 100%;
+  /* Columns share the inspector's width, so the results stay in view. */
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.decision-table-preview th,
+.decision-table-preview td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #eef2ed;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.decision-table-preview .decision-table-preview-narrow {
+  width: 18px;
+  padding-inline: 0;
+  text-align: center;
+}
+.decision-table-preview th {
+  background: #f4f7f3;
+  font-weight: 600;
+  color: #4f6a57;
+}
+.decision-table-preview code {
+  font-family: var(--font-mono);
+  color: var(--color-code-text);
+}
+.decision-table-check-panel h3 {
+  margin: 0 0 4px;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.decision-table-check ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-md);
+  color: #7a4b2d;
+}
+.decision-table-check-ok,
+.decision-table-check-note {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}

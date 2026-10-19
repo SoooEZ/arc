@@ -95,6 +95,7 @@ public final class RuleTemplates {
         null,
         null,
         null,
+        null,
         null);
   }
 
@@ -121,6 +122,7 @@ public final class RuleTemplates {
         ruleId,
         version,
         bindings,
+        null,
         null,
         null,
         null,

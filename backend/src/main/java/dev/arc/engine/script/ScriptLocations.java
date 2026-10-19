@@ -20,7 +20,10 @@ final class ScriptLocations {
   private final Map<Input, Statement> sources = new IdentityHashMap<>();
   private List<Statement> comments = List.of();
 
-  /** Records the statement that created a node, case, field, connection or input. */
+  /**
+   * Records the statement that created a node, case, field, decision table column or row,
+   * connection or input.
+   */
   void declared(Object element, Statement statement) {
     declarations.put(element, statement);
   }
@@ -60,6 +63,9 @@ final class ScriptLocations {
       case ShapeViolation.NodeDeclaration declaration -> declarations.get(declaration.node());
       case ShapeViolation.SwitchCase switchCase -> declarations.get(switchCase.option());
       case ShapeViolation.TransformField field -> declarations.get(field.field());
+      case ShapeViolation.TableCondition condition -> declarations.get(condition.condition());
+      case ShapeViolation.TableResult result -> declarations.get(result.result());
+      case ShapeViolation.TableRow row -> declarations.get(row.row());
       case ShapeViolation.Connection connection -> connectionStatement(connection.edge());
     };
   }

@@ -48,6 +48,9 @@
 .preview-node-output {
   color: var(--node-kind-output);
 }
+.preview-node-decision_table {
+  color: var(--node-kind-decision_table);
+}
 .preview-node > rect:first-of-type {
   fill: var(--color-surface);
   stroke: currentColor;

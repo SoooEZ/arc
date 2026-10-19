@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import type { Definition } from "../../src/types";
+import type { DecisionTable, Definition } from "../../src/types";
 import { changeLines, versionChanges } from "../../src/domain/versionChanges";
 import { parseJson } from "../../src/domain/json";
 import { connectGraphNodes, patchGraphNode } from "../../src/domain/graph";
@@ -215,5 +215,67 @@ test("long name lists are shortened and a layout change alone still counts", () 
   expect(changes.identical).toBe(false);
   expect(changeLines(changes).map((line) => line.text)).toEqual([
     "Moved 4 cards",
+  ]);
+});
+
+test("a decision table lists its match policy, conditions, results and rows", () => {
+  const table: DecisionTable = {
+    hitPolicy: "FIRST",
+    conditions: [{ label: "Tier", expression: "tier" }],
+    results: [{ name: "fee" }],
+    rows: [
+      { when: ['"gold"'], then: ["0"] },
+      { when: ["-"], then: ["8"] },
+    ],
+  };
+  const fees = {
+    id: "fees",
+    type: "DECISION_TABLE" as const,
+    label: "Fees",
+    position: { x: 0, y: 450 },
+    output: "fee",
+    table,
+  };
+  const before: Definition = {
+    ...published,
+    nodes: [...published.nodes, fees],
+  };
+  const after = patchGraphNode(before, "fees", {
+    table: {
+      hitPolicy: "UNIQUE",
+      conditions: [{ label: "Tier", expression: "customer.tier" }],
+      results: [{ name: "fee" }, { name: "carrier" }],
+      rows: [
+        { when: ['"gold"'], then: ["0", '"UPS"'] },
+        { when: ["-"], then: ["8", '"DHL"'] },
+        { when: ["null"], then: ["9", '"DHL"'] },
+      ],
+    },
+  });
+  expect(versionChanges(before, after).changedNodes).toEqual([
+    {
+      name: "Fees",
+      fields: [
+        { field: "Matching", before: "First match", after: "Only one match" },
+        { field: "Condition Tier", before: "tier", after: "customer.tier" },
+        { field: "Results", before: "fee", after: "fee, carrier" },
+        { field: "Row 1", before: '"gold" → 0', after: '"gold" → 0 | "UPS"' },
+        { field: "Row 2", before: "- → 8", after: '- → 8 | "DHL"' },
+        { field: "Row 3", before: null, after: 'null → 9 | "DHL"' },
+      ],
+    },
+  ]);
+  // Reordered conditions name their order; many changed rows are counted.
+  const many = patchGraphNode(before, "fees", {
+    table: {
+      ...table,
+      rows: Array.from({ length: 12 }, (_, index) => ({
+        when: [`${index}`],
+        then: ["1"],
+      })),
+    },
+  });
+  expect(versionChanges(before, many).changedNodes[0].fields).toEqual([
+    { field: "Rows", before: "2 rows", after: "12 rows, 12 changed" },
   ]);
 });

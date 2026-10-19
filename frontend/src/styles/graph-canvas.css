@@ -177,6 +177,10 @@
   background: #e7f4f3;
   color: var(--node-kind-transform);
 }
+.node-icon.decision_table {
+  background: #f7ece9;
+  color: var(--node-kind-decision_table);
+}
 .node-detail {
   font-family: var(--font-mono);
   font-size: var(--text-md);
@@ -208,14 +212,17 @@
   border-color: #70ab88;
   box-shadow: 0 0 0 3px #dcece0a6;
 }
-/* After .node-visited: a visited Switch or Transform card keeps its kind
-   border, while visited Condition, Reference and Output cards show the
-   visited border. */
+/* After .node-visited: a visited Switch, Transform or decision table card
+   keeps its kind border, while visited Condition, Reference and Output cards
+   show the visited border. */
 .node-switch {
   border-color: #e3d9bd;
 }
 .node-transform {
   border-color: #bddbdc;
+}
+.node-decision_table {
+  border-color: #e5d2cc;
 }
 .graph-node.node-error {
   border-color: var(--color-danger);

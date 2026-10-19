@@ -79,6 +79,23 @@ const draft: Definition = {
       position: { x: 0, y: 900 },
       expression: "total",
     },
+    {
+      id: "fees",
+      type: "DECISION_TABLE",
+      label: "Fees",
+      position: { x: 0, y: 1050 },
+      table: {
+        hitPolicy: "FIRST",
+        conditions: [
+          { label: "Amount", expression: "amount" },
+          { label: "Note", expression: "note" },
+        ],
+        results: [{ name: "fee" }],
+        // A test cell holds literals: "amount" here is text.
+        rows: [{ when: ['"amount"', "-"], then: ["amount * 2"] }],
+      },
+      output: "fee",
+    },
   ],
   edges: [],
 };
@@ -199,6 +216,23 @@ test.describe("finding the variables a graph reads", () => {
       "$MAP(items, amount, amount * 2)",
     ])
       expect(variablesRead(expression)).not.toContain("amount");
+  });
+
+  test("a decision table's conditions and result cells follow a rename; its test cells hold text", () => {
+    const renamed = withRenamedReferences(draft, "amount", "orderTotal");
+    const table = renamed.nodes.find((node) => node.id === "fees")?.table;
+    expect(table?.conditions).toEqual([
+      { label: "Amount", expression: "orderTotal" },
+      { label: "Note", expression: "note" },
+    ]);
+    expect(table?.rows).toEqual([
+      { when: ['"amount"', "-"], then: ["orderTotal * 2"] },
+    ]);
+    // An unchanged table keeps its objects.
+    const untouched = withRenamedReferences(draft, "shaped", "other");
+    expect(untouched.nodes.find((node) => node.id === "fees")).toBe(
+      draft.nodes.find((node) => node.id === "fees"),
+    );
   });
 
   test("every expression-bearing field counts, as withRenamedReferences rewrites them", () => {

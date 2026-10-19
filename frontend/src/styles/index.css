@@ -20,6 +20,7 @@
 @import "./expressions.css";
 @import "./editor-navigation.css";
 @import "./contextual-editors.css";
+@import "./decision-table.css";
 @import "./execution.css";
 @import "./api.css";
 @import "./studio.css";

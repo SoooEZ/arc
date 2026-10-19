@@ -293,7 +293,8 @@ class ErrorRecoveryTest {
                 assertThat(error.status()).isEqualTo(422);
                 assertThat(error.kind()).isEqualTo(ArcException.Kind.DEFINITION);
                 assertThat(error.getMessage())
-                    .isEqualTo("Result variables belong to Formula, Transform and Reference nodes");
+                    .isEqualTo(
+                        "Result variables belong to Formula, Transform, Reference and Decision table nodes");
                 assertThat(error.locations())
                     .containsExactly(
                         new ArcException.Location("stale", 1, "out", "Output"),

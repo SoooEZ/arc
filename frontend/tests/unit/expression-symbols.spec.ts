@@ -162,6 +162,32 @@ node last OUTPUT "Last" { return reused; as reused; }`,
   ]);
 });
 
+test("a decision table's conditions and result cells are expressions; its tests and names are not", () => {
+  expect(
+    names(
+      `inputs { amount: NUMBER required; tier: STRING required; }
+node fees DECISION_TABLE "Fees" {
+  hit first;
+  condition "amount" = tier;
+  result amount;
+  row "amount" | >= 100 -> amount * 2 | tier;
+  row not(amount) | - -> 0;
+  as fee;
+}
+node out OUTPUT "Result" { return fee; }`,
+      true,
+    ),
+  ).toEqual([
+    { text: "amount", kind: "parameter" },
+    { text: "tier", kind: "parameter" },
+    { text: "tier", kind: "parameter" },
+    { text: "amount", kind: "parameter" },
+    { text: "tier", kind: "parameter" },
+    { text: "fee", kind: "variable" },
+    { text: "fee", kind: "variable" },
+  ]);
+});
+
 test("a declaration's type reads in any case, as the server's grammar does", () => {
   for (const type of ["NUMBER", "number", "Number"])
     expect(

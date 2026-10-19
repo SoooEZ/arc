@@ -72,7 +72,8 @@ class OutputNameTest {
             ArcException.class,
             error -> {
               assertThat(error.getMessage())
-                  .isEqualTo("Result variables belong to Formula, Transform and Reference nodes");
+                  .isEqualTo(
+                      "Result variables belong to Formula, Transform, Reference and Decision table nodes");
               assertThat(error.locations().getFirst().nodeId()).isEqualTo("out");
             });
   }

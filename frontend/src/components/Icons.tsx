@@ -6,6 +6,7 @@ import {
   LogOut,
   Network,
   Split,
+  TableProperties,
   WandSparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const nodeIcons: Record<NodeType, LucideIcon> = {
   TRANSFORM: WandSparkles,
   REFERENCE: Braces,
   OUTPUT: LogOut,
+  DECISION_TABLE: TableProperties,
 };
 
 export function KindIcon({ kind, size = 20 }: { kind: Kind; size?: number }) {

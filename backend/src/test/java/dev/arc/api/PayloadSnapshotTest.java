@@ -39,7 +39,9 @@ class PayloadSnapshotTest extends RuleControllerSlice {
         List.of(
             new Engine.Step(
                 "pricing", 3, "calc", "Calc", "FORMULA", new BigDecimal("12.50"), "next", 0),
-            new Engine.Step("child", 1, "out", "Out", "OUTPUT", "x", null, 1));
+            new Engine.Step("child", 1, "out", "Out", "OUTPUT", "x", null, 1),
+            new Engine.Step(
+                "pricing", 3, "fee", "Fee", "DECISION_TABLE", 8, "next", List.of(3), 0));
     var sources =
         List.of(new Parameters.Read("rate", "country-tax", 2, Parameters.Read.Status.DEFAULT, 55));
     when(execution.preview(any()))
@@ -64,7 +66,10 @@ class PayloadSnapshotTest extends RuleControllerSlice {
                         + "\"branch\":\"next\",\"depth\":0},"
                         + "{\"ruleId\":\"child\",\"version\":1,\"nodeId\":\"out\","
                         + "\"label\":\"Out\",\"type\":\"OUTPUT\",\"value\":\"x\","
-                        + "\"branch\":null,\"depth\":1}],"
+                        + "\"branch\":null,\"depth\":1},"
+                        + "{\"ruleId\":\"pricing\",\"version\":3,\"nodeId\":\"fee\","
+                        + "\"label\":\"Fee\",\"type\":\"DECISION_TABLE\",\"value\":8,"
+                        + "\"branch\":\"next\",\"matchedRows\":[3],\"depth\":0}],"
                         + "\"durationMicros\":1234,"
                         + "\"sources\":[{\"input\":\"rate\",\"sourceId\":\"country-tax\","
                         + "\"version\":2,\"status\":\"DEFAULT\",\"durationMicros\":55}],"
@@ -171,7 +176,14 @@ class PayloadSnapshotTest extends RuleControllerSlice {
           + "{\"id\":\"done\",\"type\":\"OUTPUT\",\"label\":\"Done\",\"position\":null,"
           + "\"expression\":\"price\",\"output\":null,\"ruleId\":null,\"version\":null,"
           + "\"bindings\":null,\"cases\":null,\"fields\":null,\"selector\":null,"
-          + "\"outputName\":\"total\"}],"
+          + "\"outputName\":\"total\"},"
+          + "{\"id\":\"fee\",\"type\":\"DECISION_TABLE\",\"label\":\"Fee\",\"position\":null,"
+          + "\"expression\":null,\"output\":\"fee\","
+          + NULL_NODE_FIELDS
+          + ",\"table\":{\"hitPolicy\":null,"
+          + "\"conditions\":[{\"label\":\"Tier\",\"expression\":\"tier\"}],"
+          + "\"results\":[{\"name\":\"fee\"}],"
+          + "\"rows\":[{\"when\":[\"\\\"gold\\\"\"],\"then\":[\"0\"]}]}}],"
           + "\"edges\":["
           + "{\"id\":\"input-next-calc\",\"source\":\"input\",\"target\":\"calc\","
           + "\"sourceHandle\":\"next\"},"
@@ -215,7 +227,16 @@ class PayloadSnapshotTest extends RuleControllerSlice {
                 .rule("apply-discount", 1)
                 .bindings(bindings)
                 .build(),
-            nodeOf("done", "OUTPUT", "Done").expression("price").outputName("total").build()),
+            nodeOf("done", "OUTPUT", "Done").expression("price").outputName("total").build(),
+            nodeOf("fee", "DECISION_TABLE", "Fee")
+                .output("fee")
+                .table(
+                    new DecisionTable(
+                        null,
+                        List.of(new DecisionTable.Condition("Tier", "tier")),
+                        List.of(new DecisionTable.Result("fee")),
+                        List.of(new DecisionTable.Row(List.of("\"gold\""), List.of("0")))))
+                .build()),
         List.of(
             new Edge("input-next-calc", "input", "calc", "next"),
             new Edge("route-case", "route", "shape", "case:big")),

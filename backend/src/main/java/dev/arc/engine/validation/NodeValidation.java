@@ -3,6 +3,7 @@ package dev.arc.engine.validation;
 import dev.arc.engine.Identifiers;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
+import dev.arc.engine.table.DecisionTables;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
@@ -44,18 +45,24 @@ final class NodeValidation {
     }
   }
 
+  /**
+   * Checks one node; a decision table's compiled tests are added to {@code tables} under the node's
+   * ID, for execution to reuse.
+   */
   void validate(
       Definition definition,
       Node node,
       Set<String> scope,
       RuleResolver resolver,
-      ExpressionCache expressions) {
+      ExpressionCache expressions,
+      Map<String, DecisionTables.Compiled> tables) {
     try {
       NodeKind kind = node.kind();
       if (kind.uses(Property.CASES))
         require(
             node.cases() != null && !node.cases().isEmpty(),
             node.label() + ": add at least one case");
+      if (kind.uses(Property.TABLE)) DecisionTableValidation.requireParts(node);
 
       // Expressions first: a broken binding is reported before its pin, with or without a plan.
       for (OwnedExpression expression : expressions(node))
@@ -65,6 +72,7 @@ final class NodeValidation {
             expressions,
             resolver,
             unavailable -> ScopeMessages.unavailableAtNode(unavailable, definition));
+      if (kind.uses(Property.TABLE)) tables.put(node.id(), DecisionTableValidation.compile(node));
       if (kind.uses(Property.RULE)) checkPinnedRule(node, resolver);
 
       if (kind.storesResult()) {
@@ -147,6 +155,7 @@ final class NodeValidation {
       case SWITCH -> join(selector(node), cases(node));
       case TRANSFORM -> mapping(node);
       case REFERENCE -> bindings(node);
+      case DECISION_TABLE -> table(node);
       case INPUT -> List.of();
     };
   }
@@ -187,6 +196,28 @@ final class NodeValidation {
       fields.add(
           OwnedExpression.at(node, field.expression(), ExpressionPositions.transformField(field)));
     return fields;
+  }
+
+  /**
+   * A decision table's condition expressions, then each row's result expressions in table order;
+   * condition cells hold tests, not expressions.
+   */
+  private static List<OwnedExpression> table(Node node) {
+    var owned = new ArrayList<OwnedExpression>();
+    DecisionTable table = node.table();
+    for (DecisionTable.Condition condition : table.conditions())
+      owned.add(
+          OwnedExpression.at(
+              node, condition.expression(), ExpressionPositions.tableCondition(condition)));
+    for (int row = 0; row < table.rows().size(); row++) {
+      List<String> then = table.rows().get(row).then();
+      for (int column = 0; column < then.size(); column++) {
+        String result = ExpressionPositions.tableResult(table.results().get(column), column);
+        owned.add(
+            OwnedExpression.at(node, then.get(column), ExpressionPositions.tableCell(row, result)));
+      }
+    }
+    return owned;
   }
 
   @SafeVarargs

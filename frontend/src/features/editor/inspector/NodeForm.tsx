@@ -10,6 +10,7 @@ import ResultFields from "./ResultFields";
 import OutputFields from "./OutputFields";
 import SwitchFields from "./SwitchFields";
 import TransformFields from "./TransformFields";
+import DecisionTableFields from "../decision-table/DecisionTableFields";
 import type { NodeFieldsProps } from "./types";
 import UnusedProperties from "./UnusedProperties";
 import { useNodeVariables } from "./useNodeVariables";
@@ -24,6 +25,7 @@ const fieldsByType: Record<NodeType, ComponentType<NodeFieldsProps>> = {
   SWITCH: SwitchFields,
   TRANSFORM: TransformFields,
   OUTPUT: OutputFields,
+  DECISION_TABLE: DecisionTableFields,
 };
 
 export interface NodeFormProps {

@@ -845,6 +845,10 @@ components:
                       nullable: true
                       pattern: '^(next|true|false|default|case:[A-Za-z0-9_-]{1,64})$'
                       description: 'The handle the step left through: next, a Condition''s true or false, a Switch''s case:<id> or default; null for an Output'
+                    matchedRows:
+                      type: array
+                      items: {type: integer, minimum: 1}
+                      description: 'DECISION_TABLE steps only (absent on every other step): the rows that produced the value, numbered from 1; one row for FIRST and UNIQUE, every matching row, perhaps none, for COLLECT'
                     depth: {type: integer}
   schemas:
     Error:
@@ -854,6 +858,54 @@ components:
         message: {type: string}
         issues: {type: array, items: {type: string}}
         locations: {type: array, items: {$ref: '#/components/schemas/Location'}}
+    DecisionTable:
+      type: object
+      description: >-
+        DECISION_TABLE only, and written only on those nodes. Each condition's expression is
+        evaluated once in the node's incoming scope; a row matches when every test holds for its
+        column's value. FIRST takes the first matching row, UNIQUE the one matching row (several
+        fail with 422) and COLLECT every matching row as a list; FIRST and UNIQUE fail with 422 when
+        no row matches. Only matched rows' result expressions run. One result column gives its
+        value, several an object keyed by result name. A null or absent hitPolicy is FIRST.
+      required: [conditions, results, rows]
+      properties:
+        hitPolicy: {type: string, nullable: true, enum: [FIRST, UNIQUE, COLLECT]}
+        conditions:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [label, expression]
+            properties:
+              label: {type: string, minLength: 1, maxLength: 160, description: Unique within the table; messages name the column by it}
+              expression: {type: string, maxLength: 2000, description: An ARC expression; empty in an unfinished draft}
+        results:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            required: [name]
+            properties:
+              name: {type: string, pattern: '^([A-Za-z_][A-Za-z_0-9]{0,63})?$', description: Unique within the table; empty in an unfinished draft}
+        rows:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [when, then]
+            properties:
+              when:
+                type: array
+                description: >-
+                  One test per condition, in column order: - (any value), a value ("gold", 100,
+                  true, null), != value, < <= > >= number, a range (10..20, 10..<20, 10<..20,
+                  10<..<20), a comma-separated list of those, or not(list). Text is tested by
+                  equality only; comparisons and ranges take numbers.
+                items: {type: string, maxLength: 2000}
+              then:
+                type: array
+                description: One ARC expression per result column, in column order
+                items: {type: string, maxLength: 2000}
     Location:
       type: object
       description: A node of a rule version; the preview root has ruleId "preview" and a null version
@@ -1027,7 +1079,7 @@ components:
             required: [id, type, label]
             properties:
               id: {type: string, pattern: '^[A-Za-z0-9_-]{1,80}$'}
-              type: {type: string, enum: [INPUT, FORMULA, CONDITION, SWITCH, TRANSFORM, REFERENCE, OUTPUT]}
+              type: {type: string, enum: [INPUT, FORMULA, CONDITION, SWITCH, TRANSFORM, REFERENCE, OUTPUT, DECISION_TABLE]}
               label: {type: string, minLength: 1, maxLength: 160}
               position:
                 type: object
@@ -1045,7 +1097,7 @@ components:
                   matches reached case expressions by same-type equality; numeric
                   values 1 and 1.0 compare equal. Null, arrays and objects produce
                   a 422 execution error with the Switch node location.
-              output: {type: string, nullable: true}
+              output: {type: string, nullable: true, description: 'The result variable of a FORMULA, TRANSFORM, REFERENCE or DECISION_TABLE'}
               outputName: {type: string, nullable: true, pattern: '^([A-Za-z_][A-Za-z_0-9]{0,63})?$', description: 'OUTPUT only; wraps a single reached Output''s value as {outputName: value} and names its key among several'}
               ruleId: {type: string, nullable: true, description: REFERENCE only; a draft may keep the rule before choosing its version}
               version: {type: integer, minimum: 1, nullable: true, description: REFERENCE only; requires ruleId}
@@ -1083,6 +1135,8 @@ components:
                 nullable: true
                 maxProperties: 50
                 additionalProperties: {type: string, maxLength: 2000}
+              table:
+                $ref: '#/components/schemas/DecisionTable'
         edges:
           type: array
           maxItems: 200

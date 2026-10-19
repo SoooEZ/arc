@@ -1,4 +1,4 @@
-import type { Definition, Input, RuleNode } from "../types";
+import type { DecisionTable, Definition, Input, RuleNode } from "../types";
 import { renameVariable, variablesRead } from "./expressionSymbols";
 import { isIdentifier } from "./identifiers";
 import { storesResult } from "./nodeKinds";
@@ -65,6 +65,35 @@ function renamedValues(
   return changed ? renamed : values;
 }
 
+/** A decision table whose condition expressions and result cells read `to` instead of `from`. */
+function renamedTable(
+  table: DecisionTable,
+  rename: (text: string) => string,
+): DecisionTable {
+  const conditions = table.conditions.map((condition) => {
+    const expression = rename(condition.expression);
+    return expression === condition.expression
+      ? condition
+      : { ...condition, expression };
+  });
+  const rows = table.rows.map((row) => {
+    const then = row.then.map(rename);
+    return then.every((cell, index) => cell === row.then[index])
+      ? row
+      : { ...row, then };
+  });
+  const conditionsChanged = conditions.some(
+    (condition, index) => condition !== table.conditions[index],
+  );
+  const rowsChanged = rows.some((row, index) => row !== table.rows[index]);
+  if (!conditionsChanged && !rowsChanged) return table;
+  return {
+    ...table,
+    conditions: conditionsChanged ? conditions : table.conditions,
+    rows: rowsChanged ? rows : table.rows,
+  };
+}
+
 function renamedNode(node: RuleNode, from: string, to: string): RuleNode {
   const rename = (text: string) => renameVariable(text, from, to);
   const patch: Partial<RuleNode> = {};
@@ -88,6 +117,10 @@ function renamedNode(node: RuleNode, from: string, to: string): RuleNode {
     const bindings = renamedValues(node.bindings, from, to);
     if (bindings !== node.bindings) patch.bindings = bindings;
   }
+  if (node.table) {
+    const table = renamedTable(node.table, rename);
+    if (table !== node.table) patch.table = table;
+  }
   return Object.keys(patch).length ? { ...node, ...patch } : node;
 }
 
@@ -102,8 +135,9 @@ function renamedInput(input: Input, from: string, to: string): Input {
 /**
  * The definition with every expression that reads the variable `from`
  * reading `to`: node expressions, selectors, cases, Transform fields,
- * Reference bindings and the mappings of sourced inputs. Declarations keep
- * their names, and unchanged nodes and inputs keep their objects.
+ * Reference bindings, decision table conditions and result cells, and the
+ * mappings of sourced inputs. Declarations keep their names, and unchanged
+ * nodes and inputs keep their objects. Test cells hold literals only.
  */
 export function withRenamedReferences(
   definition: Definition,
@@ -131,7 +165,8 @@ export function withRenamedReferences(
 /**
  * Every variable an expression of the definition reads, in the places
  * withRenamedReferences rewrites: node expressions, selectors, cases,
- * Transform fields, Reference bindings and the mappings of sourced inputs.
+ * Transform fields, Reference bindings, decision table conditions and result
+ * cells, and the mappings of sourced inputs.
  */
 export function readVariables(definition: Definition): Set<string> {
   const read = new Set<string>();
@@ -145,6 +180,8 @@ export function readVariables(definition: Definition): Set<string> {
     node.cases?.forEach((item) => scan(item.expression));
     node.fields?.forEach((field) => scan(field.expression));
     if (node.bindings) Object.values(node.bindings).forEach(scan);
+    node.table?.conditions.forEach((condition) => scan(condition.expression));
+    node.table?.rows.forEach((row) => row.then.forEach(scan));
   }
   for (const input of definition.inputs)
     if (input.source) Object.values(input.source.bindings).forEach(scan);

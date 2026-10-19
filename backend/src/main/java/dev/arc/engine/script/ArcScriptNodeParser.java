@@ -10,6 +10,7 @@ import dev.arc.engine.Identifiers;
 import dev.arc.engine.Limits;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.script.ArcScriptScanner.Statement;
+import dev.arc.engine.table.DecisionTables;
 import dev.arc.error.ArcException;
 import dev.arc.model.Definition.*;
 import dev.arc.model.Handles;
@@ -81,6 +82,10 @@ final class ArcScriptNodeParser {
       Pattern.compile("field\\s+" + ID + "\\s*=\\s*(.*)", Pattern.DOTALL);
   private static final Pattern REFERENCE =
       Pattern.compile("use\\s+" + ID + "(?:\\s+version\\s+([1-9]\\d*))?");
+  private static final Pattern HIT = Pattern.compile("hit\\s+(first|unique|collect)");
+  private static final Pattern CONDITION =
+      Pattern.compile("condition\\s+(" + QUOTED + ")\\s*=(?:\\s*(.*))?", Pattern.DOTALL);
+  private static final Pattern RESULT = Pattern.compile("result(?:\\s+(.*))?", Pattern.DOTALL);
 
   /**
    * A declaration's keyword: its leading letters. The word ended at the first whitespace before, so
@@ -105,7 +110,11 @@ final class ArcScriptNodeParser {
   private final Map<String, String> bindings = new LinkedHashMap<>();
   private final List<BranchCase> cases = new ArrayList<>();
   private final List<Field> fields = new ArrayList<>();
+  private final List<DecisionTable.Condition> conditions = new ArrayList<>();
+  private final List<DecisionTable.Result> results = new ArrayList<>();
+  private final List<RowStatement> rows = new ArrayList<>();
   private final Set<String> assigned = new HashSet<>();
+  private String hitPolicy;
   private String expression;
   private String selector;
   private Boolean valueCases;
@@ -162,9 +171,50 @@ final class ArcScriptNodeParser {
             kind.uses(Property.CASES) ? cases : null,
             kind.uses(Property.FIELDS) && !fields.isEmpty() ? fields : null,
             selector,
-            outputName);
+            outputName,
+            kind.uses(Property.TABLE) ? table(locations) : null);
     locations.declared(node, header);
     return node;
+  }
+
+  /**
+   * A row as written, split into its two sides; its cells are counted once every column is known.
+   */
+  private record RowStatement(Statement statement, String tests, String results) {}
+
+  /**
+   * The table the statements declare. A side of a row without text has one empty cell when the
+   * table has columns on that side, and none when it has none; draft shape then checks that each
+   * row has a cell per column, at the row's statement.
+   */
+  private DecisionTable table(ScriptLocations locations) {
+    var tableRows = new ArrayList<DecisionTable.Row>();
+    for (RowStatement row : rows) {
+      var parsed =
+          new DecisionTable.Row(
+              cells(row.tests(), conditions.size(), row.statement(), true),
+              cells(row.results(), results.size(), row.statement(), false));
+      locations.declared(parsed, row.statement());
+      tableRows.add(parsed);
+    }
+    return new DecisionTable(hitPolicy, conditions, results, tableRows);
+  }
+
+  /** A side's cells; an empty cell stays empty, any other must be a test or an expression. */
+  private List<String> cells(String side, int columns, Statement statement, boolean tests) {
+    if (side.isEmpty()) return columns == 0 ? List.of() : List.of("");
+    List<String> cells = TableRowText.cells(side);
+    for (String cell : cells) {
+      if (cell.isEmpty()) continue;
+      if (!tests) optionalExpression(cell, statement);
+      else
+        try {
+          DecisionTables.test(cell);
+        } catch (ArcException failure) {
+          throw error(failure.getMessage(), statement);
+        }
+    }
+    return cells;
   }
 
   private Edge parseEdge(Matcher match, Statement statement, ScriptLocations locations) {
@@ -243,6 +293,10 @@ final class ArcScriptNodeParser {
         unique("selector", statement);
         selector = optionalExpression(value, statement);
       }
+      case "hit" -> parseHit(statement);
+      case "condition" -> parseCondition(statement, locations);
+      case "result" -> parseResult(statement, locations);
+      case "row" -> parseRow(value, statement);
       case "as" -> {
         unique("as", statement);
         String name = identifier(value, statement);
@@ -273,17 +327,19 @@ final class ArcScriptNodeParser {
       case TRANSFORM -> Set.of("let", "field", "as");
       case REFERENCE -> Set.of("use", "bind", "as");
       case OUTPUT -> Set.of("return", "as");
+      case DECISION_TABLE -> Set.of("hit", "condition", "result", "row", "as");
     };
   }
 
   /**
    * The property that {@code as name;} declares: an Output's field name, or the result variable of
-   * a Transform or Reference. The keyword table above rejects {@code as} for the other kinds first.
+   * a Transform, Reference or decision table. The keyword table above rejects {@code as} for the
+   * other kinds first.
    */
   private static Property aliasTarget(NodeKind kind) {
     return switch (kind) {
       case OUTPUT -> Property.OUTPUT_NAME;
-      case TRANSFORM, REFERENCE -> Property.OUTPUT;
+      case TRANSFORM, REFERENCE, DECISION_TABLE -> Property.OUTPUT;
       case INPUT, FORMULA, CONDITION, SWITCH ->
           throw new IllegalStateException("as is not declared for " + kind);
     };
@@ -330,6 +386,44 @@ final class ArcScriptNodeParser {
     var field = new Field(name, optionalExpression(match.group(2).trim(), statement));
     locations.declared(field, statement);
     fields.add(field);
+  }
+
+  /** {@code hit first|unique|collect}: the decision table's policy; omitted, it stays unset. */
+  private void parseHit(Statement statement) {
+    Matcher match = HIT.matcher(statement.text());
+    if (!match.matches()) throw error("Use: hit first; hit unique; or hit collect;", statement);
+    unique("hit", statement);
+    hitPolicy = match.group(1).toUpperCase(Locale.ROOT);
+  }
+
+  /** {@code condition "Label" = expression}: a column; a draft may leave the expression empty. */
+  private void parseCondition(Statement statement, ScriptLocations locations) {
+    Matcher match = CONDITION.matcher(statement.text());
+    if (!match.matches()) throw error("Use: condition \"Label\" = expression;", statement);
+    String value = match.group(2) == null ? "" : match.group(2).trim();
+    var condition =
+        new DecisionTable.Condition(
+            syntax.unquote(match.group(1), statement), optionalExpression(value, statement));
+    locations.declared(condition, statement);
+    conditions.add(condition);
+  }
+
+  /** {@code result name}: a result column; {@code result;} leaves it unnamed in a draft. */
+  private void parseResult(Statement statement, ScriptLocations locations) {
+    Matcher match = RESULT.matcher(statement.text());
+    if (!match.matches()) throw error("Use: result name;", statement);
+    String name = match.group(1) == null ? "" : match.group(1).trim();
+    var result = new DecisionTable.Result(name.isEmpty() ? "" : identifier(name, statement));
+    locations.declared(result, statement);
+    results.add(result);
+  }
+
+  /** {@code row test | test -> result | result}: its cells are read once the columns are known. */
+  private void parseRow(String row, Statement statement) {
+    var parts =
+        TableRowText.parts(row)
+            .orElseThrow(() -> error("Use: row test | test -> result | result;", statement));
+    rows.add(new RowStatement(statement, parts.tests(), parts.results()));
   }
 
   /** {@code use "rule-id" [version n]}: a draft may choose the rule before its version. */

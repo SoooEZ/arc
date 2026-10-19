@@ -95,6 +95,12 @@ class LimitsTest {
                 .rule("child", 1)
                 .bindings(Map.of("b", expression))
                 .build());
+    sites.put(
+        "Condition expression exceeds 2,000 characters or is missing",
+        expression -> table(List.of(new DecisionTable.Condition("C", expression)), "-", "1"));
+    sites.put(
+        "Row 1 has a cell that exceeds 2,000 characters",
+        expression -> table(List.of(new DecisionTable.Condition("C", "1")), "-", expression));
     String longest = expressionOfLength(Limits.MAX_EXPRESSION_CHARACTERS);
     String tooLong = expressionOfLength(Limits.MAX_EXPRESSION_CHARACTERS + 1);
     Expressions.compile(longest);
@@ -114,6 +120,19 @@ class LimitsTest {
   /** A number followed by spaces, so the compiler reaches its length check and nothing else. */
   private static String expressionOfLength(int length) {
     return "1" + " ".repeat(length - 1);
+  }
+
+  /** A decision table with these conditions and one row of one test and one result. */
+  private static Node table(List<DecisionTable.Condition> conditions, String test, String result) {
+    return nodeOf("site", "DECISION_TABLE", "Site")
+        .output("v")
+        .table(
+            new DecisionTable(
+                null,
+                conditions,
+                List.of(new DecisionTable.Result("r")),
+                List.of(new DecisionTable.Row(List.of(test), List.of(result)))))
+        .build();
   }
 
   private static Node switchNode(List<BranchCase> cases, String selector) {

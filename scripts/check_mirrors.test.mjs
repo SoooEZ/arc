@@ -260,6 +260,7 @@ test("node, rule and source kinds have one vocabulary across the frontend, the s
     CASES: "cases",
     FIELDS: "fields",
     OUTPUT_NAME: "outputName",
+    TABLE: "table",
   };
   assert.deepEqual(
     enumConstants(nodeKindJava, "Property"),

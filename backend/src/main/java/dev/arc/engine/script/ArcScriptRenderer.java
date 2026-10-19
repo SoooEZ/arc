@@ -7,6 +7,8 @@ import dev.arc.model.Definition;
 import dev.arc.model.Definition.*;
 import dev.arc.model.NodeKind;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -108,6 +110,10 @@ final class ArcScriptRenderer {
     if (node.bindings() != null)
       for (var binding : new TreeMap<>(node.bindings()).entrySet())
         expressions.add(new Written("binding " + binding.getKey(), binding.getValue()));
+    if (node.table() != null && node.table().conditions() != null)
+      for (DecisionTable.Condition condition : node.table().conditions())
+        if (condition != null)
+          expressions.add(new Written("condition " + condition.label(), condition.expression()));
     for (Written written : expressions)
       if (written.expression() != null && !ArcScriptScanner.scansAsOneValue(written.expression()))
         throw ArcException.invalid(
@@ -117,6 +123,32 @@ final class ArcScriptRenderer {
                     + ", which has a ';', '}' or '//' outside quotes or an unclosed quote or"
                     + " bracket; correct it in the graph")
             .atNode(null, null, node.id(), node.label());
+    if (node.table() != null) requireOneCellPerCell(node);
+  }
+
+  /**
+   * Refuses a decision table cell that would not read back as that one cell: besides what ends a
+   * statement, a {@code |} or {@code ->} outside quotes and brackets would split it.
+   */
+  private static void requireOneCellPerCell(Node node) {
+    List<DecisionTable.Row> rows = node.table().rows();
+    if (rows == null) return;
+    for (int index = 0; index < rows.size(); index++) {
+      DecisionTable.Row row = rows.get(index);
+      if (row == null) continue;
+      var cells = new ArrayList<String>();
+      if (row.when() != null) cells.addAll(row.when());
+      if (row.then() != null) cells.addAll(row.then());
+      for (String cell : cells)
+        if (cell != null && !TableRowText.writesAsOneCell(cell))
+          throw ArcException.invalid(
+                  node.label()
+                      + ": ARC Script cannot show row "
+                      + (index + 1)
+                      + ", which has a cell with a ';', '}', '//', '|' or '->' outside quotes or"
+                      + " an unclosed quote or bracket; correct it in the graph")
+              .atNode(null, null, node.id(), node.label());
+    }
   }
 
   /** An expression and the part of its node that holds it, for a refusal to name. */
@@ -133,7 +165,38 @@ final class ArcScriptRenderer {
       case REFERENCE -> referenceDeclarations(node);
       case OUTPUT ->
           statement("return", node.expression()) + statement("as", node.outputFieldName());
+      case DECISION_TABLE -> tableDeclarations(node);
     };
+  }
+
+  /**
+   * The policy when one is chosen, the condition and result columns, the rows, then the result
+   * variable: {@code row "gold" | - -> 0;}. A cell left empty is written empty.
+   */
+  private String tableDeclarations(Node node) {
+    DecisionTable table = node.table();
+    var out = new StringBuilder();
+    if (table.hitPolicy() != null)
+      out.append(statement("hit", table.hitPolicy().toLowerCase(Locale.ROOT)));
+    for (DecisionTable.Condition condition : table.conditions())
+      out.append(statement("condition " + write(condition.label()) + " =", condition.expression()));
+    for (DecisionTable.Result result : table.results())
+      out.append(statement("result", result.name()));
+    for (DecisionTable.Row row : table.rows())
+      out.append("  row")
+          .append(cells(row.when()))
+          .append(" ->")
+          .append(cells(row.then()))
+          .append(";\n");
+    return out.append(statement("as", node.resultName())).toString();
+  }
+
+  /**
+   * One side of a row: nothing for no cells or one empty cell, else the cells joined by {@code |}.
+   */
+  private static String cells(List<String> cells) {
+    if (cells.isEmpty() || cells.size() == 1 && cells.getFirst().isEmpty()) return "";
+    return " " + String.join(" | ", cells);
   }
 
   private String switchDeclarations(Node node) {

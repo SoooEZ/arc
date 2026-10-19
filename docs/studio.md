@@ -19,7 +19,7 @@ Arguments follow the input declaration order in that published version. Trailing
 
 Choose **Open in Editor** for a larger editor with the grouped catalog, hover help, click-to-insert snippets and upstream-variable chips. Apply changes that expression in the shared draft; Cancel preserves it. Syntax, Formula pin/argument-count and unavailable-variable checks run as you edit in the dialog; Test rule checks runtime values and types. Read-only versions allow inspection without applying edits. The preview panel's **Input JSON** and the published API playground also use code editors with Tab/Shift+Tab indentation and bracket matching. Incomplete JSON stays editable; running checks the current buffer. Monaco's **Ctrl+M** (**Ctrl+Shift+M** on macOS) toggle lets Tab move focus out of the editor when needed.
 
-**Add node → Condition** adds a True/False node. Its **Branches** setting turns it into cases (stored as a `SWITCH`) for multiple branches and back while it has one condition case; use **Add node → Transform** for data shaping. Formula expressions can nest functions and process objects/arrays; they are not restricted to arithmetic. They still use ARC's bounded expression language, rather than arbitrary JavaScript or host code.
+**Add node → Condition** adds a True/False node. Its **Branches** setting turns it into cases (stored as a `SWITCH`) for multiple branches and back while it has one condition case; use **Add node → Transform** for data shaping and **Add node → Decision table** for rules that read best as a table ([Decision tables](#decision-tables)). Formula expressions can nest functions and process objects/arrays; they are not restricted to arithmetic. They still use ARC's bounded expression language, rather than arbitrary JavaScript or host code.
 
 ## Switch and data transformation
 
@@ -139,6 +139,71 @@ All three conversions preserve null. Use `$COALESCE` for null defaults or `$IFER
 
 `$CONCAT`, `$CONTAINS`, `$GET` and `$PLUCK` read numbers as `$TO_STRING` writes them: `$CONCAT("Year ", $YEAR(date))` is `Year 2020`, and `$GET(items, 10.0)` reads index 10. `$CONCAT` skips null and rejects objects. `$CONTAINS` is false when the text or the searched value is null; with an array it tests membership, comparing arrays and objects by value; searching an object, or searching text for an array or object, is an error, so the value must be a scalar when searching text. `$GET`/`$PLUCK` need a text or number path.
 
+## Decision tables
+
+**Add node → Decision table** adds one card that holds a table. Its **condition** columns are values the table tests, each an expression over the node's incoming scope, evaluated once per run; its **result** columns are what a matching row gives. Each row has one test per condition and one expression per result. The table's value is stored under **Save result as**, like a Formula's result.
+
+| # | Tier | Order amount | Region | → | fee |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `"gold"` | `-` | `"domestic"` | → | `0` |
+| 2 | `-` | `>= 100` | `"domestic"` | → | `0` |
+| 3 | `-` | `< 100` | `"domestic"` | → | `8` |
+| 4 | `-` | `-` | `"overseas"` | → | `25` |
+
+A test is one of these:
+
+| Test | Holds when the column's value… |
+| --- | --- |
+| `-` | is anything, null included |
+| `"gold"`, `100`, `true`, `null` | equals it: the same type (`1` is not `"1"`), numbers by value (`1` is `1.0`), text exactly |
+| `!= "gold"` | does not equal it |
+| `< 100`, `<= 100`, `> 100`, `>= 100` | is a number on that side; a null value never holds |
+| `100..500`, `100..<500`, `100<..500`, `100<..<500` | is a number in the range: `..` includes both ends, `<` on a side leaves that end out |
+| `"gold", "platinum"`, `< 0, > 100` | holds for one of the listed tests |
+| `not("gold", "platinum")` | holds for none of them |
+
+The values of one column are of one type: numbers, text, or `true`/`false` (`null` and `-` fit any column). Comparisons and ranges take numbers; a text or true/false value compared with a number fails the run with `422`, and so does a condition whose value is an array or an object.
+
+**Matching** decides which rows give the value:
+
+- **First match** (`hit first`, the default): rows are tried from the top and the first matching row gives the value. No matching row fails the run with `422` "No row matches Tier "silver", Order amount 50, Region "moon"".
+- **Only one match** (`hit unique`): every row is tried and exactly one may match. Several matches fail with `422` naming the rows; no match fails as above.
+- **All matches (list)** (`hit collect`): every matching row gives a value, in table order, and the value is a list (empty when none matches).
+
+With one result column, a row gives that value; with several, it gives an object keyed by the result names, read downstream as `shipping.fee`. Only the matching rows' result expressions run; they read the node's incoming scope, never each other. The Test panel's trace shows the matched rows beside the table's value ("Row 3", "Rows 1, 4").
+
+The inspector shows the table's summary and first rows. **Edit table…** opens the grid: click a column heading to rename it, change its expression or move or delete it; **Add condition**, **Add result** and **Add row** extend the table (up to 20 conditions, 10 results and 200 rows), and each row's ⋮ menu inserts, duplicates, moves or deletes it. Enter moves down a column. A test cell that is no test is marked with the reason; plain text is quoted when you leave the cell (`gold` becomes `"gold"`, `gold, silver` becomes `"gold", "silver"`). Results are expressions, so text there needs quotes. To fill the grid from a spreadsheet, copy a block of cells and paste it into a cell: it fills to the right and down, adding rows as needed; an empty pasted condition cell becomes `-`, and pasted results are read as values (numbers stay numbers, TRUE/FALSE become `true`/`false`, other text is quoted). **Apply to graph** writes the table to the draft as one undoable edit; **Cancel** discards it. A published version opens the same grid read-only.
+
+**Table check**, in the inspector and below the grid, reads the table as you edit it. For **First match** it names rows the rows above always answer (so they never match) and values no row matches; for **Only one match** it names pairs of rows that can match the same values, with an example, and values no row matches. Null values are not checked. These are hints: they never block saving or publishing, and a value no row covers may be intended (the run then fails, as above).
+
+In code, a table is written row by row. This complete script returns `8` for its default inputs, `0` for an amount of 100 or more, `25` for `"overseas"`, and fails with `422` for a region the table does not name:
+
+```arc
+schema 1;
+inputs {
+  tier: STRING required default "silver";
+  amount: NUMBER required default 80;
+  region: STRING required default "domestic";
+}
+node input INPUT "Input" { next -> fee; }
+node fee DECISION_TABLE "Shipping fee" {
+  hit first;
+  condition "Tier" = tier;
+  condition "Order amount" = amount;
+  condition "Region" = region;
+  result fee;
+  row "gold" | - | "domestic" -> 0;
+  row - | >= 100 | "domestic" -> 0;
+  row - | < 100 | "domestic" -> 8;
+  row - | - | "overseas" -> 25;
+  as shipping;
+  next -> output;
+}
+node output OUTPUT "Shipping" { return shipping; }
+```
+
+`hit` is written only when the match policy is set. `condition "Label" = expression;` declares a condition column (its label is required and unique in the table), `result name;` a result column, and each `row` lists its tests separated by `|`, then `->` and its results separated by `|`. `as` names the table's result variable. An unfinished table keeps its gaps in code (`condition "Tier" =;`, `result;`, an empty cell between two `|`). The **Decision table** module inserts a template.
+
 ## Example
 
 Create a rule, open its code editor, replace the script with this, then build and test:
@@ -238,7 +303,7 @@ Source definitions contain `kind` (`LOOKUP` or `HTTP`), `parameters`, and `timeo
 
 ### Node expressions and connections
 
-Clicking a node opens its inspector. The header keeps the node icon, inline **Node name** field and `</>` action in one row, with the node type below its icon. Editing the name updates the canvas label immediately. The header groups the code and **Delete node** icons at the right, with hover labels; Input cannot be deleted. Canvas code and reference icons likewise stay together. Inspector sections use bold headings and start expanded; click a heading to collapse its section. Every section has an info icon that explains its controls on hover or keyboard focus. **Available variables** appears above each expression editor, only when that editor is shown. Hover the text for a preview above the editor, or click to pin that list above it. You can keep editing or click elsewhere while it stays open; only its **X** closes it. Leaving the owning expression removes its panel. Formula, Reference and Transform result names live under **Save result as**, and an Output's value under **Returns**. Renaming a result variable, or an input parameter in the Input node, renames it in every expression that reads it: node expressions, selectors, cases, Transform fields, Reference mappings and source mappings. The expressions follow each complete name as you type; while the name is empty, starts with a digit or is another variable's, they keep the last name they followed, and they follow again once the name is valid and unique. Undo reverts a burst of renaming in one step. A name that two declarations share is renamed alone, since its reads may belong to either. A parameter or result name shows the naming rule only when the name breaks it. Variable choices follow connected upstream paths, including the path from Input. Connect a new Switch to Input or an upstream calculation before choosing its variables; disconnected nodes have none. **Open in Editor** shows the same available names for expressions. Variable dropdowns display **value_name** [value_type] *from* **source_name**, with a muted italic “from”; computed outputs with no declared type use `result`. The chosen value uses the same formatting.
+Clicking a node opens its inspector. The header keeps the node icon, inline **Node name** field and `</>` action in one row, with the node type below its icon. Editing the name updates the canvas label immediately. The header groups the code and **Delete node** icons at the right, with hover labels; Input cannot be deleted. Canvas code and reference icons likewise stay together. Inspector sections use bold headings and start expanded; click a heading to collapse its section. Every section has an info icon that explains its controls on hover or keyboard focus. **Available variables** appears above each expression editor, only when that editor is shown. Hover the text for a preview above the editor, or click to pin that list above it. You can keep editing or click elsewhere while it stays open; only its **X** closes it. Leaving the owning expression removes its panel. Formula, Reference and Transform result names live under **Save result as**, and an Output's value under **Returns**. Renaming a result variable, or an input parameter in the Input node, renames it in every expression that reads it: node expressions, selectors, cases, Transform fields, decision table conditions and results, Reference mappings and source mappings. The expressions follow each complete name as you type; while the name is empty, starts with a digit or is another variable's, they keep the last name they followed, and they follow again once the name is valid and unique. Undo reverts a burst of renaming in one step. A name that two declarations share is renamed alone, since its reads may belong to either. A parameter or result name shows the naming rule only when the name breaks it. Variable choices follow connected upstream paths, including the path from Input. Connect a new Switch to Input or an upstream calculation before choosing its variables; disconnected nodes have none. **Open in Editor** shows the same available names for expressions. Variable dropdowns display **value_name** [value_type] *from* **source_name**, with a muted italic “from”; computed outputs with no declared type use `result`. The chosen value uses the same formatting.
 
 When only one Output runs, its optional **Output name** wraps the chosen return value in an object. For example, selecting `total` and naming the output `payable` returns `{"payable": 42}` when total is 42. Leave the name blank to return 42 directly. The name applies to variables, constants and expressions and survives graph/code editing, saving and publication. In ARC Script, use `return total; as payable;`. When multiple Outputs run, each raw value uses **Output name** as its field key, otherwise the directly returned variable name, otherwise the node ID. For example, returning `amount` and naming another Output `payable` produces `{"amount": 100, "payable": 42}`. Named Outputs add no extra wrapper in this object. Give constants, property paths and compound expressions an Output name when you want a meaningful field instead of the node-ID fallback. Duplicate keys among reached Outputs produce an error identifying both nodes; skipped branches do not conflict. The rule applies to existing published versions as well as drafts, without rewriting their saved definitions. The return preview labels the single-Output value separately from its field in a multiple-Output result, showing the actual outer key whenever the graph has other Outputs. The runtime includes only reached Outputs; simply having several Output nodes does not mean all will execute.
 
@@ -254,7 +319,7 @@ Node errors are grouped behind one header icon. Hover to inspect all messages, o
 
 Right-click a connection and choose **Delete** to remove that connection while keeping its endpoint nodes and all other connections. Changes stay in the draft until saved. Deletion is disabled in historical versions and while a document command is pending.
 
-Use the `</>` button on a canvas node, or **Node expression** in its inspector, to edit the whole node as ARC Script. A condition has a `when` expression; a Switch has `case ... when` or `select` with `case ... equals`; a formula has `let`; an output has `return`; a reused rule has `use`, `bind` and `as`. The Input node includes the rule’s parameters and source mappings. **Apply to graph** synchronizes the edit without saving or publishing. Syntax errors must be fixed before applying; other graph validation errors remain visible on the canvas while you finish the draft.
+Use the `</>` button on a canvas node, or **Node expression** in its inspector, to edit the whole node as ARC Script. A condition has a `when` expression; a Switch has `case ... when` or `select` with `case ... equals`; a formula has `let`; an output has `return`; a reused rule has `use`, `bind` and `as`; a decision table has `hit`, `condition`, `result`, `row` and `as`. The Input node includes the rule’s parameters and source mappings. **Apply to graph** synchronizes the edit without saving or publishing. Syntax errors must be fixed before applying; other graph validation errors remain visible on the canvas while you finish the draft.
 
 Unfinished nodes keep their gaps in code. Omit a statement for a value you have not set, or leave the value empty: `let total;` has a result name but no expression, `let = amount * 2;` has an expression but no name, and `return;`, `when;`, `select;`, `field "name" =;`, `bind rate =;` and `case id "Label" when;` hold empty values. `use "rule-id";` keeps a chosen rule before you pick its version. Builds accept these drafts; validation still reports the missing parts until you fill them in. Problems such as a label over 160 characters or a connection to a missing node are reported at the statement that declares them.
 

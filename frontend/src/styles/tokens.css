@@ -62,6 +62,7 @@
   --node-kind-transform: #538f91;
   --node-kind-reference: #a08abb;
   --node-kind-output: #7b9e72;
+  --node-kind-decision_table: #a0756a;
 
   --sidebar-width: 68px;
   --sidebar-expanded-width: 224px;

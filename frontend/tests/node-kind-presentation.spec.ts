@@ -110,11 +110,27 @@ function everyKind(childId: string): Definition {
         position: at(700, 540),
       },
       {
+        id: "band",
+        type: "DECISION_TABLE",
+        label: "Band table",
+        table: {
+          hitPolicy: "FIRST",
+          conditions: [{ label: "Amount", expression: "amount" }],
+          results: [{ name: "band" }],
+          rows: [
+            { when: [">= 5"], then: ['"high"'] },
+            { when: ["-"], then: ['"low"'] },
+          ],
+        },
+        output: "band",
+        position: at(700, 720),
+      },
+      {
         id: "done2",
         type: "OUTPUT",
         label: "Reused",
         expression: "reused",
-        position: at(700, 760),
+        position: at(700, 900),
       },
     ],
     edges: [
@@ -126,7 +142,8 @@ function everyKind(childId: string): Definition {
       { id: "f", source: "pick", target: "done", sourceHandle: "case:mid" },
       { id: "g", source: "pick", target: "done", sourceHandle: "default" },
       { id: "h", source: "shape", target: "reuse", sourceHandle: "next" },
-      { id: "i", source: "reuse", target: "done2", sourceHandle: "next" },
+      { id: "i", source: "reuse", target: "band", sourceHandle: "next" },
+      { id: "j", source: "band", target: "done2", sourceHandle: "next" },
     ],
   };
 }
@@ -205,6 +222,14 @@ function expectations(childId: string): Record<string, Expected> {
       key: "reference",
       kindLabel: "Reuse rule",
       detail: `${childId} · v1`,
+      storesResult: true,
+    },
+    band: {
+      ...step,
+      label: "Band table",
+      key: "decision_table",
+      kindLabel: "Decision table",
+      detail: "2 rows → band",
       storesResult: true,
     },
     done2: {
@@ -298,12 +323,12 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
 
   // Only Conditions, True / False or with cases, stand out on the minimap.
   const minimapNodes = page.locator(".react-flow__minimap-node");
-  await expect(minimapNodes).toHaveCount(8);
+  await expect(minimapNodes).toHaveCount(9);
   const fills = await minimapNodes.evaluateAll((rects) =>
     rects.map((rect) => getComputedStyle(rect).fill).sort(),
   );
   expect(fills).toEqual([
-    ...Array(6).fill("rgb(212, 223, 216)"),
+    ...Array(7).fill("rgb(212, 223, 216)"),
     ...Array(2).fill("rgb(232, 216, 178)"),
   ]);
 
@@ -316,9 +341,10 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
     "Transform",
     "Reuse rule",
     "Output",
+    "Decision table",
   ]);
   const keys = ["formula", "condition", "transform", "reference"];
-  for (const [index, key] of [...keys, "output"].entries())
+  for (const [index, key] of [...keys, "output", "decision_table"].entries())
     await expect(items.nth(index).locator(`.node-icon.${key}`)).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(items).toHaveCount(0);
@@ -347,7 +373,7 @@ test("every node kind shows its own classes, labels, handles and sections", asyn
   // The Script outline marks the nodes that end a path.
   await page.getByRole("button", { name: "Code editor", exact: true }).click();
   const outline = page.locator(".studio-outline");
-  await expect(outline.locator("button")).toHaveCount(8);
+  await expect(outline.locator("button")).toHaveCount(9);
   for (const [nodeId, kind] of expected) {
     const row = outline.locator("button", {
       hasText: exactly(`${kind.label}${kind.key}`),

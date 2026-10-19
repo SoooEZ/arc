@@ -6,6 +6,7 @@ import dev.arc.engine.Limits;
 import dev.arc.engine.RuleResolver;
 import dev.arc.engine.expression.Expressions;
 import dev.arc.engine.graph.GraphPlan;
+import dev.arc.engine.table.DecisionTables;
 import dev.arc.engine.validation.CompiledGraph;
 import dev.arc.engine.validation.ExpressionPositions;
 import dev.arc.error.ArcException;
@@ -19,7 +20,15 @@ import java.util.function.Supplier;
 
 /** One execution session; nested rules share its trace, recursion guard and source-read budget. */
 final class GraphExecution {
-  private record Outcome(Object value, String branch) {}
+  /**
+   * What a node produced: its value, the handle it left through and, for a decision table, the rows
+   * that produced the value, numbered from 1 for the trace.
+   */
+  private record Outcome(Object value, String branch, List<Integer> matchedRows) {
+    Outcome(Object value, String branch) {
+      this(value, branch, null);
+    }
+  }
 
   private record ReachedOutput(Node node, Object value) {}
 
@@ -181,6 +190,7 @@ final class GraphExecution {
               node.type(),
               traceValue,
               outcome.branch(),
+              outcome.matchedRows(),
               depth));
     }
 
@@ -199,6 +209,7 @@ final class GraphExecution {
         case TRANSFORM -> new Outcome(transform(node, scope), Handles.NEXT);
         case REFERENCE -> new Outcome(reference(node, scope), Handles.NEXT);
         case OUTPUT -> new Outcome(eval(node.expression(), scope), null);
+        case DECISION_TABLE -> decide(node, scope);
       };
     }
 
@@ -246,6 +257,54 @@ final class GraphExecution {
         }
       }
       return Expressions.bounded(transformed);
+    }
+
+    /**
+     * Evaluates each condition once, in column order, lets the compiled table select its rows and
+     * evaluates only their results. One result column gives its value, several an object keyed by
+     * result name; COLLECT gives a list of those, one per matching row.
+     */
+    private Outcome decide(Node node, Map<String, Object> scope) {
+      DecisionTable table = node.table();
+      var values = new ArrayList<Object>(table.conditions().size());
+      for (DecisionTable.Condition condition : table.conditions()) {
+        try {
+          values.add(eval(condition.expression(), scope));
+        } catch (ArcException error) {
+          throw error.withContext(ExpressionPositions.tableCondition(condition));
+        }
+      }
+      DecisionTables.Compiled matcher = compiled.table(node.id());
+      List<Integer> rows = matcher.select(values);
+      var results = new ArrayList<Object>(rows.size());
+      var numbers = new ArrayList<Integer>(rows.size());
+      for (int row : rows) {
+        results.add(rowResult(table, row, scope));
+        numbers.add(row + 1);
+      }
+      Object value =
+          matcher.policy() == DecisionTable.HitPolicy.COLLECT
+              ? Expressions.bounded(results)
+              : results.getFirst();
+      return new Outcome(value, Handles.NEXT, List.copyOf(numbers));
+    }
+
+    private Object rowResult(DecisionTable table, int row, Map<String, Object> scope) {
+      List<String> then = table.rows().get(row).then();
+      if (then.size() == 1) return result(table, row, 0, scope);
+      var fields = new LinkedHashMap<String, Object>();
+      for (int column = 0; column < then.size(); column++)
+        fields.put(table.results().get(column).name(), result(table, row, column, scope));
+      return Expressions.bounded(fields);
+    }
+
+    private Object result(DecisionTable table, int row, int column, Map<String, Object> scope) {
+      try {
+        return eval(table.rows().get(row).then().get(column), scope);
+      } catch (ArcException error) {
+        String result = ExpressionPositions.tableResult(table.results().get(column), column);
+        throw error.withContext(ExpressionPositions.tableCell(row, result));
+      }
     }
 
     private Object reference(Node node, Map<String, Object> scope) {

@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 import { NodeIcon } from "../../components/Icons";
 import type { Definition, Execution, Step } from "../../types";
 import { semanticGraphKey } from "../../domain/graph";
+import { matchedRowsText } from "../../domain/decisionTables";
 import { stringifyJson } from "../../domain/json";
 import { fixedExitCaption, handles, sourcePort } from "../../domain/nodePorts";
 import { useKeyedValue } from "../../hooks/useKeyedValue";
@@ -13,12 +14,15 @@ import TraceNotices from "./TraceNotices";
  * The badge a traced branch shows: the exit's caption for this graph's nodes;
  * for a nested rule's steps, whose graph is not here, the fixed exits (True,
  * False, Default) caption themselves. The `next` exit and a case handle
- * without its node show no badge.
+ * without its node show no badge; a decision table shows its matched rows.
  */
 export function branchBadge(
   step: Step,
   definition: Definition,
 ): { text: string; fallback: boolean } | null {
+  // A decision table names the rows that gave its value.
+  if (step.matchedRows)
+    return { text: matchedRowsText(step.matchedRows), fallback: false };
   if (step.branch === null || step.branch === handles.next) return null;
   const node =
     step.depth === 0

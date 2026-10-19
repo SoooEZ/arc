@@ -20,11 +20,13 @@ public enum NodeKind {
   SWITCH,
   TRANSFORM,
   REFERENCE,
-  OUTPUT;
+  OUTPUT,
+  DECISION_TABLE;
 
   /**
    * An optional node property beyond {@code id}, {@code type}, {@code label} and {@code position}:
-   * the expression fields, the result variable, the pinned rule and an Output's name.
+   * the expression fields, the result variable, the pinned rule, an Output's name and a decision
+   * table.
    */
   public enum Property {
     /** {@code expression} */
@@ -42,7 +44,9 @@ public enum NodeKind {
     /** {@code fields} */
     FIELDS,
     /** {@code outputName} */
-    OUTPUT_NAME
+    OUTPUT_NAME,
+    /** {@code table}: a decision table's condition columns, result columns and rows. */
+    TABLE
   }
 
   /** The kind a JSON {@code type} names exactly; empty for null, unknown or differently cased. */
@@ -66,7 +70,7 @@ public enum NodeKind {
    */
   public List<String> handles(List<BranchCase> cases) {
     return switch (this) {
-      case INPUT, FORMULA, TRANSFORM, REFERENCE -> List.of(Handles.NEXT);
+      case INPUT, FORMULA, TRANSFORM, REFERENCE, DECISION_TABLE -> List.of(Handles.NEXT);
       case CONDITION -> List.of(Handles.TRUE, Handles.FALSE);
       case SWITCH -> Handles.ofSwitch(cases);
       case OUTPUT -> List.of();
@@ -80,7 +84,7 @@ public enum NodeKind {
   public boolean choosesOneExit() {
     return switch (this) {
       case CONDITION, SWITCH -> true;
-      case INPUT, FORMULA, TRANSFORM, REFERENCE, OUTPUT -> false;
+      case INPUT, FORMULA, TRANSFORM, REFERENCE, OUTPUT, DECISION_TABLE -> false;
     };
   }
 
@@ -112,6 +116,7 @@ public enum NodeKind {
       case TRANSFORM -> Set.of(Property.FIELDS, Property.EXPRESSION, Property.OUTPUT);
       case REFERENCE -> Set.of(Property.RULE, Property.BINDINGS, Property.OUTPUT);
       case OUTPUT -> Set.of(Property.EXPRESSION, Property.OUTPUT_NAME);
+      case DECISION_TABLE -> Set.of(Property.TABLE, Property.OUTPUT);
     };
   }
 

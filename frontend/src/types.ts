@@ -6,7 +6,8 @@ export type NodeType =
   | "SWITCH"
   | "TRANSFORM"
   | "REFERENCE"
-  | "OUTPUT";
+  | "OUTPUT"
+  | "DECISION_TABLE";
 export type InputType = "NUMBER" | "STRING" | "BOOLEAN" | "ARRAY" | "OBJECT";
 export interface Input {
   name: string;
@@ -29,6 +30,7 @@ export interface RuleNode {
   bindings?: Record<string, string> | null;
   cases?: BranchCase[] | null;
   fields?: TransformField[] | null;
+  table?: DecisionTable | null;
 }
 export interface BranchCase {
   id: string;
@@ -38,6 +40,35 @@ export interface BranchCase {
 export interface TransformField {
   name: string;
   expression: string;
+}
+/**
+ * Which rows of a decision table give its value: the first that matches, the
+ * only one that may match (several fail the run), or every match as a list.
+ * Null and absent read as FIRST.
+ */
+export type HitPolicy = "FIRST" | "UNIQUE" | "COLLECT";
+/** A condition column: an expression evaluated once, named by its label. */
+export interface DecisionTableCondition {
+  label: string;
+  expression: string;
+}
+/** A result column: its name keys the value when a table has several. */
+export interface DecisionTableResult {
+  name: string;
+}
+/**
+ * One row: a test per condition column (`-` matches any value) and an
+ * expression per result column.
+ */
+export interface DecisionTableRow {
+  when: string[];
+  then: string[];
+}
+export interface DecisionTable {
+  hitPolicy?: HitPolicy | null;
+  conditions: DecisionTableCondition[];
+  results: DecisionTableResult[];
+  rows: DecisionTableRow[];
 }
 export interface RuleEdge {
   id: string;
@@ -109,6 +140,8 @@ export interface Step {
   value: unknown;
   branch: string | null;
   depth: number;
+  /** A decision table's matched rows, numbered from 1; absent for other steps. */
+  matchedRows?: number[] | null;
 }
 export interface Execution {
   ruleId: string;

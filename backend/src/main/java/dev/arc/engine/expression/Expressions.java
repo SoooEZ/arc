@@ -132,6 +132,14 @@ public final class Expressions {
     return ValueBounds.decimal(value);
   }
 
+  /**
+   * The order of two numbers by decimal value, as {@code <} and {@code >} compare them: {@code 1}
+   * and {@code 1.0} are equal. A value that is not a number fails as those operators fail.
+   */
+  public static int compareNumbers(Object a, Object b) {
+    return operand(a).compareTo(operand(b));
+  }
+
   public static boolean bool(Object value) {
     if (!(value instanceof Boolean b))
       throw ArcException.invalid("Expected a boolean, got " + ValueBounds.typeOf(value));

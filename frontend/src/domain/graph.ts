@@ -249,7 +249,7 @@ export function createGraphNode(
   position: RuleNode["position"],
 ): RuleNode {
   const kind = nodeKinds[type];
-  const fields = kind.newNodeFields();
+  const fields = kind.newNodeFields(definition);
   return {
     id,
     type,
@@ -263,5 +263,6 @@ export function createGraphNode(
     bindings: fields.bindings,
     cases: fields.cases,
     fields: fields.fields,
+    table: fields.table,
   };
 }

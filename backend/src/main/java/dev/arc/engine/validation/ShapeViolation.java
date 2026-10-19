@@ -1,6 +1,7 @@
 package dev.arc.engine.validation;
 
 import dev.arc.model.Definition.BranchCase;
+import dev.arc.model.Definition.DecisionTable;
 import dev.arc.model.Definition.Edge;
 import dev.arc.model.Definition.Field;
 import dev.arc.model.Definition.Input;
@@ -20,6 +21,9 @@ public record ShapeViolation(String message, Element element) {
           NodeDeclaration,
           SwitchCase,
           TransformField,
+          TableCondition,
+          TableResult,
+          TableRow,
           Connection {}
 
   /** The document as a whole, such as its schema version or node count. */
@@ -42,6 +46,15 @@ public record ShapeViolation(String message, Element element) {
 
   /** One field of a Transform node. */
   public record TransformField(Node node, Field field) implements Element {}
+
+  /** One condition column of a decision table. */
+  public record TableCondition(Node node, DecisionTable.Condition condition) implements Element {}
+
+  /** One result column of a decision table. */
+  public record TableResult(Node node, DecisionTable.Result result) implements Element {}
+
+  /** One row of a decision table. */
+  public record TableRow(Node node, DecisionTable.Row row) implements Element {}
 
   /** One connection; it belongs to the node it leaves. */
   public record Connection(Edge edge) implements Element {}

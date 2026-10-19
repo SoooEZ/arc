@@ -160,7 +160,7 @@ function scriptNames(
     if (token.text === "source") declare(index + 1, "parameter");
     let start = end;
     if (["when", "select", "return"].includes(token.text)) start = index + 1;
-    if (["let", "field", "bind"].includes(token.text)) {
+    if (["let", "field", "bind", "condition"].includes(token.text)) {
       if (token.text === "let") declare(index + 1, "variable");
       for (let at = index + 1; at < end; at++) {
         if (tokens[at].text === "=") {
@@ -173,6 +173,20 @@ function scriptNames(
       for (let at = index + 1; at < end; at++) {
         if (["when", "equals"].includes(tokens[at].text)) {
           start = at + 1;
+          break;
+        }
+      }
+    }
+    // A decision table row: its tests hold literals; the cells after `->`
+    // are expressions.
+    if (token.text === "row") {
+      for (let at = index + 1; at + 1 < end; at++) {
+        if (
+          tokens[at].text === "-" &&
+          tokens[at + 1].text === ">" &&
+          tokens[at + 1].offset === tokens[at].offset + 1
+        ) {
+          start = at + 2;
           break;
         }
       }

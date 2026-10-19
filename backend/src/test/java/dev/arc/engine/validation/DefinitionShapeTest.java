@@ -127,6 +127,7 @@ class DefinitionShapeTest {
     fixtures.put(
         "Source fallback requires a default value",
         withSource(new SourceBinding("rates", 1, Map.of(), "", "DEFAULT")));
+    tableFixtures(fixtures);
     for (var fixture : fixtures.entrySet()) {
       assertThatThrownBy(() -> validator.shape(fixture.getValue()))
           .as("shape: " + fixture.getKey())
@@ -135,6 +136,112 @@ class DefinitionShapeTest {
           .as("structure: " + fixture.getKey())
           .doesNotThrowAnyException();
     }
+  }
+
+  /** A decision table's columns and rows are content: the scope plan reads none of them. */
+  private void tableFixtures(Map<String, Definition> fixtures) {
+    var amount = List.of(new DecisionTable.Condition("Amount", "amount"));
+    var fee = List.of(new DecisionTable.Result("fee"));
+    var row = new DecisionTable.Row(List.of("-"), List.of("1"));
+    validator.shape(withExtraNode(table(new DecisionTable(null, amount, fee, List.of(row)))));
+    fixtures.put(
+        "Tables belong to Decision table nodes",
+        withNode(
+            copyOf(calculate()).table(new DecisionTable(null, amount, fee, List.of(row))).build()));
+    fixtures.put("Table: a decision table needs its table", withExtraNode(table(null)));
+    fixtures.put(
+        "Table: hitPolicy must be FIRST, UNIQUE or COLLECT",
+        withExtraNode(table(new DecisionTable("first", amount, fee, List.of(row)))));
+    fixtures.put(
+        "Table: a decision table needs its conditions, results and rows lists",
+        withExtraNode(table(new DecisionTable(null, amount, fee, null))));
+    var conditions = new ArrayList<DecisionTable.Condition>();
+    for (int index = 0; index <= Limits.MAX_TABLE_CONDITIONS; index++)
+      conditions.add(new DecisionTable.Condition("C" + index, "1"));
+    fixtures.put(
+        "Provide at most 20 conditions",
+        withExtraNode(table(new DecisionTable(null, conditions, fee, List.of()))));
+    var results = new ArrayList<DecisionTable.Result>();
+    for (int index = 0; index <= Limits.MAX_TABLE_RESULTS; index++)
+      results.add(new DecisionTable.Result("r" + index));
+    fixtures.put(
+        "Provide at most 10 results",
+        withExtraNode(table(new DecisionTable(null, amount, results, List.of()))));
+    var rows = new ArrayList<DecisionTable.Row>();
+    for (int index = 0; index <= Limits.MAX_TABLE_ROWS; index++) rows.add(row);
+    fixtures.put(
+        "Provide at most 200 rows",
+        withExtraNode(table(new DecisionTable(null, amount, fee, rows))));
+    fixtures.put(
+        "Conditions need unique labels of 1 to 160 characters",
+        withExtraNode(
+            table(
+                new DecisionTable(
+                    null,
+                    List.of(
+                        new DecisionTable.Condition("Amount", "amount"),
+                        new DecisionTable.Condition("Amount", "1")),
+                    fee,
+                    List.of()))));
+    fixtures.put(
+        "Condition expression exceeds 2,000 characters or is missing",
+        withExtraNode(
+            table(
+                new DecisionTable(
+                    null, List.of(new DecisionTable.Condition("A", null)), fee, List.of()))));
+    fixtures.put(
+        "Results need unique names: letters, digits and underscores, starting with a letter or"
+            + " underscore",
+        withExtraNode(
+            table(
+                new DecisionTable(
+                    null, amount, List.of(new DecisionTable.Result("1fee")), List.of()))));
+    fixtures.put(
+        "Row 1 needs its tests and results",
+        withExtraNode(
+            table(
+                new DecisionTable(
+                    null, amount, fee, List.of(new DecisionTable.Row(null, List.of("1")))))));
+    fixtures.put(
+        "Row 1 has 2 tests, but the table has 1 condition",
+        withExtraNode(
+            table(
+                new DecisionTable(
+                    null,
+                    amount,
+                    fee,
+                    List.of(new DecisionTable.Row(List.of("-", "-"), List.of("1")))))));
+    fixtures.put(
+        "Row 1 has 0 results, but the table has 1 result column",
+        withExtraNode(
+            table(
+                new DecisionTable(
+                    null, amount, fee, List.of(new DecisionTable.Row(List.of("-"), List.of()))))));
+    fixtures.put(
+        "Row 1: write every cell as text; - tests any value",
+        withExtraNode(
+            table(
+                new DecisionTable(
+                    null,
+                    amount,
+                    fee,
+                    List.of(new DecisionTable.Row(Arrays.asList((String) null), List.of("1")))))));
+    fixtures.put(
+        "Row 1 has a cell that exceeds 2,000 characters",
+        withExtraNode(
+            table(
+                new DecisionTable(
+                    null,
+                    amount,
+                    fee,
+                    List.of(
+                        new DecisionTable.Row(
+                            List.of("-"),
+                            List.of("1" + " ".repeat(Limits.MAX_EXPRESSION_CHARACTERS))))))));
+  }
+
+  private static Node table(DecisionTable table) {
+    return nodeOf("table", "DECISION_TABLE", "Table").output("fee").table(table).build();
   }
 
   @Test

@@ -33,6 +33,7 @@ test("the descriptor covers every node kind, and only exact kind names", () => {
     "TRANSFORM",
     "REFERENCE",
     "OUTPUT",
+    "DECISION_TABLE",
   ]);
   for (const type of nodeTypes) expect(isNodeType(type)).toBe(true);
   // Script text can name anything; Object members must not pass for a kind.
@@ -48,6 +49,7 @@ test("the Add node menu offers every kind but Input, and one Condition", () => {
     "TRANSFORM",
     "REFERENCE",
     "OUTPUT",
+    "DECISION_TABLE",
   ]);
 });
 
@@ -63,6 +65,7 @@ test("labels and style keys keep the names that cards, previews and styles use",
     TRANSFORM: "Transform",
     REFERENCE: "Reuse rule",
     OUTPUT: "Output",
+    DECISION_TABLE: "Decision table",
   });
   // The stylesheets select node-<key>, node-icon <key> and preview-node-<key>.
   for (const type of nodeTypes)
@@ -84,6 +87,7 @@ test("new nodes serialize exactly as before the descriptor", () => {
     "bindings",
     "cases",
     "fields",
+    "table",
   ];
   const start = '{"id":"n","type":';
   const expected: Record<NodeType, string> = {
@@ -94,6 +98,7 @@ test("new nodes serialize exactly as before the descriptor", () => {
     TRANSFORM: `${start}"TRANSFORM","position":{"x":1,"y":2},"label":"Transform","output":"result_1","fields":[{"name":"value","expression":"null"}]}`,
     REFERENCE: `${start}"REFERENCE","position":{"x":1,"y":2},"label":"Reusable rule","output":"result_1","bindings":{}}`,
     OUTPUT: `${start}"OUTPUT","position":{"x":1,"y":2},"label":"Output","expression":"0"}`,
+    DECISION_TABLE: `${start}"DECISION_TABLE","position":{"x":1,"y":2},"label":"Decision table","output":"result_1","table":{"hitPolicy":"FIRST","conditions":[{"label":"Condition 1","expression":""}],"results":[{"name":"value"}],"rows":[{"when":["-"],"then":["0"]}]}}`,
   };
   for (const type of nodeTypes)
     expect(serialized(type), type).toEqual({ keys, json: expected[type] });
@@ -117,6 +122,7 @@ test("exits, incoming handles and card widths follow each kind", () => {
   expect(exits("FORMULA")).toEqual(next);
   expect(exits("TRANSFORM")).toEqual(next);
   expect(exits("REFERENCE")).toEqual(next);
+  expect(exits("DECISION_TABLE")).toEqual(next);
   expect(exits("OUTPUT")).toEqual([]);
   expect(exits("CONDITION")).toEqual([
     ["true", "True", 0.27, false],
@@ -138,6 +144,7 @@ test("exits, incoming handles and card widths follow each kind", () => {
     ["TRANSFORM", 230],
     ["REFERENCE", 230],
     ["OUTPUT", 230],
+    ["DECISION_TABLE", 230],
   ]);
   const noCases = { ...node("SWITCH"), cases: [] };
   expect(nodeWidth(noCases)).toBe(230);

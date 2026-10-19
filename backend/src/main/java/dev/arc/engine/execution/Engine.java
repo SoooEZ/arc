@@ -1,5 +1,6 @@
 package dev.arc.engine.execution;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import dev.arc.engine.ExecutionDeadline;
@@ -14,6 +15,10 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class Engine {
+  /**
+   * One executed node. {@code matchedRows} lists a decision table's rows that produced its value,
+   * numbered from 1; it is written for those steps only, so every other step's JSON is unchanged.
+   */
   public record Step(
       String ruleId,
       Integer version,
@@ -22,7 +27,21 @@ public class Engine {
       String type,
       Object value,
       String branch,
-      int depth) {}
+      @JsonInclude(JsonInclude.Include.NON_NULL) List<Integer> matchedRows,
+      int depth) {
+    /** A step of a node that is not a decision table. */
+    public Step(
+        String ruleId,
+        Integer version,
+        String nodeId,
+        String label,
+        String type,
+        Object value,
+        String branch,
+        int depth) {
+      this(ruleId, version, nodeId, label, type, value, branch, null, depth);
+    }
+  }
 
   public record Result(
       Object result,

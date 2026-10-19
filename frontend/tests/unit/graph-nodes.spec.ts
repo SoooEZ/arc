@@ -98,9 +98,10 @@ test("result-producing kinds and removable nodes follow the graph contract", () 
         "TRANSFORM",
         "REFERENCE",
         "OUTPUT",
+        "DECISION_TABLE",
       ] as const
     ).filter(storesResult),
-  ).toEqual(["FORMULA", "TRANSFORM", "REFERENCE"]);
+  ).toEqual(["FORMULA", "TRANSFORM", "REFERENCE", "DECISION_TABLE"]);
   const definition = template();
   expect(canRemoveGraphNode(definition, "calculate")).toBe(true);
   expect(canRemoveGraphNode(definition, "input")).toBe(false);

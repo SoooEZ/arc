@@ -426,7 +426,8 @@ class RuleDefinitionServiceTest {
             .bindings(Map.of("amount", "amount"))
             .output("r")
             .build();
-    String message = "Result variables belong to Formula, Transform and Reference nodes";
+    String message =
+        "Result variables belong to Formula, Transform, Reference and Decision table nodes";
     for (Definition parent : List.of(graph(reference, "r"), graph(null, "@child:1(amount)"))) {
       // These passed every static check and publish, then failed every execution of the parent.
       assertThatThrownBy(() -> service.validate(parent))

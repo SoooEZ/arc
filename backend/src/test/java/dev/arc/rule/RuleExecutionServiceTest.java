@@ -357,7 +357,8 @@ class RuleExecutionServiceTest {
             error -> {
               assertThat(error.status()).isEqualTo(422);
               assertThat(error.getMessage())
-                  .isEqualTo("Result variables belong to Formula, Transform and Reference nodes");
+                  .isEqualTo(
+                      "Result variables belong to Formula, Transform, Reference and Decision table nodes");
               assertThat(error.locations())
                   .contains(new ArcException.Location("child", 1, "output", "Result"));
             });

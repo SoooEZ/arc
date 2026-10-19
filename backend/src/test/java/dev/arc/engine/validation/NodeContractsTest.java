@@ -10,6 +10,7 @@ import dev.arc.error.ArcException;
 import dev.arc.error.ArcException.Location;
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.BranchCase;
+import dev.arc.model.Definition.DecisionTable;
 import dev.arc.model.Definition.Edge;
 import dev.arc.model.Definition.Field;
 import dev.arc.model.Definition.Node;
@@ -273,7 +274,7 @@ class NodeContractsTest {
             Property.EXPRESSION,
             "Expressions belong to Formula, Condition, Transform and Output nodes",
             Property.OUTPUT,
-            "Result variables belong to Formula, Transform and Reference nodes",
+            "Result variables belong to Formula, Transform, Reference and Decision table nodes",
             Property.RULE,
             "Rule references belong to Reference nodes",
             Property.BINDINGS,
@@ -285,7 +286,9 @@ class NodeContractsTest {
             Property.FIELDS,
             "Fields belong to Transform nodes",
             Property.OUTPUT_NAME,
-            "Output names belong to Output nodes");
+            "Output names belong to Output nodes",
+            Property.TABLE,
+            "Tables belong to Decision table nodes");
     for (NodeKind kind : NodeKind.values())
       for (Property property : Property.values()) {
         if (kind.uses(property)) continue;
@@ -314,6 +317,13 @@ class NodeContractsTest {
       case CASES -> node.cases(List.of(new BranchCase("one", "One", "true")));
       case FIELDS -> node.fields(List.of(new Field("value", "1")));
       case OUTPUT_NAME -> node.outputName("total");
+      case TABLE ->
+          node.table(
+              new DecisionTable(
+                  null,
+                  List.of(new DecisionTable.Condition("One", "1")),
+                  List.of(new DecisionTable.Result("value")),
+                  List.of(new DecisionTable.Row(List.of("-"), List.of("1")))));
     };
   }
 

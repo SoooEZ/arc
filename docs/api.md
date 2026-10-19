@@ -133,6 +133,27 @@ The new rule has the original's kind and, as its draft, the original's saved dra
 
 The body is read strictly: an unknown field is a `400` that names it. An unknown original is `404` "Rule not found: id" before the body's values are checked; `id`, `name` and `description` are then refused exactly as `POST /rules` refuses them (`422`), a taken `id` is `409` "This rule ID already exists", and a version the original lacks is `404` "Published rule version not found: id vN".
 
+## Decision tables
+
+A `DECISION_TABLE` node holds a `table` and stores its value in `output`, like a Formula:
+
+```json
+{"id": "fee", "type": "DECISION_TABLE", "label": "Shipping fee", "output": "shipping",
+ "table": {"hitPolicy": "FIRST",
+           "conditions": [{"label": "Tier", "expression": "tier"}, {"label": "Order amount", "expression": "amount"}],
+           "results": [{"name": "fee"}],
+           "rows": [{"when": ["\"gold\"", "-"], "then": ["0"]},
+                    {"when": ["-", ">= 100"], "then": ["0"]},
+                    {"when": ["-", "< 100"], "then": ["8"]}]}}
+```
+
+Each condition's expression is evaluated once; a row matches when every test in `when` holds for its column's value, and its `then` expressions give the value: one result column's value, or an object keyed by result name for several. `hitPolicy` `FIRST` (the default when absent or null) takes the first matching row, `UNIQUE` the only one and `COLLECT` every matching row as a list. A test is `-`, a value (`"gold"`, `100`, `true`, `null`), `!= value`, `<`, `<=`, `>` or `>=` a number, a number range (`10..20`, `10..<20`, `10<..20`, `10<..<20`), a comma-separated list of those, or `not(list)`; text is tested by equality only. [The graph contract](architecture.md#graph-document) has the full rules.
+
+- Draft saves check the table's shape (`422` at the node): `table` is required on this kind and refused on every other ("Tables belong to Decision table nodes"); `conditions`, `results` and `rows` are required lists; at most 20 conditions, 10 results and 200 rows; condition labels are unique and 1–160 characters; result names are unique identifiers (empty while unfinished); every row has one test per condition and one result per result column ("Row 3 has 2 tests, but the table has 3 conditions"); a cell is text of at most 2,000 characters; `hitPolicy` is `FIRST`, `UNIQUE`, `COLLECT` or null.
+- `/validate`, `/diagnostics`, preview and publish also require a condition, a result and a row, a name for every result, a test in every condition cell and one type of value per condition column, naming the cell: `Shipping fee / Row 3 / Condition Tier: Write text in quotes: "gold"; a test cannot read a variable`.
+- Execution fails with `422` at the node when `FIRST` or `UNIQUE` finds no row ("No row matches Tier "silver", Order amount null"), when `UNIQUE` finds several ("Rows 1 and 3 both match …; with one match only, rows must not overlap"), when a condition's value is an array or an object, and when a comparison or range meets text or a boolean.
+- A trace step of the node has `"branch": "next"` and `matchedRows`, the rows that produced its value numbered from 1 (`[3]`; `COLLECT` lists every match, perhaps none). No other step has `matchedRows`, and no other node has a `table` field: their JSON is unchanged.
+
 ## Saved test cases
 
 A rule keeps up to 100 test cases: inputs to run and the outcome they should produce. They belong to the rule, not to its draft or its published versions, so writing one changes neither the draft nor its `revision` or `updatedAt`, and deleting the rule deletes its cases. The server stores cases; running and comparing them is the client's work. The editor runs each case through `POST /preview` against the graph it shows; an API client can run them through `POST /rules/{id}/execute` against a published version.
@@ -190,6 +211,13 @@ The current release has no batch endpoint, run-history storage, or authenticatio
 ## Code studio and external parameters
 
 See [the studio guide](studio.md) for ARC Script, the function catalog, source APIs, and HTTP configuration. Inputs additionally accept ARRAY and OBJECT types and optional versioned `source` bindings. Execution responses include a `sources` array describing fetches and defaults. Entries appear in read order: an input's source dependencies are read first, in declaration order.
+
+## Behavior changes from the decision table node
+
+A node type is new; graphs without it keep their JSON, results and messages, except one message, and no migration runs.
+
+- `DECISION_TABLE` nodes choose a value by rows ([Decision tables](#decision-tables)). Node JSON gains `table` on those nodes only, and trace steps gain `matchedRows` on their steps only.
+- A result variable on a kind that does not store one is now refused with "Result variables belong to Formula, Transform, Reference and Decision table nodes" (it listed Formula, Transform and Reference).
 
 ## Behavior changes from the 2026-10-18 round-3 usability work
 

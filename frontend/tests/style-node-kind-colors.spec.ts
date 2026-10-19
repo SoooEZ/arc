@@ -11,6 +11,7 @@ const kinds: NodeType[] = [
   "TRANSFORM",
   "REFERENCE",
   "OUTPUT",
+  "DECISION_TABLE",
 ];
 
 const color = (locator: Locator) =>
@@ -34,6 +35,10 @@ test("library previews colour every node kind like its canvas icon", async ({
         type,
         label: `${type.toLowerCase()} step`,
         position: { x: 0, y: index * 160 },
+        // A decision table node carries its table, empty while a draft is unfinished.
+        ...(type === "DECISION_TABLE"
+          ? { table: { conditions: [], results: [], rows: [] } }
+          : {}),
       })),
       edges: [
         { id: "e", source: "input", target: "formula", sourceHandle: "next" },

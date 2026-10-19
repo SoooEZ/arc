@@ -263,7 +263,41 @@ node output OUTPUT "Result" { return $SUM(SUM, $ROUND(ROUND, 2)); }
     assert lazy["result"] == 7 and not lazy["sources"] and lazy["executedSteps"] == 2
     assert not any(step["ruleId"] == rule_id for step in lazy["trace"])
 
-    print(f"PASS: {smoke_http.checks} studio/source HTTP checks, pinned Formula calls, function namespaces, identifier validation, version pins, fallbacks, caller overrides, diagnostics, and HTTP destination policy.")
+    # A decision table round-trips through code, whole and as one node, and reports a cell at its row.
+    table_script = """inputs { tier: STRING required; amount: NUMBER optional; }
+node input INPUT "Input" { next -> fee; }
+node fee DECISION_TABLE "Shipping fee" {
+  hit first;
+  condition "Tier" = tier;
+  condition "Order amount" = amount;
+  result fee;
+  result carrier;
+  row "gold", "silver" | - -> 0 | "post";
+  row - | 10..<100 -> amount * 0.1 | $IF(amount > 1 || false, $CONCAT("a", "|"), "b");
+  row - | - -> 9 | "courier";
+  as shipping;
+  next -> out;
+}
+node out OUTPUT "Output" { return shipping; }"""
+    table_build = call("POST", "/studio/build", {"source": table_script})
+    assert table_build["diagnostics"] == [], table_build["diagnostics"]
+    table_graph = table_build["definition"]
+    assert [("table" in node) for node in table_graph["nodes"]] == [False, True, False]
+    assert table_graph["nodes"][1]["table"]["rows"][1] == {
+        "when": ["-", "10..<100"], "then": ["amount * 0.1", '$IF(amount > 1 || false, $CONCAT("a", "|"), "b")']}
+    assert call("POST", "/studio/build", call("POST", "/studio/render", table_graph))["definition"] == table_graph
+    fragment = call("POST", "/studio/node/render", {"definition": table_graph, "nodeId": "fee"})["source"]
+    assert '  row "gold", "silver" | - -> 0 | "post";\n' in fragment, fragment
+    applied = call("POST", "/studio/node/build", {"definition": table_graph, "nodeId": "fee",
+                                                  "source": fragment.replace("-> 9 |", "-> 12 |")})
+    assert applied["diagnostics"] == [] and applied["definition"]["nodes"][1]["table"]["rows"][2]["then"][0] == "12"
+    preview = call("POST", "/preview", {"definition": table_graph, "inputs": {"tier": "bronze", "amount": 50}})
+    assert preview["result"] == {"fee": 5.0, "carrier": "a|"} and preview["trace"][1]["matchedRows"] == [2], preview
+    bad_cell = call("POST", "/studio/build", {"source": table_script.replace('row - | - ->', 'row - | gold ->')})
+    assert bad_cell["definition"] is None and bad_cell["diagnostics"] == [{
+        "message": 'Write text in quotes: "gold"; a test cannot read a variable', "line": 11, "column": 3}], bad_cell
+
+    print(f"PASS: {smoke_http.checks} studio/source HTTP checks, pinned Formula calls, function namespaces, identifier validation, version pins, fallbacks, caller overrides, diagnostics, decision tables, and HTTP destination policy.")
 finally:
     print("Created rule fixtures: " + ", ".join(created_rules))
     print("Created source fixtures: " + ", ".join(created_sources))

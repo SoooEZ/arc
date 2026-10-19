@@ -29,15 +29,16 @@ ALLOWED_JAVA = {
 ENGINE_DEPENDENCIES = {
     "expression": {"expression", "Identifiers", "ExecutionDeadline", "Limits", "ValueText", "ValueBounds"},
     "graph": {"graph"},
-    "validation": {"validation", "graph", "expression", "Identifiers", "InputTypes", "RuleResolver", "Limits"},
-    "script": {"script", "expression", "validation", "Identifiers", "InputTypes", "Limits"},
-    "execution": {"execution", "graph", "validation", "expression", "Identifiers", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline", "Limits", "BoundedCache"},
+    "table": {"table", "expression", "Limits", "ValueText"},
+    "validation": {"validation", "graph", "expression", "table", "Identifiers", "InputTypes", "RuleResolver", "Limits"},
+    "script": {"script", "expression", "table", "validation", "Identifiers", "InputTypes", "Limits"},
+    "execution": {"execution", "graph", "validation", "expression", "table", "Identifiers", "InputTypes", "RuleResolver", "SourceReader", "ExecutionDeadline", "Limits", "BoundedCache"},
 }
 ENGINE_FEATURES = set(ENGINE_DEPENDENCIES)
 # Node kinds and connection handles have one vocabulary: dev.arc.model.NodeKind and Handles. Outside
 # dev.arc.model no literal may spell a kind, a case handle or a regex alternation of them, and a
 # handle literal may not be compared or collected. The allowlist names each legitimate literal.
-NODE_KINDS = ("INPUT", "FORMULA", "CONDITION", "SWITCH", "TRANSFORM", "REFERENCE", "OUTPUT")
+NODE_KINDS = ("INPUT", "FORMULA", "CONDITION", "SWITCH", "TRANSFORM", "REFERENCE", "OUTPUT", "DECISION_TABLE")
 HANDLES = ("next", "true", "false", "default")
 CASE_HANDLE_PREFIX = "case:"
 NODE_VOCABULARY_ALLOWED = {

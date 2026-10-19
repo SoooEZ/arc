@@ -12,7 +12,7 @@ class IdentifierScriptTest {
 
   @Test
   void nodeResultDeclarationsRejectInvalidNamesInWholeGraphAndNodeBuilds() {
-    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE")) {
+    for (String type : List.of("FORMULA", "TRANSFORM", "REFERENCE", "DECISION_TABLE")) {
       String declaration = type.equals("FORMULA") ? "let value = 1;" : "as value;";
       String source = "node result " + type + " \"Result\" {\n  " + declaration + "\n}";
       var original = script.build(source);

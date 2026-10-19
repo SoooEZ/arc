@@ -67,9 +67,18 @@ class DefinitionTest {
             .output("result")
             .rule("called", 1)
             .outputName("named")
+            .table(
+                new DecisionTable(
+                    null,
+                    Arrays.asList(new DecisionTable.Condition("C", "condition"), null),
+                    List.of(new DecisionTable.Result("r")),
+                    Arrays.asList(
+                        new DecisionTable.Row(List.of("\"not an expression\""), List.of("then")),
+                        new DecisionTable.Row(List.of("-"), null),
+                        null)))
             .build();
     assertThat(node.expressionTexts())
-        .containsExactly("expression", "binding", "selector", "case", "field");
+        .containsExactly("expression", "binding", "selector", "case", "field", "condition", "then");
     assertThat(nodeOf("bare", "OUTPUT", "Bare").build().expressionTexts())
         .containsExactly(null, null);
   }
@@ -96,6 +105,8 @@ class DefinitionTest {
     var bindings = new LinkedHashMap<>(Map.of("amount", "amount"));
     var cases = new ArrayList<>(List.of(new BranchCase("big", "Big", "1")));
     var fields = new ArrayList<>(List.of(new Field("value", "amount")));
+    var when = new ArrayList<>(List.of("-"));
+    var rows = new ArrayList<>(List.of(new DecisionTable.Row(when, List.of("1"))));
     var every =
         nodeOf("every", "SWITCH", "Every")
             .at(1, 2)
@@ -107,6 +118,12 @@ class DefinitionTest {
             .fields(fields)
             .selector("amount")
             .outputName("total")
+            .table(
+                new DecisionTable(
+                    "FIRST",
+                    List.of(new DecisionTable.Condition("Amount", "amount")),
+                    List.of(new DecisionTable.Result("fee")),
+                    rows))
             .build();
     var inputs =
         new ArrayList<>(
@@ -130,6 +147,8 @@ class DefinitionTest {
     bindings.put("rate", "1");
     cases.clear();
     fields.clear();
+    when.clear();
+    rows.clear();
     nodes.clear();
     edges.clear();
     notes.clear();
@@ -138,6 +157,10 @@ class DefinitionTest {
     assertThat(copy.bindings()).containsOnlyKeys("amount");
     assertThat(copy.cases()).hasSize(1);
     assertThat(copy.fields()).hasSize(1);
+    assertThat(copy.table().rows())
+        .containsExactly(new DecisionTable.Row(List.of("-"), List.of("1")));
+    assertThatThrownBy(() -> copy.table().rows().getFirst().when().add("x"))
+        .isInstanceOf(UnsupportedOperationException.class);
     assertThat(detached.edges()).hasSize(1);
     assertThat(detached.notes()).containsExactly("note");
     var input = detached.inputs().getFirst();

@@ -46,7 +46,8 @@ pre {
 }
 /* Monospace code surfaces show every entered character: programming ligatures
    would draw == or -> as one glyph (lesson F11). Monaco sets fontLigatures: false.
-   .code-text marks other code fields, such as JSON default editors. */
+   .code-text marks other code fields, such as JSON default editors;
+   .table-cell-input the cells of the source and decision tables (>= 100). */
 code,
 pre,
 .code-text,
@@ -56,6 +57,7 @@ pre,
 .json-input,
 .json-input textarea,
 .source-json,
+.table-cell-input,
 .function-chips .MuiChip-root,
 .function-tooltip strong,
 .studio-filebar > span {

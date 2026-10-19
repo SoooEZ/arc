@@ -2,6 +2,7 @@ package dev.arc.support;
 
 import dev.arc.model.Definition;
 import dev.arc.model.Definition.BranchCase;
+import dev.arc.model.Definition.DecisionTable;
 import dev.arc.model.Definition.Edge;
 import dev.arc.model.Definition.Field;
 import dev.arc.model.Definition.Input;
@@ -101,7 +102,8 @@ public final class GraphFixtures {
         .cases(node.cases())
         .fields(node.fields())
         .selector(node.selector())
-        .outputName(node.outputName());
+        .outputName(node.outputName())
+        .table(node.table());
   }
 
   public static Edge edge(String source, String target, String handle) {
@@ -123,6 +125,7 @@ public final class GraphFixtures {
     private List<Field> fields;
     private String selector;
     private String outputName;
+    private DecisionTable table;
 
     private NodeBuilder(String id, String type, String label) {
       this.id = id;
@@ -182,6 +185,12 @@ public final class GraphFixtures {
       return this;
     }
 
+    /** A decision table's columns and rows. */
+    public NodeBuilder table(DecisionTable table) {
+      this.table = table;
+      return this;
+    }
+
     public Node build() {
       return new Node(
           id,
@@ -196,7 +205,8 @@ public final class GraphFixtures {
           cases,
           fields,
           selector,
-          outputName);
+          outputName,
+          table);
     }
   }
 }

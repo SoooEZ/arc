@@ -238,7 +238,7 @@ flowchart TB
 | `inputs[]` | Input 节点检查器里的参数卡片 | [`InputFields`](../frontend/src/features/editor/inspector/InputFields.tsx)、[`InputParameterCard`](../frontend/src/features/editor/inspector/InputParameterCard.tsx) |
 | `notes` | 只在代码视图里以 `//` 注释出现 | 后端渲染和解析 |
 
-### 七种节点
+### 八种节点
 
 每种节点的事实都写在 [`nodeKinds`](../frontend/src/domain/nodeKinds.ts) 描述表里；新增一种节点时，编译器会要求每一项都填上。
 
@@ -251,8 +251,9 @@ flowchart TB
 | `TRANSFORM` | Transform | `next` | 是 | 是 | `fields` 或 `expression`、`output` | `TransformFields` |
 | `REFERENCE` | Reuse rule | `next` | 是 | 是 | `ruleId` + `version`、`bindings`、`output` | `ReferenceFields` |
 | `OUTPUT` | Output | 无 | 否 | 是 | `expression`、`outputName` | `OutputFields` |
+| `DECISION_TABLE` | Decision table | `next` | 是 | 是 | `table`、`output` | `DecisionTableFields` |
 
-“存结果”的节点（Formula、Transform、Reference）在检查器里多一个 `ResultFields`，结果名写进 `output`，下游表达式可以当变量读。Switch 的出口 ID 用分支的 `id` 而不是顺序，所以调整分支顺序不会断开连线。
+“存结果”的节点（Formula、Transform、Reference、Decision table）在检查器里多一个 `ResultFields`，结果名写进 `output`，下游表达式可以当变量读。Switch 的出口 ID 用分支的 `id` 而不是顺序，所以调整分支顺序不会断开连线。
 
 ### DocumentState 和它的 9 个 action
 
@@ -404,7 +405,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 按这个顺序读，每一步都建立在前一步上。前六步读完，就能看懂编辑器的大部分代码。
 
 1. [types.ts](../frontend/src/types.ts)：先认识数据，Definition、RuleNode、RuleEdge、Input、Rule。后面所有代码都在处理它们。
-2. [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) 和 [nodePorts.ts](../frontend/src/domain/nodePorts.ts)：七种节点各有什么出口、存不存结果、允许哪些属性，出口句柄怎么生成。
+2. [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) 和 [nodePorts.ts](../frontend/src/domain/nodePorts.ts)：八种节点各有什么出口、存不存结果、允许哪些属性，出口句柄怎么生成。
 3. [graph.ts](../frontend/src/domain/graph.ts)：所有图变更都是纯函数，createGraphNode、patchGraphNode、connectGraphNodes、removeGraphNode，还有两个图键。对照 [graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts) 看用法。
 4. [documentState.ts](../frontend/src/features/editor/document/documentState.ts)：reducer 和 9 个 action，文件很短。配合 [document-state.spec.ts](../frontend/tests/unit/document-state.spec.ts) 一起读，测试名就是行为说明。
 5. [useRuleDocument.ts](../frontend/src/features/editor/document/useRuleDocument.ts)：`edit`、`runTask`（来自 [commandRunner.ts](../frontend/src/features/editor/document/commandRunner.ts)）、`action`、`buildCode`、视图切换；同时看 [editorCapabilities.ts](../frontend/src/features/editor/document/editorCapabilities.ts)。
@@ -533,6 +534,20 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [useNodeDialog.ts](../frontend/src/features/editor/node-dialogs/useNodeDialog.ts) | 唯一的节点对话框请求（编辑或代码）；节点消失时自动丢弃 |  |
 | [useNodeExpressionDraft.ts](../frontend/src/features/editor/node-dialogs/useNodeExpressionDraft.ts) | 节点代码缓冲：渲染、防抖检查、Apply 时构建、离开前确认 |  |
 | [nodeFormDraft.ts](../frontend/src/features/editor/node-dialogs/nodeFormDraft.ts) | 把节点表单的修改三方合并回最新草稿，有冲突就返回 null | [node-form.spec.ts](../frontend/tests/unit/node-form.spec.ts) |
+
+### `features/editor/decision-table/`：决策表
+
+决策表节点的检查器表单和表格编辑对话框。表格的语法、编辑和检查是 `domain/` 里的纯逻辑。
+
+| 文件 | 职责 | 单元测试 |
+| --- | --- | --- |
+| [DecisionTableFields.tsx](../frontend/src/features/editor/decision-table/DecisionTableFields.tsx) | 检查器里的决策表：摘要和前几行、Edit table、匹配方式、表格检查 |  |
+| [DecisionTableDialog.tsx](../frontend/src/features/editor/decision-table/DecisionTableDialog.tsx) | 表格编辑对话框：工具栏、列设置、网格、提示，Apply to graph 时整表写回草稿；只读版本只看不改 |  |
+| [TableGrid.tsx](../frontend/src/features/editor/decision-table/TableGrid.tsx) | 网格：表头、按行记忆化的行（一格输入只重绘这一格），回车下移、从表格软件粘贴、行菜单 |  |
+| [ColumnPanel.tsx](../frontend/src/features/editor/decision-table/ColumnPanel.tsx) | 选中列的设置：条件的名字和表达式，结果的名字，移动和删除 |  |
+| [TableCheckList.tsx](../frontend/src/features/editor/decision-table/TableCheckList.tsx) | 表格检查的提示列表 |  |
+| [TablePreview.tsx](../frontend/src/features/editor/decision-table/TablePreview.tsx) | 检查器里只读的前几行 |  |
+| [useTableEditor.ts](../frontend/src/features/editor/decision-table/useTableEditor.ts) | 对话框里的暂存表格：reducer 给每行一个自增的身份，增删移动行时格子的编辑器不串行 | [decision-table-editor.spec.ts](../frontend/tests/unit/decision-table-editor.spec.ts) |
 
 ### `features/editor/settings/`：规则设置
 
@@ -757,6 +772,8 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 
 | 文件 | 职责 | 单元测试 |
 | --- | --- | --- |
+| [decisionTables.ts](../frontend/src/domain/decisionTables.ts) | 决策表：条件格子的语法（值、比较、区间、列表、not、`-`）和数字按值比较；离开格子时给纯文本加引号，粘贴表格软件内容时的换算；行列的增删移动、上限和名字规则 | [decision-tables.spec.ts](../frontend/tests/unit/decision-tables.spec.ts) |
+| [decisionTableCheck.ts](../frontend/src/domain/decisionTableCheck.ts) | 表格检查：把每列的取值切成测试能区分的片段，精确找出永远匹配不到的行、会同时匹配的行和没有行匹配的值，有工作量上限 | [decision-table-check.spec.ts](../frontend/tests/unit/decision-table-check.spec.ts) |
 | [definitionEchoes.ts](../frontend/src/domain/definitionEchoes.ts) | 区分服务器回显（键序、显式 null、数字写法、缺坐标）和真实改动，尽量保留本地对象 | [definition-echoes.spec.ts](../frontend/tests/unit/definition-echoes.spec.ts) |
 | [draftHistory.ts](../frontend/src/domain/draftHistory.ts) | 撤销/重做的草稿历史：每次修改记一步，同一种修改（同一节点的同一字段、拖动同一批卡片）一秒内连续发生合成一步；最多 100 步 | [draft-history.spec.ts](../frontend/tests/unit/draft-history.spec.ts) |
 | [executionInputs.ts](../frontend/src/domain/executionInputs.ts) | 测试输入：按默认值生成示例 JSON，解析输入缓冲区，读写单个输入（inputEntry、withInputEntry：不传、null 或值），生成 cURL 命令 | [document-state.spec.ts](../frontend/tests/unit/document-state.spec.ts)、[execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[input-buffer.spec.ts](../frontend/tests/unit/input-buffer.spec.ts) |
@@ -770,7 +787,7 @@ React Flow 只在对象变化时重画。[`flowNodes`](../frontend/src/features/
 | [json.ts](../frontend/src/domain/json.ts) | 无损 JSON 编解码：double 保不住的数字存成 DecimalNumber，按原文写回 | [definition-echoes.spec.ts](../frontend/tests/unit/definition-echoes.spec.ts)、[document-state.spec.ts](../frontend/tests/unit/document-state.spec.ts)、[execution.spec.ts](../frontend/tests/unit/execution.spec.ts)、[formula-calls.spec.ts](../frontend/tests/unit/formula-calls.spec.ts)、[input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[json.spec.ts](../frontend/tests/unit/json.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts)、[source-buffers.spec.ts](../frontend/tests/unit/source-buffers.spec.ts) |
 | [formulaReferences.ts](../frontend/src/domain/formulaReferences.ts) | `@id:version` 引用的唯一语法出处：由 resourceIds 的 ID 语法和服务器的版本语法组成，版本上限是 int；expressionSymbols、arcLanguage、useFormulaSupport、formulaCalls 和路由都从这里读 | [formula-references.spec.ts](../frontend/tests/unit/formula-references.spec.ts) |
 | [limits.ts](../frontend/src/domain/limits.ts) | 后端 Limits.java 的镜像：节点、连线、参数、$OBJECT 字段数、JSON 指针长度、发布说明长度等上限，以及“还能不能再加”；规则名称/描述的校验（只含不换行空格或全角空格等 Unicode 空白的名称同样拒绝）；JSON 指针字段的规则（sourcePointerProblem） | [limits.spec.ts](../frontend/tests/unit/limits.spec.ts) |
-| [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) | 七种节点的描述表（SWITCH 在界面上就是带多个分支的 Condition，不在添加菜单里）：出口、是否存结果、能否被连入、允许的属性、新建默认值、卡片摘要；`entryInputNode` 找服务器当作入口的 Input 节点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
+| [nodeKinds.ts](../frontend/src/domain/nodeKinds.ts) | 八种节点的描述表（SWITCH 在界面上就是带多个分支的 Condition，不在添加菜单里）：出口、是否存结果、能否被连入、允许的属性、新建默认值、卡片摘要；`entryInputNode` 找服务器当作入口的 Input 节点 | [canvas.spec.ts](../frontend/tests/unit/canvas.spec.ts)、[graph-nodes.spec.ts](../frontend/tests/unit/graph-nodes.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [nodePorts.ts](../frontend/src/domain/nodePorts.ts) | 连接句柄的唯一出处：按节点类型算出口端口（ID、标签、位置、兜底），以及按显示方向的卡片宽度和最小高度 | [branches.spec.ts](../frontend/tests/unit/branches.spec.ts)、[definition-echoes.spec.ts](../frontend/tests/unit/definition-echoes.spec.ts)、[node-kinds.spec.ts](../frontend/tests/unit/node-kinds.spec.ts) |
 | [numericDefaults.ts](../frontend/src/domain/numericDefaults.ts) | 解析 NUMBER 默认值并保留写法的位数；超出服务器精度就拒绝 | [input-defaults.spec.ts](../frontend/tests/unit/input-defaults.spec.ts)、[numeric-defaults.spec.ts](../frontend/tests/unit/numeric-defaults.spec.ts) |
 | [outputNames.ts](../frontend/src/domain/outputNames.ts) | 多个 Output 时每个结果字段的名字：outputName → 变量名 → 节点 ID |  |
